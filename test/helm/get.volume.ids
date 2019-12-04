@@ -1,0 +1,5 @@
+#/bin/bash
+ids=$(kubectl describe persistentvolume -n test | grep VolumeHandle | awk ' { print $2; }')
+echo ids $ids
+ids=$(echo $ids | tr ' ' ',' )
+echo ids $ids

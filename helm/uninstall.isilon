@@ -1,0 +1,8 @@
+#!/bin/bash
+helm delete --purge isilon
+sleep 10
+kubectl get pods -n isilon
+kubectl get volumesnapshotclass | grep isilon-snapclass --quiet
+if [ $? -eq 0 ];
+    then kubectl delete volumesnapshotclass isilon-snapclass
+fi

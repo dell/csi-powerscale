@@ -1,0 +1,52 @@
+#/bin/bash
+# Verify the kubernetes installation has the feature gates needed.
+sh ./verify.kubernetes
+rc=$?
+if [ $rc -ne 0 ] ; 
+	then echo "******************************************************************************************************"
+             echo "Warning: Kubernetes --feature-gates not correctly configured or mount not installed... it may not work"
+	     echo "******************************************************************************************************"
+             sleep 5
+fi
+# Make sure the isilon-cred has already been established
+kubectl get secrets -n isilon | grep isilon-cred --quiet
+if [ $? -ne 0 ];
+    then echo "*** YOU MUST PROVIDE Isilon credentials in a Kubernetes secret- see secret.yaml template ***"
+    exit 2
+fi
+
+# Check if isilon-certs exists. If not, then create it
+kubectl get secrets -n isilon | grep isilon-certs --quiet
+if [ $? -ne 0 ];
+    then echo "*** Couldn't find isilon-certs. Creating an empty secret. Delete it and re-create it if you want to validate OneFS API server's certificates ***"
+    kubectl create -f ./emptysecret.yaml
+fi
+
+# Check for required CustomResourceDefinitions
+kubectl get customresourcedefinitions | grep csidrivers --quiet
+if [ $? -ne 0 ];
+    then echo "installing csidriver CRD"; kubectl create -f csidriver.yaml
+fi
+kubectl get customresourcedefinitions | grep nodeinfo --quiet
+if [ $? -ne 0 ];
+    then echo "installing nodeinfo CRD"; kubectl create -f nodeinfo.yaml
+fi
+helm install --values myvalues.yaml --name isilon --namespace isilon ./csi-isilon
+sleep 10
+kubectl get pods --namespace isilon
+sleep 5
+kubectl get pods --namespace isilon
+sleep 5
+kubectl get pods --namespace isilon
+echo "CSIDrivers:"
+kubectl get csidrivers
+echo "CSINodeInfos:"
+kubectl get csinodeinfos
+echo "StorageClasses:"
+kubectl get storageclass
+kubectl get volumesnapshotclass | grep isilon-snapclass --quiet
+if [ $? -ne 0 ];
+    then echo "installing volumesnapshotclass"; kubectl create -f volumesnapshotclass.yaml
+fi
+echo "VolumeSnapshotClasses:"
+kubectl get volumesnapshotclass

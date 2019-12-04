@@ -1,0 +1,50 @@
+{
+  "description": "",
+  "devices": [
+    {
+      "devid": 1,
+      "guid": "000e1ea5825065e0e65c231d37b8ab381ab7",
+      "is_up": true,
+      "lnn": 1
+    },
+    {
+      "devid": 2,
+      "guid": "000e1ea577400ee7e65c401ce161d195da97",
+      "is_up": true,
+      "lnn": 2
+    },
+    {
+      "devid": 3,
+      "guid": "000e1ea577302ce6e65c4a1fe30e4d5cc72a",
+      "is_up": true,
+      "lnn": 3
+    }
+  ],
+  "encoding": "utf-8",
+  "guid": "000e1ea582501ce1e65c8e123920ccb186fe",
+  "has_quorum": true,
+  "is_compliance": false,
+  "is_virtual": false,
+  "is_vonefs": false,
+  "join_mode": "Manual",
+  "local_devid": 1,
+  "local_lnn": 1,
+  "local_serial": "SX410-301543-0031",
+  "name": "PIE-IsilonX",
+  "onefs_version": {
+    "build": "B_8_2_0_0_009(RELEASE)",
+    "copyright": "Copyright (c) 2001-2016 EMC Corporation. All Rights Reserved.",
+    "reldate": 1200019,
+    "release": "v8.2.0.0",
+    "revision": "577024045854228489",
+    "type": "Isilon OneFS",
+    "version": "Isilon OneFS v8.2.0.0 B_8_2_0_0_009(RELEASE): 0x802005000000009:Mon May  6 17:10:51 PDT 2019    root@sea-build11-01:/b/mnt/obj/b/mnt/src/amd64.amd64/sys/IQ.amd64.release   FreeBSD clang version 3.9.1 (tags/RELEASE_391/final 289601) (based on LLVM 3.9.1)"
+  },
+  "timezone": {
+    "abbreviation": "EDT",
+    "custom": "",
+    "name": "Eastern Time Zone",
+    "path": "America/New_York"
+  },
+  "upgrade_type": null
+}

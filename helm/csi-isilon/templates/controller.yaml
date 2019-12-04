@@ -1,0 +1,180 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-controller
+  namespace: {{ .Release.Namespace }}
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Name }}-controller
+rules:
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete", "update"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["csi.storage.k8s.io"]
+    resources: ["csinodeinfos"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csinodes"]
+    verbs: ["get", "list", "watch", "update"]
+# below for snapshotter
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents"]
+    verbs: ["create", "get", "list", "watch", "update", "delete"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots/status"]
+    verbs: ["update"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["create", "list", "watch", "delete"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Name }}-controller
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-controller
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ .Release.Name }}-controller
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: StatefulSet
+apiVersion: apps/v1beta1
+metadata:
+  name: {{ .Release.Name }}-controller
+  namespace: {{ .Release.Namespace }}
+spec:
+  serviceName: {{ .Release.Name }}-controller
+  replicas: {{ required "Must provide the number of controller instances to create." .Values.controllerCount }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-controller
+    spec:
+      serviceAccount: {{ .Release.Name }}-controller
+      containers:
+        - name: attacher
+          image: {{ required "Must provide the CSI attacher container image." .Values.images.attacher }}
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--v=5"
+          env:
+            - name: ADDRESS
+              value: /var/run/csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
+        - name: provisioner
+          image: {{ required "Must provide the CSI provisioner container image." .Values.images.provisioner }}
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--volume-name-prefix={{ required "Must provide a value to prefix to driver created volume names" .Values.volumeNamePrefix }}"
+            - "--volume-name-uuid-length=10"
+            - "--worker-threads=5"
+            - "--timeout=60s"
+            - "--v=5"
+          env:
+            - name: ADDRESS
+              value: /var/run/csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
+        - name: snapshotter
+          #image: quay.io/k8scsi/csi-snapshotter:v1.0.0
+          image: {{ required "Must provide the CSI snapshotter container image." .Values.images.snapshotter }}
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--connection-timeout=15s"
+            - "--v=5"
+          env:
+            - name: ADDRESS
+              value: /var/run/csi/csi.sock
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
+        - name: driver
+          image: {{ required "Must provide the Isilon driver container image." .Values.images.driver }}
+          imagePullPolicy: Always
+          command: [ "/csi-isilon" ]
+          env:
+            - name: CSI_ENDPOINT
+              value: /var/run/csi/csi.sock
+            - name: X_CSI_MODE
+              value: controller
+            - name: X_CSI_DEBUG
+              value: "{{ .Values.enableDebug }}"
+            - name: X_CSI_VERBOSE
+              value: "{{ .Values.verbose }}"
+            - name: X_CSI_ISI_ENDPOINT
+              value: {{ required "Must provide an Isilon REST API gateway HTTPS endpoint." .Values.isiIP }}
+            - name: X_CSI_ISI_PORT
+              value: "{{ .Values.isiPort }}"
+            - name: X_CSI_ISI_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-creds
+                  key: username
+            - name: X_CSI_ISI_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-creds
+                  key: password
+            - name: X_CSI_ISI_AUTOPROBE
+              value: "{{ .Values.autoProbe }}"
+            - name: X_CSI_ISI_QUOTA_ENABLED
+              value: "{{ .Values.enableQuota }}"
+            - name: X_CSI_ISI_INSECURE
+              value: "{{ .Values.isiInsecure }}"
+            - name: X_CSI_ISI_ACCESS_ZONE
+              value: {{ .Values.isiAccessZone }}
+            - name: X_CSI_ISI_PATH
+              value: {{ .Values.isiPath }}
+            - name: X_CSI_ISILON_NO_PROBE_ON_START
+              value: "{{ .Values.noProbeOnStart }}"    
+            - name: X_CSI_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: SSL_CERT_DIR
+              value: /certs                   
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
+            - name: certs
+              mountPath: /certs
+              readOnly: true 
+      volumes:
+        - name: socket-dir
+          emptyDir:
+        - name: certs
+          secret:
+              secretName: {{ .Release.Name }}-certs    

@@ -1,0 +1,8 @@
+{
+  "errors": [
+    {
+      "code": "AEC_BAD_REQUEST",
+      "message": "Invalid resume token"
+    }
+  ]
+}

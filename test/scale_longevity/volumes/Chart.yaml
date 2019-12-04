@@ -1,0 +1,9 @@
+name: volumes
+version: 1.0.0
+appVersion: 1.0.0
+description: |
+  Test CSI Isilon deployment.
+keywords:
+- csi-isilon
+- storage
+engine: gotpl

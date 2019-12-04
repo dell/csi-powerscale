@@ -1,0 +1,17 @@
+{"children":[{
+    "name" : "DELLEMC_UnityFileSra_v6.0.1.85.tar",
+    "size" : 665332736
+}
+,{
+    "name" : "t1.txt",
+    "size" : 138
+}
+,{
+    "name" : "dir1",
+    "size" : 24
+}
+,{
+    "name" : "t2.txt",
+    "size" : 161
+}
+]}

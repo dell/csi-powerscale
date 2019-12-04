@@ -1,0 +1,16 @@
+{
+  "days_to_expiry": 71,
+  "expiration": "2019-10-14",
+  "expired_alert": false,
+  "expiring_alert": false,
+  "id": "SMARTQUOTAS",
+  "name": "SMARTQUOTAS",
+  "status": "Evaluation",
+  "tiers": [
+    {
+      "licensed_node_count": 3,
+      "tier": "NONINF",
+      "used_node_count": 3
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ required "name required " .Values.name | quote }}
+spec:
+  selector:
+    matchLabels:
+      app: csi-test
+  serviceName: csi-test
+  replicas: {{ required "replicas required" .Values.replicas }}
+  podManagementPolicy: "Parallel"
+  template:
+    metadata:
+      labels:
+        app: csi-test
+    spec:
+      containers:
+        - name: test
+          image: docker.io/centos:latest
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            {{ range $i, $e := until (int .Values.numberOfVolumes) }}
+            - name: pvol-{{ $i }}
+              mountPath: /data{{ $i }}
+            {{ end }}
+          command: ["/bin/bash"]
+          args: ["-c", "trap 'exit 0' SIGTERM;while true; do sleep 1; done"]
+  volumeClaimTemplates:
+    {{ $storageClass := .Values.storageClass | quote }}
+      {{ range $i, $e := until (int .Values.numberOfVolumes) }}
+      - metadata:
+          name: pvol-{{ $i }}
+        spec:
+          accessModes: [ "ReadWriteOnce" ]
+          storageClassName: {{ required "storageClass required" $storageClass }}
+          resources:
+            requests:
+              storage: 8Gi
+      {{ end }}

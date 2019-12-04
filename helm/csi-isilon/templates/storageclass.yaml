@@ -1,0 +1,14 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ required "Must provide a storage class name." .Values.storageClass.name}}
+  annotations:
+    storageclass.beta.kubernetes.io/is-default-class: {{ .Values.storageClass.isDefault | quote }}
+provisioner: csi-isilon.dellemc.com
+reclaimPolicy: {{ required "Must provide a storage class reclaim policy." .Values.storageClass.reclaimPolicy }}
+parameters:
+  AccessZone: {{ required "Must provide an access zone." .Values.storageClass.accessZone }}
+  IsiPath: {{ required "Must provide an isiPath." .Values.storageClass.isiPath }}
+  # AccessZone groupnet service IP. Update AzServiceIP in values.yaml if different than isiIP.
+  # AzServiceIP: {{ .Values.storageClass.AzServiceIP }}
+  AzServiceIP: {{ required "Must provide an isiIP." .Values.isiIP }}

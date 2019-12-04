@@ -1,0 +1,164 @@
+{
+  "digest": "28d8c4a1844f79544af7d344c7d4c63f",
+  "exports": [
+    {
+      "all_dirs": false,
+      "block_size": 8192,
+      "can_set_time": true,
+      "case_insensitive": false,
+      "case_preserving": true,
+      "chown_restricted": false,
+      "clients": [],
+      "commit_asynchronous": false,
+      "conflicting_paths": [],
+      "description": "",
+      "directory_transfer_size": 131072,
+      "encoding": "DEFAULT",
+      "id": 7,
+      "link_max": 32767,
+      "map_failure": {
+        "enabled": false,
+        "primary_group": {},
+        "secondary_groups": [],
+        "user": {
+          "id": "USER:nobody"
+        }
+      },
+      "map_full": true,
+      "map_lookup_uid": false,
+      "map_non_root": {
+        "enabled": false,
+        "primary_group": {},
+        "secondary_groups": [],
+        "user": {
+          "id": "USER:nobody"
+        }
+      },
+      "map_retry": true,
+      "map_root": {
+        "enabled": true,
+        "primary_group": {},
+        "secondary_groups": [],
+        "user": {
+          "id": "USER:nobody"
+        }
+      },
+      "max_file_size": 9223372036854775807,
+      "name_max_size": 255,
+      "no_truncate": false,
+      "paths": [
+        "/ifs/data/csi_share_1/vscode_export_1",
+        "/ifs/data/csi_share_1/vscode_export_2"
+      ],
+      "read_only": false,
+      "read_only_clients": [],
+      "read_transfer_max_size": 1048576,
+      "read_transfer_multiple": 512,
+      "read_transfer_size": 131072,
+      "read_write_clients": [],
+      "readdirplus": true,
+      "readdirplus_prefetch": 10,
+      "return_32bit_file_ids": false,
+      "root_clients": [],
+      "security_flavors": [
+        "unix"
+      ],
+      "setattr_asynchronous": false,
+      "snapshot": "-",
+      "symlinks": true,
+      "time_delta": 1.000000000000000e-09,
+      "unresolved_clients": [],
+      "write_datasync_action": "DATASYNC",
+      "write_datasync_reply": "DATASYNC",
+      "write_filesync_action": "FILESYNC",
+      "write_filesync_reply": "FILESYNC",
+      "write_transfer_max_size": 1048576,
+      "write_transfer_multiple": 512,
+      "write_transfer_size": 524288,
+      "write_unstable_action": "UNSTABLE",
+      "write_unstable_reply": "UNSTABLE",
+      "zone": "System"
+    },
+    {
+      "all_dirs": false,
+      "block_size": 8192,
+      "can_set_time": true,
+      "case_insensitive": false,
+      "case_preserving": true,
+      "chown_restricted": false,
+      "clients": [
+        "10.247.98.140"
+      ],
+      "commit_asynchronous": false,
+      "conflicting_paths": [],
+      "description": "",
+      "directory_transfer_size": 131072,
+      "encoding": "DEFAULT",
+      "id": 10,
+      "link_max": 32767,
+      "map_failure": {
+        "enabled": false,
+        "primary_group": {},
+        "secondary_groups": [],
+        "user": {
+          "id": "USER:nobody"
+        }
+      },
+      "map_full": true,
+      "map_lookup_uid": false,
+      "map_non_root": {
+        "enabled": false,
+        "primary_group": {},
+        "secondary_groups": [],
+        "user": {
+          "id": "USER:nobody"
+        }
+      },
+      "map_retry": true,
+      "map_root": {
+        "enabled": true,
+        "primary_group": {},
+        "secondary_groups": [],
+        "user": {
+          "id": "USER:nobody"
+        }
+      },
+      "max_file_size": 9223372036854775807,
+      "name_max_size": 255,
+      "no_truncate": false,
+      "paths": [
+        "/ifs/data/csi_share_1/k8s-e89c9d089e"
+      ],
+      "read_only": false,
+      "read_only_clients": [],
+      "read_transfer_max_size": 1048576,
+      "read_transfer_multiple": 512,
+      "read_transfer_size": 131072,
+      "read_write_clients": [],
+      "readdirplus": true,
+      "readdirplus_prefetch": 10,
+      "return_32bit_file_ids": false,
+      "root_clients": [],
+      "security_flavors": [
+        "unix"
+      ],
+      "setattr_asynchronous": false,
+      "snapshot": "-",
+      "symlinks": true,
+      "time_delta": 1.000000000000000e-09,
+      "unresolved_clients": [],
+      "write_datasync_action": "DATASYNC",
+      "write_datasync_reply": "DATASYNC",
+      "write_filesync_action": "FILESYNC",
+      "write_filesync_reply": "FILESYNC",
+      "write_transfer_max_size": 1048576,
+      "write_transfer_multiple": 512,
+      "write_transfer_size": 524288,
+      "write_unstable_action": "UNSTABLE",
+      "write_unstable_reply": "UNSTABLE",
+      "zone": "System"
+    }
+  ],
+  "resume": "1-1-MAAA1-MAAA2-MTEA1-MgAA1-NAAA0-1-MgAA2-aWQA2-MTEA32-MjhkOGM0YTE4NDRmNzk1NDRhZjdkMzQ0YzdkNGM2M2YA1-MQAA",
+  "total": 35
+}

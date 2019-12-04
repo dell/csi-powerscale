@@ -1,0 +1,62 @@
+#!/bin/sh
+
+# Determine the kubernetes version
+kubeversion=$(kubectl version  | grep 'Server Version' | sed -e 's/^.*GitVersion:"//' -e 's/",.*//')
+echo Kubernetes version $kubeversion
+
+# Determine the nodes
+MINION_NODES=$(kubectl get nodes -o wide | grep  -v -e master -e INTERNAL | awk ' { print $6; }')
+MASTER_NODES=$(kubectl get nodes -o wide | awk ' /master/{ print $6; }')
+echo Kubernetes master nodes: $MASTER_NODES
+echo Kubernetes minion nodes: $MINION_NODES
+
+# Variables used for verification
+FEATURE_GATES="VolumeSnapshotDataSource=true KubeletPluginsWatcher=true CSINodeInfo=true CSIDriverRegistry=true"
+MASTER_PROCS="kubelet kube-apiserver kube-scheduler kube-controller-manager"
+MINION_PROCS="kubelet"
+fail=0
+
+echo Verifying the feature gates.
+for node in $MASTER_NODES
+do
+	echo ssh $node ps -ef >.ps.out
+	ssh $node ps -ef >.ps.out
+	for gate in $FEATURE_GATES
+	do
+	#echo checking $node for $gate ...
+		for proc in $MASTER_PROCS
+		do
+		#echo proc $proc
+		count=$(grep $proc .ps.out | grep -c $gate)
+		#echo $node $gate $proc $count
+		[ $count -lt "1" ] && { echo "node $node proc $proc gate $gate failed"; fail=1; }
+		done
+	done
+	ssh $node hash mount  2>/dev/null || { echo >&2 "CSI driver requires mount but it's not installed on $node"; fail=1; }
+done
+
+for node in $MINION_NODES
+do
+	echo ssh $node ps -ef >.ps.out
+	ssh $node ps -ef >.ps.out
+	for gate in $FEATURE_GATES
+	do
+	#echo checking $node for $gate ...
+		for proc in $MINION_PROCS
+		do
+		#echo proc $proc
+		count=$(grep $proc .ps.out | grep -c $gate)
+		#echo $node $gate $proc $count
+		[ $count -lt "1" ] && { echo "node $node proc $proc gate $gate failed"; fail=1; }
+		done
+	done
+	ssh $node hash mount  2>/dev/null || { echo >&2 "CSI driver requires mount but it's not installed on $node"; fail=1; }
+done
+
+if [ $fail -eq 1 ]
+then
+	echo "Verification Failed."
+else
+	echo "Verification Succeded."
+fi
+exit $fail

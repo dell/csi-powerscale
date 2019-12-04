@@ -1,0 +1,8 @@
+{
+  "errors": [
+    {
+      "code": "AEC_NOT_FOUND",
+      "message": "new_snapshot_name snapshot not found"
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+    name: isilontest
+    namespace: {{ .Values.namespace }}
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+    name: isilontest
+    namespace: {{ .Values.namespace }}
+spec:
+    selector:
+        matchLabels:
+          app: isilontest
+    template:
+      metadata:
+        labels:
+          app: isilontest
+      spec:
+        serviceAccount: isilontest
+        hostNetwork: true
+        containers:
+          - name: test
+            image: docker.io/centos:latest
+            command: [ "/bin/sleep", "3600" ]
+            volumeMounts:
+              - mountPath: "/data0"
+                name: pvol0
+              - mountPath: "/data1"
+                name: pvol1
+              - mountPath: "/data2"
+                name: pvol2
+              - mountPath: "/data3"
+                name: pvol3
+              - mountPath: "/data4"
+                name: pvol4
+              - mountPath: "/data5"
+                name: pvol5
+              - mountPath: "/data6"
+                name: pvol6
+        volumes:
+          - name: pvol0
+            persistentVolumeClaim:
+              claimName: pvol0
+          - name: pvol1
+            persistentVolumeClaim:
+              claimName: pvol1
+          - name: pvol2
+            persistentVolumeClaim:
+              claimName: pvol2
+          - name: pvol3
+            persistentVolumeClaim:
+              claimName: pvol3
+          - name: pvol4
+            persistentVolumeClaim:
+              claimName: pvol4
+          - name: pvol5
+            persistentVolumeClaim:
+              claimName: pvol5
+          - name: pvol6
+            persistentVolumeClaim:
+              claimName: pvol6
