@@ -1,0 +1,140 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvol0
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: isilon
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvol1
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: isilon
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvol2
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: isilon
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvol3
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: isilon
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvol4
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: isilon
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvol5
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: isilon
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvol6
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: isilon
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvol7
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: isilon
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvol8
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: isilon
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvol9
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: isilon
+---

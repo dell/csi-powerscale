@@ -1,0 +1,4 @@
+name: scaleStatefulSet
+replicas: 1
+storageClass: default
+numberOfVolumes: 5

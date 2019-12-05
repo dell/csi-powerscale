@@ -1,0 +1,15 @@
+name: csi-isilon
+version: 1.0.0
+appVersion: 1.0.0
+description: |
+  Isilon CSI (Container Storage Interface) driver Kubernetes
+  integration. This chart includes everything required to provision via CSI as
+  well as an Isilon StorageClass.
+keywords:
+- csi
+- storage
+sources:
+- https://github.com/dell/csi-isilon
+maintainers:
+- name: DellEMC
+engine: gotpl

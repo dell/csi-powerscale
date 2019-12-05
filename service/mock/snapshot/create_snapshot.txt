@@ -1,0 +1,8 @@
+{
+"created" : 1567491928,
+"id" : 34,
+"name" : "create_Snapshot_name",
+"path" : "/ifs/data/csi-isilon/volume2",
+"size" : 4096,
+"state" : "active"
+}

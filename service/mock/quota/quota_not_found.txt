@@ -1,0 +1,8 @@
+{
+  "errors": [
+    {
+      "code": "AEC_NOT_FOUND",
+      "message": "Failed to fetch quota domain record: No such file or directory"
+    }
+  ]
+}

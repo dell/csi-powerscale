@@ -1,0 +1,22 @@
+{
+"snapshots" :
+[
+
+{
+"created" : 1567061367,
+"expires" : null,
+"has_locks" : false,
+"id" : 3,
+"name" : "existent_comp_snapshot_name",
+"path" : "/ifs/data/csi-isilon/volume2",
+"pct_filesystem" : 8.106093574156148e-09,
+"pct_reserve" : 0.0,
+"schedule" : null,
+"shadow_bytes" : 0,
+"size" : 8192,
+"state" : "active",
+"target_id" : null,
+"target_name" : null
+}
+]
+}

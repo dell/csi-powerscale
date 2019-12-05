@@ -1,0 +1,17 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvc-2
+  namespace: test
+spec:
+  accessModes:
+  - ReadOnlyMany
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: isilon
+  dataSource:
+    kind: PersistentVolumeClaim
+    name: pvc-1
+    apiGroup: ""

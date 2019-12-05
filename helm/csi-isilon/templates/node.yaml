@@ -1,0 +1,177 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-node
+  namespace: {{ .Release.Namespace }}
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Name }}-node
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["create", "delete", "get", "list", "watch", "update"]
+  - apiGroups: [""]
+    resources: ["persistentvolumesclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments"]
+    verbs: ["get", "list", "watch", "update"]
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Name }}-node
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-node
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ .Release.Name }}-node
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: DaemonSet
+apiVersion: apps/v1beta2
+metadata:
+  name: {{ .Release.Name }}-node
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-node
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-node
+    spec:
+      serviceAccount: {{ .Release.Name }}-node
+      hostNetwork: true
+      containers:  
+        - name: driver
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+          image: {{ required "Must provide the Isilon driver container image." .Values.images.driver }}
+          imagePullPolicy: Always
+          command: [ "/csi-isilon" ]
+          env:
+            - name: CSI_ENDPOINT
+              value: /var/lib/kubelet/plugins/csi-isilon/csi_sock
+            - name: X_CSI_MODE
+              value: node
+            - name: X_CSI_DEBUG
+              value: "{{ .Values.enableDebug }}"
+            - name: X_CSI_ISI_INSECURE
+              value: "{{ .Values.isiInsecure }}"                
+            - name: X_CSI_VERBOSE
+              value: "{{ .Values.verbose }}"              
+            - name: X_CSI_PRIVATE_MOUNT_DIR
+              value: "/var/lib/kubelet/plugins/csi-isilon/disks"
+            - name: X_CSI_ISI_ENDPOINT
+              value: {{ required "Must provide an Isilon REST API gateway HTTPS endpoint." .Values.isiIP }}   
+            - name: X_CSI_ISI_PORT
+              value: "{{ .Values.isiPort }}"
+            - name: X_CSI_ISI_PATH
+              value: {{ .Values.isiPath }}                
+            - name: X_CSI_ISILON_NO_PROBE_ON_START
+              value: "{{ .Values.noProbeOnStart }}"  
+            - name: X_CSI_ISILON_NFS_V3
+              value: "{{ .Values.nfsV3 }}"                        
+            - name: X_CSI_ISI_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-creds
+                  key: username
+            - name: X_CSI_ISI_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-creds
+                  key: password
+            - name: X_CSI_ISI_AUTOPROBE
+              value: "{{ .Values.autoProbe }}"       
+            - name: X_CSI_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName 
+            - name: X_CSI_NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP       
+            - name: SSL_CERT_DIR
+              value: /certs                             
+          volumeMounts:
+            - name: driver-path
+              mountPath: /var/lib/kubelet/plugins/csi-isilon
+            - name: volumedevices-path
+              mountPath: /var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices
+            - name: pods-path
+              mountPath: /var/lib/kubelet/pods
+              mountPropagation: "Bidirectional"
+            - name: dev
+              mountPath: /dev   
+            - name: certs
+              mountPath: /certs
+              readOnly: true      
+        - name: registrar
+          image: {{ required "Must provide the CSI node registrar container image." .Values.images.registrar }}
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+            #- --mode=node-register
+            #- --driver-requires-attachment=true
+            #- --pod-info-mount-version=v1
+            - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-isilon/csi_sock
+          env:
+            - name: ADDRESS
+              value: /csi/csi_sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: registration-dir
+              mountPath: /registration
+            - name: driver-path
+              mountPath: /csi
+      volumes:
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry/
+            type: DirectoryOrCreate
+        - name: driver-path
+          hostPath:
+            path: /var/lib/kubelet/plugins/csi-isilon
+            type: DirectoryOrCreate
+        - name: volumedevices-path
+          hostPath:
+            path: /var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices
+            type: DirectoryOrCreate
+        - name: pods-path
+          hostPath:
+            path: /var/lib/kubelet/pods
+            type: Directory
+        - name: dev
+          hostPath:
+            path: /dev
+            type: Directory
+        - name: certs
+          secret:
+              secretName: {{ .Release.Name }}-certs    
