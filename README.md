@@ -4,8 +4,12 @@
 ## Description
 CSI Driver for Dell EMC Isilon is a Container Storage Interface ([CSI](https://github.com/container-storage-interface/spec)) driver that provides support for provisioning persistent storage using Dell EMC Isilon.
 
-It supports CSI specification version 1.1.
-
+CSI driver for Dell EMC Isilon  
+    * supports CSI specification version 1.1  
+    * support for Kubernetes 1.14  
+    * supports Red Hat Enterprise Linux 7.6 host operating system  
+    * supports Isilon OneFS versions 8.1 and 8.2  
+  
 The project may be compiled as a stand-alone binary using Golang that, when run, provides a valid CSI endpoint. It may also be built as a Golang plug-in in order to extend the functionality of other programs.
 
 ## Building
