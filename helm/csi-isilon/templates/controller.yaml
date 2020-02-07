@@ -67,13 +67,16 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ---
 kind: StatefulSet
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 metadata:
   name: {{ .Release.Name }}-controller
   namespace: {{ .Release.Namespace }}
 spec:
   serviceName: {{ .Release.Name }}-controller
   replicas: {{ required "Must provide the number of controller instances to create." .Values.controllerCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-controller
   template:
     metadata:
       labels:
