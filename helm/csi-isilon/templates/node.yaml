@@ -46,7 +46,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ---
 kind: DaemonSet
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 metadata:
   name: {{ .Release.Name }}-node
   namespace: {{ .Release.Namespace }}

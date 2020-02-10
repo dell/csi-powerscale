@@ -31,7 +31,7 @@ kubectl get customresourcedefinitions | grep nodeinfo --quiet
 if [ $? -ne 0 ];
     then echo "installing nodeinfo CRD"; kubectl create -f nodeinfo.yaml
 fi
-helm install --values myvalues.yaml --name isilon --namespace isilon ./csi-isilon
+helm install isilon --values myvalues.yaml --namespace isilon ./csi-isilon
 sleep 10
 kubectl get pods --namespace isilon
 sleep 5

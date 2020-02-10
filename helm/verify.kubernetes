@@ -5,8 +5,8 @@ kubeversion=$(kubectl version  | grep 'Server Version' | sed -e 's/^.*GitVersion
 echo Kubernetes version $kubeversion
 
 # Determine the nodes
-MINION_NODES=$(kubectl get nodes -o wide | grep  -v -e master -e INTERNAL | awk ' { print $6; }')
-MASTER_NODES=$(kubectl get nodes -o wide | awk ' /master/{ print $6; }')
+MINION_NODES=$(kubectl get nodes -o wide | grep  -v -e master -e INTERNAL -e controlplane | awk ' { print $6; }')
+MASTER_NODES=$(kubectl get nodes -o wide | awk ' /master|controlplane/{ print $6; }')
 echo Kubernetes master nodes: $MASTER_NODES
 echo Kubernetes minion nodes: $MINION_NODES
 

@@ -9,6 +9,8 @@ reclaimPolicy: {{ required "Must provide a storage class reclaim policy." .Value
 parameters:
   AccessZone: {{ required "Must provide an access zone." .Values.storageClass.accessZone }}
   IsiPath: {{ required "Must provide an isiPath." .Values.storageClass.isiPath }}
-  # AccessZone groupnet service IP. Update AzServiceIP in values.yaml if different than isiIP.
-  # AzServiceIP: {{ .Values.storageClass.AzServiceIP }}
-  AzServiceIP: {{ required "Must provide an isiIP." .Values.isiIP }}
+  {{ if .Values.storageClass.AzServiceIP }}
+  AzServiceIP: {{ .Values.storageClass.AzServiceIP }}
+  {{ else }}
+  AzServiceIP: {{ required "A valid .Values.isiIP is required when .Values.storageClass.AzServiceIP is not defined." .Values.isiIP }}
+  {{ end }}
