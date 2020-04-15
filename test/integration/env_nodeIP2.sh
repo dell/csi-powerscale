@@ -11,8 +11,9 @@ export X_CSI_ISI_QUOTA_ENABLED="false"
 export X_CSI_NODE_NAME=`hostname`
 export X_CSI_NODE_IP="1.1.1.2"
 export X_CSI_ISI_INSECURE="true"
-export X_CSI_ISI_SYSTEMNAME=""
-export X_CSI_MODE="controller"
+export X_CSI_ISI_AUTOPROBE="false"
+export X_CSI_ISILON_NO_PROBE_ON_START="true"
+export X_CSI_MODE=""
 
 # Variables for using tests
 export CSI_ENDPOINT=`pwd`/unix_sock

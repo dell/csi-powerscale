@@ -11,7 +11,7 @@ echo Kubernetes master nodes: $MASTER_NODES
 echo Kubernetes minion nodes: $MINION_NODES
 
 # Variables used for verification
-FEATURE_GATES="VolumeSnapshotDataSource=true KubeletPluginsWatcher=true CSINodeInfo=true CSIDriverRegistry=true"
+FEATURE_GATES="VolumeSnapshotDataSource=true CSINodeInfo=true CSIDriverRegistry=true"
 MASTER_PROCS="kubelet kube-apiserver kube-scheduler kube-controller-manager"
 MINION_PROCS="kubelet"
 fail=0

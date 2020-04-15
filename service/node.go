@@ -18,13 +18,13 @@ package service
 import (
 	"errors"
 	"fmt"
-
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/common/utils"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"strconv"
 )
 
 func (s *service) NodeExpandVolume(
@@ -59,16 +59,18 @@ func (s *service) NodeStageVolume(
 		return nil, status.Errorf(codes.InvalidArgument, "error parsing access mode : '%v'", err)
 	}
 
+	addClientFunc := s.getAddClientFunc(req)
+
 	switch *am {
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER:
-		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, clientIP, s.isiSvc.AddExportClientByIDWithZone)
+		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, clientIP, addClientFunc)
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
 		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, clientIP, s.isiSvc.AddExportReadOnlyClientByIDWithZone)
 	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
 		if s.isiSvc.OtherClientsAlreadyAdded(exportID, accessZone, clientIP) {
 			return nil, status.Errorf(codes.FailedPrecondition, "export '%d' in access zone '%s' already has other clients added to it, and the access mode is SINGLE_NODE_WRITER, thus the request fails", exportID, accessZone)
 		}
-		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, clientIP, s.isiSvc.AddExportClientByIDWithZone)
+		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, clientIP, addClientFunc)
 	default:
 		return nil, status.Errorf(codes.InvalidArgument, "unsupported access mode: '%s'", am.String())
 	}
@@ -78,6 +80,25 @@ func (s *service) NodeStageVolume(
 	}
 
 	return &csi.NodeStageVolumeResponse{}, nil
+}
+
+func (s *service) getAddClientFunc(req *csi.NodeStageVolumeRequest) (addClientFunc func(exportID int, accessZone, clientIP string) error) {
+	rootClientEnabled := false
+	volumeContext := req.GetVolumeContext()
+	if volumeContext != nil {
+		utils.LogMap("VolumeContext", volumeContext)
+		rootClientEnabledStr := volumeContext[RootClientEnabledParam]
+		val, err := strconv.ParseBool(rootClientEnabledStr)
+		if err == nil {
+			rootClientEnabled = val
+		}
+	}
+
+	if rootClientEnabled {
+		return s.isiSvc.AddExportRootClientByIDWithZone
+	}
+
+	return s.isiSvc.AddExportClientByIDWithZone
 }
 
 func (s *service) NodeUnstageVolume(

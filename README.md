@@ -17,7 +17,7 @@ The project may be compiled as a stand-alone binary using Golang that, when run,
 This project is a Go module (see golang.org Module information for explanation).
 The dependencies for this project are listed in the go.mod file.
 
-To build the source, execute `make clean build`.
+To build the source, execute `make clean build`. Before building the source, three variables called REPO_NAME, IMAGE_NAME, and IMAGE_TAG should be defined. For example, run `export REPO_NAME=` in Linux to define the variable REPO_NAME. The image URL will be combined as $(REPO_NAME)/$(IMAGE_NAME):$(IMAGE_TAG).
 
 To run unit tests, execute `make unit-test`.
 
