@@ -197,6 +197,7 @@ func (f *feature) getService() *service {
 	opts.Path = "/ifs/data/csi-isilon"
 	opts.Insecure = true
 	opts.DebugEnabled = true
+	opts.Verbose = 1
 	svc.opts = opts
 	svc.mode = "controller"
 	f.service = svc
@@ -1460,6 +1461,7 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	opts.Path = "/ifs/data/csi-isilon"
 	opts.Insecure = true
 	opts.DebugEnabled = true
+	opts.Verbose = 1
 	if inducedErrors.autoProbeNotEnabled {
 		opts.AutoProbe = false
 	} else {

@@ -65,7 +65,7 @@ type Opts struct {
 	AutoProbe    bool
 	QuotaEnabled bool
 	DebugEnabled bool
-	Verbose      bool
+	Verbose      uint
 	NfsV3        bool
 }
 
@@ -137,7 +137,7 @@ func (s *service) initializeService(ctx context.Context) {
 	opts.Insecure = utils.ParseBooleanFromContext(ctx, constants.EnvInsecure)
 	opts.AutoProbe = utils.ParseBooleanFromContext(ctx, constants.EnvAutoProbe)
 	opts.DebugEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvDebug)
-	opts.Verbose = utils.ParseBooleanFromContext(ctx, constants.EnvVerbose)
+	opts.Verbose = utils.ParseUintFromContext(ctx, constants.EnvVerbose)
 	opts.NfsV3 = utils.ParseBooleanFromContext(ctx, constants.EnvNfsV3)
 
 	s.opts = opts

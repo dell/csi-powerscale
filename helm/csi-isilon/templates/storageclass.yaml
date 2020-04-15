@@ -11,4 +11,16 @@ parameters:
   IsiPath: {{ required "Must provide an isiPath." .Values.storageClass.isiPath }}
   # AccessZone groupnet service IP. Update AzServiceIP in values.yaml if different than isiIP.
   # AzServiceIP: {{ .Values.storageClass.AzServiceIP }}
-  AzServiceIP: {{ required "Must provide an isiIP." .Values.isiIP }}
+  {{ if .Values.storageClass.AzServiceIP }}
+  AzServiceIP: {{ .Values.storageClass.AzServiceIP }}
+  {{ else }}
+  AzServiceIP: {{ required "A valid .Values.isiIP is required when .Values.storageClass.AzServiceIP is not defined." .Values.isiIP }}
+  {{ end }}
+  # When a PVC is being created, it takes the storage class' value of "storageclass.rootClientEnabled", 
+  # which  determines, when a node mounts the PVC, in NodeStageVolume, whether to add the k8s node to 
+  # the "Root clients" field (when true) or "Clients" field (when false) of the NFS export 
+  {{ if .Values.storageClass.rootClientEnabled }}
+  RootClientEnabled: {{ .Values.storageClass.rootClientEnabled | quote }}
+  {{ else }}
+  RootClientEnabled: "false"
+  {{ end }}

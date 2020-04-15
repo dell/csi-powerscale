@@ -7,10 +7,10 @@ else
 endif
 
 docker:
-	docker build -t "artifactory-sio.isus.emc.com:8129/csi-isilon:v1.0.0$(RELNOTE)" .
+	docker build -t "$(REPO_NAME)/$(IMAGE_NAME):$(IMAGE_TAG)$(RELNOTE)" .
 
 push:
-	docker push "artifactory-sio.isus.emc.com:8129/csi-isilon:v1.0.0$(RELNOTE)"
+	docker push "$(REPO_NAME)/$(IMAGE_NAME):$(IMAGE_TAG)$(RELNOTE)"
 
 version:
 	@echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) BUILD ${BUILD} TYPE ${TYPE} RELNOTE $(RELNOTE) SEMVER $(SEMVER)"

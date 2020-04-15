@@ -225,7 +225,7 @@ func createIsilonClient() (*isi.Client, error) {
 		ctx,
 		"https://"+os.Getenv(constants.EnvEndpoint)+":"+os.Getenv(constants.EnvPort),
 		true,
-		false,
+		1,
 		os.Getenv(constants.EnvUser),
 		"",
 		os.Getenv(constants.EnvPassword),
@@ -488,21 +488,21 @@ func (f *feature) nodeStageVolume(req *csi.NodeStageVolumeRequest) error {
 func (f *feature) checkNodeExistsForOneExport(am *csi.VolumeCapability_AccessMode_Mode, nodeIP string, export isi.Export) error {
 	switch *am {
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER:
-		if utils.IsStringInSlice(nodeIP, *export.Clients) && !utils.IsStringInSlice(nodeIP, *export.ReadWriteClients) && !utils.IsStringInSlice(nodeIP, *export.ReadOnlyClients) {
+		if utils.IsStringInSlice(nodeIP, *export.Clients) && !utils.IsStringInSlice(nodeIP, *export.ReadWriteClients) && !utils.IsStringInSlice(nodeIP, *export.ReadOnlyClients) && !utils.IsStringInSlice(nodeIP, *export.RootClients) {
 			break
 		} else {
 			err := fmt.Errorf("the location of nodeIP '%s' is wrong\n", nodeIP)
 			return err
 		}
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
-		if utils.IsStringInSlice(nodeIP, *export.ReadOnlyClients) && !utils.IsStringInSlice(nodeIP, *export.ReadWriteClients) && !utils.IsStringInSlice(nodeIP, *export.Clients) {
+		if utils.IsStringInSlice(nodeIP, *export.ReadOnlyClients) && !utils.IsStringInSlice(nodeIP, *export.ReadWriteClients) && !utils.IsStringInSlice(nodeIP, *export.Clients) && !utils.IsStringInSlice(nodeIP, *export.RootClients) {
 			break
 		} else {
 			err := fmt.Errorf("the location of nodeIP '%s' is wrong\n", nodeIP)
 			return err
 		}
 	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
-		if len(*export.Clients) == 1 && utils.IsStringInSlice(nodeIP, *export.Clients) && !utils.IsStringInSlice(nodeIP, *export.ReadWriteClients) && !utils.IsStringInSlice(nodeIP, *export.ReadOnlyClients) {
+		if len(*export.Clients) == 1 && utils.IsStringInSlice(nodeIP, *export.Clients) && !utils.IsStringInSlice(nodeIP, *export.ReadWriteClients) && !utils.IsStringInSlice(nodeIP, *export.ReadOnlyClients) && !utils.IsStringInSlice(nodeIP, *export.RootClients) {
 			break
 		} else {
 			err := fmt.Errorf("the location of nodeIP '%s' is wrong\n", nodeIP)
@@ -595,15 +595,15 @@ func (f *feature) checkIsilonClientNotExistsForOneExport(nodeIP string, exportID
 	}
 	fqdn, _ := utils.GetFQDNByIP(nodeIP)
 	if fqdn != "" {
-		isNodeIPInClientFields := utils.IsStringInSlices(nodeIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients)
-		isNodeFqdnInClientFields := utils.IsStringInSlices(fqdn, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients)
+		isNodeIPInClientFields := utils.IsStringInSlices(nodeIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
+		isNodeFqdnInClientFields := utils.IsStringInSlices(fqdn, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 		if isNodeIPInClientFields || isNodeFqdnInClientFields {
 			err := fmt.Errorf("nodeIP '%s' still exists\n", nodeIP)
 			fmt.Print(err)
 			return err
 		}
 	} else {
-		isNodeIPInClientFields := utils.IsStringInSlices(nodeIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients)
+		isNodeIPInClientFields := utils.IsStringInSlices(nodeIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 		if isNodeIPInClientFields {
 			err := fmt.Errorf("nodeIP '%s' still exists\n", nodeIP)
 			fmt.Print(err)

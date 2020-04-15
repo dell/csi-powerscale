@@ -48,6 +48,7 @@ Feature: Isilon CSI interface
      | "volume1"     | 8             | "System"        | "/ifs/data/csi-isilon"    | "none"              | "none"                   |
      | "volume1"     | -1            | "System"        | "/ifs/data/csi-isilon"    | "none"              | "must not be negative"   |
      | ""            | 0             | "System"        | "/ifs/data/csi-isilon"    | "none"              | "name cannot be empty"   |
+     | "volume1"     | 8             | "none"          | "/ifs/data/csi-isilon"    | ""                  | "none"                   |
 
     Scenario Outline: Create volume with different volume and export status and induce server errors
       Given a Isilon service

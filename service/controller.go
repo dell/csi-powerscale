@@ -39,16 +39,18 @@ import (
 
 // constants
 const (
-	errUnknownAccessType       = "unknown access type is not Mount"
-	errUnknownAccessMode       = "unknown or unsupported access mode"
-	errNoSingleNodeReader      = "Single node only reader access mode is not supported"
-	errNoMultiNodeSingleWriter = "Multi node single writer access mode is not supported"
-	MaxRetries                 = 10
-	RetrySleepTime             = 1000 * time.Millisecond
-	AccessZoneParam            = "AccessZone"
-	ExportPathParam            = "Path"
-	IsiPathParam               = "IsiPath"
-	AzServiceIPParam           = "AzServiceIP"
+	errUnknownAccessType          = "unknown access type is not Mount"
+	errUnknownAccessMode          = "unknown or unsupported access mode"
+	errNoSingleNodeReader         = "Single node only reader access mode is not supported"
+	errNoMultiNodeSingleWriter    = "Multi node single writer access mode is not supported"
+	MaxRetries                    = 10
+	RetrySleepTime                = 1000 * time.Millisecond
+	AccessZoneParam               = "AccessZone"
+	ExportPathParam               = "Path"
+	IsiPathParam                  = "IsiPath"
+	AzServiceIPParam              = "AzServiceIP"
+	RootClientEnabledParam        = "RootClientEnabled"
+	RootClientEnabledParamDefault = "false"
 )
 
 // validateVolSize uses the CapacityRange range params to determine what size
@@ -75,14 +77,15 @@ func (s *service) CreateVolume(
 	req *csi.CreateVolumeRequest) (
 	*csi.CreateVolumeResponse, error) {
 	var (
-		accessZone  string
-		isiPath     string
-		path        string
-		azServiceIP string
-		quotaID     string
-		exportID    int
-		foundVol    bool
-		export      isi.Export
+		accessZone        string
+		isiPath           string
+		path              string
+		azServiceIP       string
+		rootClientEnabled string
+		quotaID           string
+		exportID          int
+		foundVol          bool
+		export            isi.Export
 	)
 	// auto probe
 	if err := s.autoProbe(ctx); err != nil {
@@ -113,15 +116,35 @@ func (s *service) CreateVolume(
 			isiPath = params[IsiPathParam]
 		}
 	} else {
-		// use the default isiPath if not set in the storage class
+		// use the default isiPath if not setu in the storage class
 		isiPath = s.opts.Path
 	}
 	if _, ok := params[AzServiceIPParam]; ok {
 		azServiceIP = params[AzServiceIPParam]
+		if azServiceIP == "" {
+			// use the endpoint if empty in the storage class
+			azServiceIP = s.opts.Endpoint
+		}
 	} else {
 		// use the endpoint if not set in the storage class
 		azServiceIP = s.opts.Endpoint
 	}
+
+	if val, ok := params[RootClientEnabledParam]; ok {
+		_, err := strconv.ParseBool(val)
+		// use the default if the boolean literal from the storage class is malformed
+		if err != nil {
+			log.WithField(RootClientEnabledParam, val).Debugf(
+				"invalid boolean value for '%s', defaulting to 'false'", RootClientEnabledParam)
+
+			rootClientEnabled = RootClientEnabledParamDefault
+		}
+		rootClientEnabled = val
+	} else {
+		// use the default if not set in the storage class
+		rootClientEnabled = RootClientEnabledParamDefault
+	}
+
 	foundVol = false
 	path = utils.GetPathForVolume(isiPath, req.GetName())
 	// to ensure idempotency, check if the volume still exists.
@@ -149,7 +172,7 @@ func (s *service) CreateVolume(
 		log.Debugf("id of the corresonding nfs export of existing volume '%s' has been resolved to '%d'", req.GetName(), exportID)
 		if exportID != 0 {
 			if foundVol {
-				return s.getCreateVolumeResponse(exportID, req.GetName(), path, export.Zone, sizeInBytes, azServiceIP), nil
+				return s.getCreateVolumeResponse(exportID, req.GetName(), path, export.Zone, sizeInBytes, azServiceIP, rootClientEnabled), nil
 			}
 			// in case the export exists but no related volume (directory)
 			if err = s.isiSvc.UnexportByIDWithZone(exportID, accessZone); err != nil {
@@ -190,7 +213,7 @@ func (s *service) CreateVolume(
 		for i := 0; i < MaxRetries; i++ {
 			if export, _ := s.isiSvc.GetExportByIDWithZone(exportID, accessZone); export != nil {
 				// return the response
-				return s.getCreateVolumeResponse(exportID, req.GetName(), path, accessZone, sizeInBytes, azServiceIP), nil
+				return s.getCreateVolumeResponse(exportID, req.GetName(), path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled), nil
 			}
 			time.Sleep(RetrySleepTime)
 			log.Printf("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
@@ -272,20 +295,21 @@ func (s *service) createVolumeFromSource(
 	return nil
 }
 
-func (s *service) getCreateVolumeResponse(exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP string) *csi.CreateVolumeResponse {
+func (s *service) getCreateVolumeResponse(exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled string) *csi.CreateVolumeResponse {
 	return &csi.CreateVolumeResponse{
-		Volume: s.getCSIVolume(exportID, volName, path, accessZone, sizeInBytes, azServiceIP),
+		Volume: s.getCSIVolume(exportID, volName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled),
 	}
 }
 
-func (s *service) getCSIVolume(exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP string) *csi.Volume {
+func (s *service) getCSIVolume(exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled string) *csi.Volume {
 	// Make the additional volume attributes
 	attributes := map[string]string{
-		"ID":          strconv.Itoa(exportID),
-		"Name":        volName,
-		"Path":        path,
-		"AccessZone":  accessZone,
-		"AzServiceIP": azServiceIP,
+		"ID":                strconv.Itoa(exportID),
+		"Name":              volName,
+		"Path":              path,
+		"AccessZone":        accessZone,
+		"AzServiceIP":       azServiceIP,
+		"RootClientEnabled": rootClientEnabled,
 	}
 	log.Debugf("Attributes '%v'", attributes)
 	vi := &csi.Volume{
@@ -544,7 +568,10 @@ func (s *service) ListVolumes(ctx context.Context,
 		for _, path := range *paths {
 			// TODO get the capacity range, not able to get now
 			volName := utils.GetVolumeNameFromExportPath(path)
-			volume := s.getCSIVolume(export.ID, volName, path, export.Zone, 0, s.opts.Endpoint)
+			// Not able to get "rootClientEnabled", it's read from the volume's storage class
+			// and added to "volumeContext" in CreateVolume, and read in NodeStageVolume.
+			// The value is not relevant here so just pass default value "false" here.
+			volume := s.getCSIVolume(export.ID, volName, path, export.Zone, 0, s.opts.Endpoint, "false")
 			entries[i] = &csi.ListVolumesResponse_Entry{
 				Volume: volume,
 			}

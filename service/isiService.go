@@ -299,14 +299,14 @@ func (svc *isiService) OtherClientsAlreadyAdded(exportID int, accessZone string,
 		return true
 	}
 
-	clientFieldsNotEmpty := len(*export.Clients) > 0 || len(*export.ReadOnlyClients) > 0 || len(*export.ReadWriteClients) > 0
+	clientFieldsNotEmpty := len(*export.Clients) > 0 || len(*export.ReadOnlyClients) > 0 || len(*export.ReadWriteClients) > 0 || len(*export.RootClients) > 0
 
-	isNodeInClientFields := utils.IsStringInSlices(clientIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients)
+	isNodeInClientFields := utils.IsStringInSlices(clientIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 
 	fqdn, _ := utils.GetFQDNByIP(clientIP)
 
 	if fqdn != "" {
-		isNodeInClientFields = isNodeInClientFields || utils.IsStringInSlices(fqdn, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients)
+		isNodeInClientFields = isNodeInClientFields || utils.IsStringInSlices(fqdn, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 	}
 
 	return clientFieldsNotEmpty && !isNodeInClientFields
@@ -343,6 +343,14 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(exportID int
 func (svc *isiService) AddExportClientByIDWithZone(exportID int, accessZone, clientIP string) error {
 	log.Debugf("AddExportClientByID client '%s'", clientIP)
 	if err := svc.client.AddExportClientsByIDWithZone(context.Background(), exportID, accessZone, []string{clientIP}); err != nil {
+		return fmt.Errorf("failed to add client to export id '%d' with access zone '%s' : '%s'", exportID, accessZone, err.Error())
+	}
+	return nil
+}
+
+func (svc *isiService) AddExportRootClientByIDWithZone(exportID int, accessZone, clientIP string) error {
+	log.Debugf("AddExportRootClientByID client '%s'", clientIP)
+	if err := svc.client.AddExportRootClientsByIDWithZone(context.Background(), exportID, accessZone, []string{clientIP}); err != nil {
 		return fmt.Errorf("failed to add client to export id '%d' with access zone '%s' : '%s'", exportID, accessZone, err.Error())
 	}
 	return nil

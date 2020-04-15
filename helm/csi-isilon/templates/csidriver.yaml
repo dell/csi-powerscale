@@ -4,4 +4,4 @@ metadata:
     name: isilon
 spec:
     attachRequired: true
-    podInfoOnMountVersion: "v1"
+    podInfoOnMount: true

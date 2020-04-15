@@ -22,15 +22,6 @@ if [ $? -ne 0 ];
     kubectl create -f ./emptysecret.yaml
 fi
 
-# Check for required CustomResourceDefinitions
-kubectl get customresourcedefinitions | grep csidrivers --quiet
-if [ $? -ne 0 ];
-    then echo "installing csidriver CRD"; kubectl create -f csidriver.yaml
-fi
-kubectl get customresourcedefinitions | grep nodeinfo --quiet
-if [ $? -ne 0 ];
-    then echo "installing nodeinfo CRD"; kubectl create -f nodeinfo.yaml
-fi
 helm install --values myvalues.yaml --name isilon --namespace isilon ./csi-isilon
 sleep 10
 kubectl get pods --namespace isilon
@@ -40,13 +31,43 @@ sleep 5
 kubectl get pods --namespace isilon
 echo "CSIDrivers:"
 kubectl get csidrivers
-echo "CSINodeInfos:"
-kubectl get csinodeinfos
+echo "CSINodes:"
+kubectl get csinodes
 echo "StorageClasses:"
 kubectl get storageclass
-kubectl get volumesnapshotclass | grep isilon-snapclass --quiet
+
+waitOnVolumeSnapshotClass(){
+
+kubectl get customresourcedefinitions | grep volumesnapshotclasses --quiet
+
+RC=$?
+
+if [ $RC -ne 0 ];
+then 
+    echo "waiting for crd VolumeSnapshotClass to be created"  
+
+    start=$(date +%s)
+    
+    while [ $RC -ne 0 ]
+    do
+	    kubectl get customresourcedefinitions 2>&1 | grep volumesnapshotclasses --quiet
+        RC=$?
+	    end=$(date +%s)
+	    seconds=$(( $end - $start ))
+	    if [ $seconds -ge 300 ]; then
+    		echo "crd VolumeSnapshotClass unavaialble after waiting for 5 minutes"
+		break
+  	    fi
+    done    
+    echo "waiting is done, crd VolumeSnapshotClass has been created"
+else 
+    echo "crd VolumeSnapshotClass was already created"
+fi
+}
+
+kubectl get volumesnapshotclass 2>&1 | grep isilon-snapclass --quiet
 if [ $? -ne 0 ];
-    then echo "installing volumesnapshotclass"; kubectl create -f volumesnapshotclass.yaml
+    then waitOnVolumeSnapshotClass; echo "installing volumesnapshotclass instance isilon-snapclass"; kubectl create -f volumesnapshotclass.yaml
 fi
 echo "VolumeSnapshotClasses:"
 kubectl get volumesnapshotclass

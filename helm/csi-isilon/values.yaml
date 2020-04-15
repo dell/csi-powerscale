@@ -20,8 +20,12 @@ controllerCount: 1
 # Indicates whether debug level logs should be logged
 enableDebug: "false"
 
-# Indicates whether the OneFS REST API response should be logged
-verbose: "false"
+# Indicates what content of the OneFS REST API message should be logged in debug level logs
+# Values:
+#   0 - log full content of the HTTP request and response
+#   1 - log without the HTTP response body
+#   2 - log only 1st line of the HTTP request and response
+verbose: 1
 
 # Indicates whether the provisioner should attempt to set (later unset) quota on a newly provisioned volume
 # This requires SmartQuotas to be enabled.
@@ -59,10 +63,15 @@ storageClass:
   #Access Zone service IP if different from isiIP, specify here and refer in storageClass
   #AzServiceIP : 192.168.2.1
 
+  # When a PVC is being created, it takes the storage class' value of "storageclass.rootClientEnabled", 
+  # which  determines, when a node mounts the PVC, in NodeStageVolume, whether to add the k8s node to 
+  # the "Root clients" field (when true) or "Clients" field (when false) of the NFS export 
+  rootClientEnabled: "false"
+
 # IT IS RECOMMENDED YOU DO NOT CHANGE THE IMAGES TO BE DONLOADED.
 images:
   # "images.driver" defines the container images used for the driver container.
-  driver: dellemc/csi-isilon:v1.0.0
+  driver: dellemc/csi-isilon:v1.1.0
 
   # "images.attacher" defines the container images used for the csi attacher
   # container.

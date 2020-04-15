@@ -93,6 +93,20 @@ func ParseBooleanFromContext(ctx context.Context, key string) bool {
 	return false
 }
 
+// ParseUintFromContext parses an environment variable into a uint value. If an error is encountered, default is set to 0, and error is logged
+func ParseUintFromContext(ctx context.Context, key string) uint {
+	if val, ok := csictx.LookupEnv(ctx, key); ok {
+		i, err := strconv.ParseUint(val, 10, 0)
+		if err != nil {
+			log.WithField(key, val).Debugf(
+				"invalid int value for '%s', defaulting to 0", key)
+			return 0
+		}
+		return uint(i)
+	}
+	return 0
+}
+
 // RemoveExistingCSISockFile When the sock file that the gRPC server is going to be listening on already exists, error will be thrown saying the address is already in use, thus remove it first
 func RemoveExistingCSISockFile() error {
 
