@@ -56,6 +56,8 @@ type feature struct {
 	publishVolumeRequest               *csi.ControllerPublishVolumeRequest
 	unpublishVolumeRequest             *csi.ControllerUnpublishVolumeRequest
 	deleteVolumeRequest                *csi.DeleteVolumeRequest
+	controllerExpandVolumeRequest      *csi.ControllerExpandVolumeRequest
+	controllerExpandVolumeResponse     *csi.ControllerExpandVolumeResponse
 	listVolumesRequest                 *csi.ListVolumesRequest
 	listVolumesResponse                *csi.ListVolumesResponse
 	listSnapshotsRequest               *csi.ListSnapshotsRequest
@@ -281,6 +283,9 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call get export related functions in isiService$`, f.iCallGetExportRelatedFunctionsInIsiService)
 	s.Step(`^I call unimplemented functions$`, f.iCallUnimplementedFunctions)
 	s.Step(`^I call init Service object$`, f.iCallInitServiceObject)
+	s.Step(`^I call ControllerExpandVolume "([^"]*)" "(\d+)"$`, f.iCallControllerExpandVolume)
+	s.Step(`^a valid ControllerExpandVolumeResponse is returned$`, f.aValidControllerExpandVolumeResponseIsReturned)
+
 }
 
 // GetPluginInfo
@@ -613,6 +618,8 @@ func (f *feature) iInduceError(errtype string) error {
 		stepHandlersErrors.CreateQuotaError = true
 	case "CreateExportError":
 		stepHandlersErrors.CreateExportError = true
+	case "UpdateQuotaError":
+		stepHandlersErrors.UpdateQuotaError = true
 	case "GetExportInternalError":
 		stepHandlersErrors.GetExportInternalError = true
 	case "VolumeNotExistError":
@@ -707,11 +714,15 @@ func (f *feature) aValidControllerGetCapabilitiesResponseIsReturned() error {
 				count = count + 1
 			case csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS:
 				count = count + 1
+			case csi.ControllerServiceCapability_RPC_CLONE_VOLUME:
+				count = count + 1
+			case csi.ControllerServiceCapability_RPC_EXPAND_VOLUME:
+				count = count + 1
 			default:
 				return fmt.Errorf("received unexpected capability: %v", rpcType)
 			}
 		}
-		if count != 4 /*6*/ {
+		if count != 6 /*6*/ {
 			return errors.New("Did not retrieve all the expected capabilities")
 		}
 		return nil
@@ -796,6 +807,7 @@ func clearErrors() {
 	stepHandlersErrors.ExportNotFoundError = false
 	stepHandlersErrors.VolumeNotExistError = false
 	stepHandlersErrors.CreateQuotaError = false
+	stepHandlersErrors.UpdateQuotaError = false
 	stepHandlersErrors.CreateExportError = false
 	stepHandlersErrors.GetExportInternalError = false
 	stepHandlersErrors.GetExportByIDNotFoundError = false
@@ -1328,6 +1340,44 @@ func (f *feature) aValidCreateSnapshotResponseIsReturned() error {
 		f.createSnapshotResponse.Snapshot.SizeBytes,
 		f.createSnapshotResponse.Snapshot.CreationTime)
 	return nil
+}
+
+func getControllerExpandVolumeRequest(volumeID string, requiredBytes int64) *csi.ControllerExpandVolumeRequest {
+	return &csi.ControllerExpandVolumeRequest{
+		VolumeId: volumeID,
+		CapacityRange: &csi.CapacityRange{
+			RequiredBytes: requiredBytes,
+			LimitBytes:    requiredBytes,
+		},
+	}
+}
+
+func (f *feature) iCallControllerExpandVolume(volumeID string, requiredBytes int64) error {
+	log.Printf("###")
+	ctx := new(context.Context)
+	f.controllerExpandVolumeRequest = getControllerExpandVolumeRequest(volumeID, requiredBytes)
+	req := f.controllerExpandVolumeRequest
+
+	f.controllerExpandVolumeResponse, f.err = f.service.ControllerExpandVolume(*ctx, req)
+	if f.err != nil {
+		log.Printf("ControllerExpandVolume call failed: %s\n", f.err.Error())
+	}
+	if f.controllerExpandVolumeResponse != nil {
+		log.Printf("Volume capacity %d\n", f.controllerExpandVolumeResponse.CapacityBytes)
+	}
+	return nil
+}
+
+func (f *feature) aValidControllerExpandVolumeResponseIsReturned() error {
+	if f.err != nil {
+		return f.err
+	}
+	if f.controllerExpandVolumeRequest.GetCapacityRange().GetRequiredBytes() <= f.controllerExpandVolumeResponse.CapacityBytes {
+		fmt.Printf("Volume expansion succeeded\n")
+		return nil
+	}
+
+	return fmt.Errorf("Volume expansion failed")
 }
 
 func (f *feature) setVolumeContent(isSnapshotType bool, identity string) *csi.CreateVolumeRequest {

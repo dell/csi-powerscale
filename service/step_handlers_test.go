@@ -48,6 +48,7 @@ var (
 		ExportNotFoundError        bool
 		VolumeNotExistError        bool
 		CreateQuotaError           bool
+		UpdateQuotaError           bool
 		CreateExportError          bool
 		GetExportInternalError     bool
 		GetExportByIDNotFoundError bool
@@ -109,6 +110,7 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/platform/1/quota/quotas/{quota_id}", handleGetQuotaByID).Methods("GET")
 	isilonRouter.HandleFunc("/platform/1/quota/quotas/", handleCreateQuota).Methods("POST")
 	isilonRouter.HandleFunc("/platform/1/quota/quotas/{quota_id}", handleDeleteQuotaByID).Methods("DELETE")
+	isilonRouter.HandleFunc("/platform/1/quota/quotas/{quota_id}", handleUpdateQuotaByID).Methods("PUT")
 
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/{volume_id}", handleDeleteVolume).Methods("DELETE").Queries("recursive", "true")
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/{id}", handleGetVolume).Methods("GET").Queries("metadata", "")
@@ -327,6 +329,18 @@ func handleGetQuotaByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(readFromFile("mock/quota/get_quota_by_id.txt"))
+}
+
+// handleUpdateQuotaByID implements PUT /platform/1/quota/quotas/AABpAQEAAAAAAAAAAAAAQA0AAAAAAAAA
+func handleUpdateQuotaByID(w http.ResponseWriter, r *http.Request) {
+	if stepHandlersErrors.UpdateQuotaError {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+	// response body is empty
+	w.Write([]byte(""))
 }
 
 // handleUnexportPath implements DELETE /platform/2/protocols/nfs/exports/43?zone=System

@@ -87,7 +87,13 @@ echo "namespace: ${NAMESPACE}" >> "${VALUES}"
 echo "release: ${RELEASE}" >> "${VALUES}"
 
 # Start the tests
-helm install --name "${RELEASE}" -f "${VALUES}" "${TEST}"
+helm version | grep "v3." --quiet
+if [ $? -eq 0 ]; then
+  helm install "${RELEASE}" -f "${VALUES}" "${TEST}"
+else
+  helm install --name "${RELEASE}" -f "${VALUES}" "${TEST}"
+fi
+
 echo "waiting 60 seconds on pod to initialize"
 sleep 60
 kubectl describe pods -n "${NAMESPACE}"

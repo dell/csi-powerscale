@@ -6,6 +6,7 @@ metadata:
     storageclass.beta.kubernetes.io/is-default-class: {{ .Values.storageClass.isDefault | quote }}
 provisioner: csi-isilon.dellemc.com
 reclaimPolicy: {{ required "Must provide a storage class reclaim policy." .Values.storageClass.reclaimPolicy }}
+allowVolumeExpansion: true
 parameters:
   AccessZone: {{ required "Must provide an access zone." .Values.storageClass.accessZone }}
   IsiPath: {{ required "Must provide an isiPath." .Values.storageClass.isiPath }}

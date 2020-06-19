@@ -21,6 +21,7 @@ import (
 
 	utils "github.com/dell/csi-isilon/common/utils"
 	isi "github.com/dell/goisilon"
+	"github.com/dell/goisilon/api"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -200,6 +201,43 @@ func (svc *isiService) DeleteQuotaByExportIDWithZone(volName string, exportID in
 	return nil
 }
 
+func (svc *isiService) GetVolumeQuota(volName string, exportID int, accessZone string) (isi.Quota, error) {
+	log.Debugf("begin to get quota for volume name : '%s', export ID : '%d'", volName, exportID)
+
+	var export isi.Export
+	var err error
+	var quotaID string
+
+	if export, err = svc.client.GetExportByIDWithZone(context.Background(), exportID, accessZone); err != nil {
+		return nil, fmt.Errorf("failed to get export '%s':'%d' with access zone '%s', error: '%s'", volName, exportID, accessZone, err.Error())
+	}
+
+	log.Debugf("export (id : '%d') corresponding to path '%s' found, description field is '%s'", export.ID, volName, export.Description)
+
+	if quotaID, err = utils.GetQuotaIDFromDescription(export); err != nil {
+		return nil, err
+	}
+
+	if quotaID == "" {
+		log.Debugf("No quota set on the volume")
+		return nil, fmt.Errorf("failed to get quota: No quota set on the volume '%s'", volName)
+	}
+
+	log.Debugf("get quota by id '%s'", quotaID)
+	return svc.client.GetQuotaByID(context.Background(), quotaID)
+}
+
+func (svc *isiService) UpdateQuotaSize(quotaID string, updatedSize int64) error {
+
+	log.Debugf("updating quota by id '%s' with size '%d'", quotaID, updatedSize)
+
+	if err := svc.client.UpdateQuotaSizeByID(context.Background(), quotaID, updatedSize); err != nil {
+		return fmt.Errorf("failed to update quota '%s' with size '%d', error: '%s'", quotaID, updatedSize, err.Error())
+	}
+
+	return nil
+}
+
 func (svc *isiService) UnexportByIDWithZone(exportID int, accessZone string) error {
 	log.Debugf("begin to unexport NFS export with ID '%d' in access zone '%s'", exportID, accessZone)
 
@@ -208,6 +246,17 @@ func (svc *isiService) UnexportByIDWithZone(exportID int, accessZone string) err
 	}
 
 	return nil
+}
+
+func (svc *isiService) GetExportsWithParams(params api.OrderedValues) (isi.Exports, error) {
+	log.Debugf("begin to get exports with params..")
+	var exports isi.Exports
+	var err error
+
+	if exports, err = svc.client.GetExportsWithParams(context.Background(), params); err != nil {
+		return nil, fmt.Errorf("failed to get exports with params")
+	}
+	return exports, nil
 }
 
 func (svc *isiService) DeleteVolume(isiPath, volName string) error {

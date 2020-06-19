@@ -6,7 +6,7 @@ require (
 	github.com/akutz/gournal v0.5.0
 	github.com/container-storage-interface/spec v1.1.0
 	github.com/dell/gofsutil v1.1.0
-	github.com/dell/goisilon v1.1.0
+	github.com/dell/goisilon v1.2.0
 	github.com/golang/protobuf v1.3.2
 	github.com/google/uuid v1.1.1
 	github.com/gorilla/mux v1.7.3

@@ -92,7 +92,7 @@ Feature: Isilon CSI interface
     Scenario: Delete volume good scenario with quota enabled
       Given a Isilon service
       And I enable quota
-      When I call DeleteVolume "volume2=_=_=43=_=_=System"
+      When I call DeleteVolume "volume1=_=_=43=_=_=System"
       Then a valid DeleteVolumeResponse is returned
 
     Scenario Outline: Delete volume with invalid volume id
@@ -103,8 +103,8 @@ Feature: Isilon CSI interface
 
      Examples:
      | volumeID                         | errormsg                                                          |
-     | "volume2=_=_=43=_=_=System"      | "none"                                                            |
-     | "volume2=_=_=43"                 | "failed to parse volume ID"                                       |
+     | "volume1=_=_=43=_=_=System"      | "none"                                                            |
+     | "volume1=_=_=43"                 | "failed to parse volume ID"                                       |
      | ""                               | "no volume id is provided by the DeleteVolumeRequest instance"    |
 
     Scenario Outline: Delete volume with induced errors
@@ -122,4 +122,3 @@ Feature: Isilon CSI interface
      | "DeleteQuotaError"               | "EOF"                                                               |
      | "GetExportInternalError"         | "EOF"                                                               |
      | "QuotaNotFoundError"             | "Failed to fetch quota domain record: No such file or directory"    |
-     | "UnexportError"                  | "EOF"                                                               |
