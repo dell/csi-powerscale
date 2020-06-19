@@ -86,6 +86,8 @@ func (s *service) CreateVolume(
 		exportID          int
 		foundVol          bool
 		export            isi.Export
+		sourceSnapshotID  string
+		sourceVolumeID    string
 	)
 	// auto probe
 	if err := s.autoProbe(ctx); err != nil {
@@ -172,7 +174,7 @@ func (s *service) CreateVolume(
 		log.Debugf("id of the corresonding nfs export of existing volume '%s' has been resolved to '%d'", req.GetName(), exportID)
 		if exportID != 0 {
 			if foundVol {
-				return s.getCreateVolumeResponse(exportID, req.GetName(), path, export.Zone, sizeInBytes, azServiceIP, rootClientEnabled), nil
+				return s.getCreateVolumeResponse(exportID, req.GetName(), path, export.Zone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID), nil
 			}
 			// in case the export exists but no related volume (directory)
 			if err = s.isiSvc.UnexportByIDWithZone(exportID, accessZone); err != nil {
@@ -188,6 +190,16 @@ func (s *service) CreateVolume(
 	// check volume content source in the request
 	// if not null, copy content from the datasource
 	if contentSource := req.GetVolumeContentSource(); contentSource != nil {
+
+		// Fetch source snapshot ID  or volume ID from content source
+		if snapshot := contentSource.GetSnapshot(); snapshot != nil {
+			sourceSnapshotID = snapshot.GetSnapshotId()
+			log.Debugf("Creating volume from snapshot ID: '%s'", sourceSnapshotID)
+		} else if volume := contentSource.GetVolume(); volume != nil {
+			sourceVolumeID = volume.GetVolumeId()
+			log.Debugf("Creating volume from existing volume ID: '%s'", sourceVolumeID)
+		}
+
 		err = s.createVolumeFromSource(isiPath, contentSource, req, sizeInBytes)
 		if err != nil {
 			return nil, err
@@ -213,7 +225,7 @@ func (s *service) CreateVolume(
 		for i := 0; i < MaxRetries; i++ {
 			if export, _ := s.isiSvc.GetExportByIDWithZone(exportID, accessZone); export != nil {
 				// return the response
-				return s.getCreateVolumeResponse(exportID, req.GetName(), path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled), nil
+				return s.getCreateVolumeResponse(exportID, req.GetName(), path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID), nil
 			}
 			time.Sleep(RetrySleepTime)
 			log.Printf("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
@@ -295,13 +307,13 @@ func (s *service) createVolumeFromSource(
 	return nil
 }
 
-func (s *service) getCreateVolumeResponse(exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled string) *csi.CreateVolumeResponse {
+func (s *service) getCreateVolumeResponse(exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID string) *csi.CreateVolumeResponse {
 	return &csi.CreateVolumeResponse{
-		Volume: s.getCSIVolume(exportID, volName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled),
+		Volume: s.getCSIVolume(exportID, volName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID),
 	}
 }
 
-func (s *service) getCSIVolume(exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled string) *csi.Volume {
+func (s *service) getCSIVolume(exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID string) *csi.Volume {
 	// Make the additional volume attributes
 	attributes := map[string]string{
 		"ID":                strconv.Itoa(exportID),
@@ -312,10 +324,34 @@ func (s *service) getCSIVolume(exportID int, volName, path, accessZone string, s
 		"RootClientEnabled": rootClientEnabled,
 	}
 	log.Debugf("Attributes '%v'", attributes)
+
+	// Set content source as part of create volume response if volume is created from snapshot or existing volume
+	// ContentSource is an optional field as part of CSI spec, but provisioner side car version 1.4.0
+	// mandates it
+	var contentSource *csi.VolumeContentSource
+	if sourceSnapshotID != "" {
+		contentSource = &csi.VolumeContentSource{
+			Type: &csi.VolumeContentSource_Snapshot{
+				Snapshot: &csi.VolumeContentSource_SnapshotSource{
+					SnapshotId: sourceSnapshotID,
+				},
+			},
+		}
+	} else if sourceVolumeID != "" {
+		contentSource = &csi.VolumeContentSource{
+			Type: &csi.VolumeContentSource_Volume{
+				Volume: &csi.VolumeContentSource_VolumeSource{
+					VolumeId: sourceVolumeID,
+				},
+			},
+		}
+	}
+
 	vi := &csi.Volume{
 		VolumeId:      utils.GetNormalizedVolumeID(volName, exportID, accessZone),
 		CapacityBytes: sizeInBytes,
 		VolumeContext: attributes,
+		ContentSource: contentSource,
 	}
 	return vi
 }
@@ -370,26 +406,75 @@ func (s *service) DeleteVolume(
 			return nil, err
 		}
 	}
+
 	if !s.isiSvc.IsVolumeExistent(isiPath, "", volName) {
 		log.Debugf("volume '%s' not found, skip calling delete directory.", volName)
 	} else {
+		// Before deleting the Volume, we would like to check if there are any
+		// NFS exports which still exist on the Volume. These exports could
+		// have been created out-of-band outside of CSI Driver.
+		path := utils.GetPathForVolume(isiPath, volName)
+		params := isiApi.OrderedValues{
+			{[]byte("path"), []byte(path)},
+			{[]byte("zone"), []byte(accessZone)},
+		}
+		exports, err := s.isiSvc.GetExportsWithParams(params)
+		if err != nil {
+			jsonError, ok := err.(*isiApi.JSONError)
+			if ok {
+				if jsonError.StatusCode != 404 {
+					return nil, err
+				}
+			}
+			return nil, err
+		}
+
+		if exports != nil && exports.Total == 1 && exports.Exports[0].ID == exportID {
+			log.Infof("controller begins to unexport id '%d', target path '%s', access zone '%s'", exportID, volName, accessZone)
+			if err := s.isiSvc.UnexportByIDWithZone(exportID, accessZone); err != nil {
+				return nil, err
+			}
+		} else if exports != nil && exports.Total > 1 {
+			return nil, fmt.Errorf("Exports found for volume %s in AccessZone %s. It is not safe to delete the volume", volName, accessZone)
+		}
+
 		if err := s.isiSvc.DeleteVolume(isiPath, volName); err != nil {
 			return nil, err
 		}
-	}
-
-	log.Infof("controller begins to unexport id '%d', target path '%s', access zone '%s'", exportID, volName, accessZone)
-	if err := s.isiSvc.UnexportByIDWithZone(exportID, accessZone); err != nil {
-		return nil, err
 	}
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
 func (s *service) ControllerExpandVolume(
-	context.Context,
-	*csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	ctx context.Context,
+	req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 
-	return nil, status.Error(codes.Unimplemented, "")
+	volName, exportID, accessZone, err := utils.ParseNormalizedVolumeID(req.GetVolumeId())
+	if err != nil {
+		return nil, status.Error(codes.NotFound, err.Error())
+	}
+	requiredBytes := req.GetCapacityRange().GetRequiredBytes()
+
+	// when Quota is disabled, always return success
+	// Otherwise, update the quota size as requested
+	if s.opts.QuotaEnabled {
+		quota, err := s.isiSvc.GetVolumeQuota(volName, exportID, accessZone)
+		if err != nil {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+
+		quotaSize := quota.Thresholds.Hard
+		if requiredBytes <= quotaSize {
+			// volume capacity is larger than or equal to the target capacity, return OK
+			return &csi.ControllerExpandVolumeResponse{CapacityBytes: quotaSize, NodeExpansionRequired: false}, nil
+		}
+
+		if err = s.isiSvc.UpdateQuotaSize(quota.Id, requiredBytes); err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+
+	return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: false}, nil
 }
 
 /*
@@ -571,7 +656,7 @@ func (s *service) ListVolumes(ctx context.Context,
 			// Not able to get "rootClientEnabled", it's read from the volume's storage class
 			// and added to "volumeContext" in CreateVolume, and read in NodeStageVolume.
 			// The value is not relevant here so just pass default value "false" here.
-			volume := s.getCSIVolume(export.ID, volName, path, export.Zone, 0, s.opts.Endpoint, "false")
+			volume := s.getCSIVolume(export.ID, volName, path, export.Zone, 0, s.opts.Endpoint, "false", "", "")
 			entries[i] = &csi.ListVolumesResponse_Entry{
 				Volume: volume,
 			}
@@ -681,6 +766,20 @@ func (s *service) ControllerGetCapabilities(
 					},
 				},
 			},*/
+			{
+				Type: &csi.ControllerServiceCapability_Rpc{
+					Rpc: &csi.ControllerServiceCapability_RPC{
+						Type: csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
+					},
+				},
+			},
+			{
+				Type: &csi.ControllerServiceCapability_Rpc{
+					Rpc: &csi.ControllerServiceCapability_RPC{
+						Type: csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
+					},
+				},
+			},
 		},
 	}, nil
 }

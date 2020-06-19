@@ -1,0 +1,9 @@
+apiVersion: snapshot.storage.k8s.io/v1alpha1
+kind: VolumeSnapshot
+metadata:
+  name: testvolclaim1-snap1        
+spec:
+  snapshotClassName: isilon-snapclass
+  source:
+    name: testvolclaim1
+    kind: PersistentVolumeClaim

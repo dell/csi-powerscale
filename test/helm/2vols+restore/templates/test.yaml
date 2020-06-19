@@ -10,6 +10,7 @@ metadata:
     name: isilontest
     namespace: test
 spec:
+    serviceName: "isilontest"
     selector:
         matchLabels:
           app: isilontest

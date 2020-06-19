@@ -6,9 +6,14 @@ Add the repo (if you haven't already):
 $ helm repo add isilon https://isilon.github.io/charts
 ```
 
-Install the driver:
+Install the driver using helm 2:
 ```bash
 $ helm install --values myvalues.yaml --name isilon-csi --namespace isilon ./csi-isilon
+```
+
+Install the driver using helm 3:
+```bash
+$ helm install isilon --values myvalues.yaml --namespace isilon ./csi-isilon
 ```
 
 ## Introduction
@@ -23,24 +28,36 @@ This chart bootstraps the Isilon driver on a [Kubernetes](http://kubernetes.io) 
 
 ## Installing the Chart
 
-To install the chart with the release name `isilon`:
+To install the chart with the release name `isilon` using helm 2:
 
 ```bash
 $ helm install --values myvalues.yaml --name isilon --namespace isilon ./csi-isilon
 ```
 > **Tip**: List all releases using `helm list`
 
+To install the chart with the release name `isilon` using helm 3:
+
+```bash
+$ helm install isilon --values myvalues.yaml --namespace isilon ./csi-isilon
+```
+
 There are a number of required values that must be set either via the command-line or a [`values.yaml`](values.yaml) file. Those values are listed in the configuration section below.
 
 ## Uninstalling the Chart
 
-To uninstall/delete the `my-release` deployment:
+To uninstall/delete the `my-release` deployment using helm 2:
 
 ```bash
 $ helm delete isilon [--purge]
 ```
 
 The command removes all the Kubernetes components associated with the chart and deletes the release. The purge option also removes the provisioned release name, so that the name itself can also be reused.
+
+To uninstall/delete the `my-release` deployment using helm 3:
+
+```bash
+$ helm delete -n isilon isilon
+```
 
 ## Configuration
 

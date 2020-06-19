@@ -10,6 +10,7 @@ metadata:
     name: isilontest
     namespace: {{ .Values.namespace }}
 spec:
+    serviceName: "isilontest"
     selector:
         matchLabels:
           app: isilontest

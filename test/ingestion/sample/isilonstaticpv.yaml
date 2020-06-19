@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: isilonstaticpv
+  namespace: default
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: isilon
+  csi:
+    driver: csi-isilon.dellemc.com
+    volumeAttributes:
+        Path: "/ifs/data/csi/isilonvol=_=_=652=_=_=System"
+        Name: "isilonvol=_=_=652=_=_=System"
+        AzServiceIP: 'XX.XX.XX.XX'
+    volumeHandle: isilonvol=_=_=652=_=_=System
+  claimRef:
+    name: isilonstaticpvc
+    namespace: default

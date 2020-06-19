@@ -35,36 +35,36 @@ func main() {
 		provider.New())
 }
 
-const usage = `    X_CSI_ISILON_ENDPOINT
+const usage = `   X_CSI_ISI_ENDPOINT 
         Specifies the HTTPS endpoint for the Isilon REST API server. This parameter is
         required when running the Controller service.
 
         The default value is empty.
     
-    X_CSI_ISILON_PORT
+    X_CSI_ISI_PORT
         Specifies the HTTPS port number for the Isilon REST API server.
 
         The default value is 8080.
 
-    X_CSI_ISILON_USER
+    X_CSI_ISI_USER 
         Specifies the user name when authenticating to the Isilon REST API server.
 
         The default value is admin.
 
-    X_CSI_ISILON_PASSWORD
-        Specifies the password of the user defined by X_CSI_ISILON_USER to use
+    X_CSI_ISI_PASSWORD 
+        Specifies the password of the user defined by X_CSI_ISI_USER to use
         when authenticating to the Isilon REST API server. This parameter is required
         when running the Controller service.
 
         The default value is empty.
 
-    X_CSI_ISILON_INSECURE
+    X_CSI_ISI_INSECURE 
         Specifies that the ISILON Gateway's hostname and certificate chain
 	should not be verified.
 
         The default value is false.
 
-    X_CSI_ISILON_SYSTEMNAME
+    X_CSI_ISI_SYSTEMNAME
         Specifies the name of the Isilon system to interact with.
 
         The default value is default.

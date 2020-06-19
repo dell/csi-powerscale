@@ -47,7 +47,13 @@ RELEASE=`basename "${TEST}"`
 
 VALUES="__${NAMESPACE}-${RELEASE}__.yaml"
 
-helm delete --purge "${RELEASE}"
+helm version | grep "v3." --quiet
+if [ $? -eq 0 ]; then
+  helm delete "${RELEASE}"
+else
+  helm delete --purge "${RELEASE}"
+fi
+
 sleep 10
 kubectl get pods -n "${NAMESPACE}"
 echo "waiting for persistent volumes to be cleaned up"

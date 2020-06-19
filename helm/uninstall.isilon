@@ -1,5 +1,14 @@
 #!/bin/bash
-helm delete --purge isilon
+helm version | grep "v3." --quiet
+if [ $? -eq 0 ]
+then
+    echo "Uninstalling using helm version 3"
+    helm delete -n isilon isilon
+else
+    echo "Uninstalling using helm version 2"
+    helm delete --purge isilon
+fi
+
 sleep 10
 kubectl get pods -n isilon
 kubectl get volumesnapshotclass | grep isilon-snapclass --quiet

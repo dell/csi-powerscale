@@ -46,7 +46,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ---
 kind: DaemonSet
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 metadata:
   name: {{ .Release.Name }}-node
   namespace: {{ .Release.Namespace }}
@@ -115,7 +115,9 @@ spec:
                 fieldRef:
                   fieldPath: status.hostIP       
             - name: SSL_CERT_DIR
-              value: /certs                             
+              value: /certs    
+            - name: X_CSI_ISI_QUOTA_ENABLED
+              value: "{{ .Values.enableQuota }}"                         
           volumeMounts:
             - name: driver-path
               mountPath: /var/lib/kubelet/plugins/csi-isilon
