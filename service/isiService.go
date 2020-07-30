@@ -427,6 +427,22 @@ func (svc *isiService) RemoveExportClientByIDWithZone(exportID int, accessZone, 
 	return nil
 }
 
+func (svc *isiService) EnableRootMappingByIDWithZone(exportID int, accessZone, clientIP string) error {
+	log.Debugf("EnableRootMappingByIDWithZone client '%s'", clientIP)
+	if err := svc.client.EnableRootMappingByIDWithZone(context.Background(), exportID, accessZone, "nobody"); err != nil {
+		return fmt.Errorf("failed to enable root user to nobody mapping for export id '%d' : '%s'", exportID, err.Error())
+	}
+	return nil
+}
+
+func (svc *isiService) DisableRootMappingByIDWithZone(exportID int, accessZone, clientIP string) error {
+	log.Debugf("DisableRootMappingByIDWithZone client '%s'", clientIP)
+	if err := svc.client.DisableRootMappingByIDWithZone(context.Background(), exportID, accessZone); err != nil {
+		return fmt.Errorf("failed to disable root user mapping for export id '%d' : '%s'", exportID, err.Error())
+	}
+	return nil
+}
+
 func (svc *isiService) GetExportsWithLimit(limit string) (isi.ExportList, string, error) {
 	log.Debug("begin getting exports for Isilon")
 	var exports isi.Exports
