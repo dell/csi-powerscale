@@ -59,18 +59,17 @@ func (s *service) NodeStageVolume(
 		return nil, status.Errorf(codes.InvalidArgument, "error parsing access mode : '%v'", err)
 	}
 
-	addClientFunc := s.getAddClientFunc(req)
-
 	switch *am {
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER:
-		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, clientIP, addClientFunc)
+		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, clientIP, s.isiSvc.AddExportClientByIDWithZone)
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
+		// TODO this may need an additional client network entry as well, to block all other access
 		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, clientIP, s.isiSvc.AddExportReadOnlyClientByIDWithZone)
 	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
 		if s.isiSvc.OtherClientsAlreadyAdded(exportID, accessZone, clientIP) {
 			return nil, status.Errorf(codes.FailedPrecondition, "export '%d' in access zone '%s' already has other clients added to it, and the access mode is SINGLE_NODE_WRITER, thus the request fails", exportID, accessZone)
 		}
-		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, clientIP, addClientFunc)
+		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, clientIP, s.isiSvc.AddExportClientByIDWithZone)
 	default:
 		return nil, status.Errorf(codes.InvalidArgument, "unsupported access mode: '%s'", am.String())
 	}
@@ -79,11 +78,17 @@ func (s *service) NodeStageVolume(
 		return nil, status.Errorf(codes.Internal, "internal error occured when attempting to add client ip '%s' to export '%d', error : '%v'", clientIP, exportID, err)
 	}
 
+	if s.rootClientEnabled(req) {
+		s.isiSvc.DisableRootMappingByIDWithZone(exportID, accessZone, clientIP)
+	} else {
+		s.isiSvc.EnableRootMappingByIDWithZone(exportID, accessZone, clientIP)
+	}
+
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
-func (s *service) getAddClientFunc(req *csi.NodeStageVolumeRequest) (addClientFunc func(exportID int, accessZone, clientIP string) error) {
-	rootClientEnabled := false
+func (s *service) rootClientEnabled(req *csi.NodeStageVolumeRequest) (rootClientEnabled bool) {
+	rootClientEnabled = false
 	volumeContext := req.GetVolumeContext()
 	if volumeContext != nil {
 		utils.LogMap("VolumeContext", volumeContext)
@@ -93,12 +98,7 @@ func (s *service) getAddClientFunc(req *csi.NodeStageVolumeRequest) (addClientFu
 			rootClientEnabled = val
 		}
 	}
-
-	if rootClientEnabled {
-		return s.isiSvc.AddExportRootClientByIDWithZone
-	}
-
-	return s.isiSvc.AddExportClientByIDWithZone
+	return rootClientEnabled
 }
 
 func (s *service) NodeUnstageVolume(
