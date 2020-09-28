@@ -523,8 +523,8 @@ func (f *feature) checkIsilonClientExistsForOneExport(nodeIP string, exportID in
 		panic(fmt.Sprintf("failed to get export by id '%d' and zone '%s'\n", exportID, accessZone))
 	}
 	var am *csi.VolumeCapability_AccessMode_Mode
-	var req *csi.NodeStageVolumeRequest
-	req = f.nodeStageVolumeRequest
+	var req *csi.ControllerPublishVolumeRequest
+	req = f.controllerPublishVolumeRequest
 	am, err = utils.GetAccessMode(req)
 	fqdn, _ := utils.GetFQDNByIP(nodeIP)
 	// if fqdn exists, check fqdn firstly, then nodeIP

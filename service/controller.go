@@ -86,6 +86,7 @@ func (s *service) CreateVolume(
 		exportID          int
 		foundVol          bool
 		export            isi.Export
+		contentSource     *csi.VolumeContentSource
 		sourceSnapshotID  string
 		sourceVolumeID    string
 	)
@@ -156,6 +157,19 @@ func (s *service) CreateVolume(
 		foundVol = true
 	}
 
+	// check volume content source in the request
+	if contentSource = req.GetVolumeContentSource(); contentSource != nil {
+
+		// Fetch source snapshot ID  or volume ID from content source
+		if snapshot := contentSource.GetSnapshot(); snapshot != nil {
+			sourceSnapshotID = snapshot.GetSnapshotId()
+			log.Debugf("Creating volume from snapshot ID: '%s'", sourceSnapshotID)
+		} else if volume := contentSource.GetVolume(); volume != nil {
+			sourceVolumeID = volume.GetVolumeId()
+			log.Debugf("Creating volume from existing volume ID: '%s'", sourceVolumeID)
+		}
+	}
+
 	if export, err = s.isiSvc.GetExportWithPathAndZone(path, accessZone); err != nil || export == nil {
 		var errMsg string
 		if err == nil {
@@ -187,18 +201,8 @@ func (s *service) CreateVolume(
 	if err = s.isiSvc.CreateVolume(isiPath, req.GetName()); err != nil {
 		return nil, err
 	}
-	// check volume content source in the request
-	// if not null, copy content from the datasource
-	if contentSource := req.GetVolumeContentSource(); contentSource != nil {
-
-		// Fetch source snapshot ID  or volume ID from content source
-		if snapshot := contentSource.GetSnapshot(); snapshot != nil {
-			sourceSnapshotID = snapshot.GetSnapshotId()
-			log.Debugf("Creating volume from snapshot ID: '%s'", sourceSnapshotID)
-		} else if volume := contentSource.GetVolume(); volume != nil {
-			sourceVolumeID = volume.GetVolumeId()
-			log.Debugf("Creating volume from existing volume ID: '%s'", sourceVolumeID)
-		}
+	// if volume content source is not null, copy content from the datasource
+	if contentSource != nil {
 
 		err = s.createVolumeFromSource(isiPath, contentSource, req, sizeInBytes)
 		if err != nil {
@@ -477,6 +481,14 @@ func (s *service) ControllerExpandVolume(
 	return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: false}, nil
 }
 
+func (s *service) getAddClientFunc(rootClientEnabled bool) (addClientFunc func(exportID int, accessZone, clientIP string) error) {
+	if rootClientEnabled {
+		return s.isiSvc.AddExportRootClientByIDWithZone
+	}
+
+	return s.isiSvc.AddExportClientByIDWithZone
+}
+
 /*
  * ControllerPublishVolume : Checks all params and validity
  */
@@ -508,13 +520,15 @@ func (s *service) ControllerPublishVolume(
 			"volume ID is required")
 	}
 
-	volName, _, _, err := utils.ParseNormalizedVolumeID(volID)
+	volName, exportID, accessZone, err := utils.ParseNormalizedVolumeID(volID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to parse volume ID '%s', error : '%v'", volID, err))
 	}
-	if accessZone = volumeContext[AccessZoneParam]; accessZone == "" {
-		accessZone = s.opts.AccessZone
+
+	if exportID == 0 {
+		return nil, status.Error(codes.InvalidArgument, "invalid export ID")
 	}
+
 	if exportPath = volumeContext[ExportPathParam]; exportPath == "" {
 		exportPath = utils.GetPathForVolume(s.opts.Path, volName)
 	}
@@ -553,6 +567,39 @@ func (s *service) ControllerPublishVolume(
 	if !checkValidAccessTypes(vcs) {
 		return nil, status.Error(codes.InvalidArgument,
 			errUnknownAccessType)
+	}
+
+	rootClientEnabled := false
+	rootClientEnabledStr := volumeContext[RootClientEnabledParam]
+	val, err := strconv.ParseBool(rootClientEnabledStr)
+	if err == nil {
+		rootClientEnabled = val
+	}
+
+	addClientFunc := s.getAddClientFunc(rootClientEnabled)
+
+	switch am.Mode {
+	case csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER:
+		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, nodeID, addClientFunc)
+		if err == nil && rootClientEnabled {
+			err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, nodeID, s.isiSvc.AddExportClientByIDWithZone)
+		}
+	case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
+		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, nodeID, s.isiSvc.AddExportReadOnlyClientByIDWithZone)
+	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
+		if s.isiSvc.OtherClientsAlreadyAdded(exportID, accessZone, nodeID) {
+			return nil, status.Errorf(codes.FailedPrecondition, "export '%d' in access zone '%s' already has other clients added to it, and the access mode is SINGLE_NODE_WRITER, thus the request fails", exportID, accessZone)
+		}
+		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, nodeID, addClientFunc)
+		if err == nil && rootClientEnabled {
+			err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, nodeID, s.isiSvc.AddExportClientByIDWithZone)
+		}
+	default:
+		return nil, status.Errorf(codes.InvalidArgument, "unsupported access mode: '%s'", am.String())
+	}
+
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "internal error occured when attempting to add client ip '%s' to export '%d', error : '%v'", nodeID, exportID, err)
 	}
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
@@ -677,7 +724,26 @@ func (s *service) ControllerUnpublishVolume(
 	req *csi.ControllerUnpublishVolumeRequest) (
 	*csi.ControllerUnpublishVolumeResponse, error) {
 
-	return nil, status.Error(codes.Unimplemented, "")
+	if req.VolumeId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "ControllerUnpublishVolumeRequest.VolumeId is empty")
+	}
+
+	_, exportID, accessZone, err := utils.ParseNormalizedVolumeID(req.VolumeId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to parse volume ID '%s', error : '%s'", req.VolumeId, err.Error()))
+	}
+
+	nodeID := req.GetNodeId()
+	if nodeID == "" {
+		return nil, status.Error(codes.InvalidArgument,
+			"node ID is required")
+	}
+
+	if err := s.isiSvc.RemoveExportClientByIDWithZone(exportID, accessZone, nodeID); err != nil {
+		return nil, status.Errorf(codes.Internal, "error encountered when trying to remove client '%s' from export '%d' with access zone '%s'", nodeID, exportID, accessZone)
+	}
+
+	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
 func (s *service) GetCapacity(
@@ -745,13 +811,13 @@ func (s *service) ControllerGetCapabilities(
 					},
 				},
 			},
-			/*{
+			{
 				Type: &csi.ControllerServiceCapability_Rpc{
 					Rpc: &csi.ControllerServiceCapability_RPC{
 						Type: csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
 					},
 				},
-			},*/
+			},
 			{
 				Type: &csi.ControllerServiceCapability_Rpc{
 					Rpc: &csi.ControllerServiceCapability_RPC{
@@ -881,14 +947,6 @@ func (s *service) validateCreateSnapshotRequest(
 	if snapshotName == "" {
 		return "", "", status.Error(codes.InvalidArgument,
 			"name cannot be empty")
-	}
-
-	// Validate requested name is not too long, if supplied. If so, truncate to 31 characters.
-	if len(snapshotName) > 31 {
-		snapshotName = strings.Replace(snapshotName, "snapshot-", "sn-", 1)
-		snapshotName = snapshotName[0:31]
-		log.Debugf("Requested name '%s' longer than 31 character max, truncated to '%s'\n", req.Name, snapshotName)
-		req.Name = snapshotName
 	}
 
 	return srcVolumeID, snapshotName, nil

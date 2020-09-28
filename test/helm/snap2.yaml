@@ -1,10 +1,9 @@
-apiVersion: snapshot.storage.k8s.io/v1alpha1
+apiVersion: snapshot.storage.k8s.io/v1beta1
 kind: VolumeSnapshot
 metadata:
   name: pvol0-snap2
   namespace: test
 spec:
-  snapshotClassName: isilon-snapclass
+  volumeSnapshotClassName: isilon-snapclass
   source:
-    name: pvol0
-    kind: PersistentVolumeClaim
+    persistentVolumeClaimName: pvol0

@@ -1,8 +1,8 @@
 name: csi-isilon
-version: 1.2.0
-appVersion: 1.2.0
+version: 1.3.0
+appVersion: 1.3.0
 description: |
-  Isilon CSI (Container Storage Interface) driver Kubernetes
+  PowerScale CSI (Container Storage Interface) driver Kubernetes
   integration. This chart includes everything required to provision via CSI as
   well as an Isilon StorageClass.
 keywords:

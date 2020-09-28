@@ -18,13 +18,13 @@ package service
 import (
 	"errors"
 	"fmt"
+
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/common/utils"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"strconv"
 )
 
 func (s *service) NodeExpandVolume(
@@ -39,66 +39,10 @@ func (s *service) NodeStageVolume(
 	req *csi.NodeStageVolumeRequest) (
 	*csi.NodeStageVolumeResponse, error) {
 
-	_, exportID, accessZone, err := utils.ParseNormalizedVolumeID(req.VolumeId)
+	// TODO - Need to have logic for staging path of export
 	s.logStatistics()
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to parse volume ID '%s', error : '%v'", req.VolumeId, err))
-	}
-	if exportID == 0 {
-		return nil, status.Error(codes.InvalidArgument, "invalid export ID")
-	}
-
-	clientIP := s.nodeIP
-	log.Debugf("client ip is : '%s'", clientIP)
-	if clientIP == "" {
-		return nil, status.Errorf(codes.Internal, "client IP is empty")
-	}
-
-	var am *csi.VolumeCapability_AccessMode_Mode
-	if am, err = utils.GetAccessMode(req); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "error parsing access mode : '%v'", err)
-	}
-
-	addClientFunc := s.getAddClientFunc(req)
-
-	switch *am {
-	case csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER:
-		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, clientIP, addClientFunc)
-	case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
-		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, clientIP, s.isiSvc.AddExportReadOnlyClientByIDWithZone)
-	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
-		if s.isiSvc.OtherClientsAlreadyAdded(exportID, accessZone, clientIP) {
-			return nil, status.Errorf(codes.FailedPrecondition, "export '%d' in access zone '%s' already has other clients added to it, and the access mode is SINGLE_NODE_WRITER, thus the request fails", exportID, accessZone)
-		}
-		err = s.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(exportID, accessZone, clientIP, addClientFunc)
-	default:
-		return nil, status.Errorf(codes.InvalidArgument, "unsupported access mode: '%s'", am.String())
-	}
-
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "internal error occured when attempting to add client ip '%s' to export '%d', error : '%v'", clientIP, exportID, err)
-	}
 
 	return &csi.NodeStageVolumeResponse{}, nil
-}
-
-func (s *service) getAddClientFunc(req *csi.NodeStageVolumeRequest) (addClientFunc func(exportID int, accessZone, clientIP string) error) {
-	rootClientEnabled := false
-	volumeContext := req.GetVolumeContext()
-	if volumeContext != nil {
-		utils.LogMap("VolumeContext", volumeContext)
-		rootClientEnabledStr := volumeContext[RootClientEnabledParam]
-		val, err := strconv.ParseBool(rootClientEnabledStr)
-		if err == nil {
-			rootClientEnabled = val
-		}
-	}
-
-	if rootClientEnabled {
-		return s.isiSvc.AddExportRootClientByIDWithZone
-	}
-
-	return s.isiSvc.AddExportClientByIDWithZone
 }
 
 func (s *service) NodeUnstageVolume(
@@ -106,25 +50,8 @@ func (s *service) NodeUnstageVolume(
 	req *csi.NodeUnstageVolumeRequest) (
 	*csi.NodeUnstageVolumeResponse, error) {
 
+	// TODO - Need to have logic for staging path of export
 	s.logStatistics()
-	if req.VolumeId == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "NodeUnstageVolumeRequest.VolumeId is empty")
-	}
-
-	_, exportID, accessZone, err := utils.ParseNormalizedVolumeID(req.VolumeId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to parse volume ID '%s', error : '%s'", req.VolumeId, err.Error()))
-	}
-
-	clientIP := s.nodeIP
-	log.Debugf("client ip is : '%s'", clientIP)
-	if clientIP == "" {
-		return nil, status.Errorf(codes.Internal, "client IP is empty")
-	}
-
-	if err := s.isiSvc.RemoveExportClientByIDWithZone(exportID, accessZone, clientIP); err != nil {
-		return nil, status.Errorf(codes.Internal, "error encountered when trying to remove client '%s' from export '%d' with access zone '%s'", clientIP, exportID, accessZone)
-	}
 
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }

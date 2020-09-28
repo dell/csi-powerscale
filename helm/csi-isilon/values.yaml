@@ -1,10 +1,10 @@
-# "isiIP" defines the HTTPs endpoint of the Isilon OneFS API server
+# "isiIP" defines the HTTPs endpoint of the PowerScale OneFS API server
 isiIP: 1.1.1.1
 
-# "isiPort" defines the HTTPs port number of the Isilon OneFS API server
+# "isiPort" defines the HTTPs port number of the PowerScale OneFS API server
 isiPort: "8080"
 
-# "isiInsecure" specifies whether the Isilon OneFS API server's certificate chain and host name should be verified.
+# "isiInsecure" specifies whether the PowerScale OneFS API server's certificate chain and host name should be verified.
 isiInsecure: "true"
 
 # The name of the access zone a volume can be created in
@@ -13,12 +13,8 @@ isiAccessZone: "System"
 # "volumeNamePrefix" defines a string prepended to each volume created by the CSI driver.
 volumeNamePrefix: k8s
 
-# "controllerCount" defines the number of csi-isilon controller nodes to deploy to
-# the Kubernetes release.
-controllerCount: 1
-
 # Indicates whether debug level logs should be logged
-enableDebug: "false"
+enableDebug: "true"
 
 # Indicates what content of the OneFS REST API message should be logged in debug level logs
 # Values:
@@ -29,13 +25,13 @@ verbose: 1
 
 # Indicates whether the provisioner should attempt to set (later unset) quota on a newly provisioned volume
 # This requires SmartQuotas to be enabled.
-enableQuota: "false"
+enableQuota: "true"
 
 # Indicates whether the controller/node should probe during initialization
 noProbeOnStart: "false"
 
 # The default base path for the volumes to be created, this will be used if a storage class does not have the IsiPath parameter specified
-# Ensure that this path exists on Isilon.
+# Ensure that this path exists on PowerScale.
 isiPath: "/ifs/data/csi"
 
 # Enable auto probe.
@@ -67,9 +63,3 @@ storageClass:
   # which  determines, when a node mounts the PVC, in NodeStageVolume, whether to add the k8s node to 
   # the "Root clients" field (when true) or "Clients" field (when false) of the NFS export 
   rootClientEnabled: "false"
-
-# IT IS RECOMMENDED YOU DO NOT CHANGE THE IMAGES TO BE DOWNLOADED.
-images:
-  # "images.driver" defines the container images used for the driver container.
-  driver: dellemc/csi-isilon:v1.2.0
-

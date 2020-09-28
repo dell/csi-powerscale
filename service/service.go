@@ -162,7 +162,22 @@ func (s *service) ValidateCreateVolumeRequest(
 			"name cannot be empty")
 	}
 
+	vcs := req.GetVolumeCapabilities()
+	isBlock := isVolumeTypeBlock(vcs)
+	if isBlock {
+		return 0, errors.New("raw block requested from NFS Volume")
+	}
+
 	return sizeInBytes, nil
+}
+
+func isVolumeTypeBlock(vcs []*csi.VolumeCapability) bool {
+	for _, vc := range vcs {
+		if at := vc.GetBlock(); at != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // ValidateDeleteVolumeRequest validates the DeleteVolumeRequest parameter for a DeleteVolume operation

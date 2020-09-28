@@ -1,18 +1,18 @@
 apiVersion: v1
-    kind: Pod
-    metadata:
-      name: ngnix-pv-pod
-    spec:
-      containers:
-        - name: task-pv-container
-          image: nginx
-          ports:
-            - containerPort: 80
-              name: "http-server"
-          volumeMounts:
-            - mountPath: "/usr/share/nginx/html"
-              name: task-pv-storage
-      volumes:
-        - name: task-pv-storage
-          persistentVolumeClaim:
-            claimName: testvolclaim1
+kind: Pod
+metadata:
+  name: ngnix-pv-pod
+spec:
+  containers:
+  - name: task-pv-container
+    image: nginx
+    ports:
+    - containerPort: 80
+      name: "http-server"
+    volumeMounts:
+    - mountPath: "/usr/share/nginx/html"
+      name: task-pv-storage
+  volumes:
+  - name: task-pv-storage
+    persistentVolumeClaim:
+      claimName: testvolclaim1

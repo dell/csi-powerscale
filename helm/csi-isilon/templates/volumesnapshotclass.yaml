@@ -1,0 +1,9 @@
+apiVersion: snapshot.storage.k8s.io/v1beta1
+kind: VolumeSnapshotClass
+metadata:
+  name: "isilon-snapclass"
+driver: csi-isilon.dellemc.com
+deletionPolicy: Delete
+parameters:
+#IsiPath should match with respective storageClass IsiPath
+  IsiPath: {{ required "Must provide an isiPath." .Values.storageClass.isiPath }}

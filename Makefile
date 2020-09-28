@@ -1,15 +1,34 @@
-all: clean build
+# default target
+all: help
 
-# Tag parameters
-MAJOR=1
-MINOR=0
-PATCH=0
-NOTES=
-TAGMSG="CSI Spec 1.0"
+# include an overrides file, which sets up default values and allows user overrides
+include overrides.mk
 
+# Help target, prints usefule information
+help:
+	@echo
+	@echo "The following targets are commonly used:"
+	@echo
+	@echo "build            - Builds the code locally"
+	@echo "check            - Runs the suite of code checking tools: lint, format, etc"
+	@echo "clean            - Cleans the local build"
+	@echo "docker           - Builds the code within a golang container and then creates the driver image"
+	@echo "integration-test - Runs the integration tests. Requires access to an array"
+	@echo "push             - Pushes the built container to a target registry"
+	@echo "unit-test        - Runs the unit tests"
+	@echo
+	@make -s overrides-help
+
+# Clean the build
 clean:
 	rm -f core/core_generated.go
+	rm -f semver.mk
 	go clean
+
+# Dependencies
+dependencies:
+	go generate
+	go run core/semver/semver.go -f mk >semver.mk
 
 check:
 	@./check.sh
@@ -17,28 +36,16 @@ check:
 format:
 	@gofmt -w -s .
 
-build:
-	go generate
-	@./check.sh
+# Build the driver locally
+build: dependencies check
 	GOOS=linux CGO_ENABLED=0 go build
 
-install:
-	go generate
-	GOOS=linux CGO_ENABLED=0 go install
-
-# Tags the release with the Tag parameters set above
-tag:
-	-git tag -d v$(MAJOR).$(MINOR).$(PATCH)$(NOTES)
-	git tag -a -m $(TAGMSG) v$(MAJOR).$(MINOR).$(PATCH)$(NOTES)
-
 # Generates the docker container (but does not push)
-docker:
-#	go generate
-	go run core/semver/semver.go -f mk >semver.mk
+docker: dependencies
 	make -f docker.mk docker
 
 # Pushes container to the repository
-push:	docker
+push: docker
 	make -f docker.mk push
 
 # Windows or Linux; requires no hardware
@@ -56,5 +63,4 @@ version:
 
 gosec:
 	gosec -quiet -log gosec.log -out=gosecresults.csv -fmt=csv ./...
-
 

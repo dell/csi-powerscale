@@ -1,16 +1,16 @@
+# docker makefile, included from Makefile, will build/push images with docker or podman
+
 # Includes the following generated file to get semantic version information
-#include semver.mk
-ifdef NOTES
-	RELNOTE="-$(NOTES)"
-else
-	RELNOTE=
-endif
+include semver.mk
 
 docker:
-	docker build -t "$(REPO_NAME)/$(IMAGE_NAME):$(IMAGE_TAG)$(RELNOTE)" .
+	@echo "Base Images is set to: $(BASEIMAGE)"
+	@echo "Building: $(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
+	$(BUILDER) build -t "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)" --target $(BUILDSTAGE) --build-arg GOPROXY=$(GOPROXY) --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOVERSION=$(GOVERSION) .
 
 push:
-	docker push "$(REPO_NAME)/$(IMAGE_NAME):$(IMAGE_TAG)$(RELNOTE)"
+	@echo "Pushing: $(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
+	$(BUILDER) push "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
 
 version:
 	@echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) BUILD ${BUILD} TYPE ${TYPE} RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
