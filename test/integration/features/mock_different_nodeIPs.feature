@@ -10,9 +10,9 @@ Feature: Isilon CSI interface
     And a volume request "integration0" "8"
     When I call CreateVolume
     When I call ControllerPublishVolume "X_CSI_NODE_NAME"
-    Then there are no errors
+    Then check Isilon client exists "X_CSI_NODE_NAME"
     When I call NodeStageVolume
-    Then check Isilon client exists "X_CSI_NODE_IP"
+    Then there are no errors
 
 @first_run
   Scenario: Create, ControllerPublish, NodeStage, NodeUnstage, ControllerUnpublish, delete basic volume with accessMode multi-writer
@@ -21,9 +21,9 @@ Feature: Isilon CSI interface
     And a volume request "integration1" "8"
     When I call CreateVolume
     When I call ControllerPublishVolume "X_CSI_NODE_NAME"
-    Then there are no errors
+    Then check Isilon client exists "X_CSI_NODE_NAME"
     When I call NodeStageVolume
-    Then check Isilon client exists "X_CSI_NODE_IP"
+    Then there are no errors
 
 @first_run
   Scenario: Create, ControllerPublish, NodeStage, NodeUnstage, ControllerUnpublish, delete basic volume with accessMode single-writer
@@ -32,9 +32,9 @@ Feature: Isilon CSI interface
     And a volume request "integration2" "8"
     When I call CreateVolume
     When I call ControllerPublishVolume "X_CSI_NODE_NAME"
-    Then there are no errors
+    Then check Isilon client exists "X_CSI_NODE_NAME"
     When I call NodeStageVolume
-    Then check Isilon client exists "X_CSI_NODE_IP"
+    Then there are no errors
 
 @second_run
   Scenario: Create, ControllerPublish, NodeStage, NodeUnstage, ControllerUnpublish, delete basic volume with accessMode multi-reader
@@ -43,13 +43,13 @@ Feature: Isilon CSI interface
     And a volume request "integration0" "8"
     When I call CreateVolume
     When I call ControllerPublishVolume "X_CSI_NODE_NAME"
-    Then there are no errors
+    Then check Isilon client exists "X_CSI_NODE_NAME"
     When I call NodeStageVolume
-    Then check Isilon client exists "X_CSI_NODE_IP"
+    Then there are no errors
     When I call NodeUnstageVolume
-    Then check Isilon client not exists "X_CSI_NODE_IP"
+    Then there are no errors
     When I call ControllerUnpublishVolume "X_CSI_NODE_NAME"
-    Then the error contains "Unimplemented"
+    Then check Isilon client not exists "X_CSI_NODE_NAME"
     When I call DeleteVolume
     Then there is not a directory "integration0"
     Then there is not an export "integration0" 
@@ -61,13 +61,13 @@ Feature: Isilon CSI interface
     And a volume request "integration1" "8"
     When I call CreateVolume
     When I call ControllerPublishVolume "X_CSI_NODE_NAME"
-    Then there are no errors
+    Then check Isilon client exists "X_CSI_NODE_NAME"
     When I call NodeStageVolume
-    Then check Isilon client exists "X_CSI_NODE_IP"
+    Then there are no errors
     When I call NodeUnstageVolume
-    Then check Isilon client not exists "X_CSI_NODE_IP"
+    Then there are no errors
     When I call ControllerUnpublishVolume "X_CSI_NODE_NAME"
-    Then the error contains "Unimplemented"
+    Then check Isilon client not exists "X_CSI_NODE_NAME"
     When I call DeleteVolume
     Then there is not a directory "integration1"
     Then there is not an export "integration1" 
@@ -79,13 +79,9 @@ Feature: Isilon CSI interface
     And a volume request "integration2" "8"
     When I call CreateVolume
     When I call ControllerPublishVolume "X_CSI_NODE_NAME"
-    Then there are no errors
-    When I call NodeStageVolume
     Then the error contains "already has other clients added to it, and the access mode is SINGLE_NODE_WRITER"
-    When I call NodeUnstageVolume
-    Then check Isilon client not exists "X_CSI_NODE_IP"
     When I call ControllerUnpublishVolume "X_CSI_NODE_NAME"
-    Then the error contains "Unimplemented"
+    Then check Isilon client not exists "X_CSI_NODE_NAME"
     When I call DeleteVolume
     Then there is not a directory "integration0"
     Then there is not an export "integration0" 

@@ -88,23 +88,23 @@ Feature: Isilon CSI interface
       When I call NodeGetCapabilities
       Then a valid NodeGetCapabilitiesResponse is returned
 
-    Scenario: NodeStageVolume bad scenario with empty access type
+    Scenario: ControllerPublishVolume bad scenario with empty access type
       Given a Isilon service
       When I call Probe
       And I induce error "OmitAccessMode"
-      And I call NodeStageVolume with name "volume2=_=_=43=_=_=System" and access type ""
+      And I call ControllerPublishVolume with "" to "vpi7125" 
       Then the error contains "access mode is required"
 
-    Scenario: NodeStageVolume good scenario
+    Scenario: ControllerPublishVolume good scenario
       Given a Isilon service
       When I call Probe
-      And I call NodeStageVolume with name "volume2=_=_=43=_=_=System" and access type "multiple-writer"
-      Then a valid NodeStageVolumeResponse is returned
+      And I call ControllerPublishVolume with name "volume2=_=_=43=_=_=System" and access type "multiple-writer" to "vpi7125"
+      Then a valid ControllerPublishVolumeResponse is returned
 
-    Scenario Outline: NodeStageVolume with different volume id and access type
+    Scenario Outline: ControllerPublishVolume with different volume id and access type
       Given a Isilon service
       When I call Probe
-      And I call NodeStageVolume with name <volumeID> and access type <accessType>
+      And I call ControllerPublishVolume with name <volumeID> and access type <accessType> to "vpi7125"
       Then the error contains <errormsg>
 
       Examples:
@@ -115,24 +115,24 @@ Feature: Isilon CSI interface
       | "volume2=_=_=43=_=_=System"    | "multiple-reader"         | "none"                              |
       | "volume2=_=_=43=_=_=System"    | "multiple-writer"         | "none"                              |
       | "volume2=_=_=43=_=_=System"    | "single-reader"           | "unsupported access mode"           |
-      | "volume2=_=_=43=_=_=System"    | "unknown"                 | "unknown access mode"               |
+      | "volume2=_=_=43=_=_=System"    | "unknown"                 | "unknown or unsupported access mode"|
 
-    Scenario: NodeUnstageVolume good scenario
+    Scenario: ControllerUnpublishVolume good scenario
       Given a Isilon service
       When I call Probe
-      And I call NodeUnstageVolume with name "volume2=_=_=43=_=_=System"
-      Then a valid NodeUnstageVolumeResponse is returned
+      And I call ControllerUnpublishVolume with name "volume2=_=_=43=_=_=System" and access type "single-writer" to "vpi7125"
+      Then valid ControllerUnpublishVolumeResponse is returned
     
-    Scenario Outline: NodeUnstageVolume bad calls
+    Scenario Outline: ControllerUnpublishVolume bad calls
       Given a Isilon service
       When I call Probe
-      And I call NodeUnstageVolume with name <volumeID>
+      And I call ControllerUnpublishVolume with name <volumeID> and access type "single-writer" to "vpi7125"
       Then the error contains <errormsg>
 
       Examples:
-      | volumeID               | errormsg                                        |
-      | ""                     | "NodeUnstageVolumeRequest.VolumeId is empty"    |
-      | "volume2=_=_=43"       | "failed to parse volume ID"                     |
+      | volumeID               | errormsg                                                |
+      | ""                     | "ControllerUnpublishVolumeRequest.VolumeId is empty"    |
+      | "volume2=_=_=43"       | "failed to parse volume ID"                             |
 
     Scenario Outline: Calls to ListVolumes
       Given a Isilon service

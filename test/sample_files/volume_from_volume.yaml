@@ -1,0 +1,17 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: volume-from-volume
+  namespace: default 
+spec:
+  accessModes:
+  - ReadWriteMany
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: isilon
+  dataSource:
+    kind: PersistentVolumeClaim
+    name: existing-pvc
+    apiGroup: ""

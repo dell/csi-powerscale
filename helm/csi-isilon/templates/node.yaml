@@ -69,7 +69,7 @@ spec:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
           image: {{ required "Must provide the Isilon driver container image." .Values.images.driver }}
-          imagePullPolicy: Always
+          imagePullPolicy: Always 
           command: [ "/csi-isilon" ]
           env:
             - name: CSI_ENDPOINT

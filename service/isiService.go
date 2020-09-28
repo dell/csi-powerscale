@@ -18,6 +18,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"net"
 
 	utils "github.com/dell/csi-isilon/common/utils"
 	isi "github.com/dell/goisilon"
@@ -364,9 +365,14 @@ func (svc *isiService) OtherClientsAlreadyAdded(exportID int, accessZone string,
 func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(exportID int, accessZone, clientIP string, addClientFunc func(exportID int, accessZone, clientIP string) error) error {
 	log.Debugf("AddExportClientNetworkIdentifierByID client ip '%s'", clientIP)
 
-	fqdn, _ := utils.GetFQDNByIP(clientIP)
-
-	log.Debugf("ip '%s' is resolved to '%s'", clientIP, fqdn)
+	var fqdn string
+	if net.ParseIP(clientIP) != nil {
+		fqdn, _ = utils.GetFQDNByIP(clientIP)
+		log.Debugf("ip '%s' is resolved to '%s'", clientIP, fqdn)
+	} else {
+		fqdn = clientIP
+		log.Debugf("fqdn is '%s'", fqdn)
+	}
 
 	if fqdn != "" {
 
@@ -421,6 +427,13 @@ func (svc *isiService) RemoveExportClientByIDWithZone(exportID int, accessZone, 
 	log.Debugf("RemoveExportClientByName client IP '%v'", clientsToRemove)
 
 	if err := svc.client.RemoveExportClientsByIDWithZone(context.Background(), exportID, accessZone, clientsToRemove); err != nil {
+		//Return success if export doesn't exist
+		if notFoundErr, ok := err.(*api.JSONError); ok {
+			if notFoundErr.StatusCode == 404 {
+				log.Debugf("Export id '%v' does not exist", exportID)
+				return nil
+			}
+		}
 		return fmt.Errorf("failed to remove clients from export '%d' with access zone '%s' : '%s'", exportID, accessZone, err.Error())
 	}
 

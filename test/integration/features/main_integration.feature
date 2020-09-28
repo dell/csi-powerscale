@@ -150,7 +150,7 @@ Feature: Isilon CSI interface
       When I call ControllerPublishVolume "X_CSI_NODE_NAME"
       Then there are no errors
       When I call ControllerUnpublishVolume "X_CSI_NODE_NAME"
-      Then the error contains "Unimplemented"
+      Then there are no errors
       When I call DeleteVolume
       Then there is not a directory "integration0"
       Then there is not an export "integration0"
@@ -162,13 +162,13 @@ Feature: Isilon CSI interface
       And a volume request "integration0" "8"
       When I call CreateVolume
       When I call ControllerPublishVolume "X_CSI_NODE_NAME"
-      Then there are no errors
-      When I call NodeStageVolume
       Then check Isilon client exists "X_CSI_NODE_IP"
+      When I call NodeStageVolume
+      Then there are no errors
       When I call NodeUnstageVolume
-      Then check Isilon client not exists "X_CSI_NODE_IP"
+      Then there are no errors
       When I call ControllerUnpublishVolume "X_CSI_NODE_NAME"
-      Then the error contains "Unimplemented"
+      Then check Isilon client not exists "X_CSI_NODE_IP"
       When I call DeleteVolume
       Then there is not a directory "integration0"
       Then there is not an export "integration0" 
@@ -186,17 +186,17 @@ Feature: Isilon CSI interface
       And a volume request "integration0" "8"
       When I call CreateVolume
       When I call ControllerPublishVolume "X_CSI_NODE_NAME"
-      Then there are no errors
-      When I call NodeStageVolume
       Then check Isilon client exists "X_CSI_NODE_IP"
+      When I call NodeStageVolume
+      Then there are no errors
       When I call NodePublishVolume "datadir0"
       Then verify published volume with access <access> "datadir0"
       When I call NodeUnpublishVolume "datadir0"
       Then verify not published volume with access <access> "datadir0"
       When I call NodeUnstageVolume
-      Then check Isilon client not exists "X_CSI_NODE_IP"
+      Then there are no errors
       When I call ControllerUnpublishVolume "X_CSI_NODE_NAME"
-      Then the error contains "Unimplemented"
+      Then check Isilon client not exists "X_CSI_NODE_IP"
       When I call DeleteVolume
       Then there is not a directory "integration0"
       Then there is not an export "integration0" 
@@ -214,19 +214,17 @@ Feature: Isilon CSI interface
       And a volume request "integration0" "8"
       When I call CreateVolume
       When I call ControllerPublishVolume "X_CSI_NODE_NAME"
-      Then there are no errors
-      When I call NodeStageVolume
-      When I call NodeStageVolume
       Then check Isilon client exists "X_CSI_NODE_IP"
+      When I call NodeStageVolume
+      Then there are no errors
       When I call NodePublishVolume "datadir0"
       Then verify published volume with access <access> "datadir0"
       When I call NodeUnpublishVolume "datadir0"
       Then verify not published volume with access <access> "datadir0"
       When I call NodeUnstageVolume
-      When I call NodeUnstageVolume
-      Then check Isilon client not exists "X_CSI_NODE_IP"
+      Then there are no errors
       When I call ControllerUnpublishVolume "X_CSI_NODE_NAME"
-      Then the error contains "Unimplemented"
+      Then check Isilon client not exists "X_CSI_NODE_IP"
       When I call DeleteVolume
       Then there is not a directory "integration0"
       Then there is not an export "integration0" 
@@ -244,9 +242,9 @@ Feature: Isilon CSI interface
       And a volume request "integration0" "8"
       When I call CreateVolume
       When I call ControllerPublishVolume "X_CSI_NODE_NAME"
-      Then there are no errors
-      When I call NodeStageVolume
       Then check Isilon client exists "X_CSI_NODE_IP"
+      When I call NodeStageVolume
+      Then there are no errors
       When I call NodePublishVolume "datadir0"
       When I call NodePublishVolume "datadir0"
       Then verify published volume with access <access> "datadir0"
@@ -254,9 +252,9 @@ Feature: Isilon CSI interface
       When I call NodeUnpublishVolume "datadir0"
       Then verify not published volume with access <access> "datadir0"
       When I call NodeUnstageVolume
-      Then check Isilon client not exists "X_CSI_NODE_IP"
+      Then there are no errors
       When I call ControllerUnpublishVolume "X_CSI_NODE_NAME"
-      Then the error contains "Unimplemented"
+      Then check Isilon client not exists "X_CSI_NODE_IP"
       When I call DeleteVolume
       Then there is not a directory "integration0"
       Then there is not an export "integration0" 
@@ -340,17 +338,17 @@ Feature: Isilon CSI interface
       Then there are <numberOfVolumes> directories
       And there are <numberOfVolumes> exports
       When I controllerPublish <numberOfVolumes> volumes in parallel
-      Then there are no errors
-      When I nodeStage <numberOfVolumes> volumes in parallel
       Then check <numberOfVolumes> Isilon clients exist
+      When I nodeStage <numberOfVolumes> volumes in parallel
+      Then there are no errors
       When I nodePublish <numberOfVolumes> volumes in parallel
       Then verify published volumes <numberOfVolumes>
       When I nodeUnpublish <numberOfVolumes> volumes in parallel
       Then verify not published volumes <numberOfVolumes>
       When I nodeUnstage <numberOfVolumes> volumes in parallel
-      Then check <numberOfVolumes> Isilon clients not exist
+      Then there are no errors
       When I controllerUnpublish <numberOfVolumes> volumes in parallel
-      Then the error contains "Unimplemented"
+      Then check <numberOfVolumes> Isilon clients not exist
       When I delete <numberOfVolumes> volumes in parallel
       Then there are not <numberOfVolumes> directories 
       Then there are not <numberOfVolumes> exports

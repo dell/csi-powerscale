@@ -264,9 +264,12 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I change the target path$`, f.iChangeTheTargetPath)
 	s.Step(`^I mark request read only$`, f.iMarkRequestReadOnly)
 	s.Step(`^I call NodeStageVolume with name "([^"]*)" and access type "([^"]*)"$`, f.iCallNodeStageVolume)
+	s.Step(`^I call ControllerPublishVolume with name "([^"]*)" and access type "([^"]*)" to "([^"]*)"$`, f.iCallControllerPublishVolume)
 	s.Step(`^a valid NodeStageVolumeResponse is returned$`, f.aValidNodeStageVolumeResponseIsReturned)
 	s.Step(`^I call NodeUnstageVolume with name "([^"]*)"$`, f.iCallNodeUnstageVolume)
+	s.Step(`^I call ControllerUnpublishVolume with name "([^"]*)" and access type "([^"]*)" to "([^"]*)"$`, f.iCallControllerUnPublishVolume)
 	s.Step(`^a valid NodeUnstageVolumeResponse is returned$`, f.aValidNodeUnstageVolumeResponseIsReturned)
+	s.Step(`^a valid ControllerUnpublishVolumeResponse is returned$`, f.aValidControllerUnpublishVolumeResponseIsReturned)
 	s.Step(`^I call ListVolumes with max entries (-?\d+) starting token "([^"]*)"$`, f.iCallListVolumesWithMaxEntriesStartingToken)
 	s.Step(`^a valid ListVolumesResponse is returned$`, f.aValidListVolumesResponseIsReturned)
 	s.Step(`^I call NodeUnpublishVolume$`, f.iCallNodeUnpublishVolume)
@@ -722,7 +725,7 @@ func (f *feature) aValidControllerGetCapabilitiesResponseIsReturned() error {
 				return fmt.Errorf("received unexpected capability: %v", rpcType)
 			}
 		}
-		if count != 6 /*6*/ {
+		if count != 7 /*7*/ {
 			return errors.New("Did not retrieve all the expected capabilities")
 		}
 		return nil
@@ -974,6 +977,16 @@ func (f *feature) aValidControllerPublishVolumeResponseIsReturned() error {
 	return nil
 }
 
+func (f *feature) aValidControllerUnpublishVolumeResponseIsReturned() error {
+	if f.err != nil {
+		return errors.New("UnpublishVolume returned error: " + f.err.Error())
+	}
+	if f.unpublishVolumeResponse == nil {
+		return errors.New("No UnpublishVolumeResponse returned")
+	}
+	return nil
+}
+
 func (f *feature) aValidNodeStageVolumeResponseIsReturned() error {
 	if f.err != nil {
 		return errors.New("NodeStageVolume returned error: " + f.err.Error())
@@ -1065,6 +1078,37 @@ func (f *feature) getControllerPublishVolumeRequest(accessType, nodeID string) *
 	attributes := map[string]string{}
 	attributes[AccessZoneParam] = f.accessZone
 	req.VolumeContext = attributes
+	return req
+}
+
+func (f *feature) getControllerUnPublishVolumeRequest(accessType, nodeID string) *csi.ControllerUnpublishVolumeRequest {
+	capability := new(csi.VolumeCapability)
+
+	mountVolume := new(csi.VolumeCapability_MountVolume)
+	mountVolume.MountFlags = make([]string, 0)
+	mount := new(csi.VolumeCapability_Mount)
+	mount.Mount = mountVolume
+	capability.AccessType = mount
+
+	if !inducedErrors.omitAccessMode {
+		capability.AccessMode = getAccessMode(accessType)
+	}
+	fmt.Printf("capability.AccessType %v\n", capability.AccessType)
+	fmt.Printf("capability.AccessMode %v\n", capability.AccessMode)
+	req := new(csi.ControllerUnpublishVolumeRequest)
+	if !inducedErrors.noVolumeID {
+		if inducedErrors.invalidVolumeID || f.createVolumeResponse == nil {
+			req.VolumeId = "000-000"
+		} else {
+			req.VolumeId = "volume1=_=_=19=_=_=System"
+		}
+	}
+	if !inducedErrors.noNodeID {
+		req.NodeId = nodeID
+	}
+	// add in the context
+	attributes := map[string]string{}
+	attributes[AccessZoneParam] = f.accessZone
 	return req
 }
 
@@ -1220,6 +1264,48 @@ func (f *feature) iChangeTheTargetPath() error {
 
 func (f *feature) iMarkRequestReadOnly() error {
 	f.nodePublishVolumeRequest.Readonly = true
+	return nil
+}
+
+func (f *feature) iCallControllerPublishVolume(volID string, accessMode string, nodeID string) error {
+
+	header := metadata.New(map[string]string{"csi.requestid": "1"})
+	ctx := metadata.NewIncomingContext(context.Background(), header)
+	req := f.publishVolumeRequest
+	if f.publishVolumeRequest == nil {
+		req = f.getControllerPublishVolumeRequest(accessMode, nodeID)
+		f.publishVolumeRequest = req
+	}
+
+	// a customized volume ID can be specified to overwrite the default one
+	if volID != "" {
+		req.VolumeId = volID
+	}
+
+	log.Printf("Calling controllerPublishVolume")
+	f.publishVolumeResponse, f.err = f.service.ControllerPublishVolume(ctx, req)
+	if f.err != nil {
+		log.Printf("PublishVolume call failed: %s\n", f.err.Error())
+	}
+	f.publishVolumeRequest = nil
+	return nil
+}
+
+func (f *feature) iCallControllerUnPublishVolume(volID string, accessMode string, nodeID string) error {
+	ctx := new(context.Context)
+	req := f.getControllerUnPublishVolumeRequest(accessMode, nodeID)
+	f.unpublishVolumeRequest = req
+
+	// a customized volume ID can be specified to overwrite the default one
+	req.VolumeId = volID
+	f.unpublishVolumeResponse, f.err = f.service.ControllerUnpublishVolume(*ctx, req)
+	if f.err != nil {
+		log.Printf("ControllerUnPublishVolume call failed: %s\n", f.err.Error())
+	}
+
+	if f.unpublishVolumeResponse != nil {
+		log.Printf("a unpublishVolumeResponse has been returned\n")
+	}
 	return nil
 }
 
@@ -1557,7 +1643,6 @@ func (f *feature) iCallUnimplementedFunctions() error {
 	_, f.err = f.service.ListSnapshots(context.Background(), new(csi.ListSnapshotsRequest))
 	_, f.err = f.service.NodeUnpublishVolume(context.Background(), new(csi.NodeUnpublishVolumeRequest))
 	_, f.err = f.service.ControllerExpandVolume(context.Background(), new(csi.ControllerExpandVolumeRequest))
-	_, f.err = f.service.ControllerUnpublishVolume(context.Background(), new(csi.ControllerUnpublishVolumeRequest))
 	_, f.err = f.service.NodeExpandVolume(context.Background(), new(csi.NodeExpandVolumeRequest))
 	_, f.err = f.service.NodeGetVolumeStats(context.Background(), new(csi.NodeGetVolumeStatsRequest))
 	return nil

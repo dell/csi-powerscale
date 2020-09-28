@@ -301,8 +301,8 @@ func RemoveStringsFromSlice(filters []string, list []string) []string {
 	return result
 }
 
-// GetAccessMode extracts the access mode from the given *csi.NodeStageVolumeRequest instance
-func GetAccessMode(req *csi.NodeStageVolumeRequest) (*csi.VolumeCapability_AccessMode_Mode, error) {
+// GetAccessMode extracts the access mode from the given *csi.ControllerPublishVolumeRequest instance
+func GetAccessMode(req *csi.ControllerPublishVolumeRequest) (*csi.VolumeCapability_AccessMode_Mode, error) {
 
 	vc := req.GetVolumeCapability()
 	if vc == nil {
