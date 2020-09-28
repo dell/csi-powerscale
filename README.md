@@ -391,7 +391,7 @@ User can query for csi-powerscale driver using the following command
    | Parameter | Description | Required | Default |
    | --------- | ----------- | -------- |-------- |
    | ***Common parameters for node and controller*** |
-   | CSI_ENDPOINT | Specifies the HTTP endpoint for PowerScale. | No | /var/run/csi/csi.sock |
+   | CSI_ENDPOINT | The UNIX socket address for handling gRPC calls | No | /var/run/csi/csi.sock |
    | X_CSI_DEBUG | To enable debug mode | No | false |
    | X_CSI_ISI_ENDPOINT | HTTPs endpoint of the PowerScale OneFS API server | Yes | |
    | X_CSI_ISI_INSECURE | Specifies whether SSL security needs to be enabled for communication between PowerScale and CSI Driver | No | true |
