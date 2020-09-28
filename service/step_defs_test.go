@@ -203,8 +203,8 @@ func (f *feature) getService() *service {
 	svc.opts = opts
 	svc.mode = "controller"
 	f.service = svc
-	f.service.nodeID = "k8s-rhel76-qual-10-247-98-140"
-	f.service.nodeIP = "10.247.98.140"
+	f.service.nodeID = "k8s-rhel76-qual-1.1.1.1"
+	f.service.nodeIP = "1.1.1.1"
 
 	utils.ConfigureLogger(opts.DebugEnabled)
 
@@ -1606,8 +1606,8 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	svc.opts = opts
 	svc.mode = mode
 	f.service = svc
-	f.service.nodeID = "k8s-rhel76-qual-10-247-98-140"
-	f.service.nodeIP = "10.247.98.140"
+	f.service.nodeID = "k8s-rhel76-qual-1.1.1.1"
+	f.service.nodeIP = "1.1.1.1"
 	utils.ConfigureLogger(opts.DebugEnabled)
 	return svc
 }
