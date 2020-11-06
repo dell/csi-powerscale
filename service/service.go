@@ -329,6 +329,16 @@ func (s *service) GetCSINodeID(ctx context.Context) (string, error) {
 	return "", errors.New("Cannot get node id")
 }
 
+// GetCSINodeIP gets the IP of the CSI node
+func (s *service) GetCSINodeIP(ctx context.Context) (string, error) {
+	// if the node ip has already been initialized, return it
+	if s.nodeIP != "" {
+		return s.nodeIP, nil
+	}
+	// node id couldn't be read from env variable while initializing service, return with error
+	return "", errors.New("Cannot get node IP")
+}
+
 func (s *service) getVolByName(isiPath, volName string) (isi.Volume, error) {
 
 	// The `GetVolume` API returns a slice of volumes, but when only passing

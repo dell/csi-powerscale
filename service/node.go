@@ -18,7 +18,6 @@ package service
 import (
 	"errors"
 	"fmt"
-
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/common/utils"
 	log "github.com/sirupsen/logrus"
@@ -182,10 +181,18 @@ func (s *service) NodeGetInfo(
 	req *csi.NodeGetInfoRequest) (
 	*csi.NodeGetInfoResponse, error) {
 
-	nodeID, err := s.GetCSINodeID(ctx)
+	// Fetch node pod FQDN
+	nodeID, err := utils.GetOwnFQDN()
 	if (err) != nil {
 		return nil, err
 	}
+
+	nodeIP, err := s.GetCSINodeIP(ctx)
+	if (err) != nil {
+		return nil, err
+	}
+
+	nodeID = nodeID + utils.NodeIDSeparator + nodeIP
 
 	return &csi.NodeGetInfoResponse{NodeId: nodeID}, nil
 }
