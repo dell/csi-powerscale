@@ -23,6 +23,26 @@ For clarity, Dell EMC does not provide support for any source code modifications
 
 For any CSI driver issues, questions or feedback, join the [Dell EMC Container community](<https://www.dell.com/community/Containers/bd-p/Containers/>)
 
+## Release Notes
+
+Update below sample files of Dell CSI Operator corresponding to Isilon/PowerScale with latest Patch release : CSI Driver for Powerscale v1.3.0.1
+
+**Note**: Replace image "dellemc/csi-isilon:v1.3.0.000R" with "dellemc/csi-isilon:v1.3.0.100R"
+
+***Upstream Kubernetes***
+
+samples/isilon_v130_k8s_117.yaml
+
+samples/isilon_v130_k8s_118.yaml
+
+samples/isilon_v130_k8s_119.yaml
+
+***Openshift Environments***
+
+samples/isilon_v130_ops_43.yaml
+
+samples/isilon_v130_ops_44.yaml
+
 ## Overview
 
 PowerScale CSI plugins implement an interface between CSI enabled Container Orchestrator(CO) and PowerScale Storage Array. It allows dynamically provisioning PowerScale volumes 
@@ -416,3 +436,5 @@ On UCP based clusters, kubectl may not be installed by default, it is important 
 installation of the driver.
 
 The worker nodes on UCP backed clusters may run any of the OSs which we support with upstream clusters.
+
+

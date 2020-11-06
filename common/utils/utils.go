@@ -190,6 +190,12 @@ var VolumeIDSeparator = "=_=_="
 // VolumeIDPattern is the regex pattern that identifies the quota id set in the export's description field set by csi driver
 var VolumeIDPattern = regexp.MustCompile(fmt.Sprintf("^(.+)%s(\\d+)%s(.+)$", VolumeIDSeparator, VolumeIDSeparator))
 
+// NodeIDSeparator is the separator that separates node name and IP Address
+var NodeIDSeparator = "=#=#="
+
+// NodeIDPattern is the regex pattern that identifies the NodeID
+var NodeIDPattern = regexp.MustCompile(fmt.Sprintf("^(.+)%s(.+)$", NodeIDSeparator))
+
 // ExportConflictMessagePattern is the regex pattern that identifies the error message of export conflict
 var ExportConflictMessagePattern = regexp.MustCompile(fmt.Sprintf("^Export rules (\\d+) and (\\d+) conflict on '(.+)'$"))
 
@@ -355,6 +361,19 @@ func ParseNormalizedVolumeID(volID string) (string, int, string, error) {
 		volID, matches[1], exportID, matches[3])
 
 	return matches[1], exportID, matches[3], nil
+}
+
+// Parses NodeID to node name and IP address using pattern '^(.+)=#=#=(.+)$'
+func ParseNodeID(nodeID string) (string, string, error) {
+	matches := NodeIDPattern.FindStringSubmatch(nodeID)
+
+	if len(matches) < 3 {
+		return "", "", fmt.Errorf("node ID '%s' cannot match the expected '^(.+)=#=#=(.+)$' pattern", nodeID)
+	}
+
+	log.Debugf("Node ID '%s' parsed into node name '%s' and IP address '%s'", nodeID, matches[1], matches[2])
+
+	return matches[1], matches[2], nil
 }
 
 // GetPathForVolume gets the volume full path by the combination of isiPath and volumeName

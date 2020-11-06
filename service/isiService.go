@@ -18,7 +18,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"net"
 
 	utils "github.com/dell/csi-isilon/common/utils"
 	isi "github.com/dell/goisilon"
@@ -341,7 +340,7 @@ func (svc *isiService) IsVolumeExistent(isiPath, volID, name string) bool {
 	return isExistent
 }
 
-func (svc *isiService) OtherClientsAlreadyAdded(exportID int, accessZone string, clientIP string) bool {
+func (svc *isiService) OtherClientsAlreadyAdded(exportID int, accessZone string, nodeID string) bool {
 	export, _ := svc.GetExportByIDWithZone(exportID, accessZone)
 
 	if export == nil {
@@ -349,44 +348,43 @@ func (svc *isiService) OtherClientsAlreadyAdded(exportID int, accessZone string,
 		return true
 	}
 
+	clientFQDN, clientIP, err := utils.ParseNodeID(nodeID)
+	if err != nil {
+		log.Debugf("failed to parse node ID '%s', return true for otherClientsAlreadyAdded as a safer return value", nodeID)
+		return true
+	}
+
 	clientFieldsNotEmpty := len(*export.Clients) > 0 || len(*export.ReadOnlyClients) > 0 || len(*export.ReadWriteClients) > 0 || len(*export.RootClients) > 0
 
-	isNodeInClientFields := utils.IsStringInSlices(clientIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
+	isNodeInClientFields := utils.IsStringInSlices(clientFQDN, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 
-	fqdn, _ := utils.GetFQDNByIP(clientIP)
-
-	if fqdn != "" {
-		isNodeInClientFields = isNodeInClientFields || utils.IsStringInSlices(fqdn, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
+	if clientIP != "" {
+		isNodeInClientFields = isNodeInClientFields || utils.IsStringInSlices(clientIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 	}
 
 	return clientFieldsNotEmpty && !isNodeInClientFields
 }
 
-func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(exportID int, accessZone, clientIP string, addClientFunc func(exportID int, accessZone, clientIP string) error) error {
-	log.Debugf("AddExportClientNetworkIdentifierByID client ip '%s'", clientIP)
+func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(exportID int, accessZone, nodeID string, addClientFunc func(exportID int, accessZone, clientIP string) error) error {
 
-	var fqdn string
-	if net.ParseIP(clientIP) != nil {
-		fqdn, _ = utils.GetFQDNByIP(clientIP)
-		log.Debugf("ip '%s' is resolved to '%s'", clientIP, fqdn)
-	} else {
-		fqdn = clientIP
-		log.Debugf("fqdn is '%s'", fqdn)
+	// try adding by client FQDN first as it is preferred over IP for its stableness.
+	// OneFS API will return error if it cannot resolve the client FQDN ,
+	// in that case, fall back to adding by IP
+
+	clientFQDN, clientIP, err := utils.ParseNodeID(nodeID)
+	if err != nil {
+		return err
 	}
 
-	if fqdn != "" {
+	log.Debugf("AddExportClientNetworkIdentifierByID client FQDN '%s' client IP '%s'", clientFQDN, clientIP)
 
-		// try adding by FQDN first as FQDN is preferred over IP for its stableness. OneFS API will return error if it cannot resolve the FQDN,
-		// in that case, fall back to adding by IP
-		var err error
-		if err = addClientFunc(exportID, accessZone, fqdn); err == nil {
+	if err = addClientFunc(exportID, accessZone, clientFQDN); err == nil {
 
-			//adding by FQDN is successful, no need to trying adding by IP
-			return nil
-		}
-
-		log.Errorf("failed to add client fqdn '%s' to export id '%d' : '%v', try using client ip '%s'", fqdn, exportID, err, clientIP)
+		//adding by client FQDN is successful, no need to trying adding by IP
+		return nil
 	}
+
+	log.Infof("failed to add client FQDN '%s' to export id '%d' : '%v'", clientFQDN, exportID, err)
 
 	if err := addClientFunc(exportID, accessZone, clientIP); err != nil {
 		return fmt.Errorf("failed to add client ip '%s' to export id '%d' : '%v'", clientIP, exportID, err)
@@ -419,10 +417,16 @@ func (svc *isiService) AddExportReadOnlyClientByIDWithZone(exportID int, accessZ
 	return nil
 }
 
-func (svc *isiService) RemoveExportClientByIDWithZone(exportID int, accessZone, clientIP string) error {
+func (svc *isiService) RemoveExportClientByIDWithZone(exportID int, accessZone, nodeID string) error {
 	// it could either be IP or FQDN that has been added to the export's client fields, should consider both during the removal
-	fqdn, _ := utils.GetFQDNByIP(clientIP)
-	clientsToRemove := []string{clientIP, fqdn}
+	clientFQDN, clientIP, err := utils.ParseNodeID(nodeID)
+	if err != nil {
+		return err
+	}
+
+	log.Debugf("RemoveExportClientByIDWithZone client FQDN '%s' client IP '%s'", clientFQDN, clientIP)
+
+	clientsToRemove := []string{clientIP, clientFQDN}
 
 	log.Debugf("RemoveExportClientByName client IP '%v'", clientsToRemove)
 
