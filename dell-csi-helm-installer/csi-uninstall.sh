@@ -12,24 +12,31 @@ SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 DRIVERDIR="${SCRIPTDIR}/../helm"
 PROG="${0}"
 
+# export the name of the debug log, so child processes will see it
+export DEBUGLOG="${SCRIPTDIR}/uninstall-debug.log"
+
 declare -a VALIDDRIVERS
 
 source "$SCRIPTDIR"/common.sh
 
+if [ -f "${DEBUGLOG}" ]; then
+  rm -f "${DEBUGLOG}"
+fi
+
 #
 # usage will print command execution help and then exit
 function usage() {
-    echo "Help for $PROG"
-    echo
-    echo "Usage: $PROG options..."
-    echo "Options:"
-    echo "  Required"
-    echo "  --namespace[=]<namespace>  Kubernetes namespace to uninstall the CSI driver from"
+    decho "Help for $PROG"
+    decho
+    decho "Usage: $PROG options..."
+    decho "Options:"
+    decho "  Required"
+    decho "  --namespace[=]<namespace>  Kubernetes namespace to uninstall the CSI driver from"
 
-    echo "  Optional"
-    echo "  --release[=]<helm release> Name to register with helm, default value will match the driver name"
-    echo "  -h                         Help"
-    echo
+    decho "  Optional"
+    decho "  --release[=]<helm release> Name to register with helm, default value will match the driver name"
+    decho "  -h                         Help"
+    decho
 
     exit 0
 }
@@ -41,18 +48,19 @@ function usage() {
 function validate_params() {
     # make sure the driver was specified
     if [ -z "${DRIVER}" ]; then
-        echo "No driver specified"
+        decho "No driver specified"
         exit 1
     fi
     # make sure the driver name is valid
     if [[ ! "${VALIDDRIVERS[@]}" =~ "${DRIVER}" ]]; then
-        echo "Driver: ${DRIVER} is invalid."
-        echo "Valid options are: ${VALIDDRIVERS[@]}"
+        decho "Driver: ${DRIVER} is invalid."
+        decho "Valid options are: ${VALIDDRIVERS[@]}"
         exit 1
     fi
     # the namespace is required
     if [ -z "${NAMESPACE}" ]; then
-        echo "No namespace specified"
+        decho "No namespace specified"
+        usage
         exit 1
     fi
 }
@@ -60,15 +68,16 @@ function validate_params() {
 
 # check_for_driver will see if the driver is installed within the namespace provided
 function check_for_driver() {
-    NUM=$(helm list --namespace "${NAMESPACE}" | grep "^${RELEASE}\b" | wc -l)
+    NUM=$(run_command helm list --namespace "${NAMESPACE}" | grep "^${RELEASE}\b" | wc -l)
     if [ "${NUM}" == "0" ]; then
-        echo "The CSI Driver is not installed."
+        log error "The CSI Driver is not installed."
         exit 1
     fi
 }
 
 # get the list of valid CSI Drivers, this will be the list of directories in drivers/ that contain helm charts
 get_drivers "${DRIVERDIR}"
+
 # if only one driver was found, set the DRIVER to that one
 if [ ${#VALIDDRIVERS[@]} -eq 1 ]; then
   DRIVER="${VALIDDRIVERS[0]}"
@@ -95,8 +104,8 @@ while getopts ":h-:" optchar; do
         RELEASE=${OPTARG#*=}
         ;;
       *)
-        echo "Unknown option --${OPTARG}"
-        echo "For help, run $PROG -h"
+        decho "Unknown option --${OPTARG}"
+        decho "For help, run $PROG -h"
         exit 1
         ;;
       esac
@@ -105,8 +114,8 @@ while getopts ":h-:" optchar; do
       usage
     ;;
     *)
-      echo "Unknown option -${OPTARG}"
-      echo "For help, run $PROG -h"
+      decho "Unknown option -${OPTARG}"
+      decho "For help, run $PROG -h"
       exit 1
       ;;
   esac
@@ -119,12 +128,12 @@ RELEASE=$(get_release_name "${DRIVER}")
 validate_params
 
 check_for_driver
-helm delete -n "${NAMESPACE}" "${RELEASE}"
+run_command helm delete -n "${NAMESPACE}" "${RELEASE}"
 if [ $? -ne 0 ]; then
-    echo "Removal of the CSI Driver was unsuccessful"
+    decho "Removal of the CSI Driver was unsuccessful"
     exit 1
 fi
 
-echo "Removal of the CSI Driver is in progress."
-echo "It may take a few minutes for all pods to terminate."
+decho "Removal of the CSI Driver is in progress."
+decho "It may take a few minutes for all pods to terminate."
 

@@ -36,7 +36,7 @@ func TestMain(m *testing.M) {
 	}, godog.Options{
 		Format: "pretty",
 		Paths:  []string{"features"},
-		//Tags: "wip",
+		Tags:   "~todo",
 	})
 	fmt.Printf("godog finished\n")
 

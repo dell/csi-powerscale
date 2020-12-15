@@ -19,20 +19,46 @@ package main
 
 import (
 	"context"
-
+	"flag"
+	"fmt"
 	"github.com/dell/csi-isilon/common/constants"
+	"github.com/dell/csi-isilon/common/k8sutils"
+	"os"
+	"strings"
+
 	"github.com/dell/csi-isilon/provider"
 	"github.com/rexray/gocsi"
 )
 
 // main is ignored when this package is built as a go plug-in
 func main() {
-	gocsi.Run(
-		context.Background(),
-		constants.PluginName,
-		"An Isilon Container Storage Interface (CSI) Plugin",
-		usage,
-		provider.New())
+	enableLeaderElection := flag.Bool("leader-election", false, "Enables leader election.")
+	leaderElectionNamespace := flag.String("leader-election-namespace", "", "The namespace where leader election lease will be created. Defaults to the pod namespace if not set.")
+	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+	flag.Parse()
+
+	run := func(ctx context.Context) {
+		gocsi.Run(
+			ctx,
+			constants.PluginName,
+			"An Isilon Container Storage Interface (CSI) Plugin",
+			usage,
+			provider.New())
+	}
+
+	if !*enableLeaderElection {
+		run(context.TODO())
+	} else {
+		driverName := strings.Replace(constants.PluginName, ".", "-", -1)
+		lockName := fmt.Sprintf("driver-%s", driverName)
+		k8sclientset, err := k8sutils.CreateKubeClientSet(*kubeconfig)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "failed to initialize leader election: %v", err)
+			os.Exit(1)
+		}
+		// Attempt to become leader and start the driver
+		k8sutils.LeaderElection(k8sclientset, lockName, *leaderElectionNamespace, run)
+	}
 }
 
 const usage = `   X_CSI_ISI_ENDPOINT 

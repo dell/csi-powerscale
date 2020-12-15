@@ -60,7 +60,7 @@ Feature: Isilon CSI interface
       And a volume request "integration0" "8"
       When I call CreateVolume
       When I call ControllerPublishVolume "X_CSI_NODE_NAME"
-      Then check Isilon client exists "X_CSI_NODE_IP"
+      Then check Isilon client exists "X_CSI_NODE_NAME"
       When I call NodeStageVolume
       Then there are no errors
       When I call NodePublishVolume "datadir0"

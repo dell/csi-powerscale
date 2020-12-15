@@ -115,6 +115,7 @@ func (f *feature) aBasicVolumeRequest(name string, size int64) error {
 	capability := new(csi.VolumeCapability)
 	mount := new(csi.VolumeCapability_MountVolume)
 	mount.FsType = "nfs"
+	mount.MountFlags = []string{"vers=4"}
 	mountType := new(csi.VolumeCapability_Mount)
 	mountType.Mount = mount
 	capability.AccessType = mountType
@@ -247,6 +248,17 @@ func (f *feature) thereIsADirectory(name string) error {
 	return nil
 }
 
+func (f *feature) thereIsNoDirectory(name string) error {
+	ctx := context.Background()
+	isiClient, err = createIsilonClient()
+	_, err = isiClient.GetVolumeWithIsiPath(ctx, f.isiPath, "", name)
+	if err == nil {
+		f.addError(fmt.Errorf("there should not be a directory '%s'\n", name))
+		panic(fmt.Sprintf("there should not be a directory '%s'\n", name))
+	}
+	return nil
+}
+
 func (f *feature) thereIsAnExport(name string) error {
 	ctx := context.Background()
 	isiClient, err = createIsilonClient()
@@ -260,6 +272,34 @@ func (f *feature) thereIsAnExport(name string) error {
 		fmt.Printf("failed to get export with path: '%s' and access zone '%s'\n", path, accessZone)
 		panic(fmt.Sprintf("there should be an export'\n"))
 	}
+	return nil
+}
+
+func (f *feature) thereIsAnExportForSnapshotDir(name string) error {
+	ctx := context.Background()
+	isiClient, err = createIsilonClient()
+
+	snapshotSrc, err := isiClient.GetIsiSnapshotByIdentity(ctx, name)
+	if err != nil {
+		f.addError(err)
+		fmt.Printf("failed to get snapshot id for snapshot '#{name}', error '#{err}'\n")
+		panic(fmt.Sprintf("failed to get snapshot id for snapshot '%s', error '%v'\n", name, err))
+	}
+
+	snapshotIsiPath, err := isiClient.GetSnapshotIsiPath(ctx, f.isiPath, strconv.FormatInt(snapshotSrc.Id, 10))
+	if err != nil {
+		f.addError(err)
+		fmt.Printf("failed to get snapshot dir path for snapshot '#{name}', error '#{err}'\n")
+		panic(fmt.Sprintf("failed to get snapshot dir path for snapshot '%s', error '%v'\n", name, err))
+	}
+
+	export, err := isiClient.GetExportWithPathAndZone(ctx, snapshotIsiPath, "")
+	if err != nil || export == nil {
+		f.addError(err)
+		fmt.Printf("failed to get export for snapshot dir path error '#{err}'\n")
+		panic(fmt.Sprintf("failed to get export for snapshot dir path error '%v'\n", err))
+	}
+
 	return nil
 }
 
@@ -300,7 +340,13 @@ func (f *feature) verifySize(name string) error {
 	} else {
 		println(quota.Thresholds.Hard)
 		println(f.createVolumeRequest.CapacityRange.RequiredBytes)
-		if quota.Thresholds.Hard != f.createVolumeRequest.CapacityRange.RequiredBytes {
+		// For volume requests with large size like 1EB the driver will set the requested size to 0
+		// and the default volume size with which the volume is created by Isilon is 3GB in this case
+		if f.createVolumeRequest.CapacityRange.RequiredBytes == 0 {
+			if quota.Thresholds.Hard != 0 && quota.Thresholds.Hard != 3221225472 {
+				panic(fmt.Sprintf("the size of volume '%s' is wrong, expected is '0' or '3221225472' \n", name))
+			}
+		} else if quota.Thresholds.Hard != f.createVolumeRequest.CapacityRange.RequiredBytes {
 			panic(fmt.Sprintf("the size of volume '%s' is wrong, expected is '%d'\n", name, f.createVolumeRequest.CapacityRange.RequiredBytes))
 		}
 	}
@@ -526,15 +572,15 @@ func (f *feature) checkIsilonClientExistsForOneExport(nodeIP string, exportID in
 	var req *csi.ControllerPublishVolumeRequest
 	req = f.controllerPublishVolumeRequest
 	am, err = utils.GetAccessMode(req)
-	fqdn, _ := utils.GetFQDNByIP(nodeIP)
+	_, fqdn, clientIP, _ := utils.ParseNodeID(nodeIP)
 	// if fqdn exists, check fqdn firstly, then nodeIP
 	if fqdn != "" {
 		err = f.checkNodeExistsForOneExport(am, fqdn, export)
 		if err != nil {
-			err = f.checkNodeExistsForOneExport(am, nodeIP, export)
+			err = f.checkNodeExistsForOneExport(am, clientIP, export)
 		}
 	} else {
-		err = f.checkNodeExistsForOneExport(am, nodeIP, export)
+		err = f.checkNodeExistsForOneExport(am, clientIP, export)
 	}
 	return err
 }
@@ -593,19 +639,19 @@ func (f *feature) checkIsilonClientNotExistsForOneExport(nodeIP string, exportID
 	if export == nil {
 		panic(fmt.Sprintf("failed to get export by id '%d' and zone '%s'\n", exportID, accessZone))
 	}
-	fqdn, _ := utils.GetFQDNByIP(nodeIP)
+	_, fqdn, clientIP, _ := utils.ParseNodeID(nodeIP)
 	if fqdn != "" {
-		isNodeIPInClientFields := utils.IsStringInSlices(nodeIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
+		isNodeIPInClientFields := utils.IsStringInSlices(clientIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 		isNodeFqdnInClientFields := utils.IsStringInSlices(fqdn, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 		if isNodeIPInClientFields || isNodeFqdnInClientFields {
-			err := fmt.Errorf("nodeIP '%s' still exists\n", nodeIP)
+			err := fmt.Errorf("clientFQDN '%s' or clientIP '%s' still exists\n", fqdn, clientIP)
 			fmt.Print(err)
 			return err
 		}
 	} else {
-		isNodeIPInClientFields := utils.IsStringInSlices(nodeIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
+		isNodeIPInClientFields := utils.IsStringInSlices(clientIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 		if isNodeIPInClientFields {
-			err := fmt.Errorf("nodeIP '%s' still exists\n", nodeIP)
+			err := fmt.Errorf("clientIP '%s' still exists\n", clientIP)
 			fmt.Print(err)
 			return err
 		}
@@ -639,10 +685,29 @@ func getDataDirName(path string) string {
 
 func (f *feature) getNodePublishVolumeRequest(path string) *csi.NodePublishVolumeRequest {
 	req := new(csi.NodePublishVolumeRequest)
-	req.VolumeId = f.volID
+	if f.volID != "" {
+		req.VolumeId = f.volID
+	} else {
+		// For ephemeral volumes
+		req.VolumeId = "csi-09f8a4447eb5e3141ff3"
+	}
 	req.Readonly = false
 	req.TargetPath = getDataDirName(path)
-	req.VolumeCapability = f.capability
+	if f.capability != nil {
+		req.VolumeCapability = f.capability
+	} else {
+		// For ephemeral volumes
+		capability := new(csi.VolumeCapability)
+		accessMode := new(csi.VolumeCapability_AccessMode)
+		accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
+		capability.AccessMode = accessMode
+		mount := new(csi.VolumeCapability_MountVolume)
+		mount.FsType = ""
+		mountType := new(csi.VolumeCapability_Mount)
+		mountType.Mount = mount
+		capability.AccessType = mountType
+		req.VolumeCapability = capability
+	}
 	req.VolumeContext = f.vol.VolumeContext
 	f.nodePublishVolumeRequest = req
 	return req
@@ -656,6 +721,19 @@ func (f *feature) iCallNodePublishVolume(path string) error {
 		f.addError(err)
 	} else {
 		fmt.Printf("NodePublishVolume '%s' completed successfully\n", f.volID)
+	}
+	return nil
+}
+
+func (f *feature) iCallEphemeralNodePublishVolume(path string) error {
+	f.nodePublishVolumeRequest = f.getNodePublishVolumeRequest(path)
+	f.nodePublishVolumeRequest.VolumeContext["csi.storage.k8s.io/ephemeral"] = "true"
+	err := f.nodePublishVolume(f.nodePublishVolumeRequest)
+	if err != nil {
+		fmt.Printf("EphemeralNodePublishVolume error: '%s'\n", err.Error())
+		f.addError(err)
+	} else {
+		fmt.Printf("EphemeralNodePublishVolume '%s' completed successfully\n", f.volID)
 	}
 	return nil
 }
@@ -692,6 +770,21 @@ func (f *feature) iCallNodeUnpublishVolume(path string) error {
 		f.addError(err)
 	} else {
 		fmt.Printf("NodeUnpublishVolume '%s' completed successfully\n", f.volID)
+	}
+	return nil
+}
+
+func (f *feature) iCallEphemeralNodeUnpublishVolume(path string) error {
+	f.nodeUnpublishVolumeRequest = f.getNodeUnpublishVolumeRequest(path)
+	if f.nodeUnpublishVolumeRequest.VolumeId == "" {
+		f.nodeUnpublishVolumeRequest.VolumeId = f.nodePublishVolumeRequest.VolumeId
+	}
+	err := f.nodeUnpublishVolume(f.nodeUnpublishVolumeRequest)
+	if err != nil {
+		fmt.Printf("Ephemeral NodeUnpublishVolume error: '%s'\n", err.Error())
+		f.addError(err)
+	} else {
+		fmt.Printf("Ephemeral NodeUnpublishVolume '%s' completed successfully\n", f.volID)
 	}
 	return nil
 }
@@ -875,6 +968,42 @@ func (f *feature) iCallCreateVolumeFromSnapshot(name string) error {
 	fmt.Printf("Calling CreateVolume with snapshot source '%s'\n", f.snapshotID)
 	fmt.Printf("The access zone is '%s', and the isiPath is '%s'\n", req.Parameters[AccessZoneParam], req.Parameters[IsiPathParam])
 	_ = f.createAVolume(req, "single CreateVolume from Snap")
+	time.Sleep(SleepTime)
+	return nil
+}
+
+func (f *feature) iCallCreateROVolumeFromSnapshot(name string) error {
+	req := f.createVolumeRequest
+	req.Name = name
+	source := &csi.VolumeContentSource_SnapshotSource{SnapshotId: f.snapshotID}
+	req.VolumeContentSource = new(csi.VolumeContentSource)
+	req.VolumeContentSource.Type = &csi.VolumeContentSource_Snapshot{Snapshot: source}
+
+	vc := &csi.VolumeCapability{}
+	vc.AccessMode = &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY}
+	vc.AccessType = &csi.VolumeCapability_Mount{Mount: &csi.VolumeCapability_MountVolume{MountFlags: nil}}
+	req.VolumeCapabilities = []*csi.VolumeCapability{vc}
+	f.capability = vc
+
+	fmt.Printf("Calling RO CreateVolume with snapshot source '%s'\n", f.snapshotID)
+	fmt.Printf("The access zone is '%s', and the isiPath is '%s'\n", req.Parameters[AccessZoneParam], req.Parameters[IsiPathParam])
+	err := f.createAVolume(req, "single RO CreateVolume from Snap")
+	time.Sleep(SleepTime)
+	return err
+}
+
+func (f *feature) iCallCreateVolumeFromVolume(newVolume, srcVolume string, size int64) error {
+	req := f.createVolumeRequest
+	req.Name = newVolume
+	capacityRange := new(csi.CapacityRange)
+	capacityRange.RequiredBytes = size * 1024 * 1024 * 1024
+	req.CapacityRange = capacityRange
+	source := &csi.VolumeContentSource_VolumeSource{VolumeId: f.volID}
+	req.VolumeContentSource = new(csi.VolumeContentSource)
+	req.VolumeContentSource.Type = &csi.VolumeContentSource_Volume{Volume: source}
+	fmt.Printf("Calling CreateVolume with volume source '%s' volume id '%s'\n", srcVolume, f.volID)
+	fmt.Printf("The access zone is '%s', and the isiPath is '%s'\n", req.Parameters[AccessZoneParam], req.Parameters[IsiPathParam])
+	_ = f.createAVolume(req, "single CreateVolume '#{newVolume}' from volume '#{srcVolume}'")
 	time.Sleep(SleepTime)
 	return nil
 }
@@ -1116,7 +1245,7 @@ func (f *feature) checkIsilonClientsExist(nVols int) error {
 		volName := fmt.Sprintf("scale%d", i)
 		volId := f.volNameID[volName]
 		_, exportID, accessZone, _ := utils.ParseNormalizedVolumeID(volId)
-		var nodeIP = os.Getenv("X_CSI_NODE_IP")
+		var nodeIP = os.Getenv("X_CSI_NODE_NAME")
 		err := f.checkIsilonClientExistsForOneExport(nodeIP, exportID, accessZone)
 		if err != nil {
 			panic(fmt.Sprintf("check Isilon clients exist unsuccessfully\n"))
@@ -1130,7 +1259,7 @@ func (f *feature) checkIsilonClientsNotExist(nVols int) error {
 		volName := fmt.Sprintf("scale%d", i)
 		volID := f.volNameID[volName]
 		_, exportID, accessZone, _ := utils.ParseNormalizedVolumeID(volID)
-		var nodeIP = os.Getenv("X_CSI_NODE_IP")
+		var nodeIP = os.Getenv("X_CSI_NODE_NAME")
 		err := f.checkIsilonClientNotExistsForOneExport(nodeIP, exportID, accessZone)
 		if err != nil {
 			panic(fmt.Sprintf("check Isilon clients not exist unsuccessfully\n"))
@@ -1403,10 +1532,12 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a basic volume request "([^"]*)" "(\d+)"$`, f.aBasicVolumeRequest)
 	s.Step(`^I call CreateVolume$`, f.iCallCreateVolume)
 	s.Step(`^there is a directory "([^"]*)"$`, f.thereIsADirectory)
+	s.Step(`^there is no directory "([^"]*)"$`, f.thereIsNoDirectory)
 	s.Step(`^verify "([^"]*)" size$`, f.verifySize)
 	s.Step(`^I call DeleteVolume$`, f.iCallDeleteVolume)
 	s.Step(`^there is not a directory "([^"]*)"$`, f.thereIsNotADirectory)
 	s.Step(`^there is an export "([^"]*)"$`, f.thereIsAnExport)
+	s.Step(`^there is an export for snapshot dir "([^"]*)"$`, f.thereIsAnExportForSnapshotDir)
 	s.Step(`^there is not an export "([^"]*)"$`, f.thereIsNotAnExport)
 	s.Step(`^I call ControllerPublishVolume "([^"]*)"$`, f.iCallControllerPublishVolume)
 	s.Step(`^I call ControllerUnpublishVolume "([^"]*)"$`, f.iCallControllerUnpublishVolume)
@@ -1420,6 +1551,8 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^the error contains "([^"]*)"$`, f.theErrorContains)
 	s.Step(`^I call NodePublishVolume "([^"]*)"$`, f.iCallNodePublishVolume)
 	s.Step(`^I call NodeUnpublishVolume "([^"]*)"$`, f.iCallNodeUnpublishVolume)
+	s.Step(`^I call EphemeralNodePublishVolume "([^"]*)"$`, f.iCallEphemeralNodePublishVolume)
+	s.Step(`^I call EphemeralNodeUnpublishVolume "([^"]*)"$`, f.iCallEphemeralNodeUnpublishVolume)
 	s.Step(`^verify published volume with access "([^"]*)" "([^"]*)"$`, f.verifyPublishedVolumeWithAccess)
 	s.Step(`^verify not published volume with access "([^"]*)" "([^"]*)"$`, f.verifyNotPublishedVolumeWithAccess)
 	s.Step(`^I call CreateSnapshot "([^"]*)" "([^"]*)"$`, f.iCallCreateSnapshot)
@@ -1427,6 +1560,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^there is a snapshot "([^"]*)"$`, f.thereIsASnapshot)
 	s.Step(`^there is not a snapshot "([^"]*)"$`, f.thereIsNotASnapshot)
 	s.Step(`^I call CreateVolumeFromSnapshot "([^"]*)"$`, f.iCallCreateVolumeFromSnapshot)
+	s.Step(`^I call CreateROVolumeFromSnapshot "([^"]*)"$`, f.iCallCreateROVolumeFromSnapshot)
 	s.Step(`^I call DeleteAllVolumes$`, f.iCallDeleteAllVolumes)
 	s.Step(`^I call DeleteAllSnapshots$`, f.iCallDeleteAllSnapshots)
 	s.Step(`^there is not a quota "([^"]*)"$`, f.thereIsNotAQuota)
@@ -1448,4 +1582,5 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^there are not (\d+) exports$`, f.thereAreNotExports)
 	s.Step(`^there are not (\d+) quotas$`, f.thereAreNotQuotas)
 	s.Step(`^there are no errors$`, f.thereAreNoErrors)
+	s.Step(`^I call CreateVolumeFromVolume "([^"]*)" "([^"]*)" "([^"]*)"$`, f.iCallCreateVolumeFromVolume)
 }

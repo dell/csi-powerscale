@@ -4,6 +4,7 @@ metadata:
   name: {{ required "Must provide a storage class name." .Values.storageClass.name}}
   annotations:
     storageclass.beta.kubernetes.io/is-default-class: {{ .Values.storageClass.isDefault | quote }}
+    "helm.sh/resource-policy": keep
 provisioner: csi-isilon.dellemc.com
 reclaimPolicy: {{ required "Must provide a storage class reclaim policy." .Values.storageClass.reclaimPolicy }}
 allowVolumeExpansion: true
