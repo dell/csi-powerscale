@@ -18,6 +18,8 @@ package service
 import (
 	"errors"
 	"fmt"
+	"github.com/dell/csi-isilon/common/constants"
+	"github.com/dell/csi-isilon/common/k8sutils"
 	"log"
 	"net"
 	"net/http/httptest"
@@ -32,6 +34,8 @@ import (
 	"github.com/rexray/gocsi"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"os/exec"
 )
 
 type feature struct {
@@ -203,8 +207,8 @@ func (f *feature) getService() *service {
 	svc.opts = opts
 	svc.mode = "controller"
 	f.service = svc
-	f.service.nodeID = "k8s-rhel76-qual-1-1-1-1"
-	f.service.nodeIP = "1.1.1.1"
+	f.service.nodeID = "k8s-rhel76-qual=#=#=10.247.98.140"
+	f.service.nodeIP = "10.247.98.140"
 
 	utils.ConfigureLogger(opts.DebugEnabled)
 
@@ -226,6 +230,8 @@ func FeatureContext(s *godog.Suite) {
 	f := &feature{}
 	s.Step(`^a Isilon service$`, f.aIsilonService)
 	s.Step(`^a Isilon service with params "([^"]*)" "([^"]*)"$`, f.aIsilonServiceWithParams)
+	s.Step(`^a Isilon service with custom topology "([^"]*)" "([^"]*)"$`, f.aIsilonServiceWithParamsForCustomTopology)
+	s.Step(`^a Isilon service with custom topology and no label "([^"]*)" "([^"]*)"$`, f.aIsilonServiceWithParamsForCustomTopologyNoLabel)
 	s.Step(`^I render Isilon service unreachable$`, f.renderOneFSAPIUnreachable)
 	s.Step(`^I enable quota$`, f.enableQuota)
 	s.Step(`^I call GetPluginInfo$`, f.iCallGetPluginInfo)
@@ -260,6 +266,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a controller published volume$`, f.aControllerPublishedVolume)
 	s.Step(`^a capability with voltype "([^"]*)" access "([^"]*)"$`, f.aCapabilityWithVoltypeAccess)
 	s.Step(`^I call NodePublishVolume$`, f.iCallNodePublishVolume)
+	s.Step(`^I call EphemeralNodePublishVolume$`, f.iCallEphemeralNodePublishVolume)
 	s.Step(`^get Node Publish Volume Request$`, f.getNodePublishVolumeRequest)
 	s.Step(`^I change the target path$`, f.iChangeTheTargetPath)
 	s.Step(`^I mark request read only$`, f.iMarkRequestReadOnly)
@@ -273,6 +280,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call ListVolumes with max entries (-?\d+) starting token "([^"]*)"$`, f.iCallListVolumesWithMaxEntriesStartingToken)
 	s.Step(`^a valid ListVolumesResponse is returned$`, f.aValidListVolumesResponseIsReturned)
 	s.Step(`^I call NodeUnpublishVolume$`, f.iCallNodeUnpublishVolume)
+	s.Step(`^I call EphemeralNodeUnpublishVolume$`, f.iCallEphemeralNodeUnpublishVolume)
 	s.Step(`^a valid NodeUnpublishVolumeResponse is returned$`, f.aValidNodeUnpublishVolumeResponseIsReturned)
 	s.Step(`^I call CreateSnapshot "([^"]*)" "([^"]*)" "([^"]*)"$`, f.iCallCreateSnapshot)
 	s.Step(`^a valid CreateSnapshotResponse is returned$`, f.aValidCreateSnapshotResponseIsReturned)
@@ -1038,6 +1046,36 @@ func (f *feature) iCallNodeUnpublishVolume() error {
 	return nil
 }
 
+func (f *feature) iCallEphemeralNodeUnpublishVolume() error {
+	ctx := new(context.Context)
+	req := f.nodeUnpublishVolumeRequest
+	if req == nil {
+		_ = f.getNodeUnpublishVolumeRequest()
+		req = f.nodeUnpublishVolumeRequest
+	}
+	if inducedErrors.badVolumeIdentifier {
+		req.VolumeId = "bad volume identifier"
+	}
+	fmt.Printf("Calling NodePublishVolume\n")
+
+	f.nodeUnpublishVolumeResponse, f.err = f.service.NodeUnpublishVolume(*ctx, req)
+	if f.err != nil {
+		log.Printf("NodePublishVolume call failed: %s\n", f.err.Error())
+		if strings.Contains(f.err.Error(), "Target Path is required") {
+			// Rollback for the future calls
+			f.nodeUnpublishVolumeRequest.TargetPath = datadir
+		}
+	}
+	if f.nodeUnpublishVolumeResponse != nil {
+		err := os.RemoveAll(req.TargetPath)
+		if err != nil {
+			return nil
+		}
+		log.Printf("vol id %s\n", f.nodeUnpublishVolumeRequest.VolumeId)
+	}
+	return nil
+}
+
 func (f *feature) aValidNodeUnpublishVolumeResponseIsReturned() error {
 	if f.err != nil {
 		return f.err
@@ -1186,6 +1224,31 @@ func (f *feature) iCallNodePublishVolume() error {
 		_ = f.getNodePublishVolumeRequest()
 		req = f.nodePublishVolumeRequest
 	}
+	if inducedErrors.badVolumeIdentifier {
+		req.VolumeId = "bad volume identifier"
+	}
+	fmt.Printf("Calling NodePublishVolume\n")
+	_, err := f.service.NodePublishVolume(ctx, req)
+	if err != nil {
+		fmt.Printf("NodePublishVolume failed: %s\n", err.Error())
+		if f.err == nil {
+			f.err = err
+		}
+	} else {
+		fmt.Printf("NodePublishVolume completed successfully\n")
+	}
+	return nil
+}
+
+func (f *feature) iCallEphemeralNodePublishVolume() error {
+	header := metadata.New(map[string]string{"csi.requestid": "1"})
+	ctx := metadata.NewIncomingContext(context.Background(), header)
+	req := f.nodePublishVolumeRequest
+	if req == nil {
+		_ = f.getNodePublishVolumeRequest()
+		req = f.nodePublishVolumeRequest
+	}
+	f.nodePublishVolumeRequest.VolumeContext["csi.storage.k8s.io/ephemeral"] = "true"
 	if inducedErrors.badVolumeIdentifier {
 		req.VolumeId = "bad volume identifier"
 	}
@@ -1584,6 +1647,208 @@ func (f *feature) aIsilonServiceWithParams(user, mode string) error {
 	return nil
 }
 
+func (f *feature) aIsilonServiceWithParamsForCustomTopology(user, mode string) error {
+	f.checkGoRoutines("start aIsilonService")
+
+	f.err = nil
+	f.getPluginInfoResponse = nil
+	f.volumeIDList = f.volumeIDList[:0]
+	f.snapshotIDList = f.snapshotIDList[:0]
+
+	// configure gofsutil; we use a mock interface
+	gofsutil.UseMockFS()
+	gofsutil.GOFSMock.InduceBindMountError = false
+	gofsutil.GOFSMock.InduceMountError = false
+	gofsutil.GOFSMock.InduceGetMountsError = false
+	gofsutil.GOFSMock.InduceDevMountsError = false
+	gofsutil.GOFSMock.InduceUnmountError = false
+	gofsutil.GOFSMock.InduceFormatError = false
+	gofsutil.GOFSMock.InduceGetDiskFormatError = false
+	gofsutil.GOFSMock.InduceGetDiskFormatType = ""
+	gofsutil.GOFSMockMounts = gofsutil.GOFSMockMounts[:0]
+
+	// set induced errors
+	inducedErrors.badVolumeIdentifier = false
+	inducedErrors.invalidVolumeID = false
+	inducedErrors.noVolumeID = false
+	inducedErrors.differentVolumeID = false
+	inducedErrors.noNodeName = false
+	inducedErrors.noNodeID = false
+	inducedErrors.omitVolumeCapability = false
+	inducedErrors.omitAccessMode = false
+
+	// initialize volume and export existence status
+	stepHandlersErrors.ExportNotFoundError = true
+	stepHandlersErrors.VolumeNotExistError = true
+
+	// Get the httptest mock handler. Only set
+	// a new server if there isn't one already.
+	handler := getHandler()
+	// Get or reuse the cached service
+	f.getServiceWithParamsForCustomTopology(user, mode, true)
+	if handler != nil && os.Getenv("CSI_ISILON_ENDPOINT") == "" {
+		if f.server == nil {
+			f.server = httptest.NewServer(handler)
+		}
+		log.Printf("server url: %s\n", f.server.URL)
+		f.service.opts.EndpointURL = f.server.URL
+		urlList := strings.Split(f.server.URL, ":")
+		log.Printf("urlList: %v", urlList)
+		f.service.opts.Port = urlList[2]
+	} else {
+		f.server = nil
+	}
+	f.service.isiSvc, f.err = f.service.GetIsiService(context.Background())
+	f.checkGoRoutines("end aIsilonService")
+	f.service.logServiceStats()
+	if inducedErrors.noIsiService || inducedErrors.autoProbeNotEnabled {
+		f.service.isiSvc = nil
+	}
+	return nil
+}
+
+func (f *feature) aIsilonServiceWithParamsForCustomTopologyNoLabel(user, mode string) error {
+	f.checkGoRoutines("start aIsilonService")
+
+	f.err = nil
+	f.getPluginInfoResponse = nil
+	f.volumeIDList = f.volumeIDList[:0]
+	f.snapshotIDList = f.snapshotIDList[:0]
+
+	// configure gofsutil; we use a mock interface
+	gofsutil.UseMockFS()
+	gofsutil.GOFSMock.InduceBindMountError = false
+	gofsutil.GOFSMock.InduceMountError = false
+	gofsutil.GOFSMock.InduceGetMountsError = false
+	gofsutil.GOFSMock.InduceDevMountsError = false
+	gofsutil.GOFSMock.InduceUnmountError = false
+	gofsutil.GOFSMock.InduceFormatError = false
+	gofsutil.GOFSMock.InduceGetDiskFormatError = false
+	gofsutil.GOFSMock.InduceGetDiskFormatType = ""
+	gofsutil.GOFSMockMounts = gofsutil.GOFSMockMounts[:0]
+
+	// set induced errors
+	inducedErrors.badVolumeIdentifier = false
+	inducedErrors.invalidVolumeID = false
+	inducedErrors.noVolumeID = false
+	inducedErrors.differentVolumeID = false
+	inducedErrors.noNodeName = false
+	inducedErrors.noNodeID = false
+	inducedErrors.omitVolumeCapability = false
+	inducedErrors.omitAccessMode = false
+
+	// initialize volume and export existence status
+	stepHandlersErrors.ExportNotFoundError = true
+	stepHandlersErrors.VolumeNotExistError = true
+
+	// Get the httptest mock handler. Only set
+	// a new server if there isn't one already.
+	handler := getHandler()
+	// Get or reuse the cached service
+	f.getServiceWithParamsForCustomTopology(user, mode, false)
+	if handler != nil && os.Getenv("CSI_ISILON_ENDPOINT") == "" {
+		if f.server == nil {
+			f.server = httptest.NewServer(handler)
+		}
+		log.Printf("server url: %s\n", f.server.URL)
+		f.service.opts.EndpointURL = f.server.URL
+		urlList := strings.Split(f.server.URL, ":")
+		log.Printf("urlList: %v", urlList)
+		f.service.opts.Port = urlList[2]
+	} else {
+		f.server = nil
+	}
+	f.service.isiSvc, f.err = f.service.GetIsiService(context.Background())
+	f.checkGoRoutines("end aIsilonService")
+	f.service.logServiceStats()
+	if inducedErrors.noIsiService || inducedErrors.autoProbeNotEnabled {
+		f.service.isiSvc = nil
+	}
+	return nil
+}
+
+func removeNodeLabels(host string) (result bool) {
+	k8sclientset, err := k8sutils.CreateKubeClientSet("/etc/kubernetes/admin.conf")
+	if err != nil {
+		log.Printf("init client failed for custom topology: '%s'", err.Error())
+		return false
+	}
+
+	// access the API to fetch node object
+	node, _ := k8sclientset.CoreV1().Nodes().Get(context.TODO(), host, v1.GetOptions{})
+	log.Printf("Node %s details\n", node)
+
+	// Iterate node labels and check if required label is available and if found remove it
+	for lkey, lval := range node.Labels {
+		log.Printf("Label is: %s:%s\n", lkey, lval)
+		if strings.HasPrefix(lkey, constants.PluginName+"/") && lval == constants.PluginName {
+			log.Printf("Topology label %s:%s available on node", lkey, lval)
+			cmd := exec.Command("/bin/bash", "-c", "kubectl label nodes "+host+" "+lkey+"-")
+			err := cmd.Run()
+			if err != nil {
+				log.Printf("Error encountered while removing label from node %s: %s", host, err)
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func applyNodeLabel(host string) (result bool) {
+	cmd := exec.Command("kubectl", "label", "nodes", host, "csi-isilon.dellemc.com/127.0.0.1=csi-isilon.dellemc.com")
+	err := cmd.Run()
+	if err != nil {
+		log.Printf("Applying label on node %s failed", host)
+		return false
+	}
+	return true
+}
+func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, applyLabel bool) *service {
+	testControllerHasNoConnection = false
+	testNodeHasNoConnection = false
+	svc := new(service)
+	var opts Opts
+	opts.User = user
+	opts.Password = "blah"
+	opts.Endpoint = "127.0.0.1"
+	opts.EndpointURL = "http://127.0.0.1"
+	opts.AccessZone = "System"
+	opts.Path = "/ifs/data/csi-isilon"
+	opts.Insecure = true
+	opts.DebugEnabled = true
+	opts.Verbose = 1
+	opts.CustomTopologyEnabled = true
+	opts.KubeConfigPath = "/etc/kubernetes/admin.conf"
+
+	host, _ := os.Hostname()
+	result := removeNodeLabels(host)
+	if !result {
+		log.Fatal("Setting custom topology failed")
+	}
+
+	if applyLabel {
+		result = applyNodeLabel(host)
+		if !result {
+			log.Fatal("Applying csi-isilon.dellemc.com/127.0.0.1=csi-isilon.dellemc.com label on node failed")
+		}
+	}
+
+	if inducedErrors.autoProbeNotEnabled {
+		opts.AutoProbe = false
+	} else {
+		opts.AutoProbe = true
+	}
+
+	svc.opts = opts
+	svc.mode = mode
+	f.service = svc
+	f.service.nodeID = host
+	// TODO - IP has to be updated before release
+	f.service.nodeIP = "10.247.98.140"
+	utils.ConfigureLogger(opts.DebugEnabled)
+	return svc
+}
+
 func (f *feature) getServiceWithParams(user, mode string) *service {
 	testControllerHasNoConnection = false
 	testNodeHasNoConnection = false
@@ -1606,8 +1871,8 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	svc.opts = opts
 	svc.mode = mode
 	f.service = svc
-	f.service.nodeID = "k8s-rhel76-qual-1-1-1-1"
-	f.service.nodeIP = "1.1.1.1"
+	f.service.nodeID = "k8s-rhel76-qual=#=#=10.247.98.140"
+	f.service.nodeIP = "10.247.98.140"
 	utils.ConfigureLogger(opts.DebugEnabled)
 	return svc
 }

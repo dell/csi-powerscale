@@ -74,4 +74,10 @@ const (
 
 	// EnvNodeIP is the ip address of a k8s node
 	EnvNodeIP = "X_CSI_NODE_IP"
+
+	// EnvCustomTopologyEnabled indicates if custom topology has to be used by CSI Driver
+	EnvCustomTopologyEnabled = "X_CSI_CUSTOM_TOPOLOGY_ENABLED"
+
+	// EnvKubeConfigPath indicates kubernetes configuration that has to be used by CSI Driver
+	EnvKubeConfigPath = "KUBECONFIG"
 )

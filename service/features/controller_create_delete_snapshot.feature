@@ -37,6 +37,7 @@ Feature: Isilon CSI interface
 
 @deleteSnapshot
 @v1.0.0
+@todo
   Scenario Outline: Delete snapshot with various induced error use cases from examples
     Given a Isilon service
     When I call Probe
@@ -48,7 +49,8 @@ Feature: Isilon CSI interface
     | induced                 | errormsg                                        |
     | "GetSnapshotError"      | "cannot check the existence of the snapshot"    |
     | "DeleteSnapshotError"   | "error deleteing snapshot"                      |
-    
+   
+@todo 
   Scenario Outline: Controller delete snapshot various use cases from examples
     Given a Isilon service
     When I call Probe

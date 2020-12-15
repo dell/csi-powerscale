@@ -44,4 +44,13 @@ const (
 	// DefaultIsiPath is the default isiPath which will be used if there's
 	// no proper isiPath value set in neither storageclass.yaml nor values.yaml
 	DefaultIsiPath = "/ifs"
+
+	// MaxIsiConnRetries is the max number of retries to validate connection to PowerScale Array
+	MaxIsiConnRetries = 10
+
+	// KubeConfig of kubernetes cluster
+	KubeConfig = "KUBECONFIG"
+
+	// VolumeSnapshotsPath is the snapshot directory base path on PowerScale array
+	VolumeSnapshotsPath = "/ifs/.snapshot"
 )

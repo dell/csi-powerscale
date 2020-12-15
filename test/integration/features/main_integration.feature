@@ -17,7 +17,7 @@ Feature: Isilon CSI interface
       And there is not a quota "integration0"
       Then there are no errors
  
-  @todo
+  @v1.0
     Scenario: Create volume with different sizes 1EB
       Given a Isilon service
       And a basic volume request "integration0" "1099511627776"
@@ -75,6 +75,16 @@ Feature: Isilon CSI interface
       And there is not an export "integration0"
   
   @v1.0
+    Scenario: Ephemeral Inline Volume basic and idempotency tests
+      Given a Isilon service
+      When I call EphemeralNodePublishVolume "datadir0"
+      And I call EphemeralNodePublishVolume "datadir0"
+      Then there are no errors
+      When I call EphemeralNodeUnpublishVolume "datadir0"
+      And I call EphemeralNodeUnpublishVolume "datadir0"
+      Then there are no errors
+ 
+  @v1.0
     Scenario: Create volume, create snapshot, delete volume, delete snapshot and check
       Given a Isilon service
       And a basic volume request "integration0" "8"
@@ -121,7 +131,7 @@ Feature: Isilon CSI interface
       Then I call DeleteAllSnapshots
       Then there is not a snapshot "snapshot0"
 
- @v1.0
+  @v1.0
     Scenario: Create volume, create snapshot, delete old volume, create volume from snapshot
       Given a Isilon service
       And a basic volume request "integration0" "8"
@@ -140,6 +150,126 @@ Feature: Isilon CSI interface
       And there is an export "volFromSnap0"
       When I call DeleteAllVolumes
       When I call DeleteSnapshot
+      Then there is not a snapshot "snapshot0"
+
+  @v1.0
+    Scenario: Create volume, create snapshot, delete old volume, create RO volume from snapshot, delete RO volume, delete snapshot
+      Given a Isilon service
+      And a basic volume request "integration0" "8"
+      When I call CreateVolume
+      Then there is a directory "integration0"
+      Then there is an export "integration0"
+      Then verify "integration0" size
+      When I call CreateSnapshot "snapshot0" "integration0"
+      Then there is a snapshot "snapshot0"
+      When I call DeleteVolume
+      Then there is not a directory "integration0"
+      And there is not an export "integration0"
+      And there is not a quota "integration0"
+      When I call CreateROVolumeFromSnapshot "volFromSnap0"
+      Then there is no directory "volFromSnap0"
+      Then there is an export for snapshot dir "snapshot0"
+      When I call DeleteAllVolumes
+      Then there is a snapshot "snapshot0"
+      When I call DeleteSnapshot
+      Then there is not a snapshot "snapshot0"
+
+  @v1.0
+    Scenario: Create volume, create snapshot, delete old volume, create RO volume from snapshot, delete snapshot, delete RO volume
+      Given a Isilon service
+      And a basic volume request "integration0" "8"
+      When I call CreateVolume
+      Then there is a directory "integration0"
+      Then there is an export "integration0"
+      Then verify "integration0" size
+      When I call CreateSnapshot "snapshot0" "integration0"
+      Then there is a snapshot "snapshot0"
+      When I call DeleteVolume
+      Then there is not a directory "integration0"
+      And there is not an export "integration0"
+      And there is not a quota "integration0"
+      When I call CreateROVolumeFromSnapshot "volFromSnap0"
+      Then there is no directory "volFromSnap0"
+      Then there is an export for snapshot dir "snapshot0"
+      When I call DeleteSnapshot
+      Then there is a snapshot "snapshot0"
+      Then there is an export for snapshot dir "snapshot0"
+      When I call DeleteAllVolumes
+      Then there is not a snapshot "snapshot0"
+
+  @v1.0
+    Scenario: create RO volume from snapshot, ControllerPublishVolume, NodePublishVolume, NodeUnpublishVolume, ControllerUnpublishVolume, delete snapshot, delete RO volume
+      Given a Isilon service
+      And a basic volume request "integration0" "8"
+      When I call CreateVolume
+      Then there is a directory "integration0"
+      Then there is an export "integration0"
+      When I call CreateSnapshot "snapshot0" "integration0"
+      Then there is a snapshot "snapshot0"
+      When I call DeleteVolume
+      And there is not an export "integration0"
+      When I call CreateROVolumeFromSnapshot "volFromSnap0"
+      Then there is no directory "volFromSnap0"
+      Then there is an export for snapshot dir "snapshot0"
+      When I call ControllerPublishVolume "X_CSI_NODE_NAME"
+      Then there are no errors
+      Then check Isilon client exists "X_CSI_NODE_NAME"
+      When I call NodePublishVolume "datadir0"
+      Then verify published volume with access "multi-reader" "datadir0"
+      When I call NodeUnpublishVolume "datadir0"
+      Then verify not published volume with access "multi-reader" "datadir0"
+      When I call ControllerUnpublishVolume "X_CSI_NODE_NAME"
+      Then check Isilon client not exists "X_CSI_NODE_NAME"
+      When I call DeleteSnapshot
+      Then there is a snapshot "snapshot0"
+      Then there is an export for snapshot dir "snapshot0"
+      When I call DeleteAllVolumes
+      Then there is not a snapshot "snapshot0"
+
+  @v1.0
+    Scenario: idempotency check- create RO volume from snapshot, ControllerPublishVolume, NodePublishVolume, NodeUnpublishVolume, ControllerUnpublishVolume, delete snapshot, delete RO volume
+      Given a Isilon service
+      And a basic volume request "integration0" "8"
+      When I call CreateVolume
+      Then there is a directory "integration0"
+      Then there is an export "integration0"
+      When I call CreateSnapshot "snapshot0" "integration0"
+      Then there is a snapshot "snapshot0"
+      When I call DeleteVolume
+      And there is not an export "integration0"
+      When I call CreateROVolumeFromSnapshot "volFromSnap0"
+      Then there is no directory "volFromSnap0"
+      Then there is an export for snapshot dir "snapshot0"
+      When I call CreateROVolumeFromSnapshot "volFromSnap0"
+      Then there are no errors
+      Then there is no directory "volFromSnap0"
+      Then there is an export for snapshot dir "snapshot0"
+      When I call ControllerPublishVolume "X_CSI_NODE_NAME"
+      Then there are no errors
+      Then check Isilon client exists "X_CSI_NODE_NAME"
+      When I call ControllerPublishVolume "X_CSI_NODE_NAME"
+      Then there are no errors
+      Then check Isilon client exists "X_CSI_NODE_NAME"
+      When I call NodePublishVolume "datadir0"
+      Then verify published volume with access "multi-reader" "datadir0"
+      When I call NodePublishVolume "datadir0"
+      Then there are no errors
+      Then verify published volume with access "multi-reader" "datadir0"
+      When I call NodeUnpublishVolume "datadir0"
+      Then verify not published volume with access "multi-reader" "datadir0"
+      Then there are no errors
+      When I call NodeUnpublishVolume "datadir0"
+      Then verify not published volume with access "multi-reader" "datadir0"
+      Then there are no errors
+      When I call ControllerUnpublishVolume "X_CSI_NODE_NAME"
+      Then check Isilon client not exists "X_CSI_NODE_NAME"
+      When I call ControllerUnpublishVolume "X_CSI_NODE_NAME"
+      Then check Isilon client not exists "X_CSI_NODE_NAME"
+      Then there are no errors
+      When I call DeleteSnapshot
+      Then there is a snapshot "snapshot0"
+      Then there is an export for snapshot dir "snapshot0"
+      When I call DeleteAllVolumes
       Then there is not a snapshot "snapshot0"
 
   @v1.0
@@ -162,13 +292,13 @@ Feature: Isilon CSI interface
       And a volume request "integration0" "8"
       When I call CreateVolume
       When I call ControllerPublishVolume "X_CSI_NODE_NAME"
-      Then check Isilon client exists "X_CSI_NODE_IP"
+      Then check Isilon client exists "X_CSI_NODE_NAME"
       When I call NodeStageVolume
       Then there are no errors
       When I call NodeUnstageVolume
       Then there are no errors
       When I call ControllerUnpublishVolume "X_CSI_NODE_NAME"
-      Then check Isilon client not exists "X_CSI_NODE_IP"
+      Then check Isilon client not exists "X_CSI_NODE_NAME"
       When I call DeleteVolume
       Then there is not a directory "integration0"
       Then there is not an export "integration0" 
@@ -186,7 +316,7 @@ Feature: Isilon CSI interface
       And a volume request "integration0" "8"
       When I call CreateVolume
       When I call ControllerPublishVolume "X_CSI_NODE_NAME"
-      Then check Isilon client exists "X_CSI_NODE_IP"
+      Then check Isilon client exists "X_CSI_NODE_NAME"
       When I call NodeStageVolume
       Then there are no errors
       When I call NodePublishVolume "datadir0"
@@ -214,7 +344,7 @@ Feature: Isilon CSI interface
       And a volume request "integration0" "8"
       When I call CreateVolume
       When I call ControllerPublishVolume "X_CSI_NODE_NAME"
-      Then check Isilon client exists "X_CSI_NODE_IP"
+      Then check Isilon client exists "X_CSI_NODE_NAME"
       When I call NodeStageVolume
       Then there are no errors
       When I call NodePublishVolume "datadir0"
@@ -242,7 +372,7 @@ Feature: Isilon CSI interface
       And a volume request "integration0" "8"
       When I call CreateVolume
       When I call ControllerPublishVolume "X_CSI_NODE_NAME"
-      Then check Isilon client exists "X_CSI_NODE_IP"
+      Then check Isilon client exists "X_CSI_NODE_NAME"
       When I call NodeStageVolume
       Then there are no errors
       When I call NodePublishVolume "datadir0"
@@ -330,6 +460,66 @@ Feature: Isilon CSI interface
       #Then I call CreateVolumeFromSnapshot "volFromSnap0"
       #Then the error contains "failed to get snapshot"
       Then I call DeleteAllVolumes
+
+  @v1.0
+    Scenario: Volume Clone- Create source volume, create new volume from source volume, delete source volume, delete new volume
+      Given a Isilon service
+      And a basic volume request "integration0" "8"
+      When I call CreateVolume
+      Then there is a directory "integration0"
+      Then there is an export "integration0"
+      Then verify "integration0" size
+      When I call CreateVolumeFromVolume "integration1" "integration0" "8"
+      Then there is a directory "integration1"
+      Then there is an export "integration1"
+      Then verify "integration1" size
+      When I call DeleteAllVolumes
+      Then there is not a directory "integration0"
+      And there is not an export "integration0"
+      And there is not a quota "integration0"
+      And there is not a directory "integration1"
+      And there is not an export "integration1"
+      And there is not a quota "integration1"
+
+  @v1.0
+    Scenario: Volume Clone idempotency check- Create source volume, create new volume from source volume, delete source volume, delete new volume
+      Given a Isilon service
+      And a basic volume request "integration0" "8"
+      When I call CreateVolume
+      Then there is a directory "integration0"
+      Then there is an export "integration0"
+      Then verify "integration0" size
+      When I call CreateVolumeFromVolume "integration1" "integration0" "8"
+      Then there is a directory "integration1"
+      Then there is an export "integration1"
+      Then verify "integration1" size
+      When I call CreateVolumeFromVolume "integration1" "integration0" "8"
+      Then there are no errors
+      Then there is a directory "integration1"
+      Then there is an export "integration1"
+      Then verify "integration1" size
+      When I call DeleteAllVolumes
+      Then there is not a directory "integration0"
+      And there is not an export "integration0"
+      And there is not a quota "integration0"
+      And there is not a directory "integration1"
+      And there is not an export "integration1"
+      And there is not a quota "integration1"
+
+  @v1.0
+    Scenario: Volume Clone- Create volume from a nonexistent volume
+      Given a Isilon service
+      And a basic volume request "integration0" "8"
+      When I call CreateVolume
+      Then there is a directory "integration0"
+      Then there is an export "integration0"
+      When I call DeleteVolume
+      Then there is not a directory "integration0"
+      And there is not an export "integration0"
+      When I call CreateVolumeFromVolume "integration1" "integration0" "7"
+      Then the error contains "failed to get volume name 'integration0'"
+      Then there is no directory "integration1"
+      Then there is not an export "integration1"
 
   @v1.0
     Scenario Outline: Scalability test to create volume, ControllerPublish, NodeStage, NodePublish, NodeUnpublish, NodeUnstage, ControllerUnpublish, delete basic volume in parallel

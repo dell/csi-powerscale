@@ -92,19 +92,19 @@ Feature: Isilon CSI interface
       Given a Isilon service
       When I call Probe
       And I induce error "OmitAccessMode"
-      And I call ControllerPublishVolume with "" to "vpi7125" 
+      And I call ControllerPublishVolume with "" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1" 
       Then the error contains "access mode is required"
 
     Scenario: ControllerPublishVolume good scenario
       Given a Isilon service
       When I call Probe
-      And I call ControllerPublishVolume with name "volume2=_=_=43=_=_=System" and access type "multiple-writer" to "vpi7125"
+      And I call ControllerPublishVolume with name "volume2=_=_=43=_=_=System" and access type "multiple-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
       Then a valid ControllerPublishVolumeResponse is returned
 
     Scenario Outline: ControllerPublishVolume with different volume id and access type
       Given a Isilon service
       When I call Probe
-      And I call ControllerPublishVolume with name <volumeID> and access type <accessType> to "vpi7125"
+      And I call ControllerPublishVolume with name <volumeID> and access type <accessType> to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
       Then the error contains <errormsg>
 
       Examples:
@@ -120,13 +120,13 @@ Feature: Isilon CSI interface
     Scenario: ControllerUnpublishVolume good scenario
       Given a Isilon service
       When I call Probe
-      And I call ControllerUnpublishVolume with name "volume2=_=_=43=_=_=System" and access type "single-writer" to "vpi7125"
+      And I call ControllerUnpublishVolume with name "volume2=_=_=43=_=_=System" and access type "single-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
       Then valid ControllerUnpublishVolumeResponse is returned
     
     Scenario Outline: ControllerUnpublishVolume bad calls
       Given a Isilon service
       When I call Probe
-      And I call ControllerUnpublishVolume with name <volumeID> and access type "single-writer" to "vpi7125"
+      And I call ControllerUnpublishVolume with name <volumeID> and access type "single-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
       Then the error contains <errormsg>
 
       Examples:
@@ -147,12 +147,14 @@ Feature: Isilon CSI interface
       | 2        | "1-1-MAAA1"               | "none"                                                     |
       | 2        | "invalid"                 | "The starting token is not valid"                          |
 
+@todo
     Scenario: Create volume from snapshot good scenario
       Given a Isilon service
       When I call Probe
       And I call CreateVolumeFromSnapshot "2" "volume1"
       Then a valid CreateVolumeResponse is returned
 
+@todo
     Scenario Outline: Create volume from snapshot with negative or idempotent arguments
       Given a Isilon service
       When I call CreateVolumeFromSnapshot <snapshotID> <volumeName>
@@ -163,6 +165,7 @@ Feature: Isilon CSI interface
       | "1"                    | "volume1"                           | "failed to get snapshot"        |
       | "2"                    | "volume2"                           | "none"                          |
 
+@todo
     Scenario Outline: Controller publish volume with different access mode and node id
       Given a Isilon service
       When I call ControllerPublishVolume with <accessMode> to <nodeID>
@@ -176,6 +179,7 @@ Feature: Isilon CSI interface
       | "unknown"             | "vpi7125"       | "unknown or unsupported access mode"     |
       | "single-writer"       | ""              | "node ID is required"                    |
 
+@todo
     Scenario: Identify initialize real isilon service bad call
       When I call initialize real isilon service
       Then the error contains "node ID is required"
@@ -234,7 +238,7 @@ Feature: Isilon CSI interface
       Given a Isilon service
       And I induce error "autoProbeFailed"
       When I call CreateVolume "volume1"
-      And I call ControllerPublishVolume with "single-writer" to "vpi7125"
+      And I call ControllerPublishVolume with "single-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
       And I call DeleteVolume "volume2=_=_=43=_=_=System"
       And I call ValidateVolumeCapabilities with voltype "mount" access "single-writer"
       And I call GetCapacity

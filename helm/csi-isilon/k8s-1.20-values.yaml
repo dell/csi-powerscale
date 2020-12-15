@@ -1,4 +1,4 @@
-kubeversion: "v1.17"
+kubeversion: "v1.20"
 
 # IT IS RECOMMENDED YOU DO NOT CHANGE THE IMAGES TO BE DOWNLOADED.
 images:

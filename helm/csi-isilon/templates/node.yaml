@@ -69,7 +69,7 @@ spec:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
           image: {{ required "Must provide the Isilon driver container image." .Values.images.driver }}
-          imagePullPolicy: Always 
+          imagePullPolicy: Always
           command: [ "/csi-isilon" ]
           env:
             - name: CSI_ENDPOINT
@@ -117,7 +117,9 @@ spec:
             - name: SSL_CERT_DIR
               value: /certs    
             - name: X_CSI_ISI_QUOTA_ENABLED
-              value: "{{ .Values.enableQuota }}"                         
+              value: "{{ .Values.enableQuota }}"
+            - name: X_CSI_CUSTOM_TOPOLOGY_ENABLED
+              value: "{{ .Values.enableCustomTopology }}"
           volumeMounts:
             - name: driver-path
               mountPath: /var/lib/kubelet/plugins/csi-isilon

@@ -20,3 +20,6 @@ runTest ./env_nodeIP1.sh ./features/mock_different_nodeIPs.feature "first_run"
 
 echo "test accessModes with nodeIP2"
 runTest ./env_nodeIP2.sh ./features/mock_different_nodeIPs.feature "second_run"
+
+echo "Custom Topology is enabled"
+runTest ./env_Custom_Topology_Enabled.sh ./features/integration.feature "v1.0"

@@ -21,12 +21,18 @@ rules:
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "watch", "update"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["storage.k8s.io"]
     resources: ["storageclasses"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
     verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments/status"]
+    verbs: ["patch"]
   - apiGroups: ["csi.storage.k8s.io"]
     resources: ["csinodeinfos"]
     verbs: ["get", "list", "watch"]
@@ -62,6 +68,9 @@ rules:
   - apiGroups: [""]
     resources: ["persistentvolumeclaims/status"]
     verbs: ["update", "patch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "watch", "list", "delete", "update", "create"]
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -76,7 +85,7 @@ roleRef:
   name: {{ .Release.Name }}-controller
   apiGroup: rbac.authorization.k8s.io
 ---
-kind: StatefulSet
+kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: {{ .Release.Name }}-controller
@@ -85,23 +94,42 @@ spec:
   selector:
     matchLabels:
       app: {{ .Release.Name }}-controller
-  serviceName: {{ .Release.Name }}-controller
-  replicas: 1
-  selector:
-    matchLabels:
-      app: {{ .Release.Name }}-controller
+  {{- if lt (.Values.controllerCount | toString | atoi ) 1 -}}
+  {{- fail "value for .Values.controllerCount should be atleast 1" }}
+  {{- else }}
+  replicas: {{ required "Must provide the number of controller instances to create." .Values.controllerCount }}
+  {{- end }}
   template:
     metadata:
       labels:
         app: {{ .Release.Name }}-controller
     spec:
       serviceAccount: {{ .Release.Name }}-controller
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - {{ .Release.Name }}-controller
+            topologyKey: kubernetes.io/hostname
+      {{ if .Values.controller.nodeSelector }}
+      nodeSelector:
+      {{- toYaml .Values.controller.nodeSelector | nindent 8 }}
+      {{ end }}
+      {{ if .Values.controller.tolerations }}
+      tolerations:
+      {{- toYaml .Values.controller.tolerations | nindent 8 }}
+      {{ end }}
       containers:
         - name: resizer
           image: {{ required "Must provide the CSI resizer container image." .Values.images.resizer }}
           args:
             - "--csi-address=$(ADDRESS)"
             - "--v=5"
+            - "--leader-election"
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
@@ -113,6 +141,7 @@ spec:
           args:
             - "--csi-address=$(ADDRESS)"
             - "--v=5"
+            - "--leader-election"
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
@@ -128,6 +157,8 @@ spec:
             - "--worker-threads=5"
             - "--timeout=60s"
             - "--v=5"
+            - "--feature-gates=Topology=true"
+            - "--leader-election"
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
@@ -141,6 +172,7 @@ spec:
             - "--csi-address=$(ADDRESS)"
             - "--timeout=15s"
             - "--v=5"
+            - "--leader-election"
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
@@ -151,6 +183,8 @@ spec:
           image: {{ required "Must provide the Isilon driver container image." .Values.images.driver }}
           imagePullPolicy: Always
           command: [ "/csi-isilon" ]
+          args:
+            - "--leader-election"
           env:
             - name: CSI_ENDPOINT
               value: /var/run/csi/csi.sock
@@ -182,6 +216,8 @@ spec:
               value: "{{ .Values.isiInsecure }}"
             - name: X_CSI_ISI_ACCESS_ZONE
               value: {{ .Values.isiAccessZone }}
+            - name: X_CSI_CUSTOM_TOPOLOGY_ENABLED
+              value: "{{ .Values.enableCustomTopology }}"
             - name: X_CSI_ISI_PATH
               value: {{ .Values.isiPath }}
             - name: X_CSI_ISILON_NO_PROBE_ON_START

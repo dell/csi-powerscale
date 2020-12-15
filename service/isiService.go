@@ -18,6 +18,9 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/dell/csi-isilon/common/constants"
+	"path"
+	"strings"
 
 	utils "github.com/dell/csi-isilon/common/utils"
 	isi "github.com/dell/goisilon"
@@ -348,7 +351,7 @@ func (svc *isiService) OtherClientsAlreadyAdded(exportID int, accessZone string,
 		return true
 	}
 
-	clientFQDN, clientIP, err := utils.ParseNodeID(nodeID)
+	clientName, clientFQDN, clientIP, err := utils.ParseNodeID(nodeID)
 	if err != nil {
 		log.Debugf("failed to parse node ID '%s', return true for otherClientsAlreadyAdded as a safer return value", nodeID)
 		return true
@@ -356,13 +359,15 @@ func (svc *isiService) OtherClientsAlreadyAdded(exportID int, accessZone string,
 
 	clientFieldsNotEmpty := len(*export.Clients) > 0 || len(*export.ReadOnlyClients) > 0 || len(*export.ReadWriteClients) > 0 || len(*export.RootClients) > 0
 
-	isNodeInClientFields := utils.IsStringInSlices(clientFQDN, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
+	isNodeInClientFields := utils.IsStringInSlices(clientName, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
+
+	isNodeFQDNInClientFields := utils.IsStringInSlices(clientFQDN, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 
 	if clientIP != "" {
 		isNodeInClientFields = isNodeInClientFields || utils.IsStringInSlices(clientIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 	}
 
-	return clientFieldsNotEmpty && !isNodeInClientFields
+	return clientFieldsNotEmpty && !isNodeInClientFields && !isNodeFQDNInClientFields
 }
 
 func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(exportID int, accessZone, nodeID string, addClientFunc func(exportID int, accessZone, clientIP string) error) error {
@@ -371,7 +376,7 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(exportID int
 	// OneFS API will return error if it cannot resolve the client FQDN ,
 	// in that case, fall back to adding by IP
 
-	clientFQDN, clientIP, err := utils.ParseNodeID(nodeID)
+	_, clientFQDN, clientIP, err := utils.ParseNodeID(nodeID)
 	if err != nil {
 		return err
 	}
@@ -384,7 +389,7 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(exportID int
 		return nil
 	}
 
-	log.Infof("failed to add client FQDN '%s' to export id '%d' : '%v'", clientFQDN, exportID, err)
+	log.Errorf("failed to add client FQDN '%s' to export id '%d' : '%v'", clientFQDN, exportID, err)
 
 	if err := addClientFunc(exportID, accessZone, clientIP); err != nil {
 		return fmt.Errorf("failed to add client ip '%s' to export id '%d' : '%v'", clientIP, exportID, err)
@@ -419,16 +424,16 @@ func (svc *isiService) AddExportReadOnlyClientByIDWithZone(exportID int, accessZ
 
 func (svc *isiService) RemoveExportClientByIDWithZone(exportID int, accessZone, nodeID string) error {
 	// it could either be IP or FQDN that has been added to the export's client fields, should consider both during the removal
-	clientFQDN, clientIP, err := utils.ParseNodeID(nodeID)
+	clientName, clientFQDN, clientIP, err := utils.ParseNodeID(nodeID)
 	if err != nil {
 		return err
 	}
 
-	log.Debugf("RemoveExportClientByIDWithZone client FQDN '%s' client IP '%s'", clientFQDN, clientIP)
+	log.Debugf("RemoveExportClientByIDWithZone client Name '%s', client FQDN '%s' client IP '%s'", clientName, clientFQDN, clientIP)
 
-	clientsToRemove := []string{clientIP, clientFQDN}
+	clientsToRemove := []string{clientIP, clientName, clientFQDN}
 
-	log.Debugf("RemoveExportClientByName client IP '%v'", clientsToRemove)
+	log.Debugf("RemoveExportClientByName client '%v'", clientsToRemove)
 
 	if err := svc.client.RemoveExportClientsByIDWithZone(context.Background(), exportID, accessZone, clientsToRemove); err != nil {
 		//Return success if export doesn't exist
@@ -508,4 +513,76 @@ func (svc *isiService) GetExportWithPathAndZone(path, accessZone string) (isi.Ex
 	}
 
 	return export, nil
+}
+
+func (svc *isiService) GetSnapshotIsiPath(isiPath string, sourceSnapshotID string) (string, error) {
+	return svc.client.GetSnapshotIsiPath(context.Background(), isiPath, sourceSnapshotID)
+}
+
+func (svc *isiService) isROVolumeFromSnapshot(isiPath string) bool {
+	if strings.Index(isiPath, constants.VolumeSnapshotsPath) == 0 {
+		return true
+	}
+	return false
+}
+
+func (svc *isiService) GetSnapshotNameFromIsiPath(snapshotIsiPath string) (string, error) {
+	if !svc.isROVolumeFromSnapshot(snapshotIsiPath) {
+		log.Debugf("invalid snapshot isilon path- '%s'", snapshotIsiPath)
+		return "", fmt.Errorf("invalid snapshot isilon path")
+	}
+
+	// Snapshot isi path format /<ifs>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
+	dirs := strings.Split(snapshotIsiPath, "/")
+	// If there is no snapshot name in snapshot isi path or if it is empty
+	if len(dirs) < 4 || dirs[3] == "" {
+		log.Debugf("invalid snapshot isilon path- '%s'", snapshotIsiPath)
+		return "", fmt.Errorf("invalid snapshot isilon path")
+	}
+
+	return dirs[3], nil
+}
+
+func (svc *isiService) GetSnapshotIsiPathComponents(snapshotIsiPath string) (string, string, string) {
+	// Returns snapshot isi path components- isiPath, snapshotName, srcVolName
+	dirs := strings.Split(snapshotIsiPath, "/")
+	isiPath := path.Join("/", dirs[1], strings.Join(dirs[4:len(dirs)-1], "/"))
+	snapshotName := dirs[3]
+	srcVolName := dirs[len(dirs)-1]
+
+	return isiPath, snapshotName, srcVolName
+}
+
+func (svc *isiService) GetSnapshotTrackingDirName(snapshotName string) string {
+	return "." + "csi-" + snapshotName + "-tracking-dir"
+}
+
+func (svc *isiService) GetSubDirectoryCount(isiPath, directory string) (int64, error) {
+	var totalSubDirectories int64
+	if svc.IsVolumeExistent(isiPath, "", directory) {
+		// Check if there are any entries for volumes present in snapshot tracking dir
+		dirDetails, err := svc.GetVolume(isiPath, "", directory)
+		if err != nil {
+			return 0, err
+		}
+		log.Debugf("directory details for directory '%s' are '%s'", directory, dirDetails)
+
+		// Get nlinks(i.e., subdirectories present) for snapshotTrackingDir
+		for _, attr := range dirDetails.AttributeMap {
+			if attr.Name == "nlink" {
+				f, ok := attr.Value.(float64)
+				if !ok {
+					return 0, fmt.Errorf("failed to get total subdirectory count")
+				}
+				totalSubDirectories = int64(f)
+				break
+			}
+		}
+		// Every directory will have two subdirectory entries . and ..
+		log.Debugf("total number of subdirectories present under directory '%s' is '%v'",
+			directory, totalSubDirectories)
+		return totalSubDirectories, nil
+	}
+
+	return 0, fmt.Errorf("failed to get subdirectory count for directory '%s'", directory)
 }

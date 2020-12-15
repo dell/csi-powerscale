@@ -181,3 +181,21 @@ Feature: Isilon CSI interface
     | "NodeUnpublishNoTargetPath"             | "Target Path is required"                                                 |
     | "TargetNotCreatedForNodeUnpublish"      | "none"                                                                    |
     | "GOFSMockUnmountError"                  | "error unmounting target"                                                 |
+    
+  Scenario: Ephemeral NodePublish NodeUnpublish test cases
+    Given a Isilon service
+    And I call EphemeralNodePublishVolume
+    And I call EphemeralNodeUnpublishVolume
+    Then the error contains "none"   
+    
+  Scenario Outline: Ephemeral NodePublish negative scenario
+    Given a Isilon service
+    And get Node Publish Volume Request
+    And I induce error <errora>
+    And I call EphemeralNodePublishVolume
+    Then the error contains <errormsg>
+
+    Examples:
+    | errora                                  | errormsg                                                                  |
+    |"GOFSMockGetMountsError"                 | "could not reliably determine existing mount status"                      | 
+

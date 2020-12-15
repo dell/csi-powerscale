@@ -18,7 +18,12 @@ package integration_test
 import (
 	"context"
 	"fmt"
+	"github.com/Showmax/go-fqdn"
+	"github.com/dell/csi-isilon/common/constants"
+	"github.com/dell/csi-isilon/common/k8sutils"
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,10 +32,12 @@ import (
 	"github.com/dell/csi-isilon/provider"
 	"github.com/rexray/gocsi/utils"
 	"google.golang.org/grpc"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
-	datadir = "/tmp/datadir"
+	datadir         = "/tmp/datadir"
+	nodeIDSeparator = "=#=#="
 )
 
 var grpcClient *grpc.ClientConn
@@ -42,6 +49,14 @@ func TestMain(m *testing.M) {
 	grpcClient, stop = startServer(ctx)
 	fmt.Printf("back from startServer")
 	time.Sleep(5 * time.Second)
+	// Set env variables
+	host, _ := os.Hostname()
+	hostFQDN := fqdn.Get()
+	if hostFQDN == "unknown" {
+		fmt.Printf("cannot get FQDN")
+	}
+	nodeName := host + nodeIDSeparator + hostFQDN + nodeIDSeparator + os.Getenv("X_CSI_NODE_IP")
+	os.Setenv("X_CSI_NODE_NAME", nodeName)
 
 	// Make the file needed for NodeStage:
 	//  /tmp/datadir    -- for file system mounts
@@ -80,6 +95,44 @@ func TestIdentityGetPluginInfo(t *testing.T) {
 	}
 }
 
+func removeNodeLabels(host string) (result bool) {
+	k8sclientset, err := k8sutils.CreateKubeClientSet("/etc/kubernetes/admin.conf")
+	if err != nil {
+		fmt.Printf("init client failed for custom topology: '%s'", err.Error())
+		return false
+	}
+
+	// access the API to fetch node object
+	node, _ := k8sclientset.CoreV1().Nodes().Get(context.TODO(), host, v1.GetOptions{})
+	fmt.Printf("Node %s details\n", node)
+
+	// Iterate node labels and check if required label is available and if found remove it
+	for lkey, lval := range node.Labels {
+		fmt.Printf("Label is: %s:%s\n", lkey, lval)
+		if strings.HasPrefix(lkey, constants.PluginName+"/") && lval == constants.PluginName {
+			fmt.Printf("Topology label %s:%s available on node", lkey, lval)
+			cmd := exec.Command("/bin/bash", "-c", "kubectl label nodes "+host+" "+lkey+"-")
+			err := cmd.Run()
+			if err != nil {
+				fmt.Printf("Error encountered while removing label from node %s: %s", host, err)
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func applyNodeLabel(host, endpoint string) (result bool) {
+	cmd := exec.Command("kubectl", "label", "nodes", host, "csi-isilon.dellemc.com/"+endpoint+"=csi-isilon.dellemc.com")
+
+	err := cmd.Run()
+	if err != nil {
+		fmt.Printf("Applying label on node %s failed", host)
+		return false
+	}
+	return true
+}
+
 func startServer(ctx context.Context) (*grpc.ClientConn, func()) {
 	// Create a new SP instance and serve it with a piped connection.
 	sp := provider.New()
@@ -89,6 +142,25 @@ func startServer(ctx context.Context) (*grpc.ClientConn, func()) {
 		return nil, nil
 	}
 	fmt.Printf("lis: '%v'\n", lis)
+
+	// Remove any existing labels on the node
+	host, err := os.Hostname()
+	if err != nil {
+		fmt.Printf("couldn't fetch hostname: %s", err)
+		return nil, nil
+	}
+
+	customTopology := os.Getenv("X_CSI_CUSTOM_TOPOLOGY_ENABLED")
+	endPoint := os.Getenv("X_CSI_ISI_ENDPOINT")
+	if customTopology == "true" {
+		if removeNodeLabels(host) {
+			if !applyNodeLabel(host, endPoint) {
+				fmt.Printf("Could not remove node label")
+				return nil, nil
+			}
+		}
+	}
+
 	go func() {
 		fmt.Printf("starting server\n")
 		if err := sp.Serve(ctx, lis); err != nil {

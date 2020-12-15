@@ -12,11 +12,19 @@ SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 PROG="${0}"
 source "$SCRIPTDIR"/common.sh
 
+if [ -z "${DEBUGLOG}" ]; then
+  export DEBUGLOG="${SCRIPTDIR}/install-debug.log"
+  if [ -f "${DEBUGLOG}" ]; then
+    rm -f "${DEBUGLOG}"
+  fi
+fi
+
 declare -a VALIDDRIVERS
 
 # verify-csi-powermax method
 function verify-csi-powermax() {
-  verify_k8s_versions "1" "17" "1" "19"
+  verify_k8s_versions "1.17" "1.20"
+  verify_openshift_versions "4.5" "4.6"
   verify_namespace "${NS}"
   verify_required_secrets "${RELEASE}-creds"
   verify_optional_secrets "${RELEASE}-certs"
@@ -30,7 +38,8 @@ function verify-csi-powermax() {
 #
 # verify-csi-isilon method
 function verify-csi-isilon() {
-  verify_k8s_versions "1" "17" "1" "19"
+  verify_k8s_versions "1.17" "1.20"
+  verify_openshift_versions "4.5" "4.6"
   verify_namespace "${NS}"
   verify_required_secrets "${RELEASE}-creds"
   verify_optional_secrets "${RELEASE}-certs"
@@ -42,7 +51,8 @@ function verify-csi-isilon() {
 #
 # verify-csi-vxflexos method
 function verify-csi-vxflexos() {
-  verify_k8s_versions "1" "17" "1" "19"
+  verify_k8s_versions "1.17" "1.20"
+  verify_openshift_versions "4.5" "4.6"
   verify_namespace "${NS}"
   verify_required_secrets "${RELEASE}-creds"
   verify_sdc_installation
@@ -53,7 +63,8 @@ function verify-csi-vxflexos() {
 
 # verify-csi-powerstore method
 function verify-csi-powerstore() {
-  verify_k8s_versions "1" "17" "1" "19"
+  verify_k8s_versions "1.17" "1.20"
+  verify_openshift_versions "4.5" "4.6"
   verify_namespace "${NS}"
   verify_required_secrets "${RELEASE}-creds"
   verify_alpha_snap_resources
@@ -64,20 +75,27 @@ function verify-csi-powerstore() {
 
 # verify-csi-unity method
 function verify-csi-unity() {
-  verify_k8s_versions "1" "17" "1" "19"
+  verify_k8s_versions "1.17" "1.20"
+  verify_openshift_versions "4.5" "4.6"
   verify_namespace "${NS}"
   verify_required_secrets "${RELEASE}-creds"
   verify_required_secrets "${RELEASE}-certs-0"
   verify_alpha_snap_resources
-  verify_beta_snap_requirements
+  verify_unity_protocol_installation
+  verify_beta_snap_requirements  
   verify_helm_3
 }
+
+# if testing routines are found, source them for possible execution
+if [ -f "${SCRIPTDIR}/test-functions.sh" ]; then
+  source "${SCRIPTDIR}/test-functions.sh"
+fi
 
 #
 # verify-driver will call the proper method to verify a specific driver
 function verify-driver() {
   if [ -z "${1}" ]; then
-    echo "Expected one argument, the driver name, to verify-driver. Received none."
+    decho "Expected one argument, the driver name, to verify-driver. Received none."
     exit $EXIT_ERROR
   fi
   local D="${1}"
@@ -86,12 +104,12 @@ function verify-driver() {
   # if yes, check to see if it should be run and run it
   FNTYPE=$(type -t verify-$D)
   if [ "$FNTYPE" != "function" ]; then
-    echo "ERROR: verify-$D function does not exist"
+    decho "ERROR: verify-$D function does not exist"
     exit $EXIT_ERROR
   else
     header
     log step "Driver: ${D}"
-    echo
+    decho
     verify-$D
     summary
   fi
@@ -99,22 +117,22 @@ function verify-driver() {
 
 # Print usage information
 function usage() {
-  echo
-  echo "Help for $PROG"
-  echo
-  echo "Usage: $PROG options..."
-  echo "Options:"
-  echo "  Required"
-  echo "  --namespace[=]<namespace>       Kubernetes namespace to install the CSI driver"
-  echo "  --values[=]<values.yaml>        Values file, which defines configuration values"
+  decho
+  decho "Help for $PROG"
+  decho
+  decho "Usage: $PROG options..."
+  decho "Options:"
+  decho "  Required"
+  decho "  --namespace[=]<namespace>       Kubernetes namespace to install the CSI driver"
+  decho "  --values[=]<values.yaml>        Values file, which defines configuration values"
 
-  echo "  Optional"
-  echo "  --skip-verify-node              Skip worker node verification checks"
-  echo "  --release[=]<helm release>      Name to register with helm, default value will match the driver name"
-  echo "  --node-verify-user[=]<username> Username to SSH to worker nodes as, used to validate node requirements. Default is root"
-  echo "  --snapshot-crd                  Signifies that the Snapshot CRDs will be installed as part of installation."
-  echo "  -h                              Help"
-  echo
+  decho "  Optional"
+  decho "  --skip-verify-node              Skip worker node verification checks"
+  decho "  --release[=]<helm release>      Name to register with helm, default value will match the driver name"
+  decho "  --node-verify-user[=]<username> Username to SSH to worker nodes as, used to validate node requirements. Default is root"
+  decho "  --snapshot-crd                  Signifies that the Snapshot CRDs will be installed as part of installation."
+  decho "  -h                              Help"
+  decho
 
   exit $EXIT_WARNING
 }
@@ -132,11 +150,13 @@ function verify_sdc_installation() {
   fi
   log step "Verifying the SDC installation"
 
+  local SDC_MINION_NODES=$(run_command kubectl get nodes -o wide | grep -v -e master -e INTERNAL -e infra | awk ' { print $6; }')
+
   error=0
   missing=()
-  for node in $MINION_NODES; do
+  for node in $SDC_MINION_NODES; do
     # check is the scini kernel module is loaded
-    ssh ${NODEUSER}@$node "/sbin/lsmod | grep scini" >/dev/null 2>&1
+    run_command ssh ${NODEUSER}@$node "/sbin/lsmod | grep scini" >/dev/null 2>&1
     rv=$?
     if [ $rv -ne 0 ]; then
       missing+=($node)
@@ -153,7 +173,7 @@ function verify_powerstore_node_configuration() {
   fi
 
   log step "Verifying PowerStore node configuration"
-  echo
+  decho
 
   if ls "${VALUES}" >/dev/null; then
     if grep -c "scsiProtocol:[[:blank:]]\+FC" "${VALUES}" >/dev/null; then
@@ -191,20 +211,62 @@ function verify_iscsi_installation() {
   error=0
   for node in $MINION_NODES; do
     # check if the iSCSI client is installed
-    ssh ${NODEUSER}@"${node}" "cat /etc/iscsi/initiatorname.iscsi" >/dev/null 2>&1
+    run_command ssh ${NODEUSER}@"${node}" "cat /etc/iscsi/initiatorname.iscsi" >/dev/null 2>&1
     rv=$?
     if [ $rv -ne 0 ]; then
       error=1
-      found_warning "iSCSI client was not found on node: $node"
+      found_warning "Either iSCSI client was not found on node: $node or not able to verify"
     fi
-    ssh ${NODEUSER}@"${node}" pgrep iscsid &>/dev/null
+    run_command ssh ${NODEUSER}@"${node}" pgrep iscsid &>/dev/null
     rv=$?
     if [ $rv -ne 0 ]; then
       error=1
-      found_warning "iscsid is not running on node: $node"
+      found_warning "Either iscsid service is not running on node: $node or not able to verify"
     fi
   done
 
+  check_error error
+}
+
+
+function verify_unity_protocol_installation() {
+if [ ${NODE_VERIFY} -eq 0 ]; then
+    return
+  fi
+
+  log smart_step "Verifying sshpass installation.."
+  SSHPASS=$(which sshpass)
+  if [ -z "$SSHPASS" ]; then
+   found_warning "sshpass is not installed. It is mandatory to have ssh pass software for multi node kubernetes setup."
+  fi
+  
+   
+  log smart_step "Verifying iSCSI installation" "$1"
+
+  error=0
+  for node in $MINION_NODES; do
+    # check if the iSCSI client is installed
+    echo
+    echo -n "Enter the ${NODEUSER} password of ${node}: "
+    read -s nodepassword
+    echo
+    echo "$nodepassword" > protocheckfile
+    chmod 0400 protocheckfile
+    unset nodepassword
+    run_command sshpass -f protocheckfile ssh -o StrictHostKeyChecking=no ${NODEUSER}@"${node}" "cat /etc/iscsi/initiatorname.iscsi" > /dev/null 2>&1
+    rv=$?
+    if [ $rv -ne 0 ]; then
+      error=1
+      found_warning "iSCSI client is either not found on node: $node or not able to verify"
+    fi
+    run_command sshpass -f protocheckfile ssh -o StrictHostKeyChecking=no ${NODEUSER}@"${node}" "pgrep iscsid" > /dev/null 2>&1
+    rv1=$?
+    if [ $rv1 -ne 0 ]; then
+      error=1
+      found_warning "iscsid service is either not running on node: $node or not able to verify"
+    fi
+    rm -f protocheckfile
+  done
   check_error error
 }
 
@@ -219,7 +281,7 @@ function verify_fc_installation() {
   error=0
   for node in $MINION_NODES; do
     # check if FC hosts are available
-    ssh ${NODEUSER}@${node} 'ls --hide=* /sys/class/fc_host/* 1>/dev/null' &>/dev/null
+   run_command ssh ${NODEUSER}@${node} 'ls --hide=* /sys/class/fc_host/* 1>/dev/null' &>/dev/null
     rv=$?
     if [[ ${rv} -ne 0 ]]; then
       error=1
@@ -237,7 +299,7 @@ function verify_required_secrets() {
   error=0
   for N in "${@}"; do
     # Make sure the secret has already been established
-    kubectl get secrets -n "${NS}" 2>/dev/null | grep "${N}" --quiet
+    run_command kubectl get secrets -n "${NS}" 2>/dev/null | grep "${N}" --quiet
     if [ $? -ne 0 ]; then
       error=1
       found_error "Required secret, ${N}, does not exist."
@@ -252,7 +314,7 @@ function verify_optional_secrets() {
   error=0
   for N in "${@}"; do
     # Make sure the secret has already been established
-    kubectl get secrets -n "${NS}" 2>/dev/null | grep "${N}" --quiet
+    run_command kubectl get secrets -n "${NS}" 2>/dev/null | grep "${N}" --quiet
     if [ $? -ne 0 ]; then
       error=1
       found_warning "Optional secret, ${N}, does not exist."
@@ -263,45 +325,66 @@ function verify_optional_secrets() {
 
 # verify minimum and maximum k8s versions
 function verify_k8s_versions() {
+  if [ "${OPENSHIFT}" == "true" ]; then
+    return
+  fi
   log step "Verifying Kubernetes versions"
-  echo
-  log arrow
-  verify_min_k8s_version "$1" "$2" "small"
-  log arrow
-  verify_max_k8s_version "$3" "$4" "small"
-}
+  decho
 
-# verify minimum k8s version
-function verify_min_k8s_version() {
-  log smart_step "Verifying minimum Kubernetes version" "$3"
-
+  local MIN=${1}
+  local MAX=${2}
+  local V="${kMajorVersion}.${kMinorVersion}"
+  # check minimum
+  log arrow
+  log smart_step "Verifying minimum Kubernetes version" "small"
   error=0
-  if [[ "${1}" -gt "${kMajorVersion}" ]]; then
+  if [[ ${V} < ${MIN} ]]; then
     error=1
-    found_error "Kubernetes version, ${kMajorVersion}.${kMinorVersion}, is too old. Minimum required version is: ${1}.${2}"
+    found_error "Kubernetes version, ${V}, is too old. Minimum required version is: ${MIN}"
   fi
-  if [[ "${2}" -gt "${kMinorVersion}" ]]; then
-    error=1
-    found_error "Kubernetes version, ${kMajorVersion}.${kMinorVersion}, is too old. Minimum required version is: ${1}.${2}"
-  fi
-
   check_error error
+
+  # check maximum
+  log arrow
+  log smart_step "Verifying maximum Kubernetes version" "small"
+  error=0
+  if [[ ${V} > ${MAX} ]]; then
+    error=1
+    found_warning "Kubernetes version, ${V}, is newer than has been tested. Latest tested version is: ${MAX}"
+  fi
+  check_error error
+
 }
 
-# verify maximum k8s version
-function verify_max_k8s_version() {
-  log smart_step "Verifying maximum Kubernetes version" "$3"
+# verify minimum and maximum openshift versions
+function verify_openshift_versions() {
+  if [ "${OPENSHIFT}" != "true" ]; then
+    return
+  fi
+  log step "Verifying OpenShift versions"
+  decho
 
+  local MIN=${1}
+  local MAX=${2}
+  local V=$(OpenShiftVersion)
+  # check minimum
+  log arrow
+  log smart_step "Verifying minimum OpenShift version" "small"
   error=0
-  if [[ "${1}" -lt "${kMajorVersion}" ]]; then
+  if [[ ${V} < ${MIN} ]]; then
     error=1
-    found_warning "Kubernetes version, ${kMajorVersion}.${kMinorVersion}, is newer than has been tested. Last tested version is: ${1}.${2}"
+    found_error "OpenShift version, ${V}, is too old. Minimum required version is: ${MIN}"
   fi
-  if [[ "${2}" -lt "${kMinorVersion}" ]]; then
-    error=1
-    found_warning "Kubernetes version, ${kMajorVersion}.${kMinorVersion}, is newer than has been tested. Last tested version is: ${1}.${2}"
-  fi
+  check_error error
 
+  # check maximum
+  log arrow
+  log smart_step "Verifying maximum OpenShift version" "small"
+  error=0
+  if [[ ${V} > ${MAX} ]]; then
+    error=1
+    found_warning "OpenShift version, ${V}, is newer than has been tested. Latest tested version is: ${MAX}"
+  fi
   check_error error
 }
 
@@ -312,7 +395,7 @@ function verify_namespace() {
   error=0
   for N in "${@}"; do
     # Make sure the namespace exists
-    kubectl describe namespace "${N}" >/dev/null 2>&1
+    run_command kubectl describe namespace "${N}" >/dev/null 2>&1
     if [ $? -ne 0 ]; then
       error=1
       found_error "Namespace does not exist: ${N}"
@@ -325,7 +408,7 @@ function verify_namespace() {
 # verify that the no alpha version of volume snapshot resource is present on the system
 function verify_alpha_snap_resources() {
   log step "Verifying alpha snapshot resources"
-  echo
+  decho
   log arrow
   log smart_step "Verifying that alpha snapshot CRDs are not installed" "small"
 
@@ -334,11 +417,11 @@ function verify_alpha_snap_resources() {
   CRDS=("VolumeSnapshotClasses" "VolumeSnapshotContents" "VolumeSnapshots")
   for C in "${CRDS[@]}"; do
     # Verify that alpha snapshot related CRDs/CRs are not there on the system.
-    kubectl explain ${C} 2> /dev/null | grep "^VERSION.*v1alpha1$" --quiet
+    run_command kubectl explain ${C} 2> /dev/null | grep "^VERSION.*v1alpha1$" --quiet
     if [ $? -eq 0 ]; then
       error=1
       found_error "The alhpa CRD for ${C} is installed. Please uninstall it"
-      if [[ $(kubectl get ${C} -A --no-headers 2>/dev/null | wc -l) -ne 0 ]]; then
+      if [[ $(run_command kubectl get ${C} -A --no-headers 2>/dev/null | wc -l) -ne 0 ]]; then
         found_error " Found CR for alpha CRD ${C}. Please delete it"
       fi
     fi
@@ -349,7 +432,7 @@ function verify_alpha_snap_resources() {
 # verify that the requirements for beta snapshot support exist
 function verify_beta_snap_requirements() {
   log step "Verifying beta snapshot support"
-  echo
+  decho
   log arrow
   log smart_step "Verifying that beta snapshot CRDs are available" "small"
 
@@ -358,7 +441,7 @@ function verify_beta_snap_requirements() {
   CRDS=("VolumeSnapshotClasses" "VolumeSnapshotContents" "VolumeSnapshots")
   for C in "${CRDS[@]}"; do
     # Verify if snapshot related CRDs are there on the system. If not install them.
-    kubectl explain ${C} 2> /dev/null | grep "^VERSION.*v1beta1$" --quiet
+    run_command kubectl explain ${C} 2> /dev/null | grep "^VERSION.*v1beta1$" --quiet
     if [ $? -ne 0 ]; then
       error=1
       if [ "${INSTALL_CRD}" == "yes" ]; then
@@ -375,7 +458,7 @@ function verify_beta_snap_requirements() {
 
   error=0
   # check for the snapshot-controller. These are strongly suggested but not required
-  kubectl get pods -A | grep snapshot-controller --quiet
+  run_command kubectl get pods -A | grep snapshot-controller --quiet
   if [ $? -ne 0 ]; then
     error=1
     found_warning "The Snapshot Controller does not seem to be deployed. The Snapshot Controller should be provided by the Kubernetes vendor or administrator."
@@ -396,7 +479,7 @@ function verify_helm_3() {
     return
   }
 
-  helm version | grep "v3." --quiet
+  run_command helm version | grep "v3." --quiet
   if [ $? -ne 0 ]; then
     error=1
     found_error "Driver installation is supported only using helm 3"
@@ -421,15 +504,22 @@ function found_warning() {
 
 # Print a nice summary at the end
 function summary() {
-  echo
-  log section "Verification Complete"
+  local VERSTATUS="Success"
+  if [ "${#WARNINGS[@]}" -ne 0 ]; then
+    VERSTATUS="With Warnings"
+  fi
+  if [ "${#ERRORS[@]}" -ne 0 ]; then
+    VERSTATUS="With Errors"
+  fi
+  decho
+  log section "Verification Complete - ${VERSTATUS}"
   # print all the WARNINGS
   NON_CRD_WARNINGS=0
   if [ "${#WARNINGS[@]}" -ne 0 ]; then
     log warnings
     for E in "${WARNINGS[@]}"; do
-      echo "- ${E}"
-      echo ${E} | grep --quiet "^The beta CRD for VolumeSnapshot"
+      decho "- ${E}"
+      decho ${E} | grep --quiet "^The beta CRD for VolumeSnapshot"
       if [ $? -ne 0 ]; then
         NON_CRD_WARNINGS=1
       fi
@@ -444,7 +534,7 @@ function summary() {
   if [ "${#ERRORS[@]}" -ne 0 ]; then
     log errors
     for E in "${ERRORS[@]}"; do
-      echo "- ${E}"
+      decho "- ${E}"
     done
     RC=$EXIT_ERROR
   fi
@@ -457,31 +547,31 @@ function summary() {
 function validate_params() {
   # make sure the driver was specified
   if [ -z "${DRIVER}" ]; then
-    echo "No driver specified"
+    decho "No driver specified"
     usage
     exit 1
   fi
   # make sure the driver name is valid
   if [[ ! "${VALIDDRIVERS[@]}" =~ "${DRIVER}" ]]; then
-    echo "Driver: ${DRIVER} is invalid."
-    echo "Valid options are: ${VALIDDRIVERS[@]}"
+    decho "Driver: ${DRIVER} is invalid."
+    decho "Valid options are: ${VALIDDRIVERS[@]}"
     usage
     exit 1
   fi
   # the namespace is required
   if [ -z "${NS}" ]; then
-    echo "No namespace specified"
+    decho "No namespace specified"
     usage
     exit 1
   fi
   # values file
   if [ -z "${VALUES}" ]; then
-    echo "No values file was specified"
+    decho "No values file was specified"
     usage
     exit 1
   fi
   if [ ! -f "${VALUES}" ]; then
-    echo "Unable to read values file at: ${VALUES}"
+    decho "Unable to read values file at: ${VALUES}"
     usage
     exit 1
   fi
@@ -507,16 +597,16 @@ INSTALL_CRD="no"
 
 # make sure kubectl is available
 kubectl --help >&/dev/null || {
-  echo "kubectl required for verification... exiting"
+  decho "kubectl required for verification... exiting"
   exit $EXIT_ERROR
 }
 
 # Determine the nodes
-MINION_NODES=$(kubectl get nodes -o wide | grep -v -e master -e INTERNAL | awk ' { print $6; }')
-MASTER_NODES=$(kubectl get nodes -o wide | awk ' /master/{ print $6; }')
+MINION_NODES=$(run_command kubectl get nodes -o wide | grep -v -e master -e INTERNAL | awk ' { print $6; }')
+MASTER_NODES=$(run_command kubectl get nodes -o wide | awk ' /master/{ print $6; }')
 # Get the kubernetes major and minor version numbers.
-kMajorVersion=$(kubectl version | grep 'Server Version' | sed -e 's/^.*Major:"//' -e 's/[^0-9].*//g')
-kMinorVersion=$(kubectl version | grep 'Server Version' | sed -e 's/^.*Minor:"//' -e 's/[^0-9].*//g')
+kMajorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/^.*Major:"//' -e 's/[^0-9].*//g')
+kMinorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/^.*Minor:"//' -e 's/[^0-9].*//g')
 
 # get the list of valid CSI Drivers, this will be the list of directories in drivers/ that contain helm charts
 get_drivers "${SCRIPTDIR}/../helm"
@@ -571,11 +661,11 @@ while getopts ":h-:" optchar; do
       OPTIND=$((OPTIND + 1))
       ;;
     node-verify-user=*)
-      HODEUSER=${OPTARG#*=}
+      NODEUSER=${OPTARG#*=}
       ;;
     *)
-      echo "Unknown option --${OPTARG}"
-      echo "For help, run $PROG -h"
+      decho "Unknown option --${OPTARG}"
+      decho "For help, run $PROG -h"
       exit $EXIT_ERROR
       ;;
     esac
@@ -584,8 +674,8 @@ while getopts ":h-:" optchar; do
     usage
     ;;
   *)
-    echo "Unknown option -${OPTARG}"
-    echo "For help, run $PROG -h"
+    decho "Unknown option -${OPTARG}"
+    decho "For help, run $PROG -h"
     exit $EXIT_ERROR
     ;;
   esac
@@ -600,6 +690,7 @@ NODEUSER="${NODEUSER:-root}"
 
 # validate the parameters passed in
 validate_params "${MODE}"
+OPENSHIFT=$(isOpenShift)
 
 verify-driver "${DRIVER}"
 exit $?

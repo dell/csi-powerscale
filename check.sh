@@ -16,7 +16,7 @@ fmt_count() {
 }
 
 fmt() {
-    gofmt -d ./service | tee $FMT_TMPFILE
+    gofmt -d ./service ./common/ | tee $FMT_TMPFILE
     cat $FMT_TMPFILE | wc -l > $FMT_COUNT_TMPFILE
     if [ ! `cat $FMT_COUNT_TMPFILE` -eq "0" ]; then
         echo Found `cat $FMT_COUNT_TMPFILE` formatting issue\(s\).
@@ -30,14 +30,14 @@ FMT_RETURN_CODE=$?
 echo === Finished
 
 echo === Vetting...
-go vet ${MOD_FLAGS} ./service/...  
+go vet ${MOD_FLAGS} ./service/...  ./common/...
 VET_RETURN_CODE=$?
 echo === Finished
 
 echo === Linting...
 (command -v golint >/dev/null 2>&1 \
     || GO111MODULE=off go get -insecure -u golang.org/x/lint/golint) \
-    && golint --set_exit_status ./service/... 
+    && golint --set_exit_status ./service/... ./common/...
 LINT_RETURN_CODE=$?
 echo === Finished
 

@@ -16,35 +16,40 @@ PROG="${0}"
 NODE_VERIFY=1
 VERIFY=1
 MODE="install"
+WATCHLIST=""
 # version of Snapshot CRD to install. Default is none ("")
 INSTALL_CRD=""
-
+# export the name of the debug log, so child processes will see it
+export DEBUGLOG="${SCRIPTDIR}/install-debug.log"
 declare -a VALIDDRIVERS
 
 source "$SCRIPTDIR"/common.sh
 
+if [ -f "${DEBUGLOG}" ]; then
+  rm -f "${DEBUGLOG}"
+fi
 
 #
 # usage will print command execution help and then exit
 function usage() {
-  echo
-  echo "Help for $PROG"
-  echo
-  echo "Usage: $PROG options..."
-  echo "Options:"
-  echo "  Required"
-  echo "  --namespace[=]<namespace>                Kubernetes namespace containing the CSI driver"
-  echo "  --values[=]<values.yaml>                 Values file, which defines configuration values"
+  decho
+  decho "Help for $PROG"
+  decho
+  decho "Usage: $PROG options..."
+  decho "Options:"
+  decho "  Required"
+  decho "  --namespace[=]<namespace>                Kubernetes namespace containing the CSI driver"
+  decho "  --values[=]<values.yaml>                 Values file, which defines configuration values"
 
-  echo "  Optional"
-  echo "  --release[=]<helm release>               Name to register with helm, default value will match the driver name"
-  echo "  --upgrade                                Perform an upgrade of the specified driver, default is false"
-  echo "  --node-verify-user[=]<username>          Username to SSH to worker nodes as, used to validate node requirements. Default is root"
-  echo "  --skip-verify                            Skip the kubernetes configuration verification to use the CSI driver, default will run verification"
-  echo "  --skip-verify-node                       Skip worker node verification checks"
-  echo "  --snapshot-crd                           Install snapshot CRDs. Default will not install Snapshot classes."
-  echo "  -h                                       Help"
-  echo
+  decho "  Optional"
+  decho "  --release[=]<helm release>               Name to register with helm, default value will match the driver name"
+  decho "  --upgrade                                Perform an upgrade of the specified driver, default is false"
+  decho "  --node-verify-user[=]<username>          Username to SSH to worker nodes as, used to validate node requirements. Default is root"
+  decho "  --skip-verify                            Skip the kubernetes configuration verification to use the CSI driver, default will run verification"
+  decho "  --skip-verify-node                       Skip worker node verification checks"
+  decho "  --snapshot-crd                           Install snapshot CRDs. Default will not install Snapshot classes."
+  decho "  -h                                       Help"
+  decho
 
   exit 0
 }
@@ -54,17 +59,17 @@ function warning() {
   log separator
   printf "${YELLOW}WARNING:${NC}\n"
   for N in "$@"; do
-    echo $N
+    decho $N
   done
-  echo
+  decho
   if [ "${ASSUMEYES}" == "true" ]; then
-    echo "Continuing as '-Y' argument was supplied"
+    decho "Continuing as '-Y' argument was supplied"
     return
   fi
   read -n 1 -p "Press 'y' to continue or any other key to exit: " CONT
-  echo
+  decho
   if [ "${CONT}" != "Y" -a "${CONT}" != "y" ]; then
-    echo "quitting at user request"
+    decho "quitting at user request"
     exit 2
   fi
 }
@@ -79,8 +84,10 @@ function header() {
 # check_for_driver will see if the driver is already installed within the namespace provided
 function check_for_driver() {
   log section "Checking to see if CSI Driver is already installed"
-  NUM=$(helm list --namespace "${NS}" | grep "^${RELEASE}\b" | wc -l)
+  NUM=$(run_command helm list --namespace "${NS}" | grep "^${RELEASE}\b" | wc -l)
   if [ "${1}" == "install" -a "${NUM}" != "0" ]; then
+    # grab the status of the existing chart release
+    debuglog_helm_status "${NS}"  "${RELEASE}"
     log error "The CSI Driver is already installed"
   fi
   if [ "${1}" == "upgrade" -a "${NUM}" == "0" ]; then
@@ -93,31 +100,31 @@ function check_for_driver() {
 function validate_params() {
   # make sure the driver was specified
   if [ -z "${DRIVER}" ]; then
-    echo "No driver specified"
+    decho "No driver specified"
     usage
     exit 1
   fi
   # make sure the driver name is valid
   if [[ ! "${VALIDDRIVERS[@]}" =~ "${DRIVER}" ]]; then
-    echo "Driver: ${DRIVER} is invalid."
-    echo "Valid options are: ${VALIDDRIVERS[@]}"
+    decho "Driver: ${DRIVER} is invalid."
+    decho "Valid options are: ${VALIDDRIVERS[@]}"
     usage
     exit 1
   fi
   # the namespace is required
   if [ -z "${NS}" ]; then
-    echo "No namespace specified"
+    decho "No namespace specified"
     usage
     exit 1
   fi
   # values file
   if [ -z "${VALUES}" ]; then
-    echo "No values file was specified"
+    decho "No values file was specified"
     usage
     exit 1
   fi
   if [ ! -f "${VALUES}" ]; then
-    echo "Unable to read values file at: ${VALUES}"
+    decho "Unable to read values file at: ${VALUES}"
     usage
     exit 1
   fi
@@ -133,24 +140,67 @@ function install_driver() {
   fi
 
   HELMOUTPUT="/tmp/csi-install.$$.out"
-  helm ${1} --values "${DRIVERDIR}/${DRIVER}/k8s-${kMajorVersion}.${kMinorVersion}-values.yaml" --values "${DRIVERDIR}/${DRIVER}/driver-image.yaml" --values "${VALUES}" --namespace ${NS} "${RELEASE}" "${DRIVERDIR}/${DRIVER}" >"${HELMOUTPUT}" 2>&1
+  run_command helm ${1} \
+    --set openshift=${OPENSHIFT} \
+    --values "${DRIVERDIR}/${DRIVER}/k8s-${kMajorVersion}.${kMinorVersion}-values.yaml" \
+    --values "${DRIVERDIR}/${DRIVER}/driver-image.yaml" \
+    --values "${VALUES}" \
+    --namespace ${NS} "${RELEASE}" \
+    "${DRIVERDIR}/${DRIVER}" >"${HELMOUTPUT}" 2>&1
+
   if [ $? -ne 0 ]; then
     cat "${HELMOUTPUT}"
     log error "Helm operation failed, output can be found in ${HELMOUTPUT}. The failure should be examined, before proceeding. Additionally, running csi-uninstall.sh may be needed to clean up partial deployments."
   fi
   log step_success
+  getWhatToWatch "${NS}" "${RELEASE}"
   # wait for the deployment to finish, use the default timeout
-  waitOnRunning "${NS}" "statefulset ${RELEASE}-controller,daemonset ${RELEASE}-node"
+  waitOnRunning "${NS}" "${WATCHLIST}"
   if [ $? -eq 1 ]; then
     warning "Timed out waiting for the operation to complete." \
       "This does not indicate a fatal error, pods may take a while to start." \
       "Progress can be checked by running \"kubectl get pods -n ${NS}\""
+    debuglog_helm_status "${NS}" "${RELEASE}"
   fi
 }
 
 # Print a nice summary at the end
 function summary() {
   log section "Operation complete"
+}
+
+# getWhatToWatch
+# will retrieve the list of statefulsets, deployments, and daemonsets running in a target namespace
+# and sets a global variable formatted such that it can be passed to waitOnRunning to monitor the rollout
+#
+# This expects resources to be named with a prefix of the helm release name
+#
+# expects two argumnts:
+# $1: required: namespace
+# $2: required: helm release name
+function getWhatToWatch() {
+  if [ -z "${2}" ]; then
+    decho "No namespace and/or helm release name were supplied These fields are required for getWhatToWatch"
+    exit 1
+  fi
+
+  local NS="${1}"
+  local RN="${2}"
+
+  for T in StatefulSet Deployment DaemonSet; do
+    ALL=$(run_command kubectl -n "${NS}" get "${T}" -o jsonpath="{.items[*].metadata.name}")
+    for ENTITY in $ALL; do
+        if [[ "${ENTITY}" == ${RN}-* ]]; then
+            if [ "${ENTITY}" != "" ]; then
+                if [ "${WATCHLIST}" != "" ]; then
+                    WATCHLIST="${WATCHLIST},"
+                fi
+                WATCHLIST="${WATCHLIST}${T} ${ENTITY}"
+            fi
+        fi
+    done
+  done
+
 }
 
 # waitOnRunning
@@ -162,7 +212,7 @@ function summary() {
 #  $3: optional: timeout value, 300 seconds is the default.
 function waitOnRunning() {
   if [ -z "${2}" ]; then
-    echo "No namespace and/or list of deployments was supplied. This field is required for waitOnRunning"
+    decho "No namespace and/or list of deployments was supplied. This field is required for waitOnRunning"
     return 1
   fi
   # namespace
@@ -179,7 +229,7 @@ function waitOnRunning() {
   for D in "${PODS[@]}"; do
     log arrow
     log smart_step "Waiting for $D to be ready" "small"
-    kubectl -n "${NS}" rollout status --timeout=${TIMEOUT}s ${D} >/dev/null 2>&1
+    run_command kubectl -n "${NS}" rollout status --timeout=${TIMEOUT}s ${D} >/dev/null 2>&1
     if [ $? -ne 0 ]; then
       error=1
       log step_failure
@@ -198,7 +248,10 @@ function kubectl_safe() {
   eval "kubectl $1"
   exitcode=$?
   if [[ $exitcode != 0 ]]; then
-    echo "$2"
+    decho "$2"
+    decho "Command was: kubectl $1"
+    decho "Output was:"
+    eval "kubectl $1"
     exit $exitcode
   fi
 }
@@ -226,7 +279,7 @@ function install_snapshot_crd() {
     if [[ $? -ne 0 ]]; then
       # make sure CRD exists
       if [ ! -f "${SNAPCLASSDIR}/${SNAPCLASSES[$C]}" ]; then
-        echo "Unable to to find Snapshot Classes at ${SNAPCLASSDIR}"
+        decho "Unable to to find Snapshot Classes at ${SNAPCLASSDIR}"
         exit 1
       fi
       # create the custom resource
@@ -244,7 +297,7 @@ function install_snapshot_crd() {
 function verify_kubernetes() {
   EXTRA_OPTS=""
   if [ $VERIFY -eq 0 ]; then
-    echo "Skipping verification at user request"
+    decho "Skipping verification at user request"
   else
     if [ $NODE_VERIFY -eq 0 ]; then
       EXTRA_OPTS="$EXTRA_OPTS --skip-verify-node"
@@ -336,8 +389,8 @@ while getopts ":h-:" optchar; do
       HODEUSER=${OPTARG#*=}
       ;;
     *)
-      echo "Unknown option --${OPTARG}"
-      echo "For help, run $PROG -h"
+      decho "Unknown option --${OPTARG}"
+      decho "For help, run $PROG -h"
       exit 1
       ;;
     esac
@@ -346,8 +399,8 @@ while getopts ":h-:" optchar; do
     usage
     ;;
   *)
-    echo "Unknown option -${OPTARG}"
-    echo "For help, run $PROG -h"
+    decho "Unknown option -${OPTARG}"
+    decho "For help, run $PROG -h"
     exit 1
     ;;
   esac
@@ -360,18 +413,20 @@ NODEUSER="${NODEUSER:-root}"
 
 # make sure kubectl is available
 kubectl --help >&/dev/null || {
-  echo "kubectl required for installation... exiting"
+  decho "kubectl required for installation... exiting"
   exit 2
 }
 # make sure helm is available
 helm --help >&/dev/null || {
-  echo "helm required for installation... exiting"
+  decho "helm required for installation... exiting"
   exit 2
 }
 
+OPENSHIFT=$(isOpenShift)
+
 # Get the kubernetes major and minor version numbers.
-kMajorVersion=$(kubectl version | grep 'Server Version' | sed -e 's/^.*Major:"//' -e 's/[^0-9].*//g')
-kMinorVersion=$(kubectl version | grep 'Server Version' | sed -e 's/^.*Minor:"//' -e 's/[^0-9].*//g')
+kMajorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/^.*Major:"//' -e 's/[^0-9].*//g')
+kMinorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/^.*Minor:"//' -e 's/[^0-9].*//g')
 
 # validate the parameters passed in
 validate_params "${MODE}"

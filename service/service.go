@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/dell/csi-isilon/common/k8sutils"
 	"net"
 	"runtime"
 	"strings"
@@ -34,6 +35,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Manifest is the SP's manifest.
@@ -54,19 +56,21 @@ type Service interface {
 
 // Opts defines service configuration options.
 type Opts struct {
-	Endpoint     string
-	Port         string
-	EndpointURL  string
-	User         string
-	Password     string
-	AccessZone   string
-	Path         string
-	Insecure     bool
-	AutoProbe    bool
-	QuotaEnabled bool
-	DebugEnabled bool
-	Verbose      uint
-	NfsV3        bool
+	Endpoint              string
+	Port                  string
+	EndpointURL           string
+	User                  string
+	Password              string
+	AccessZone            string
+	Path                  string
+	Insecure              bool
+	AutoProbe             bool
+	QuotaEnabled          bool
+	DebugEnabled          bool
+	Verbose               uint
+	NfsV3                 bool
+	CustomTopologyEnabled bool
+	KubeConfigPath        string
 }
 
 type service struct {
@@ -133,12 +137,17 @@ func (s *service) initializeService(ctx context.Context) {
 		s.nodeIP = nodeIPEnv
 	}
 
+	if kubeConfigPath, ok := csictx.LookupEnv(ctx, constants.EnvKubeConfigPath); ok {
+		opts.KubeConfigPath = kubeConfigPath
+	}
+
 	opts.QuotaEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvQuotaEnabled)
 	opts.Insecure = utils.ParseBooleanFromContext(ctx, constants.EnvInsecure)
 	opts.AutoProbe = utils.ParseBooleanFromContext(ctx, constants.EnvAutoProbe)
 	opts.DebugEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvDebug)
 	opts.Verbose = utils.ParseUintFromContext(ctx, constants.EnvVerbose)
 	opts.NfsV3 = utils.ParseBooleanFromContext(ctx, constants.EnvNfsV3)
+	opts.CustomTopologyEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvCustomTopologyEnabled)
 
 	s.opts = opts
 
@@ -248,6 +257,46 @@ func (s *service) autoProbe(ctx context.Context) error {
 }
 
 func (s *service) GetIsiClient(clientCtx context.Context) (*isi.Client, error) {
+
+	// First we fetch node labels using kubernetes API and check, if label
+	// <provisionerName>.dellemc.com/<powerscalefqdnorip>: <provisionerName>
+	// exists on node, if exists we use corresponding PowerScale FQDN or IP for creating connection
+	// to PowerScale Array or else we fallback to using isiIP
+
+	customTopologyFound := false
+	if s.opts.CustomTopologyEnabled {
+		k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
+		if err != nil {
+			log.Errorf("init client failed for custom topology: '%s'", err.Error())
+			return nil, err
+		}
+		// access the API to fetch node object
+		node, _ := k8sclientset.CoreV1().Nodes().Get(context.TODO(), s.nodeID, v1.GetOptions{})
+		log.Debugf("Node %s details\n", node)
+
+		// Iterate node labels and check if required label is available
+		for lkey, lval := range node.Labels {
+			log.Infof("Label is: %s:%s\n", lkey, lval)
+			if strings.HasPrefix(lkey, constants.PluginName+"/") && lval == constants.PluginName {
+				log.Infof("Topology label %s:%s available on node", lkey, lval)
+				tList := strings.SplitAfter(lkey, "/")
+				if len(tList) != 0 {
+					s.opts.Endpoint = tList[1]
+					s.opts.EndpointURL = fmt.Sprintf("https://%s:%s", s.opts.Endpoint, s.opts.Port)
+					customTopologyFound = true
+				} else {
+					log.Errorf("Fetching PowerScale FQDN/IP from topology label %s:%s failed, using isiIP "+
+						"%s as PowerScale FQDN/IP", lkey, lval, s.opts.Endpoint)
+				}
+				break
+			}
+		}
+	}
+
+	if s.opts.CustomTopologyEnabled && !customTopologyFound {
+		log.Errorf("init client failed for custom topology")
+		return nil, errors.New("init client failed for custom topology")
+	}
 
 	client, err := isi.NewClientWithArgs(
 		clientCtx,

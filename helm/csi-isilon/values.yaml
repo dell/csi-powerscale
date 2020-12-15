@@ -13,6 +13,10 @@ isiAccessZone: "System"
 # "volumeNamePrefix" defines a string prepended to each volume created by the CSI driver.
 volumeNamePrefix: k8s
 
+# "controllerCount" defines the number of csi-powerscale controller pods to deploy to
+# the Kubernetes release.
+controllerCount: 2
+
 # Indicates whether debug level logs should be logged
 enableDebug: "true"
 
@@ -38,7 +42,13 @@ isiPath: "/ifs/data/csi"
 autoProbe: "true"
 
 # Specify whether to set the version to v3 when mounting an NFS export. If the value is "false", then the default version supported will be used (i.e. the mount command will not explicitly specify "-o vers=3" option)
+# This flag has now been deprecated and will be removed in a future release.
+# Please use StorageClass.mountOptions if you want to specify 'vers=3' as a mount option.
 nfsV3: "false"
+
+# Specify if custom topology label <provisionerName>.dellemc.com/<powerscalefqdnorip>:<provisionerName> has to be used for making connection to backend PowerScale Array
+# If enableCustomTopology is set to true, then do not specify allowedTopologies in storage class
+enableCustomTopology: "false"
 
 # The installation process will generate multiple storageclasses based on these parameters.
 # Only the primary storageclass for the driver will be marked default if specified.
@@ -63,3 +73,16 @@ storageClass:
   # which  determines, when a node mounts the PVC, in NodeStageVolume, whether to add the k8s node to 
   # the "Root clients" field (when true) or "Clients" field (when false) of the NFS export 
   rootClientEnabled: "false"
+
+controller:
+
+  # Define nodeSelector for the controllers, if required
+  nodeSelector:
+  #  node-role.kubernetes.io/master: ""
+
+  # Define tolerations for the controllers, if required
+  tolerations:
+  #  - key: "node-role.kubernetes.io/master"
+  #    operator: "Equal"
+  #    value: "true"
+  #    effect: "NoSchedule"

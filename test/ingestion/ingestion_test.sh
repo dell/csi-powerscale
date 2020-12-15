@@ -1,5 +1,5 @@
-# Copyright: (c) 2020, Dell EMC
 #!/bin/bash
+# Copyright: (c) 2020, Dell EMC
 
 # volumename  volumehandle  storageclass  accessmode  storagesize   pvname   pvcname
 #     1             2            3             4            5         6         7

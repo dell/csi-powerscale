@@ -48,6 +48,11 @@ func publishVolume(
 	if mntVol == nil {
 		return status.Error(codes.InvalidArgument, "Invalid access type")
 	}
+
+	var mntOptions []string
+	mntOptions = mntVol.GetMountFlags()
+	log.Infof("The mountOptions received are: %s", mntOptions)
+
 	target := req.GetTargetPath()
 	if target == "" {
 		return status.Error(codes.InvalidArgument,
@@ -69,6 +74,8 @@ func publishVolume(
 		rwOption = fmt.Sprintf("%s,%s", rwOption, "vers=3")
 	}
 
+	mntOptions = append(mntOptions, rwOption)
+
 	f := log.Fields{
 		"ID":         req.VolumeId,
 		"TargetPath": target,
@@ -83,6 +90,7 @@ func publishVolume(
 			"could not reliably determine existing mount status: '%s'",
 			err.Error())
 	}
+
 	if len(mnts) != 0 {
 		for _, m := range mnts {
 			// check for idempotency
@@ -110,7 +118,8 @@ func publishVolume(
 		}
 	}
 
-	if err := gofsutil.Mount(context.Background(), nfsExportURL, target, "nfs", rwOption); err != nil {
+	log.Infof("The mountOptions being used for mount are: %s", mntOptions)
+	if err := gofsutil.Mount(context.Background(), nfsExportURL, target, "nfs", mntOptions...); err != nil {
 		log.Errorf("%v", err)
 		return err
 	}
