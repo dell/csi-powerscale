@@ -86,3 +86,11 @@ controller:
   #    operator: "Equal"
   #    value: "true"
   #    effect: "NoSchedule"
+node:
+  
+  # Define tolerations for the node daemonset, if required
+  tolerations:
+  #  - key: "node-role.kubernetes.io/master"
+  #    operator: "Equal"
+  #    value: "true"
+  #    effect: "NoSchedule"

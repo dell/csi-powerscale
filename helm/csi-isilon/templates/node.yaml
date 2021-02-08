@@ -61,6 +61,10 @@ spec:
     spec:
       serviceAccount: {{ .Release.Name }}-node
       hostNetwork: true
+      {{ if .Values.node.tolerations }}
+      tolerations:
+      {{- toYaml .Values.node.tolerations | nindent 8 }}
+      {{ end }}
       containers:  
         - name: driver
           securityContext:
