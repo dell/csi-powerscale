@@ -1,14 +1,19 @@
 # docker makefile, included from Makefile, will build/push images with docker or podman
 
-# Includes the following generated file to get semantic version information
-include semver.mk
+docker-build:
+	@echo "Building docker image: $(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
+	docker build -t "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)" --build-arg GOPROXY=$(GOPROXY) --build-arg GOVERSION=$(GOVERSION) .
 
-docker:
-	@echo "Base Images is set to: $(BASEIMAGE)"
+docker-build-image-push:
+	@echo "Pushing: $(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
+	docker push "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
+
+podman-build:
+	@echo "Base Image is set to: $(BASEIMAGE)"
 	@echo "Building: $(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
-	$(BUILDER) build -t "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)" --target $(BUILDSTAGE) --build-arg GOPROXY=$(GOPROXY) --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOVERSION=$(GOVERSION) .
+	$(BUILDER) build -t "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)" -f Dockerfile.podman --target $(BUILDSTAGE) --build-arg GOPROXY=$(GOPROXY) --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOVERSION=$(GOVERSION) .
 
-push:
+podman-build-image-push:
 	@echo "Pushing: $(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
 	$(BUILDER) push "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
 

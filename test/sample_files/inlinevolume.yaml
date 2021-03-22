@@ -16,3 +16,4 @@ spec:
       driver: csi-isilon.dellemc.com
       volumeAttributes:
         size: "2Gi"
+        ClusterName: "cluster1"

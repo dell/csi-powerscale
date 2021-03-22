@@ -1,8 +1,6 @@
-# This is a sample manifest for utilizing the topology feature and mount options.
+# This is a sample manifest for utilizing the mount options.
 # PVCs created using this storage class will be scheduled 
 # only on the nodes with access to Isilon
-
-# Change all instances of <ISILON_IP> to the IP of the PowerScale OneFS API server
 
 # Provide mount options through "mountOptions" attribute 
 # to create PVCs with mount options.
@@ -10,7 +8,7 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: isilon
+  name: isilon-mountoption
 provisioner: csi-isilon.dellemc.com
 reclaimPolicy: Delete
 allowVolumeExpansion: true
@@ -32,13 +30,6 @@ parameters:
 # Immediate mode indicates that volume binding and dynamic provisioning occurs once the PersistentVolumeClaim is created
 # WaitForFirstConsumer mode will delay the binding and provisioning of a PersistentVolume
 # until a Pod using the PersistentVolumeClaim is created
-volumeBindingMode: WaitForFirstConsumer
-# allowedTopologies helps scheduling pod on worker nodes which matches all of below expressions
-# If enableCustomTopology is set to true in helm values.yaml, then do not specify allowedTopologies
-allowedTopologies:
-  - matchLabelExpressions:
-      - key: csi-isilon.dellemc.com/<ISILON_IP>
-        values:
-          - csi-isilon.dellemc.com
+volumeBindingMode: Immediate
 
 mountOptions: ["<mountOption1>", "<mountOption2>", ..., "<mountOptionN>"]

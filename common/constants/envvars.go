@@ -21,21 +21,9 @@ const (
 	// EnvCSIEndpoint is the name of the unix domain socket that the csi driver is listening on
 	EnvCSIEndpoint = "CSI_ENDPOINT"
 
-	// EnvEndpoint is the name of the enviroment variable used to set the
-	// HTTPS endpoint of the Isilon OneFS API server
-	EnvEndpoint = "X_CSI_ISI_ENDPOINT"
-
 	// EnvPort is the name of the enviroment variable used to set the
 	// HTTPS port number of the Isilon OneFS API server
 	EnvPort = "X_CSI_ISI_PORT"
-
-	// EnvUser is the name of the enviroment variable used to set the
-	// username when authenticating to the Isilon OneFS API server
-	EnvUser = "X_CSI_ISI_USER"
-
-	// EnvPassword is the name of the enviroment variable used to set the
-	// user's password when authenticating to the Isilon OneFS API server
-	EnvPassword = "X_CSI_ISI_PASSWORD"
 
 	// EnvInsecure is the name of the enviroment variable used to specify
 	// that the Isilon OneFS API server's certificate chain and host name should not
@@ -80,4 +68,10 @@ const (
 
 	// EnvKubeConfigPath indicates kubernetes configuration that has to be used by CSI Driver
 	EnvKubeConfigPath = "KUBECONFIG"
+
+	// EnvAllowedNetworks indicates list of networks on which NFS traffic is allowed
+	EnvAllowedNetworks = "X_CSI_ALLOWED_NETWORKS"
+
+	// EnvIsilonConfigFile specifies the filepath containing Isilon cluster's config details
+	EnvIsilonConfigFile = "X_CSI_ISILON_CONFIG_PATH"
 )

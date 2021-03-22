@@ -11,6 +11,18 @@ Feature: Isilon CSI interface
     When I call ControllerExpandVolume "volume1=_=_=557=_=_=System" "108589934592"
     Then a valid ControllerExpandVolumeResponse is returned
 
+  Scenario: Controller Expand volume good scenario with Quota enabled and non-existing volume
+    Given a Isilon service
+    And I enable quota
+    When I call ControllerExpandVolume "volume1=_=_=557=_=_=System=_=_=cluster1" "108589934592"
+    Then a valid ControllerExpandVolumeResponse is returned
+
+  Scenario: Controller Expand volume negative scenario with Quota enabled
+    Given a Isilon service
+    And I enable quota
+    When I call ControllerExpandVolume "volume1=_=_=557=_=_=System=_=_=cluster2" "108589934592"
+    Then the error contains "failed to get cluster config details for clusterName: 'cluster2'"
+
   Scenario: Controller Expand volume good scenario with Quota disabled
     Given a Isilon service
     When I call ControllerExpandVolume "volume1=_=_=557=_=_=System" "108589934592"

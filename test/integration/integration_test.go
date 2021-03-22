@@ -27,10 +27,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DATA-DOG/godog"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/cucumber/godog"
 	"github.com/dell/csi-isilon/provider"
-	"github.com/rexray/gocsi/utils"
+	"github.com/dell/gocsi/utils"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -55,8 +55,10 @@ func TestMain(m *testing.M) {
 	if hostFQDN == "unknown" {
 		fmt.Printf("cannot get FQDN")
 	}
-	nodeName := host + nodeIDSeparator + hostFQDN + nodeIDSeparator + os.Getenv("X_CSI_NODE_IP")
-	os.Setenv("X_CSI_NODE_NAME", nodeName)
+	if os.Getenv("X_CSI_CUSTOM_TOPOLOGY_ENABLED") == "true" {
+		nodeName := host + nodeIDSeparator + hostFQDN + nodeIDSeparator + os.Getenv("X_CSI_NODE_IP")
+		os.Setenv("X_CSI_NODE_NAME", nodeName)
+	}
 
 	// Make the file needed for NodeStage:
 	//  /tmp/datadir    -- for file system mounts
@@ -68,10 +70,12 @@ func TestMain(m *testing.M) {
 		fmt.Printf("'%s': '%s'\n", datadir, err)
 	}
 
+	write, err := os.Create("powerscale_integration_test_results.xml")
 	exitVal := godog.RunWithOptions("godog", func(s *godog.Suite) {
 		FeatureContext(s)
 	}, godog.Options{
-		Format: "pretty",
+		Output: write,
+		Format: "junit",
 		Paths:  []string{os.Args[len(os.Args)-2]},
 		Tags:   os.Args[len(os.Args)-1],
 	})

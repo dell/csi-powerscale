@@ -18,14 +18,14 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/dell/csi-isilon/common/constants"
 	"path"
 	"strings"
+
+	"github.com/dell/csi-isilon/common/constants"
 
 	utils "github.com/dell/csi-isilon/common/utils"
 	isi "github.com/dell/goisilon"
 	"github.com/dell/goisilon/api"
-	log "github.com/sirupsen/logrus"
 )
 
 type isiService struct {
@@ -33,12 +33,15 @@ type isiService struct {
 	client   *isi.Client
 }
 
-func (svc *isiService) CopySnapshot(isiPath string, srcSnapshotID int64, dstVolumeName string) (isi.Volume, error) {
+func (svc *isiService) CopySnapshot(ctx context.Context, isiPath string, srcSnapshotID int64, dstVolumeName string) (isi.Volume, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin to copy snapshot '%d'", srcSnapshotID)
 
 	var volumeNew isi.Volume
 	var err error
-	if volumeNew, err = svc.client.CopySnapshotWithIsiPath(context.Background(), isiPath, srcSnapshotID, "", dstVolumeName); err != nil {
+	if volumeNew, err = svc.client.CopySnapshotWithIsiPath(ctx, isiPath, srcSnapshotID, "", dstVolumeName); err != nil {
 		log.Errorf("copy snapshot failed, '%s'", err.Error())
 		return nil, err
 	}
@@ -46,12 +49,15 @@ func (svc *isiService) CopySnapshot(isiPath string, srcSnapshotID int64, dstVolu
 	return volumeNew, nil
 }
 
-func (svc *isiService) CopyVolume(isiPath, srcVolumeName, dstVolumeName string) (isi.Volume, error) {
+func (svc *isiService) CopyVolume(ctx context.Context, isiPath, srcVolumeName, dstVolumeName string) (isi.Volume, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin to copy volume '%s'", srcVolumeName)
 
 	var volumeNew isi.Volume
 	var err error
-	if volumeNew, err = svc.client.CopyVolumeWithIsiPath(context.Background(), isiPath, srcVolumeName, dstVolumeName); err != nil {
+	if volumeNew, err = svc.client.CopyVolumeWithIsiPath(ctx, isiPath, srcVolumeName, dstVolumeName); err != nil {
 		log.Errorf("copy volume failed, '%s'", err.Error())
 		return nil, err
 	}
@@ -59,12 +65,15 @@ func (svc *isiService) CopyVolume(isiPath, srcVolumeName, dstVolumeName string) 
 	return volumeNew, nil
 }
 
-func (svc *isiService) CreateSnapshot(path, snapshotName string) (isi.Snapshot, error) {
+func (svc *isiService) CreateSnapshot(ctx context.Context, path, snapshotName string) (isi.Snapshot, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin to create snapshot '%s'", snapshotName)
 
 	var snapshot isi.Snapshot
 	var err error
-	if snapshot, err = svc.client.CreateSnapshotWithPath(context.Background(), path, snapshotName); err != nil {
+	if snapshot, err = svc.client.CreateSnapshotWithPath(ctx, path, snapshotName); err != nil {
 		log.Errorf("create snapshot failed, '%s'", err.Error())
 		return nil, err
 	}
@@ -72,10 +81,13 @@ func (svc *isiService) CreateSnapshot(path, snapshotName string) (isi.Snapshot, 
 	return snapshot, nil
 }
 
-func (svc *isiService) CreateVolume(isiPath, volName string) error {
+func (svc *isiService) CreateVolume(ctx context.Context, isiPath, volName string) error {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin to create volume '%s'", volName)
 
-	if _, err := svc.client.CreateVolumeWithIsipath(context.Background(), isiPath, volName); err != nil {
+	if _, err := svc.client.CreateVolumeWithIsipath(ctx, isiPath, volName); err != nil {
 		log.Errorf("create volume failed, '%s'", err.Error())
 		return err
 	}
@@ -83,12 +95,30 @@ func (svc *isiService) CreateVolume(isiPath, volName string) error {
 	return nil
 }
 
-func (svc *isiService) GetExports() (isi.ExportList, error) {
+func (svc *isiService) CreateVolumeWithMetaData(ctx context.Context, isiPath, volName string, metadata map[string]string) error {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
+	log.Debugf("begin to create volume '%s'", volName)
+	log.Debugf("header metadata '%v'", metadata)
+
+	if _, err := svc.client.CreateVolumeWithIsipathMetaData(ctx, isiPath, volName, metadata); err != nil {
+		log.Errorf("create volume failed, '%s'", err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func (svc *isiService) GetExports(ctx context.Context) (isi.ExportList, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debug("begin getting exports for Isilon")
 
 	var exports isi.ExportList
 	var err error
-	if exports, err = svc.client.GetExports(context.Background()); err != nil {
+	if exports, err = svc.client.GetExports(ctx); err != nil {
 		log.Error("failed to get exports")
 		return nil, err
 	}
@@ -96,12 +126,15 @@ func (svc *isiService) GetExports() (isi.ExportList, error) {
 	return exports, nil
 }
 
-func (svc *isiService) GetExportByIDWithZone(exportID int, accessZone string) (isi.Export, error) {
+func (svc *isiService) GetExportByIDWithZone(ctx context.Context, exportID int, accessZone string) (isi.Export, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin getting export by id '%d' with access zone '%s' for Isilon", exportID, accessZone)
 
 	var export isi.Export
 	var err error
-	if export, err = svc.client.GetExportByIDWithZone(context.Background(), exportID, accessZone); err != nil {
+	if export, err = svc.client.GetExportByIDWithZone(ctx, exportID, accessZone); err != nil {
 		log.Error("failed to get export by id with access zone")
 		return nil, err
 	}
@@ -109,14 +142,17 @@ func (svc *isiService) GetExportByIDWithZone(exportID int, accessZone string) (i
 	return export, nil
 }
 
-func (svc *isiService) ExportVolumeWithZone(isiPath, volName, accessZone, description string) (int, error) {
+func (svc *isiService) ExportVolumeWithZone(ctx context.Context, isiPath, volName, accessZone, description string) (int, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin to export volume '%s' with access zone '%s' in Isilon path '%s'", volName, accessZone, isiPath)
 
 	var exportID int
 	var err error
 
 	path := utils.GetPathForVolume(isiPath, volName)
-	if exportID, err = svc.client.ExportVolumeWithZoneAndPath(context.Background(), path, accessZone, description); err != nil {
+	if exportID, err = svc.client.ExportVolumeWithZoneAndPath(ctx, path, accessZone, description); err != nil {
 		log.Errorf("Export volume failed, volume '%s', access zone '%s' , id %d error '%s'", volName, accessZone, exportID, err.Error())
 		return -1, err
 	}
@@ -125,7 +161,10 @@ func (svc *isiService) ExportVolumeWithZone(isiPath, volName, accessZone, descri
 	return exportID, nil
 }
 
-func (svc *isiService) CreateQuota(path, volName string, sizeInBytes int64, quotaEnabled bool) (string, error) {
+func (svc *isiService) CreateQuota(ctx context.Context, path, volName string, sizeInBytes int64, quotaEnabled bool) (string, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin to create quota for '%s', size '%d', quota enabled: '%t'", volName, sizeInBytes, quotaEnabled)
 
 	// if quotas are enabled, we need to set a quota on the volume
@@ -140,7 +179,7 @@ func (svc *isiService) CreateQuota(path, volName string, sizeInBytes int64, quot
 		var isQuotaActivated bool
 		var checkLicErr error
 
-		isQuotaActivated, checkLicErr = svc.client.IsQuotaLicenseActivated(context.Background())
+		isQuotaActivated, checkLicErr = svc.client.IsQuotaLicenseActivated(ctx)
 
 		if checkLicErr != nil {
 			log.Errorf("failed to check SmartQuotas license info: '%v'", checkLicErr)
@@ -154,7 +193,7 @@ func (svc *isiService) CreateQuota(path, volName string, sizeInBytes int64, quot
 		// create quota with container set to true
 		var quotaID string
 		var err error
-		if quotaID, err = svc.client.CreateQuotaWithPath(context.Background(), path, true, sizeInBytes); err != nil {
+		if quotaID, err = svc.client.CreateQuotaWithPath(ctx, path, true, sizeInBytes); err != nil {
 			if (isQuotaActivated) && (checkLicErr == nil) {
 				return "", fmt.Errorf("SmartQuotas is activated, but creating quota failed with error: '%v'", err)
 			}
@@ -173,20 +212,23 @@ func (svc *isiService) CreateQuota(path, volName string, sizeInBytes int64, quot
 	return "", nil
 }
 
-func (svc *isiService) DeleteQuotaByExportIDWithZone(volName string, exportID int, accessZone string) error {
+func (svc *isiService) DeleteQuotaByExportIDWithZone(ctx context.Context, volName string, exportID int, accessZone string) error {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin to delete quota for volume name : '%s', export ID : '%d'", volName, exportID)
 
 	var export isi.Export
 	var err error
 	var quotaID string
 
-	if export, err = svc.client.GetExportByIDWithZone(context.Background(), exportID, accessZone); err != nil {
+	if export, err = svc.client.GetExportByIDWithZone(ctx, exportID, accessZone); err != nil {
 		return fmt.Errorf("failed to get export '%s':'%d' with access zone '%s', skip DeleteQuotaByID. error : '%s'", volName, exportID, accessZone, err.Error())
 	}
 
 	log.Debugf("export (id : '%d') corresponding to path '%s' found, description field is '%s'", export.ID, volName, export.Description)
 
-	if quotaID, err = utils.GetQuotaIDFromDescription(export); err != nil {
+	if quotaID, err = utils.GetQuotaIDFromDescription(ctx, export); err != nil {
 		return err
 	}
 
@@ -197,27 +239,30 @@ func (svc *isiService) DeleteQuotaByExportIDWithZone(volName string, exportID in
 
 	log.Debugf("deleting quota with id '%s' for path '%s'", quotaID, volName)
 
-	if err = svc.client.ClearQuotaByID(context.Background(), quotaID); err != nil {
+	if err = svc.client.ClearQuotaByID(ctx, quotaID); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (svc *isiService) GetVolumeQuota(volName string, exportID int, accessZone string) (isi.Quota, error) {
+func (svc *isiService) GetVolumeQuota(ctx context.Context, volName string, exportID int, accessZone string) (isi.Quota, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin to get quota for volume name : '%s', export ID : '%d'", volName, exportID)
 
 	var export isi.Export
 	var err error
 	var quotaID string
 
-	if export, err = svc.client.GetExportByIDWithZone(context.Background(), exportID, accessZone); err != nil {
+	if export, err = svc.client.GetExportByIDWithZone(ctx, exportID, accessZone); err != nil {
 		return nil, fmt.Errorf("failed to get export '%s':'%d' with access zone '%s', error: '%s'", volName, exportID, accessZone, err.Error())
 	}
 
 	log.Debugf("export (id : '%d') corresponding to path '%s' found, description field is '%s'", export.ID, volName, export.Description)
 
-	if quotaID, err = utils.GetQuotaIDFromDescription(export); err != nil {
+	if quotaID, err = utils.GetQuotaIDFromDescription(ctx, export); err != nil {
 		return nil, err
 	}
 
@@ -227,63 +272,77 @@ func (svc *isiService) GetVolumeQuota(volName string, exportID int, accessZone s
 	}
 
 	log.Debugf("get quota by id '%s'", quotaID)
-	return svc.client.GetQuotaByID(context.Background(), quotaID)
+	return svc.client.GetQuotaByID(ctx, quotaID)
 }
 
-func (svc *isiService) UpdateQuotaSize(quotaID string, updatedSize int64) error {
+func (svc *isiService) UpdateQuotaSize(ctx context.Context, quotaID string, updatedSize int64) error {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
 
 	log.Debugf("updating quota by id '%s' with size '%d'", quotaID, updatedSize)
 
-	if err := svc.client.UpdateQuotaSizeByID(context.Background(), quotaID, updatedSize); err != nil {
+	if err := svc.client.UpdateQuotaSizeByID(ctx, quotaID, updatedSize); err != nil {
 		return fmt.Errorf("failed to update quota '%s' with size '%d', error: '%s'", quotaID, updatedSize, err.Error())
 	}
 
 	return nil
 }
 
-func (svc *isiService) UnexportByIDWithZone(exportID int, accessZone string) error {
+func (svc *isiService) UnexportByIDWithZone(ctx context.Context, exportID int, accessZone string) error {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin to unexport NFS export with ID '%d' in access zone '%s'", exportID, accessZone)
 
-	if err := svc.client.UnexportByIDWithZone(context.Background(), exportID, accessZone); err != nil {
+	if err := svc.client.UnexportByIDWithZone(ctx, exportID, accessZone); err != nil {
 		return fmt.Errorf("failed to unexport volume directory '%d' in access zone '%s' : '%s'", exportID, accessZone, err.Error())
 	}
 
 	return nil
 }
 
-func (svc *isiService) GetExportsWithParams(params api.OrderedValues) (isi.Exports, error) {
+func (svc *isiService) GetExportsWithParams(ctx context.Context, params api.OrderedValues) (isi.Exports, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin to get exports with params..")
 	var exports isi.Exports
 	var err error
 
-	if exports, err = svc.client.GetExportsWithParams(context.Background(), params); err != nil {
+	if exports, err = svc.client.GetExportsWithParams(ctx, params); err != nil {
 		return nil, fmt.Errorf("failed to get exports with params")
 	}
 	return exports, nil
 }
 
-func (svc *isiService) DeleteVolume(isiPath, volName string) error {
+func (svc *isiService) DeleteVolume(ctx context.Context, isiPath, volName string) error {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin to delete volume directory '%s'", volName)
 
-	if err := svc.client.DeleteVolumeWithIsiPath(context.Background(), isiPath, volName); err != nil {
+	if err := svc.client.DeleteVolumeWithIsiPath(ctx, isiPath, volName); err != nil {
 		return fmt.Errorf("failed to delete volume directory '%v' : '%v'", volName, err)
 	}
 
 	return nil
 }
 
-func (svc *isiService) ClearQuotaByID(quotaID string) error {
+func (svc *isiService) ClearQuotaByID(ctx context.Context, quotaID string) error {
 	if quotaID != "" {
-		if err := svc.client.ClearQuotaByID(context.Background(), quotaID); err != nil {
+		if err := svc.client.ClearQuotaByID(ctx, quotaID); err != nil {
 			return fmt.Errorf("failed to clear quota for '%s' : '%v'", quotaID, err)
 		}
 	}
 	return nil
 }
 
-func (svc *isiService) TestConnection() error {
+func (svc *isiService) TestConnection(ctx context.Context) error {
+	// Fetch log handler
+	ctx, log, _ := GetRunIDLog(ctx)
+
 	log.Debugf("test connection client, user name : '%s'", svc.client.API.User())
-	if _, err := svc.client.GetClusterConfig(context.Background()); err != nil {
+	if _, err := svc.client.GetClusterConfig(ctx); err != nil {
 		log.Errorf("error encountered, test connection failed : '%v'", err)
 		return err
 	}
@@ -297,12 +356,15 @@ func (svc *isiService) GetNFSExportURLForPath(ip string, dirPath string) string 
 	return fmt.Sprintf("%s:%s", ip, dirPath)
 }
 
-func (svc *isiService) GetVolume(isiPath, volID, volName string) (isi.Volume, error) {
+func (svc *isiService) GetVolume(ctx context.Context, isiPath, volID, volName string) (isi.Volume, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin getting volume with id '%s' and name '%s' for Isilon", volID, volName)
 
 	var vol isi.Volume
 	var err error
-	if vol, err = svc.client.GetVolumeWithIsiPath(context.Background(), isiPath, volID, volName); err != nil {
+	if vol, err = svc.client.GetVolumeWithIsiPath(ctx, isiPath, volID, volName); err != nil {
 		log.Errorf("failed to get volume '%s'", err)
 		return nil, err
 	}
@@ -310,10 +372,13 @@ func (svc *isiService) GetVolume(isiPath, volID, volName string) (isi.Volume, er
 	return vol, nil
 }
 
-func (svc *isiService) GetVolumeSize(isiPath, name string) int64 {
+func (svc *isiService) GetVolumeSize(ctx context.Context, isiPath, name string) int64 {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin getting volume size with name '%s' for Isilon", name)
 
-	size, err := svc.client.GetVolumeSize(context.Background(), isiPath, name)
+	size, err := svc.client.GetVolumeSize(ctx, isiPath, name)
 	if err != nil {
 		log.Errorf("failed to get volume size '%s'", err.Error())
 		return 0
@@ -322,10 +387,13 @@ func (svc *isiService) GetVolumeSize(isiPath, name string) int64 {
 	return size
 }
 
-func (svc *isiService) GetStatistics(keys []string) (isi.Stats, error) {
+func (svc *isiService) GetStatistics(ctx context.Context, keys []string) (isi.Stats, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	var stat isi.Stats
 	var err error
-	if stat, err = svc.client.GetStatistics(context.Background(), keys); err != nil {
+	if stat, err = svc.client.GetStatistics(ctx, keys); err != nil {
 		log.Errorf("failed to get array statistics '%s'", err)
 		return nil, err
 	}
@@ -333,31 +401,39 @@ func (svc *isiService) GetStatistics(keys []string) (isi.Stats, error) {
 	return stat, nil
 }
 
-func (svc *isiService) IsVolumeExistent(isiPath, volID, name string) bool {
+func (svc *isiService) IsVolumeExistent(ctx context.Context, isiPath, volID, name string) bool {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("check if volume (id :'%s', name '%s') already exists", volID, name)
 
-	isExistent := svc.client.IsVolumeExistentWithIsiPath(context.Background(), isiPath, volID, name)
+	isExistent := svc.client.IsVolumeExistentWithIsiPath(ctx, isiPath, volID, name)
 
 	log.Debugf("volume (id :'%s', name '%s') already exists : '%v'", volID, name, isExistent)
 
 	return isExistent
 }
 
-func (svc *isiService) OtherClientsAlreadyAdded(exportID int, accessZone string, nodeID string) bool {
-	export, _ := svc.GetExportByIDWithZone(exportID, accessZone)
+func (svc *isiService) OtherClientsAlreadyAdded(ctx context.Context, exportID int, accessZone string, nodeID string) bool {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
+	export, _ := svc.GetExportByIDWithZone(ctx, exportID, accessZone)
 
 	if export == nil {
 		log.Debugf("failed to get export by id '%d' with access zone '%s', return true for otherClientsAlreadyAdded as a safer return value", exportID, accessZone)
 		return true
 	}
 
-	clientName, clientFQDN, clientIP, err := utils.ParseNodeID(nodeID)
+	clientName, clientFQDN, clientIP, err := utils.ParseNodeID(ctx, nodeID)
 	if err != nil {
 		log.Debugf("failed to parse node ID '%s', return true for otherClientsAlreadyAdded as a safer return value", nodeID)
 		return true
 	}
 
 	clientFieldsNotEmpty := len(*export.Clients) > 0 || len(*export.ReadOnlyClients) > 0 || len(*export.ReadWriteClients) > 0 || len(*export.RootClients) > 0
+
+	clientFieldLength := len(*export.Clients)
 
 	isNodeInClientFields := utils.IsStringInSlices(clientName, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 
@@ -367,23 +443,43 @@ func (svc *isiService) OtherClientsAlreadyAdded(exportID int, accessZone string,
 		isNodeInClientFields = isNodeInClientFields || utils.IsStringInSlices(clientIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 	}
 
+	clientName, clientFQDN, clientIP, err = utils.ParseNodeID(ctx, utils.DummyHostNodeID)
+	if err != nil {
+		log.Debugf("failed to parse node ID '%s', return true for otherClientsAlreadyAdded as a safer return value", nodeID)
+		return true
+	}
+
+	// Additional check for dummy localhost entry
+	isLocalHostInClientFields := utils.IsStringInSlices(clientName, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
+	if !isLocalHostInClientFields {
+		isLocalHostInClientFields = utils.IsStringInSlices(clientFQDN, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
+		if !isLocalHostInClientFields {
+			isLocalHostInClientFields = utils.IsStringInSlices(clientIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
+		}
+	}
+
+	if clientFieldLength == 1 && isLocalHostInClientFields {
+		clientFieldsNotEmpty = false
+	}
 	return clientFieldsNotEmpty && !isNodeInClientFields && !isNodeFQDNInClientFields
 }
 
-func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(exportID int, accessZone, nodeID string, addClientFunc func(exportID int, accessZone, clientIP string) error) error {
+func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.Context, exportID int, accessZone, nodeID string, addClientFunc func(ctx context.Context, exportID int, accessZone, clientIP string) error) error {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
 
 	// try adding by client FQDN first as it is preferred over IP for its stableness.
 	// OneFS API will return error if it cannot resolve the client FQDN ,
 	// in that case, fall back to adding by IP
 
-	_, clientFQDN, clientIP, err := utils.ParseNodeID(nodeID)
+	_, clientFQDN, clientIP, err := utils.ParseNodeID(ctx, nodeID)
 	if err != nil {
 		return err
 	}
 
 	log.Debugf("AddExportClientNetworkIdentifierByID client FQDN '%s' client IP '%s'", clientFQDN, clientIP)
 
-	if err = addClientFunc(exportID, accessZone, clientFQDN); err == nil {
+	if err = addClientFunc(ctx, exportID, accessZone, clientFQDN); err == nil {
 
 		//adding by client FQDN is successful, no need to trying adding by IP
 		return nil
@@ -391,40 +487,52 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(exportID int
 
 	log.Errorf("failed to add client FQDN '%s' to export id '%d' : '%v'", clientFQDN, exportID, err)
 
-	if err := addClientFunc(exportID, accessZone, clientIP); err != nil {
+	if err := addClientFunc(ctx, exportID, accessZone, clientIP); err != nil {
 		return fmt.Errorf("failed to add client ip '%s' to export id '%d' : '%v'", clientIP, exportID, err)
 	}
 
 	return nil
 }
 
-func (svc *isiService) AddExportClientByIDWithZone(exportID int, accessZone, clientIP string) error {
+func (svc *isiService) AddExportClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string) error {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("AddExportClientByID client '%s'", clientIP)
-	if err := svc.client.AddExportClientsByIDWithZone(context.Background(), exportID, accessZone, []string{clientIP}); err != nil {
+	if err := svc.client.AddExportClientsByIDWithZone(ctx, exportID, accessZone, []string{clientIP}); err != nil {
 		return fmt.Errorf("failed to add client to export id '%d' with access zone '%s' : '%s'", exportID, accessZone, err.Error())
 	}
 	return nil
 }
 
-func (svc *isiService) AddExportRootClientByIDWithZone(exportID int, accessZone, clientIP string) error {
+func (svc *isiService) AddExportRootClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string) error {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("AddExportRootClientByID client '%s'", clientIP)
-	if err := svc.client.AddExportRootClientsByIDWithZone(context.Background(), exportID, accessZone, []string{clientIP}); err != nil {
+	if err := svc.client.AddExportRootClientsByIDWithZone(ctx, exportID, accessZone, []string{clientIP}); err != nil {
 		return fmt.Errorf("failed to add client to export id '%d' with access zone '%s' : '%s'", exportID, accessZone, err.Error())
 	}
 	return nil
 }
 
-func (svc *isiService) AddExportReadOnlyClientByIDWithZone(exportID int, accessZone, clientIP string) error {
+func (svc *isiService) AddExportReadOnlyClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string) error {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("AddExportReadOnlyClientByID client '%s'", clientIP)
-	if err := svc.client.AddExportReadOnlyClientsByIDWithZone(context.Background(), exportID, accessZone, []string{clientIP}); err != nil {
+	if err := svc.client.AddExportReadOnlyClientsByIDWithZone(ctx, exportID, accessZone, []string{clientIP}); err != nil {
 		return fmt.Errorf("failed to add read only client to export id '%d' with access zone '%s' : '%s'", exportID, accessZone, err.Error())
 	}
 	return nil
 }
 
-func (svc *isiService) RemoveExportClientByIDWithZone(exportID int, accessZone, nodeID string) error {
+func (svc *isiService) RemoveExportClientByIDWithZone(ctx context.Context, exportID int, accessZone, nodeID string) error {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	// it could either be IP or FQDN that has been added to the export's client fields, should consider both during the removal
-	clientName, clientFQDN, clientIP, err := utils.ParseNodeID(nodeID)
+	clientName, clientFQDN, clientIP, err := utils.ParseNodeID(ctx, nodeID)
 	if err != nil {
 		return err
 	}
@@ -435,7 +543,7 @@ func (svc *isiService) RemoveExportClientByIDWithZone(exportID int, accessZone, 
 
 	log.Debugf("RemoveExportClientByName client '%v'", clientsToRemove)
 
-	if err := svc.client.RemoveExportClientsByIDWithZone(context.Background(), exportID, accessZone, clientsToRemove); err != nil {
+	if err := svc.client.RemoveExportClientsByIDWithZone(ctx, exportID, accessZone, clientsToRemove); err != nil {
 		//Return success if export doesn't exist
 		if notFoundErr, ok := err.(*api.JSONError); ok {
 			if notFoundErr.StatusCode == 404 {
@@ -449,42 +557,54 @@ func (svc *isiService) RemoveExportClientByIDWithZone(exportID int, accessZone, 
 	return nil
 }
 
-func (svc *isiService) GetExportsWithLimit(limit string) (isi.ExportList, string, error) {
+func (svc *isiService) GetExportsWithLimit(ctx context.Context, limit string) (isi.ExportList, string, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debug("begin getting exports for Isilon")
 	var exports isi.Exports
 	var err error
-	if exports, err = svc.client.GetExportsWithLimit(context.Background(), limit); err != nil {
+	if exports, err = svc.client.GetExportsWithLimit(ctx, limit); err != nil {
 		log.Error("failed to get exports")
 		return nil, "", err
 	}
 	return exports.Exports, exports.Resume, nil
 }
 
-func (svc *isiService) GetExportsWithResume(resume string) (isi.ExportList, string, error) {
+func (svc *isiService) GetExportsWithResume(ctx context.Context, resume string) (isi.ExportList, string, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debug("begin getting exports for Isilon")
 	var exports isi.Exports
 	var err error
-	if exports, err = svc.client.GetExportsWithResume(context.Background(), resume); err != nil {
+	if exports, err = svc.client.GetExportsWithResume(ctx, resume); err != nil {
 		log.Error("failed to get exports: " + err.Error())
 		return nil, "", err
 	}
 	return exports.Exports, exports.Resume, nil
 }
 
-func (svc *isiService) DeleteSnapshot(id int64, name string) error {
+func (svc *isiService) DeleteSnapshot(ctx context.Context, id int64, name string) error {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin to delete snapshot '%s'", name)
-	if err := svc.client.RemoveSnapshot(context.Background(), id, name); err != nil {
+	if err := svc.client.RemoveSnapshot(ctx, id, name); err != nil {
 		log.Errorf("delete snapshot failed, '%s'", err.Error())
 		return err
 	}
 	return nil
 }
 
-func (svc *isiService) GetSnapshot(idendity string) (isi.Snapshot, error) {
-	log.Debugf("begin getting snapshot with id|name '%s' for Isilon", idendity)
+func (svc *isiService) GetSnapshot(ctx context.Context, identity string) (isi.Snapshot, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
+	log.Debugf("begin getting snapshot with id|name '%s' for Isilon", identity)
 	var snapshot isi.Snapshot
 	var err error
-	if snapshot, err = svc.client.GetIsiSnapshotByIdentity(context.Background(), idendity); err != nil {
+	if snapshot, err = svc.client.GetIsiSnapshotByIdentity(ctx, identity); err != nil {
 		log.Errorf("failed to get snapshot '%s'", err.Error())
 		return nil, err
 	}
@@ -492,9 +612,12 @@ func (svc *isiService) GetSnapshot(idendity string) (isi.Snapshot, error) {
 	return snapshot, nil
 }
 
-func (svc *isiService) GetSnapshotSize(isiPath, name string) int64 {
+func (svc *isiService) GetSnapshotSize(ctx context.Context, isiPath, name string) int64 {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin getting snapshot size with name '%s' for Isilon", name)
-	size, err := svc.client.GetSnapshotFolderSize(context.Background(), isiPath, name)
+	size, err := svc.client.GetSnapshotFolderSize(ctx, isiPath, name)
 	if err != nil {
 		log.Errorf("failed to get snapshot size '%s'", err.Error())
 		return 0
@@ -503,11 +626,14 @@ func (svc *isiService) GetSnapshotSize(isiPath, name string) int64 {
 	return size
 }
 
-func (svc *isiService) GetExportWithPathAndZone(path, accessZone string) (isi.Export, error) {
+func (svc *isiService) GetExportWithPathAndZone(ctx context.Context, path, accessZone string) (isi.Export, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	log.Debugf("begin getting export with target path '%s' and access zone '%s' for Isilon", path, accessZone)
 	var export isi.Export
 	var err error
-	if export, err = svc.client.GetExportWithPathAndZone(context.Background(), path, accessZone); err != nil {
+	if export, err = svc.client.GetExportWithPathAndZone(ctx, path, accessZone); err != nil {
 		log.Error("failed to get export with target path '" + path + "' and access zone '" + accessZone + "': '" + err.Error() + "'")
 		return nil, err
 	}
@@ -515,8 +641,8 @@ func (svc *isiService) GetExportWithPathAndZone(path, accessZone string) (isi.Ex
 	return export, nil
 }
 
-func (svc *isiService) GetSnapshotIsiPath(isiPath string, sourceSnapshotID string) (string, error) {
-	return svc.client.GetSnapshotIsiPath(context.Background(), isiPath, sourceSnapshotID)
+func (svc *isiService) GetSnapshotIsiPath(ctx context.Context, isiPath string, sourceSnapshotID string) (string, error) {
+	return svc.client.GetSnapshotIsiPath(ctx, isiPath, sourceSnapshotID)
 }
 
 func (svc *isiService) isROVolumeFromSnapshot(isiPath string) bool {
@@ -526,7 +652,10 @@ func (svc *isiService) isROVolumeFromSnapshot(isiPath string) bool {
 	return false
 }
 
-func (svc *isiService) GetSnapshotNameFromIsiPath(snapshotIsiPath string) (string, error) {
+func (svc *isiService) GetSnapshotNameFromIsiPath(ctx context.Context, snapshotIsiPath string) (string, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	if !svc.isROVolumeFromSnapshot(snapshotIsiPath) {
 		log.Debugf("invalid snapshot isilon path- '%s'", snapshotIsiPath)
 		return "", fmt.Errorf("invalid snapshot isilon path")
@@ -557,11 +686,14 @@ func (svc *isiService) GetSnapshotTrackingDirName(snapshotName string) string {
 	return "." + "csi-" + snapshotName + "-tracking-dir"
 }
 
-func (svc *isiService) GetSubDirectoryCount(isiPath, directory string) (int64, error) {
+func (svc *isiService) GetSubDirectoryCount(ctx context.Context, isiPath, directory string) (int64, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
 	var totalSubDirectories int64
-	if svc.IsVolumeExistent(isiPath, "", directory) {
+	if svc.IsVolumeExistent(ctx, isiPath, "", directory) {
 		// Check if there are any entries for volumes present in snapshot tracking dir
-		dirDetails, err := svc.GetVolume(isiPath, "", directory)
+		dirDetails, err := svc.GetVolume(ctx, isiPath, "", directory)
 		if err != nil {
 			return 0, err
 		}
@@ -585,4 +717,34 @@ func (svc *isiService) GetSubDirectoryCount(isiPath, directory string) (int64, e
 	}
 
 	return 0, fmt.Errorf("failed to get subdirectory count for directory '%s'", directory)
+}
+
+func (svc *isiService) IsHostAlreadyAdded(ctx context.Context, exportID int, accessZone string, nodeID string) bool {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
+	export, _ := svc.GetExportByIDWithZone(ctx, exportID, accessZone)
+
+	if export == nil {
+		log.Debugf("failed to get export by id '%d' with access zone '%s', return true for LocalhostAlreadyAdded as a safer return value", exportID, accessZone)
+		return true
+	}
+
+	clientName, clientFQDN, clientIP, err := utils.ParseNodeID(ctx, nodeID)
+	if err != nil {
+		log.Debugf("failed to parse node ID '%s', return true for LocalhostAlreadyAdded as a safer return value", nodeID)
+		return true
+	}
+
+	clientFieldsNotEmpty := len(*export.Clients) > 0 || len(*export.ReadOnlyClients) > 0 || len(*export.ReadWriteClients) > 0 || len(*export.RootClients) > 0
+
+	isNodeInClientFields := utils.IsStringInSlices(clientName, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
+
+	isNodeFQDNInClientFields := utils.IsStringInSlices(clientFQDN, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
+
+	if clientIP != "" {
+		isNodeInClientFields = isNodeInClientFields || utils.IsStringInSlices(clientIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
+	}
+
+	return clientFieldsNotEmpty && isNodeInClientFields || isNodeFQDNInClientFields
 }

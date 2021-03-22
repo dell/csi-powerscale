@@ -41,12 +41,18 @@ build: dependencies check
 	GOOS=linux CGO_ENABLED=0 go build
 
 # Generates the docker container (but does not push)
-docker: dependencies
-	make -f docker.mk docker
+podman-build:
+	make -f docker.mk podman-build
 
+dev-build: build
+	make -f docker.mk docker-build
+	
 # Pushes container to the repository
-push: docker
-	make -f docker.mk push
+podman-build-image-push: podman-build
+	make -f docker.mk podman-build-image-push
+
+dev-build-image-push: dev-build
+	make -f docker.mk docker-build-image-push
 
 # Windows or Linux; requires no hardware
 unit-test:

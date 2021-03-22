@@ -17,21 +17,25 @@ package service
 */
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"os"
 
 	"strings"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/gofsutil"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func publishVolume(
+	ctx context.Context,
 	req *csi.NodePublishVolumeRequest,
 	nfsExportURL string, nfsV3 bool) error {
+
+	// Fetch log handler
+	ctx, log := GetLogger(ctx)
 
 	volCap := req.GetVolumeCapability()
 	if volCap == nil {
@@ -60,7 +64,7 @@ func publishVolume(
 	}
 
 	// make sure target is created
-	_, err := mkdir(target)
+	_, err := mkdir(ctx, target)
 	if err != nil {
 		return status.Error(codes.FailedPrecondition, fmt.Sprintf("Could not create '%s': '%s'", target, err.Error()))
 	}
@@ -76,14 +80,13 @@ func publishVolume(
 
 	mntOptions = append(mntOptions, rwOption)
 
-	f := log.Fields{
+	f := logrus.Fields{
 		"ID":         req.VolumeId,
 		"TargetPath": target,
 		"ExportPath": nfsExportURL,
 		"AccessMode": accMode.GetMode(),
 	}
 	log.WithFields(f).Info("Node publish volume params ")
-	ctx := context.Background()
 	mnts, err := gofsutil.GetMounts(ctx)
 	if err != nil {
 		return status.Errorf(codes.Internal,
@@ -128,7 +131,12 @@ func publishVolume(
 
 // unpublishVolume removes the mount to the target path
 func unpublishVolume(
+	ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest, filterStr string) error {
+
+	// Fetch log handler
+	ctx, log := GetLogger(ctx)
+
 	target := req.GetTargetPath()
 	if target == "" {
 		return status.Error(codes.InvalidArgument,
@@ -136,7 +144,6 @@ func unpublishVolume(
 	}
 
 	log.Debugf("attempting to unmount '%s'", target)
-	ctx := context.Background()
 	mnts, err := gofsutil.GetMounts(ctx)
 	if err != nil {
 		return status.Errorf(codes.Internal,
@@ -174,7 +181,9 @@ func unpublishVolume(
 
 // mkdir creates the directory specified by path if needed.
 // return pair is a bool flag of whether dir was created, and an error
-func mkdir(path string) (bool, error) {
+func mkdir(ctx context.Context, path string) (bool, error) {
+	// Fetch log handler
+	ctx, log := GetLogger(ctx)
 	st, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		if err := os.Mkdir(path, 0750); err != nil {

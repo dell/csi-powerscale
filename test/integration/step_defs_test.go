@@ -17,8 +17,10 @@ package integration_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -26,22 +28,24 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dell/csi-isilon/common/utils"
-
-	"github.com/DATA-DOG/godog"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/cucumber/godog"
 	"github.com/dell/csi-isilon/common/constants"
+	"github.com/dell/csi-isilon/common/utils"
+	"github.com/dell/csi-isilon/service"
 	isi "github.com/dell/goisilon"
 	apiv1 "github.com/dell/goisilon/api/v1"
 )
 
 const (
-	MaxRetries      = 10
-	RetrySleepTime  = 1 * time.Second
-	SleepTime       = 200 * time.Millisecond
-	AccessZoneParam = "AccessZone"
-	ExportPathParam = "Path"
-	IsiPathParam    = "IsiPath"
+	MaxRetries       = 10
+	RetrySleepTime   = 1 * time.Second
+	SleepTime        = 200 * time.Millisecond
+	AccessZoneParam  = "AccessZone"
+	ExportPathParam  = "Path"
+	IsiPathParam     = "IsiPath"
+	ClusterNameParam = "ClusterName"
+	EnvClusterName   = "X_CSI_CLUSTER_NAME"
 )
 
 var (
@@ -77,6 +81,7 @@ type feature struct {
 	vol                              *csi.Volume
 	isiPath                          string
 	accssZone                        string
+	clusterName                      string
 }
 
 func (f *feature) addError(err error) {
@@ -129,6 +134,9 @@ func (f *feature) aBasicVolumeRequest(name string, size int64) error {
 	parameters := make(map[string]string)
 	parameters[AccessZoneParam] = "csi0zone"
 	parameters[IsiPathParam] = "/ifs/data/csi/integration"
+	if _, isPresent := os.LookupEnv(EnvClusterName); isPresent {
+		parameters[ClusterNameParam] = os.Getenv(EnvClusterName)
+	}
 	req.Parameters = parameters
 	f.createVolumeRequest = req
 	f.isiPath = parameters[IsiPathParam]
@@ -138,6 +146,8 @@ func (f *feature) aBasicVolumeRequest(name string, size int64) error {
 
 func (f *feature) iCallCreateVolume() error {
 	time.Sleep(RetrySleepTime)
+	ctx := context.Background()
+	ctx, _, _ = service.GetRunIDLog(ctx)
 	volResp, err := f.createVolume(f.createVolumeRequest)
 	if err != nil {
 		fmt.Printf("CreateVolume: '%s'\n", err.Error())
@@ -151,7 +161,7 @@ func (f *feature) iCallCreateVolume() error {
 			volResp.GetVolume().VolumeId, volResp.GetVolume().VolumeContext["CreationTime"])
 		fmt.Printf("The access zone is '%s'\n", volResp.GetVolume().VolumeContext[AccessZoneParam])
 		f.volID = volResp.GetVolume().VolumeId
-		f.volName, f.exportID, f.accssZone, err = utils.ParseNormalizedVolumeID(f.volID)
+		f.volName, f.exportID, f.accssZone, f.clusterName, err = utils.ParseNormalizedVolumeID(ctx, f.volID)
 		f.volNameID[f.volName] = f.volID
 		f.vol = volResp.Volume
 	}
@@ -222,19 +232,51 @@ func (f *feature) thereAreNoErrors() error {
 
 func createIsilonClient() (*isi.Client, error) {
 	ctx := context.Background()
+	configBytes, err := ioutil.ReadFile(os.Getenv(constants.EnvIsilonConfigFile))
+	if err != nil {
+		return nil, fmt.Errorf("file ('%s') error: %v", os.Getenv(constants.EnvIsilonConfigFile), err)
+	}
+	user, password, IPaddr, err := getDetails(configBytes, os.Getenv(EnvClusterName))
+	if err != nil {
+		return nil, err
+	}
+
 	isiClient, err = isi.NewClientWithArgs(
 		ctx,
-		"https://"+os.Getenv(constants.EnvEndpoint)+":"+os.Getenv(constants.EnvPort),
+		"https://"+IPaddr+":"+os.Getenv(constants.EnvPort),
 		true,
 		1,
-		os.Getenv(constants.EnvUser),
+		user,
 		"",
-		os.Getenv(constants.EnvPassword),
+		password,
 		os.Getenv(constants.EnvPath))
 	if err != nil {
 		fmt.Printf("error creating isilon client: '%s'\n", err.Error())
 	}
 	return isiClient, err
+}
+
+func getDetails(configBytes []byte, clusterName string) (string, string, string, error) {
+	jsonConfig := new(service.IsilonClusters)
+	err := json.Unmarshal(configBytes, &jsonConfig)
+	if err != nil {
+		return "", "", "", fmt.Errorf("unable to parse isilon clusters' config details [%v]", err)
+	}
+
+	if len(jsonConfig.IsilonClusters) == 0 {
+		return "", "", "", errors.New("cluster details are not provided in isilon-creds secret")
+	}
+	for _, config := range jsonConfig.IsilonClusters {
+		if len(clusterName) > 0 {
+			if config.ClusterName == clusterName {
+				return config.User, config.Password, config.IsiIP, nil
+			}
+		} else if config.IsDefaultCluster {
+			return config.User, config.Password, config.IsiIP, nil
+		}
+	}
+	err = errors.New("")
+	return "", "", "", err
 }
 
 func (f *feature) thereIsADirectory(name string) error {
@@ -485,6 +527,9 @@ func (f *feature) aVolumeRequest(name string, size int64) error {
 	parameters := make(map[string]string)
 	parameters[AccessZoneParam] = "csi0zone"
 	parameters[IsiPathParam] = "/ifs/data/csi/integration"
+	if _, isPresent := os.LookupEnv(EnvClusterName); isPresent {
+		parameters[ClusterNameParam] = os.Getenv(EnvClusterName)
+	}
 	req.Parameters = parameters
 	f.createVolumeRequest = req
 	f.accssZone = parameters[AccessZoneParam]
@@ -548,7 +593,7 @@ func (f *feature) checkNodeExistsForOneExport(am *csi.VolumeCapability_AccessMod
 			return err
 		}
 	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
-		if len(*export.Clients) == 1 && utils.IsStringInSlice(nodeIP, *export.Clients) && !utils.IsStringInSlice(nodeIP, *export.ReadWriteClients) && !utils.IsStringInSlice(nodeIP, *export.ReadOnlyClients) && !utils.IsStringInSlice(nodeIP, *export.RootClients) {
+		if len(*export.Clients) == 2 && utils.IsStringInSlice(nodeIP, *export.Clients) && !utils.IsStringInSlice(nodeIP, *export.ReadWriteClients) && !utils.IsStringInSlice(nodeIP, *export.ReadOnlyClients) && !utils.IsStringInSlice(nodeIP, *export.RootClients) {
 			break
 		} else {
 			err := fmt.Errorf("the location of nodeIP '%s' is wrong\n", nodeIP)
@@ -564,6 +609,7 @@ func (f *feature) checkNodeExistsForOneExport(am *csi.VolumeCapability_AccessMod
 func (f *feature) checkIsilonClientExistsForOneExport(nodeIP string, exportID int, accessZone string) error {
 	isiClient, _ = createIsilonClient()
 	ctx := context.Background()
+	ctx, _, _ = service.GetRunIDLog(ctx)
 	export, _ := isiClient.GetExportByIDWithZone(ctx, exportID, accessZone)
 	if export == nil {
 		panic(fmt.Sprintf("failed to get export by id '%d' and zone '%s'\n", exportID, accessZone))
@@ -572,7 +618,7 @@ func (f *feature) checkIsilonClientExistsForOneExport(nodeIP string, exportID in
 	var req *csi.ControllerPublishVolumeRequest
 	req = f.controllerPublishVolumeRequest
 	am, err = utils.GetAccessMode(req)
-	_, fqdn, clientIP, _ := utils.ParseNodeID(nodeIP)
+	_, fqdn, clientIP, _ := utils.ParseNodeID(ctx, nodeIP)
 	// if fqdn exists, check fqdn firstly, then nodeIP
 	if fqdn != "" {
 		err = f.checkNodeExistsForOneExport(am, fqdn, export)
@@ -635,11 +681,12 @@ func (f *feature) nodeUnstageVolume(req *csi.NodeUnstageVolumeRequest) error {
 func (f *feature) checkIsilonClientNotExistsForOneExport(nodeIP string, exportID int, accessZone string) error {
 	isiClient, _ = createIsilonClient()
 	ctx := context.Background()
+	ctx, _, _ = service.GetRunIDLog(ctx)
 	export, _ := isiClient.GetExportByIDWithZone(ctx, exportID, accessZone)
 	if export == nil {
 		panic(fmt.Sprintf("failed to get export by id '%d' and zone '%s'\n", exportID, accessZone))
 	}
-	_, fqdn, clientIP, _ := utils.ParseNodeID(nodeIP)
+	_, fqdn, clientIP, _ := utils.ParseNodeID(ctx, nodeIP)
 	if fqdn != "" {
 		isNodeIPInClientFields := utils.IsStringInSlices(clientIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 		isNodeFqdnInClientFields := utils.IsStringInSlices(fqdn, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
@@ -699,7 +746,7 @@ func (f *feature) getNodePublishVolumeRequest(path string) *csi.NodePublishVolum
 		// For ephemeral volumes
 		capability := new(csi.VolumeCapability)
 		accessMode := new(csi.VolumeCapability_AccessMode)
-		accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
+		accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
 		capability.AccessMode = accessMode
 		mount := new(csi.VolumeCapability_MountVolume)
 		mount.FsType = ""
@@ -1011,6 +1058,7 @@ func (f *feature) iCallCreateVolumeFromVolume(newVolume, srcVolume string, size 
 func (f *feature) createAVolume(req *csi.CreateVolumeRequest, voltype string) error {
 	time.Sleep(SleepTime)
 	ctx := context.Background()
+	ctx, _, _ = service.GetRunIDLog(ctx)
 	client := csi.NewControllerClient(grpcClient)
 	volResp, err := client.CreateVolume(ctx, req)
 	if err != nil {
@@ -1020,7 +1068,7 @@ func (f *feature) createAVolume(req *csi.CreateVolumeRequest, voltype string) er
 		fmt.Printf("CreateVolume from snap %s (%s) %s\n", volResp.GetVolume().VolumeContext["Name"],
 			volResp.GetVolume().VolumeId, volResp.GetVolume().VolumeContext["CreationTime"])
 		f.volID = volResp.GetVolume().VolumeId
-		f.volName, f.exportID, f.accssZone, err = utils.ParseNormalizedVolumeID(f.volID)
+		f.volName, f.exportID, f.accssZone, f.clusterName, err = utils.ParseNormalizedVolumeID(ctx, f.volID)
 		f.volNameID[f.volName] = f.volID
 		f.vol = volResp.Volume
 	}
@@ -1079,6 +1127,9 @@ func (f *feature) getMountVolumeRequest(name string) *csi.CreateVolumeRequest {
 	parameters := make(map[string]string)
 	parameters[AccessZoneParam] = "csi0zone"
 	parameters[IsiPathParam] = "/ifs/data/csi/integration"
+	if _, isPresent := os.LookupEnv(EnvClusterName); isPresent {
+		parameters[ClusterNameParam] = os.Getenv(EnvClusterName)
+	}
 	req.Parameters = parameters
 	f.createVolumeRequest = req
 	f.accssZone = parameters[AccessZoneParam]
@@ -1087,6 +1138,8 @@ func (f *feature) getMountVolumeRequest(name string) *csi.CreateVolumeRequest {
 }
 
 func (f *feature) iCreateVolumesInParallel(nVols int) error {
+	ctx := context.Background()
+	ctx, _, _ = service.GetRunIDLog(ctx)
 	idchan := make(chan string, nVols)
 	errchan := make(chan error, nVols)
 	t0 := time.Now()
@@ -1116,8 +1169,9 @@ func (f *feature) iCreateVolumesInParallel(nVols int) error {
 		var err error
 		id = <-idchan
 		if id != "" {
-			f.volName, f.exportID, f.accssZone, err = utils.ParseNormalizedVolumeID(id)
+			f.volName, f.exportID, f.accssZone, f.clusterName, err = utils.ParseNormalizedVolumeID(ctx, id)
 			f.volNameID[f.volName] = id
+			f.vol = f.volIDContext[id]
 		}
 		err = <-errchan
 		if err != nil {
@@ -1241,10 +1295,12 @@ func (f *feature) iNodeStageVolumesInParallel(nVols int) error {
 }
 
 func (f *feature) checkIsilonClientsExist(nVols int) error {
+	ctx := context.Background()
+	ctx, _, _ = service.GetRunIDLog(ctx)
 	for i := 0; i < nVols; i++ {
 		volName := fmt.Sprintf("scale%d", i)
 		volId := f.volNameID[volName]
-		_, exportID, accessZone, _ := utils.ParseNormalizedVolumeID(volId)
+		_, exportID, accessZone, _, _ := utils.ParseNormalizedVolumeID(ctx, volId)
 		var nodeIP = os.Getenv("X_CSI_NODE_NAME")
 		err := f.checkIsilonClientExistsForOneExport(nodeIP, exportID, accessZone)
 		if err != nil {
@@ -1255,10 +1311,12 @@ func (f *feature) checkIsilonClientsExist(nVols int) error {
 }
 
 func (f *feature) checkIsilonClientsNotExist(nVols int) error {
+	ctx := context.Background()
+	ctx, _, _ = service.GetRunIDLog(ctx)
 	for i := 0; i < nVols; i++ {
 		volName := fmt.Sprintf("scale%d", i)
 		volID := f.volNameID[volName]
-		_, exportID, accessZone, _ := utils.ParseNormalizedVolumeID(volID)
+		_, exportID, accessZone, _, _ := utils.ParseNormalizedVolumeID(ctx, volID)
 		var nodeIP = os.Getenv("X_CSI_NODE_NAME")
 		err := f.checkIsilonClientNotExistsForOneExport(nodeIP, exportID, accessZone)
 		if err != nil {

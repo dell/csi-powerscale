@@ -99,6 +99,10 @@ spec:
   {{- else }}
   replicas: {{ required "Must provide the number of controller instances to create." .Values.controllerCount }}
   {{- end }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
   template:
     metadata:
       labels:
@@ -159,6 +163,7 @@ spec:
             - "--v=5"
             - "--feature-gates=Topology=true"
             - "--leader-election"
+            - "--extra-create-metadata"
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
@@ -192,28 +197,16 @@ spec:
               value: controller
             - name: X_CSI_DEBUG
               value: "{{ .Values.enableDebug }}"
+            - name: X_CSI_ISI_INSECURE
+              value: "{{ .Values.isiInsecure }}"
             - name: X_CSI_VERBOSE
               value: "{{ .Values.verbose }}"
-            - name: X_CSI_ISI_ENDPOINT
-              value: {{ required "Must provide an Isilon REST API gateway HTTPS endpoint." .Values.isiIP }}
             - name: X_CSI_ISI_PORT
               value: "{{ .Values.isiPort }}"
-            - name: X_CSI_ISI_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-creds
-                  key: username
-            - name: X_CSI_ISI_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-creds
-                  key: password
             - name: X_CSI_ISI_AUTOPROBE
               value: "{{ .Values.autoProbe }}"
             - name: X_CSI_ISI_QUOTA_ENABLED
               value: "{{ .Values.enableQuota }}"
-            - name: X_CSI_ISI_INSECURE
-              value: "{{ .Values.isiInsecure }}"
             - name: X_CSI_ISI_ACCESS_ZONE
               value: {{ .Values.isiAccessZone }}
             - name: X_CSI_CUSTOM_TOPOLOGY_ENABLED
@@ -227,16 +220,30 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
             - name: SSL_CERT_DIR
-              value: /certs                   
+              value: /certs
+            - name: X_CSI_ISILON_CONFIG_PATH
+              value: /isilon-configs/config
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
             - name: certs
               mountPath: /certs
-              readOnly: true 
+              readOnly: true
+            - name: isilon-configs
+              mountPath: /isilon-configs
       volumes:
         - name: socket-dir
           emptyDir:
         - name: certs
+          projected:
+            sources:
+{{- range $i, $e := until (int .Values.certSecretCount ) }}
+              - secret:
+                  name: {{ print $.Release.Name "-certs-" $e }}
+                  items:
+                    - key: cert-{{ $e }}
+                      path: cert-{{ $e }}
+{{- end }}
+        - name: isilon-configs
           secret:
-              secretName: {{ .Release.Name }}-certs    
+            secretName: {{ .Release.Name }}-creds

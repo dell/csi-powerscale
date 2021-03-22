@@ -19,7 +19,7 @@ package provider
 import (
 	"github.com/dell/csi-isilon/common/utils"
 	"github.com/dell/csi-isilon/service"
-	"github.com/rexray/gocsi"
+	"github.com/dell/gocsi"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )

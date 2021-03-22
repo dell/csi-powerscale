@@ -16,6 +16,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -57,25 +58,28 @@ func TestRemoveStringsFromSlice(t *testing.T) {
 }
 
 func TestGetNormalizedVolumeID(t *testing.T) {
+	ctx := context.Background()
 
-	volID := GetNormalizedVolumeID("k8s-e89c9d089e", 19, "csi0zone")
+	volID := GetNormalizedVolumeID(ctx, "k8s-e89c9d089e", 19, "csi0zone", "cluster1")
 
-	assert.Equal(t, "k8s-e89c9d089e=_=_=19=_=_=csi0zone", volID)
+	assert.Equal(t, "k8s-e89c9d089e=_=_=19=_=_=csi0zone=_=_=cluster1", volID)
 }
 
 func TestParseNormalizedVolumeID(t *testing.T) {
+	ctx := context.Background()
 
-	volName, exportID, accessZone, err := ParseNormalizedVolumeID("k8s-e89c9d089e=_=_=19=_=_=csi0zone")
+	volName, exportID, accessZone, clusterName, err := ParseNormalizedVolumeID(ctx, "k8s-e89c9d089e=_=_=19=_=_=csi0zone=_=_=cluster1")
 
 	assert.Equal(t, "k8s-e89c9d089e", volName)
 	assert.Equal(t, 19, exportID)
 	assert.Equal(t, "csi0zone", accessZone)
+	assert.Equal(t, "cluster1", clusterName)
 	assert.Nil(t, err)
 
-	_, _, _, err = ParseNormalizedVolumeID("totally bogus")
+	_, _, _, _, err = ParseNormalizedVolumeID(ctx, "totally bogus")
 	assert.NotNil(t, err)
 
-	_, _, _, err = ParseNormalizedVolumeID("k8s-e89c9d089e=_=_=not_an_integer=_=_=csi0zone")
+	_, _, _, _, err = ParseNormalizedVolumeID(ctx, "k8s-e89c9d089e=_=_=not_an_integer=_=_=csi0zone")
 	assert.NotNil(t, err)
 }
 
@@ -106,7 +110,8 @@ func TestGetExportIDFromConflictMessage(t *testing.T) {
 }
 
 func TestGetFQDNByIP(t *testing.T) {
-	fqdn, _ := GetFQDNByIP("111.111.111.111")
+	ctx := context.Background()
+	fqdn, _ := GetFQDNByIP(ctx, "111.111.111.111")
 	fmt.Println(fqdn)
 	assert.Equal(t, fqdn, "")
 }

@@ -26,12 +26,13 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 
-	"github.com/DATA-DOG/godog"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/cucumber/godog"
 	"github.com/dell/csi-isilon/common/utils"
+	"github.com/dell/gocsi"
 	"github.com/dell/gofsutil"
-	"github.com/rexray/gocsi"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -102,11 +103,12 @@ var inducedErrors struct {
 }
 
 const (
-	Volume1   = "d0f055a700000000"
-	datafile  = "test/tmp/datafile"
-	datadir   = "test/tmp/datadir"
-	datafile2 = "test/tmp/datafile2"
-	datadir2  = "test/tmp/datadir2"
+	Volume1      = "d0f055a700000000"
+	datafile     = "test/tmp/datafile"
+	datadir      = "test/tmp/datadir"
+	datafile2    = "test/tmp/datafile2"
+	datadir2     = "test/tmp/datadir2"
+	clusterName1 = "cluster1"
 )
 
 func (f *feature) aIsilonService() error {
@@ -148,16 +150,21 @@ func (f *feature) aIsilonService() error {
 	handler := getHandler()
 	// Get or reuse the cached service
 	f.getService()
+	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
 	if handler != nil && os.Getenv("CSI_ISILON_ENDPOINT") == "" {
 		if f.server == nil {
 			f.server = httptest.NewServer(handler)
 		}
 		log.Printf("server url: %s\n", f.server.URL)
-		f.service.opts.EndpointURL = f.server.URL
+		clusterConfig.EndpointURL = f.server.URL
+		//f.service.opts.EndpointURL = f.server.URL
 	} else {
 		f.server = nil
 	}
-	f.service.isiSvc, _ = f.service.GetIsiService(context.Background())
+	isiSvc, _ := f.service.GetIsiService(context.Background(), clusterConfig)
+	updatedClusterConfig, _ := f.service.isiClusters.Load(clusterName1)
+	updatedClusterConfig.(*IsilonClusterConfig).isiSvc = isiSvc
+	f.service.isiClusters.Store(clusterName1, updatedClusterConfig)
 	f.checkGoRoutines("end aIsilonService")
 	f.service.logServiceStats()
 	return nil
@@ -179,36 +186,48 @@ func (f *feature) getService() *service {
 	testNodeHasNoConnection = false
 	svc := new(service)
 	var opts Opts
-	opts.User = "blah"
-	opts.Password = "blah"
-	opts.Endpoint = "127.0.0.1"
-	opts.EndpointURL = "http://127.0.0.1"
+
 	opts.AccessZone = "System"
+	opts.Path = "/ifs/data/csi-isilon"
+	opts.Insecure = true
+	opts.DebugEnabled = true
+	opts.Verbose = 1
+
+	newConfig := IsilonClusterConfig{}
+	newConfig.ClusterName = clusterName1
+	newConfig.IsiIP = "127.0.0.1"
+	newConfig.IsiPort = "8080"
+	newConfig.EndpointURL = "http://127.0.0.1"
+	newConfig.User = "blah"
+	newConfig.Password = "blah"
+	newConfig.IsiInsecure = &opts.Insecure
+	newConfig.IsiPath = "/ifs/data/csi-isilon"
+	newConfig.IsDefaultCluster = true
+
 	if os.Getenv("CSI_ISILON_ENDPOINT") != "" {
-		opts.EndpointURL = os.Getenv("CSI_ISILON_ENDPOINT")
+		newConfig.EndpointURL = os.Getenv("CSI_ISILON_ENDPOINT")
 	}
 	if os.Getenv("CSI_ISILON_USERID") != "" {
-		opts.User = os.Getenv("CSI_ISILON_USERID")
+		newConfig.User = os.Getenv("CSI_ISILON_USERID")
 	}
 	if os.Getenv("CSI_ISILON_PASSWORD") != "" {
-		opts.Password = os.Getenv("CSI_ISILON_PASSWORD")
+		newConfig.Password = os.Getenv("CSI_ISILON_PASSWORD")
 	}
 	if os.Getenv("CSI_ISILON_PATH") != "" {
-		opts.Path = os.Getenv("CSI_ISILON_PATH")
+		newConfig.IsiPath = os.Getenv("CSI_ISILON_PATH")
 	}
 	if os.Getenv("CSI_ISILON_ZONE") != "" {
 		opts.AccessZone = os.Getenv("CSI_ISILON_ZONE")
 	}
 
-	opts.Path = "/ifs/data/csi-isilon"
-	opts.Insecure = true
-	opts.DebugEnabled = true
-	opts.Verbose = 1
 	svc.opts = opts
 	svc.mode = "controller"
 	f.service = svc
-	f.service.nodeID = "k8s-rhel76-qual=#=#=1.2.3.4"
+	f.service.nodeID = fmt.Sprintf("k8s-rhel76-qual=#=#=1.2.3.4=#=#=#{clusterName1}")
 	f.service.nodeIP = "1.2.3.4"
+	f.service.defaultIsiClusterName = clusterName1
+	f.service.isiClusters = new(sync.Map)
+	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
 
 	utils.ConfigureLogger(opts.DebugEnabled)
 
@@ -216,7 +235,9 @@ func (f *feature) getService() *service {
 }
 
 func (f *feature) iSetEmptyPassword() error {
-	f.service.opts.Password = ""
+	cluster, _ := f.service.isiClusters.Load(clusterName1)
+	cluster.(*IsilonClusterConfig).Password = ""
+	f.service.isiClusters.Store(clusterName1, cluster)
 	return nil
 }
 
@@ -244,7 +265,8 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^an invalid ProbeResponse is returned$`, f.anInvalidProbeResponseIsReturned)
 	s.Step(`^I set empty password for Isilon service$`, f.iSetEmptyPassword)
 	s.Step(`^I call CreateVolume "([^"]*)"$`, f.iCallCreateVolume)
-	s.Step(`^I call CreateVolume with params "([^"]*)" (-?\d+) "([^"]*)" "([^"]*)" "([^"]*)"$`, f.iCallCreateVolumeWithParams)
+	s.Step(`^I call CreateVolume with persistent metadata "([^"]*)"$`, f.iCallCreateVolumeWithPersistentMetadata)
+	s.Step(`^I call CreateVolume with params "([^"]*)" (-?\d+) "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)"$`, f.iCallCreateVolumeWithParams)
 	s.Step(`^I call DeleteVolume "([^"]*)"$`, f.iCallDeleteVolume)
 	s.Step(`^a valid CreateVolumeResponse is returned$`, f.aValidCreateVolumeResponseIsReturned)
 	s.Step(`^a valid DeleteVolumeResponse is returned$`, f.aValidDeleteVolumeResponseIsReturned)
@@ -254,6 +276,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a valid ControllerGetCapabilitiesResponse is returned$`, f.aValidControllerGetCapabilitiesResponseIsReturned)
 	s.Step(`^I call ValidateVolumeCapabilities with voltype "([^"]*)" access "([^"]*)"$`, f.iCallValidateVolumeCapabilitiesWithVoltypeAccess)
 	s.Step(`^I call GetCapacity$`, f.iCallGetCapacity)
+	s.Step(`^I call GetCapacity with params "([^"]*)"$`, f.iCallGetCapacityWithParams)
 	s.Step(`^a valid GetCapacityResponse is returned$`, f.aValidGetCapacityResponseIsReturned)
 	s.Step(`^I call GetCapacity with Invalid access mode$`, f.iCallGetCapacityWithInvalidAccessMode)
 	s.Step(`^I call NodeGetInfo$`, f.iCallNodeGetInfo)
@@ -301,9 +324,8 @@ func FeatureContext(s *godog.Suite) {
 
 // GetPluginInfo
 func (f *feature) iCallGetPluginInfo() error {
-	ctx := new(context.Context)
 	req := new(csi.GetPluginInfoRequest)
-	f.getPluginInfoResponse, f.err = f.service.GetPluginInfo(*ctx, req)
+	f.getPluginInfoResponse, f.err = f.service.GetPluginInfo(context.Background(), req)
 	if f.err != nil {
 		return f.err
 	}
@@ -321,9 +343,8 @@ func (f *feature) aValidGetPlugInfoResponseIsReturned() error {
 }
 
 func (f *feature) iCallGetPluginCapabilities() error {
-	ctx := new(context.Context)
 	req := new(csi.GetPluginCapabilitiesRequest)
-	f.getPluginCapabilitiesResponse, f.err = f.service.GetPluginCapabilities(*ctx, req)
+	f.getPluginCapabilitiesResponse, f.err = f.service.GetPluginCapabilities(context.Background(), req)
 	if f.err != nil {
 		return f.err
 	}
@@ -346,17 +367,16 @@ func (f *feature) aValidGetPluginCapabilitiesResponseIsReturned() error {
 }
 
 func (f *feature) iCallProbe() error {
-	ctx := new(context.Context)
 	req := new(csi.ProbeRequest)
 	f.checkGoRoutines("before probe")
-	f.probeResponse, f.err = f.service.Probe(*ctx, req)
+	f.probeResponse, f.err = f.service.Probe(context.Background(), req)
 	f.checkGoRoutines("after probe")
 	return nil
 }
 
 func (f *feature) iCallAutoProbe() error {
 	f.checkGoRoutines("before auto probe")
-	f.err = f.service.autoProbe(context.Background())
+	f.err = f.service.autoProbe(context.Background(), f.service.getIsilonClusterConfig(clusterName1))
 	f.checkGoRoutines("after auto probe")
 	return nil
 }
@@ -399,7 +419,34 @@ func getTypicalCreateVolumeRequest() *csi.CreateVolumeRequest {
 	return req
 }
 
-func getCreateVolumeRequestWithParams(rangeInGiB int64, accessZone, isiPath, AzServiceIP string) *csi.CreateVolumeRequest {
+func getCreateVolumeRequestWithMetaData() *csi.CreateVolumeRequest {
+	req := new(csi.CreateVolumeRequest)
+	req.Name = "volume1"
+	capacityRange := new(csi.CapacityRange)
+	capacityRange.RequiredBytes = 8 * 1024 * 1024 * 1024
+	req.CapacityRange = capacityRange
+	mount := new(csi.VolumeCapability_MountVolume)
+	capability := new(csi.VolumeCapability)
+	accessType := new(csi.VolumeCapability_Mount)
+	accessType.Mount = mount
+	capability.AccessType = accessType
+	accessMode := new(csi.VolumeCapability_AccessMode)
+	accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER
+	capability.AccessMode = accessMode
+	capabilities := make([]*csi.VolumeCapability, 0)
+	capabilities = append(capabilities, capability)
+	parameters := make(map[string]string)
+	parameters[AccessZoneParam] = "System"
+	parameters[IsiPathParam] = "/ifs/data/csi-isilon"
+	parameters[csiPersistentVolumeName] = "pv-name"
+	parameters[csiPersistentVolumeClaimName] = "pv-claimname"
+	parameters[csiPersistentVolumeClaimNamespace] = "pv-namespace"
+	req.Parameters = parameters
+	req.VolumeCapabilities = capabilities
+	return req
+}
+
+func getCreateVolumeRequestWithParams(rangeInGiB int64, accessZone, isiPath, AzServiceIP, clusterName string) *csi.CreateVolumeRequest {
 	req := new(csi.CreateVolumeRequest)
 	req.Name = "volume1"
 	capacityRange := new(csi.CapacityRange)
@@ -425,6 +472,12 @@ func getCreateVolumeRequestWithParams(rangeInGiB int64, accessZone, isiPath, AzS
 	if AzServiceIP != "none" {
 		parameters[AzServiceIPParam] = AzServiceIP
 	}
+	if clusterName != "none" {
+		parameters[ClusterNameParam] = clusterName
+	}
+	parameters[csiPersistentVolumeName] = "pv-name"
+	parameters[csiPersistentVolumeClaimName] = "pv-claimname"
+	parameters[csiPersistentVolumeClaimNamespace] = "pv-namespace"
 	req.Parameters = parameters
 	req.VolumeCapabilities = capabilities
 	return req
@@ -479,11 +532,10 @@ func getAccessMode(accessType string) *csi.VolumeCapability_AccessMode {
 }
 
 func (f *feature) iCallCreateVolume(name string) error {
-	ctx := new(context.Context)
 	req := getTypicalCreateVolumeRequest()
 	f.createVolumeRequest = req
 	req.Name = name
-	f.createVolumeResponse, f.err = f.service.CreateVolume(*ctx, req)
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
 	if f.err != nil {
 		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
 	}
@@ -495,14 +547,29 @@ func (f *feature) iCallCreateVolume(name string) error {
 	return nil
 }
 
-func (f *feature) iCallCreateVolumeWithParams(name string, rangeInGiB int, accessZone, isiPath, AzServiceIP string) error {
-	ctx := new(context.Context)
-	req := getCreateVolumeRequestWithParams(int64(rangeInGiB), accessZone, isiPath, AzServiceIP)
+func (f *feature) iCallCreateVolumeWithPersistentMetadata(name string) error {
+	req := getCreateVolumeRequestWithMetaData()
+	f.createVolumeRequest = req
+	req.Name = name
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+		stepHandlersErrors.ExportNotFoundError = false
+		stepHandlersErrors.VolumeNotExistError = false
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateVolumeWithParams(name string, rangeInGiB int, accessZone, isiPath, AzServiceIP, clusterName string) error {
+	req := getCreateVolumeRequestWithParams(int64(rangeInGiB), accessZone, isiPath, AzServiceIP, clusterName)
 	f.createVolumeRequest = req
 	req.Name = name
 	stepHandlersErrors.ExportNotFoundError = true
 	stepHandlersErrors.VolumeNotExistError = true
-	f.createVolumeResponse, f.err = f.service.CreateVolume(*ctx, req)
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
 	if f.err != nil {
 		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
 	}
@@ -515,7 +582,6 @@ func (f *feature) iCallCreateVolumeWithParams(name string, rangeInGiB int, acces
 }
 
 func (f *feature) iCallDeleteVolume(name string) error {
-	ctx := new(context.Context)
 	if f.deleteVolumeRequest == nil {
 		req := getTypicalDeleteVolumeRequest()
 		f.deleteVolumeRequest = req
@@ -523,7 +589,9 @@ func (f *feature) iCallDeleteVolume(name string) error {
 	req := f.deleteVolumeRequest
 	req.VolumeId = name
 
-	f.deleteVolumeResponse, f.err = f.service.DeleteVolume(*ctx, req)
+	ctx, log, _ := GetRunIDLog(context.Background())
+
+	f.deleteVolumeResponse, f.err = f.service.DeleteVolume(ctx, req)
 	if f.err != nil {
 		log.Printf("DeleteVolume call failed: '%v'\n", f.err)
 	}
@@ -569,7 +637,9 @@ func (f *feature) iInduceError(errtype string) error {
 	case "autoProbeNotEnabled":
 		inducedErrors.autoProbeNotEnabled = true
 	case "autoProbeFailed":
-		f.service.isiSvc = nil
+		updatedClusterConfig, _ := f.service.isiClusters.Load(clusterName1)
+		updatedClusterConfig.(*IsilonClusterConfig).isiSvc = nil
+		f.service.isiClusters.Store(clusterName1, updatedClusterConfig)
 		f.service.opts.AutoProbe = false
 	case "GOFSMockDevMountsError":
 		gofsutil.GOFSMock.InduceDevMountsError = true
@@ -693,9 +763,8 @@ func (f *feature) theErrorContains(arg1 string) error {
 }
 
 func (f *feature) iCallControllerGetCapabilities() error {
-	ctx := new(context.Context)
 	req := new(csi.ControllerGetCapabilitiesRequest)
-	f.controllerGetCapabilitiesResponse, f.err = f.service.ControllerGetCapabilities(*ctx, req)
+	f.controllerGetCapabilitiesResponse, f.err = f.service.ControllerGetCapabilities(context.Background(), req)
 	if f.err != nil {
 		log.Printf("ControllerGetCapabilities call failed: %s\n", f.err.Error())
 		return f.err
@@ -742,7 +811,6 @@ func (f *feature) aValidControllerGetCapabilitiesResponseIsReturned() error {
 }
 
 func (f *feature) iCallValidateVolumeCapabilitiesWithVoltypeAccess(voltype, access string) error {
-	ctx := new(context.Context)
 	req := new(csi.ValidateVolumeCapabilitiesRequest)
 	if inducedErrors.invalidVolumeID || f.createVolumeResponse == nil {
 		req.VolumeId = "000-000"
@@ -781,7 +849,8 @@ func (f *feature) iCallValidateVolumeCapabilitiesWithVoltypeAccess(voltype, acce
 	capabilities = append(capabilities, capability)
 	req.VolumeCapabilities = capabilities
 	log.Printf("Calling ValidateVolumeCapabilities")
-	f.validateVolumeCapabilitiesResponse, f.err = f.service.ValidateVolumeCapabilities(*ctx, req)
+	ctx, _, _ := GetRunIDLog(context.Background())
+	f.validateVolumeCapabilitiesResponse, f.err = f.service.ValidateVolumeCapabilities(ctx, req)
 	if f.err != nil {
 		return nil
 	}
@@ -855,8 +924,25 @@ func getTypicalCapacityRequest(valid bool) *csi.GetCapacityRequest {
 
 func (f *feature) iCallGetCapacity() error {
 	header := metadata.New(map[string]string{"csi.requestid": "1"})
+	ctx, _, _ := GetRunIDLog(context.Background())
+	ctx = metadata.NewIncomingContext(ctx, header)
+	req := getTypicalCapacityRequest(true)
+	f.getCapacityResponse, f.err = f.service.GetCapacity(ctx, req)
+	if f.err != nil {
+		log.Printf("GetCapacity call failed: %s\n", f.err.Error())
+		return nil
+	}
+	return nil
+}
+
+func (f *feature) iCallGetCapacityWithParams(clusterName string) error {
+	header := metadata.New(map[string]string{"csi.requestid": "1"})
 	ctx := metadata.NewIncomingContext(context.Background(), header)
 	req := getTypicalCapacityRequest(true)
+	params := make(map[string]string)
+	params[ClusterNameParam] = clusterName
+	req.Parameters = params
+
 	f.getCapacityResponse, f.err = f.service.GetCapacity(ctx, req)
 	if f.err != nil {
 		log.Printf("GetCapacity call failed: %s\n", f.err.Error())
@@ -893,9 +979,8 @@ func (f *feature) aValidGetCapacityResponseIsReturned() error {
 }
 
 func (f *feature) iCallNodeGetInfo() error {
-	ctx := new(context.Context)
 	req := new(csi.NodeGetInfoRequest)
-	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(*ctx, req)
+	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
 	if f.err != nil {
 		log.Printf("NodeGetInfo call failed: %s\n", f.err.Error())
 		return f.err
@@ -904,9 +989,8 @@ func (f *feature) iCallNodeGetInfo() error {
 }
 
 func (f *feature) iCallNodeGetCapabilities() error {
-	ctx := new(context.Context)
 	req := new(csi.NodeGetCapabilitiesRequest)
-	f.nodeGetCapabilitiesResponse, f.err = f.service.NodeGetCapabilities(*ctx, req)
+	f.nodeGetCapabilitiesResponse, f.err = f.service.NodeGetCapabilities(context.Background(), req)
 	if f.err != nil {
 		log.Printf("NodeGetCapabilities call failed: %s\n", f.err.Error())
 		return f.err
@@ -1017,7 +1101,6 @@ func (f *feature) aValidNodeUnstageVolumeResponseIsReturned() error {
 }
 
 func (f *feature) iCallNodeUnpublishVolume() error {
-	ctx := new(context.Context)
 	req := f.nodeUnpublishVolumeRequest
 	if req == nil {
 		_ = f.getNodeUnpublishVolumeRequest()
@@ -1028,7 +1111,7 @@ func (f *feature) iCallNodeUnpublishVolume() error {
 	}
 	fmt.Printf("Calling NodePublishVolume\n")
 
-	f.nodeUnpublishVolumeResponse, f.err = f.service.NodeUnpublishVolume(*ctx, req)
+	f.nodeUnpublishVolumeResponse, f.err = f.service.NodeUnpublishVolume(context.Background(), req)
 	if f.err != nil {
 		log.Printf("NodePublishVolume call failed: %s\n", f.err.Error())
 		if strings.Contains(f.err.Error(), "Target Path is required") {
@@ -1047,7 +1130,6 @@ func (f *feature) iCallNodeUnpublishVolume() error {
 }
 
 func (f *feature) iCallEphemeralNodeUnpublishVolume() error {
-	ctx := new(context.Context)
 	req := f.nodeUnpublishVolumeRequest
 	if req == nil {
 		_ = f.getNodeUnpublishVolumeRequest()
@@ -1058,7 +1140,7 @@ func (f *feature) iCallEphemeralNodeUnpublishVolume() error {
 	}
 	fmt.Printf("Calling NodePublishVolume\n")
 
-	f.nodeUnpublishVolumeResponse, f.err = f.service.NodeUnpublishVolume(*ctx, req)
+	f.nodeUnpublishVolumeResponse, f.err = f.service.NodeUnpublishVolume(context.Background(), req)
 	if f.err != nil {
 		log.Printf("NodePublishVolume call failed: %s\n", f.err.Error())
 		if strings.Contains(f.err.Error(), "Target Path is required") {
@@ -1355,13 +1437,12 @@ func (f *feature) iCallControllerPublishVolume(volID string, accessMode string, 
 }
 
 func (f *feature) iCallControllerUnPublishVolume(volID string, accessMode string, nodeID string) error {
-	ctx := new(context.Context)
 	req := f.getControllerUnPublishVolumeRequest(accessMode, nodeID)
 	f.unpublishVolumeRequest = req
 
 	// a customized volume ID can be specified to overwrite the default one
 	req.VolumeId = volID
-	f.unpublishVolumeResponse, f.err = f.service.ControllerUnpublishVolume(*ctx, req)
+	f.unpublishVolumeResponse, f.err = f.service.ControllerUnpublishVolume(context.Background(), req)
 	if f.err != nil {
 		log.Printf("ControllerUnPublishVolume call failed: %s\n", f.err.Error())
 	}
@@ -1373,8 +1454,6 @@ func (f *feature) iCallControllerUnPublishVolume(volID string, accessMode string
 }
 
 func (f *feature) iCallNodeStageVolume(volID string, accessType string) error {
-
-	ctx := new(context.Context)
 	req := getTypicalNodeStageVolumeRequest(accessType)
 	f.nodeStageVolumeRequest = req
 
@@ -1383,7 +1462,7 @@ func (f *feature) iCallNodeStageVolume(volID string, accessType string) error {
 		req.VolumeId = volID
 	}
 
-	f.nodeStageVolumeResponse, f.err = f.service.NodeStageVolume(*ctx, req)
+	f.nodeStageVolumeResponse, f.err = f.service.NodeStageVolume(context.Background(), req)
 	if f.err != nil {
 		log.Printf("NodeStageVolume call failed: %s\n", f.err.Error())
 	}
@@ -1396,10 +1475,9 @@ func (f *feature) iCallNodeStageVolume(volID string, accessType string) error {
 }
 
 func (f *feature) iCallNodeUnstageVolume(volID string) error {
-	ctx := new(context.Context)
 	req := getTypicalNodeUnstageVolumeRequest(volID)
 	f.nodeUnstageVolumeRequest = req
-	f.nodeUnstageVolumeResponse, f.err = f.service.NodeUnstageVolume(*ctx, req)
+	f.nodeUnstageVolumeResponse, f.err = f.service.NodeUnstageVolume(context.Background(), req)
 	if f.err != nil {
 		log.Printf("NodeUnstageVolume call failed: %s\n", f.err.Error())
 	}
@@ -1411,7 +1489,6 @@ func (f *feature) iCallNodeUnstageVolume(volID string) error {
 }
 
 func (f *feature) iCallListVolumesWithMaxEntriesStartingToken(arg1 int, arg2 string) error {
-	ctx := new(context.Context)
 	req := new(csi.ListVolumesRequest)
 	//  The starting token is not valid
 	if arg2 == "invalid" {
@@ -1419,7 +1496,7 @@ func (f *feature) iCallListVolumesWithMaxEntriesStartingToken(arg1 int, arg2 str
 	}
 	req.MaxEntries = int32(arg1)
 	req.StartingToken = arg2
-	f.listVolumesResponse, f.err = f.service.ListVolumes(*ctx, req)
+	f.listVolumesResponse, f.err = f.service.ListVolumes(context.Background(), req)
 	if f.err != nil {
 		log.Printf("ListVolumes call failed: %s\n", f.err.Error())
 		return nil
@@ -1437,11 +1514,10 @@ func (f *feature) aValidListVolumesResponseIsReturned() error {
 }
 
 func (f *feature) iCallDeleteSnapshot(snapshotID string) error {
-	ctx := new(context.Context)
 	req := new(csi.DeleteSnapshotRequest)
 	req.SnapshotId = snapshotID
 	f.deleteSnapshotRequest = req
-	_, err := f.service.DeleteSnapshot(*ctx, f.deleteSnapshotRequest)
+	_, err := f.service.DeleteSnapshot(context.Background(), f.deleteSnapshotRequest)
 	if err != nil {
 		log.Printf("DeleteSnapshot call failed: %s\n", err.Error())
 		f.err = err
@@ -1464,11 +1540,10 @@ func getCreateSnapshotRequest(srcVolumeID, name, isiPath string) *csi.CreateSnap
 }
 
 func (f *feature) iCallCreateSnapshot(srcVolumeID, name, isiPath string) error {
-	ctx := new(context.Context)
 	f.createSnapshotRequest = getCreateSnapshotRequest(srcVolumeID, name, isiPath)
 	req := f.createSnapshotRequest
 
-	f.createSnapshotResponse, f.err = f.service.CreateSnapshot(*ctx, req)
+	f.createSnapshotResponse, f.err = f.service.CreateSnapshot(context.Background(), req)
 	if f.err != nil {
 		log.Printf("CreateSnapshot call failed: %s\n", f.err.Error())
 	}
@@ -1503,11 +1578,11 @@ func getControllerExpandVolumeRequest(volumeID string, requiredBytes int64) *csi
 
 func (f *feature) iCallControllerExpandVolume(volumeID string, requiredBytes int64) error {
 	log.Printf("###")
-	ctx := new(context.Context)
 	f.controllerExpandVolumeRequest = getControllerExpandVolumeRequest(volumeID, requiredBytes)
 	req := f.controllerExpandVolumeRequest
 
-	f.controllerExpandVolumeResponse, f.err = f.service.ControllerExpandVolume(*ctx, req)
+	ctx, log, _ := GetRunIDLog(context.Background())
+	f.controllerExpandVolumeResponse, f.err = f.service.ControllerExpandVolume(ctx, req)
 	if f.err != nil {
 		log.Printf("ControllerExpandVolume call failed: %s\n", f.err.Error())
 	}
@@ -1554,12 +1629,11 @@ func (f *feature) setVolumeContent(isSnapshotType bool, identity string) *csi.Cr
 }
 
 func (f *feature) iCallCreateVolumeFromSnapshot(srcSnapshotID, name string) error {
-	ctx := new(context.Context)
 	req := getTypicalCreateVolumeRequest()
 	f.createVolumeRequest = req
 	req.Name = name
 	req = f.setVolumeContent(true, srcSnapshotID)
-	f.createVolumeResponse, f.err = f.service.CreateVolume(*ctx, req)
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
 	if f.err != nil {
 		log.Printf("CreateVolume call failed: '%s'\n", f.err.Error())
 	}
@@ -1570,12 +1644,11 @@ func (f *feature) iCallCreateVolumeFromSnapshot(srcSnapshotID, name string) erro
 }
 
 func (f *feature) iCallCreateVolumeFromVolume(srcVolumeName, name string) error {
-	ctx := new(context.Context)
 	req := getTypicalCreateVolumeRequest()
 	f.createVolumeRequest = req
 	req.Name = name
 	req = f.setVolumeContent(false, srcVolumeName)
-	f.createVolumeResponse, f.err = f.service.CreateVolume(*ctx, req)
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
 	if f.err != nil {
 		log.Printf("CreateVolume call failed: '%s'\n", f.err.Error())
 	}
@@ -1586,7 +1659,7 @@ func (f *feature) iCallCreateVolumeFromVolume(srcVolumeName, name string) error 
 }
 
 func (f *feature) iCallInitializeRealIsilonService() error {
-	f.service.initializeService(context.Background())
+	f.service.initializeServiceOpts(context.Background())
 	return nil
 }
 
@@ -1629,20 +1702,26 @@ func (f *feature) aIsilonServiceWithParams(user, mode string) error {
 	handler := getHandler()
 	// Get or reuse the cached service
 	f.getServiceWithParams(user, mode)
+	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
 	if handler != nil && os.Getenv("CSI_ISILON_ENDPOINT") == "" {
 		if f.server == nil {
 			f.server = httptest.NewServer(handler)
 		}
 		log.Printf("server url: %s\n", f.server.URL)
-		f.service.opts.EndpointURL = f.server.URL
+		clusterConfig.EndpointURL = f.server.URL
 	} else {
 		f.server = nil
 	}
-	f.service.isiSvc, f.err = f.service.GetIsiService(context.Background())
+	isiSvc, _ := f.service.GetIsiService(context.Background(), clusterConfig)
+	updatedClusterConfig, _ := f.service.isiClusters.Load(clusterName1)
+	updatedClusterConfig.(*IsilonClusterConfig).isiSvc = isiSvc
+	f.service.isiClusters.Store(clusterName1, updatedClusterConfig)
 	f.checkGoRoutines("end aIsilonService")
 	f.service.logServiceStats()
 	if inducedErrors.noIsiService || inducedErrors.autoProbeNotEnabled {
-		f.service.isiSvc = nil
+		updatedClusterConfig, _ := f.service.isiClusters.Load(clusterName1)
+		updatedClusterConfig.(*IsilonClusterConfig).isiSvc = nil
+		f.service.isiClusters.Store(clusterName1, updatedClusterConfig)
 	}
 	return nil
 }
@@ -1686,23 +1765,31 @@ func (f *feature) aIsilonServiceWithParamsForCustomTopology(user, mode string) e
 	handler := getHandler()
 	// Get or reuse the cached service
 	f.getServiceWithParamsForCustomTopology(user, mode, true)
+	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
 	if handler != nil && os.Getenv("CSI_ISILON_ENDPOINT") == "" {
 		if f.server == nil {
 			f.server = httptest.NewServer(handler)
 		}
 		log.Printf("server url: %s\n", f.server.URL)
-		f.service.opts.EndpointURL = f.server.URL
+		clusterConfig.EndpointURL = f.server.URL
 		urlList := strings.Split(f.server.URL, ":")
 		log.Printf("urlList: %v", urlList)
-		f.service.opts.Port = urlList[2]
+		clusterConfig.IsiPort = urlList[2]
 	} else {
 		f.server = nil
 	}
-	f.service.isiSvc, f.err = f.service.GetIsiService(context.Background())
+	isiSvc, err := f.service.GetIsiService(context.Background(), clusterConfig)
+	f.err = err
+	updatedClusterConfig, _ := f.service.isiClusters.Load(clusterName1)
+	updatedClusterConfig.(*IsilonClusterConfig).isiSvc = isiSvc
+	f.service.isiClusters.Store(clusterName1, updatedClusterConfig)
+
 	f.checkGoRoutines("end aIsilonService")
 	f.service.logServiceStats()
 	if inducedErrors.noIsiService || inducedErrors.autoProbeNotEnabled {
-		f.service.isiSvc = nil
+		updatedClusterConfig, _ := f.service.isiClusters.Load(clusterName1)
+		updatedClusterConfig.(*IsilonClusterConfig).isiSvc = nil
+		f.service.isiClusters.Store(clusterName1, updatedClusterConfig)
 	}
 	return nil
 }
@@ -1746,23 +1833,29 @@ func (f *feature) aIsilonServiceWithParamsForCustomTopologyNoLabel(user, mode st
 	handler := getHandler()
 	// Get or reuse the cached service
 	f.getServiceWithParamsForCustomTopology(user, mode, false)
+	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
 	if handler != nil && os.Getenv("CSI_ISILON_ENDPOINT") == "" {
 		if f.server == nil {
 			f.server = httptest.NewServer(handler)
 		}
 		log.Printf("server url: %s\n", f.server.URL)
-		f.service.opts.EndpointURL = f.server.URL
+		clusterConfig.EndpointURL = f.server.URL
 		urlList := strings.Split(f.server.URL, ":")
 		log.Printf("urlList: %v", urlList)
-		f.service.opts.Port = urlList[2]
+		clusterConfig.IsiPort = urlList[2]
 	} else {
 		f.server = nil
 	}
-	f.service.isiSvc, f.err = f.service.GetIsiService(context.Background())
+	isiSvc, _ := f.service.GetIsiService(context.Background(), clusterConfig)
+	updatedClusterConfig, _ := f.service.isiClusters.Load(clusterName1)
+	updatedClusterConfig.(*IsilonClusterConfig).isiSvc = isiSvc
+	f.service.isiClusters.Store(clusterName1, updatedClusterConfig)
 	f.checkGoRoutines("end aIsilonService")
 	f.service.logServiceStats()
 	if inducedErrors.noIsiService || inducedErrors.autoProbeNotEnabled {
-		f.service.isiSvc = nil
+		updatedClusterConfig, _ := f.service.isiClusters.Load(clusterName1)
+		updatedClusterConfig.(*IsilonClusterConfig).isiSvc = nil
+		f.service.isiClusters.Store(clusterName1, updatedClusterConfig)
 	}
 	return nil
 }
@@ -1808,10 +1901,7 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	testNodeHasNoConnection = false
 	svc := new(service)
 	var opts Opts
-	opts.User = user
-	opts.Password = "blah"
-	opts.Endpoint = "127.0.0.1"
-	opts.EndpointURL = "http://127.0.0.1"
+
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
 	opts.Insecure = true
@@ -1819,6 +1909,17 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	opts.Verbose = 1
 	opts.CustomTopologyEnabled = true
 	opts.KubeConfigPath = "/etc/kubernetes/admin.conf"
+
+	newConfig := IsilonClusterConfig{}
+	newConfig.ClusterName = clusterName1
+	newConfig.IsiIP = "127.0.0.1"
+	newConfig.IsiPort = "8080"
+	newConfig.EndpointURL = "http://127.0.0.1"
+	newConfig.User = user
+	newConfig.Password = "blah"
+	newConfig.IsiInsecure = &opts.Insecure
+	newConfig.IsiPath = "/ifs/data/csi-isilon"
+	newConfig.IsDefaultCluster = true
 
 	host, _ := os.Hostname()
 	result := removeNodeLabels(host)
@@ -1843,7 +1944,11 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	svc.mode = mode
 	f.service = svc
 	f.service.nodeID = host
+	// TODO - IP has to be updated before release
 	f.service.nodeIP = "1.2.3.4"
+	f.service.defaultIsiClusterName = clusterName1
+	f.service.isiClusters = new(sync.Map)
+	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
 	utils.ConfigureLogger(opts.DebugEnabled)
 	return svc
 }
@@ -1853,15 +1958,23 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	testNodeHasNoConnection = false
 	svc := new(service)
 	var opts Opts
-	opts.User = user
-	opts.Password = "blah"
-	opts.Endpoint = "127.0.0.1"
-	opts.EndpointURL = "http://127.0.0.1"
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
 	opts.Insecure = true
 	opts.DebugEnabled = true
 	opts.Verbose = 1
+
+	newConfig := IsilonClusterConfig{}
+	newConfig.ClusterName = clusterName1
+	newConfig.IsiIP = "127.0.0.1"
+	newConfig.IsiPort = "8080"
+	newConfig.EndpointURL = "http://127.0.0.1"
+	newConfig.User = user
+	newConfig.Password = "blah"
+	newConfig.IsiInsecure = &opts.Insecure
+	newConfig.IsiPath = "/ifs/data/csi-isilon"
+	newConfig.IsDefaultCluster = true
+
 	if inducedErrors.autoProbeNotEnabled {
 		opts.AutoProbe = false
 	} else {
@@ -1870,8 +1983,11 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	svc.opts = opts
 	svc.mode = mode
 	f.service = svc
-	f.service.nodeID = "k8s-rhel76-qual=#=#=1.2.3.4"
+	f.service.nodeID = fmt.Sprintf("k8s-rhel76-qual=#=#=1.2.3.4=#=#=#{clusterName1}")
 	f.service.nodeIP = "1.2.3.4"
+	f.service.defaultIsiClusterName = clusterName1
+	f.service.isiClusters = new(sync.Map)
+	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
 	utils.ConfigureLogger(opts.DebugEnabled)
 	return svc
 }
@@ -1891,15 +2007,19 @@ func (f *feature) iCallBeforeServe() error {
 }
 
 func (f *feature) ICallCreateQuotaInIsiServiceWithNegativeSizeInBytes() error {
-	_, f.err = f.service.isiSvc.CreateQuota(f.service.opts.Path, "volume1", -1, true)
+	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
+	ctx, _, _ := GetRunIDLog(context.Background())
+	_, f.err = clusterConfig.isiSvc.CreateQuota(ctx, f.service.opts.Path, "volume1", -1, true)
 	return nil
 }
 
 func (f *feature) iCallGetExportRelatedFunctionsInIsiService() error {
-	_, f.err = f.service.isiSvc.GetExports()
-	_, f.err = f.service.isiSvc.GetExportByIDWithZone(557, "System")
-	f.err = f.service.isiSvc.DeleteQuotaByExportIDWithZone("volume1", 557, "System")
-	_, _, f.err = f.service.isiSvc.GetExportsWithLimit("2")
+	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
+	ctx, _, _ := GetRunIDLog(context.Background())
+	_, f.err = clusterConfig.isiSvc.GetExports(ctx)
+	_, f.err = clusterConfig.isiSvc.GetExportByIDWithZone(ctx, 557, "System")
+	f.err = clusterConfig.isiSvc.DeleteQuotaByExportIDWithZone(ctx, "volume1", 557, "System")
+	_, _, f.err = clusterConfig.isiSvc.GetExportsWithLimit(ctx, "2")
 	return nil
 }
 

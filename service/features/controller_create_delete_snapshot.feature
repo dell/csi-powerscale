@@ -11,6 +11,18 @@ Feature: Isilon CSI interface
     And I call CreateSnapshot "volume2=_=_=19=_=_=System" "create_snapshot_name" "/ifs/data/csi-isilon"
     Then a valid CreateSnapshotResponse is returned
 
+  Scenario: Create snapshot with cluster name in volume id good scenario
+    Given a Isilon service
+    When I call Probe
+    And I call CreateSnapshot "volume2=_=_=19=_=_=System=_=_=cluster1" "create_snapshot_name" "/ifs/data/csi-isilon"
+    Then a valid CreateSnapshotResponse is returned
+
+  Scenario: Create snapshot with cluster name in volume id whose config doesn't exists
+    Given a Isilon service
+    When I call Probe
+    And I call CreateSnapshot "volume2=_=_=19=_=_=System=_=_=cluster2" "create_snapshot_name" "/ifs/data/csi-isilon"
+    Then the error contains "failed to get cluster config details for clusterName: 'cluster2'"
+
   Scenario: Create snapshot with internal server error
     Given a Isilon service
     When I call Probe
@@ -30,7 +42,7 @@ Feature: Isilon CSI interface
     | "volume2=_=_=19=_=_=System"    | "existent_comp_snapshot_name"                 | "/ifs/data/csi-isilon"     | "none"                                 |
     | "volume2=_=_=19=_=_=System"    | "existent_comp_snapshot_name"                 | "/ifs/data/csi-isilon"     | "none"                                 |
     | "volume2=_=_=19=_=_=System"    | "existent_comp_snapshot_name_longer_than_max" | "/ifs/data/csi-isilon"     | "already exists but is incompatible"   |
-    | "volume2=_=_=19"               | "existent_comp_snapshot_name"                 | "/ifs/data/csi-isilon"     | "cannot match the expected"            |
+    | "volume2=_=_=19"               | "existent_comp_snapshot_name"                 | "/ifs/data/csi-isilon"     | "cannot be split into tokens"            |
     | "volume2=_=_=19=_=_=System"    | "create_snapshot_name"                        | ""                         | "none"                                 |
     | "volume2=_=_=19=_=_=System"    | "create_snapshot_name"                        | "none"                     | "none"                                 |
     | "volume2=_=_=19=_=_=System"    | ""                                            | "/ifs/data/csi-isilon"     | "name cannot be empty"                 |
@@ -50,7 +62,7 @@ Feature: Isilon CSI interface
     | "GetSnapshotError"      | "cannot check the existence of the snapshot"    |
     | "DeleteSnapshotError"   | "error deleteing snapshot"                      |
    
-@todo 
+@todo
   Scenario Outline: Controller delete snapshot various use cases from examples
     Given a Isilon service
     When I call Probe
@@ -60,6 +72,7 @@ Feature: Isilon CSI interface
     Examples:
     | snapshotId   | errormsg                                 |
     | "34"         | "none"                                   |
+    | "34=_=_=cluster2" | "failed to get cluster config details for clusterName: 'cluster2'"                                   |
     | ""           | "snapshot id to be deleted is required"  |
     | "404"        | "none"                                   |
     | "str"        | "cannot convert snapshot to integer"     |

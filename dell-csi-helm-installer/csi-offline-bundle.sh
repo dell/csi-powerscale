@@ -243,7 +243,6 @@ if [ "${MODE}" == "helm" ]; then
   REQUIRED_FILES=(
     "${HELMDIR}"
     "${INSTALLERDIR}"
-    "${REPODIR}/*.pdf"
     "${REPODIR}/*.md"
     "${REPODIR}/LICENSE"
   )

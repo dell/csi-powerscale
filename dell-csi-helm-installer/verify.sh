@@ -21,75 +21,25 @@ fi
 
 declare -a VALIDDRIVERS
 
-# verify-csi-powermax method
-function verify-csi-powermax() {
-  verify_k8s_versions "1.17" "1.20"
-  verify_openshift_versions "4.5" "4.6"
-  verify_namespace "${NS}"
-  verify_required_secrets "${RELEASE}-creds"
-  verify_optional_secrets "${RELEASE}-certs"
-  verify_optional_secrets "csirevproxy-tls-secret"
-  verify_alpha_snap_resources
-  verify_beta_snap_requirements
-  verify_iscsi_installation
-  verify_helm_3
+
+# source-verify-driver will call the proper method to source verification method scripts
+function source-verify-driver() {
+  if [ -z "${1}" ]; then
+    decho "Expected one argument, the driver name, to verify-driver. Received none."
+    exit $EXIT_ERROR
+  fi
+  local D="${1}"
+
+  # check if a script, matching a specific name, exists
+  local SCRIPTNAME="verify-$D.sh"
+  # check if the script exists, and source it
+  if [ -f "${SCRIPTDIR}/${SCRIPTNAME}" ]; then
+    source "${SCRIPTDIR}/${SCRIPTNAME}"
+  else
+    echo "Unable to find ${SCRIPTDIR}/${SCRIPTNAME}"
+  fi
 }
 
-#
-# verify-csi-isilon method
-function verify-csi-isilon() {
-  verify_k8s_versions "1.17" "1.20"
-  verify_openshift_versions "4.5" "4.6"
-  verify_namespace "${NS}"
-  verify_required_secrets "${RELEASE}-creds"
-  verify_optional_secrets "${RELEASE}-certs"
-  verify_alpha_snap_resources
-  verify_beta_snap_requirements
-  verify_helm_3
-}
-
-#
-# verify-csi-vxflexos method
-function verify-csi-vxflexos() {
-  verify_k8s_versions "1.17" "1.20"
-  verify_openshift_versions "4.5" "4.6"
-  verify_namespace "${NS}"
-  verify_required_secrets "${RELEASE}-creds"
-  verify_sdc_installation
-  verify_alpha_snap_resources
-  verify_beta_snap_requirements
-  verify_helm_3
-}
-
-# verify-csi-powerstore method
-function verify-csi-powerstore() {
-  verify_k8s_versions "1.17" "1.20"
-  verify_openshift_versions "4.5" "4.6"
-  verify_namespace "${NS}"
-  verify_required_secrets "${RELEASE}-creds"
-  verify_alpha_snap_resources
-  verify_beta_snap_requirements
-  verify_powerstore_node_configuration
-  verify_helm_3
-}
-
-# verify-csi-unity method
-function verify-csi-unity() {
-  verify_k8s_versions "1.17" "1.20"
-  verify_openshift_versions "4.5" "4.6"
-  verify_namespace "${NS}"
-  verify_required_secrets "${RELEASE}-creds"
-  verify_required_secrets "${RELEASE}-certs-0"
-  verify_alpha_snap_resources
-  verify_unity_protocol_installation
-  verify_beta_snap_requirements  
-  verify_helm_3
-}
-
-# if testing routines are found, source them for possible execution
-if [ -f "${SCRIPTDIR}/test-functions.sh" ]; then
-  source "${SCRIPTDIR}/test-functions.sh"
-fi
 
 #
 # verify-driver will call the proper method to verify a specific driver
@@ -99,6 +49,8 @@ function verify-driver() {
     exit $EXIT_ERROR
   fi
   local D="${1}"
+  # source a script containing verification methods
+  source-verify-driver "${D}"
   # check if a verify-$DRIVER function exists
   # if not, error and exit
   # if yes, check to see if it should be run and run it
@@ -130,7 +82,6 @@ function usage() {
   decho "  --skip-verify-node              Skip worker node verification checks"
   decho "  --release[=]<helm release>      Name to register with helm, default value will match the driver name"
   decho "  --node-verify-user[=]<username> Username to SSH to worker nodes as, used to validate node requirements. Default is root"
-  decho "  --snapshot-crd                  Signifies that the Snapshot CRDs will be installed as part of installation."
   decho "  -h                              Help"
   decho
 
@@ -141,63 +92,6 @@ function usage() {
 function header() {
   log section "Verifying Kubernetes and driver configuration"
   echo "|- Kubernetes Version: ${kMajorVersion}.${kMinorVersion}"
-}
-
-# Check if the SDC is installed and the kernel module loaded
-function verify_sdc_installation() {
-  if [ ${NODE_VERIFY} -eq 0 ]; then
-    return
-  fi
-  log step "Verifying the SDC installation"
-
-  local SDC_MINION_NODES=$(run_command kubectl get nodes -o wide | grep -v -e master -e INTERNAL -e infra | awk ' { print $6; }')
-
-  error=0
-  missing=()
-  for node in $SDC_MINION_NODES; do
-    # check is the scini kernel module is loaded
-    run_command ssh ${NODEUSER}@$node "/sbin/lsmod | grep scini" >/dev/null 2>&1
-    rv=$?
-    if [ $rv -ne 0 ]; then
-      missing+=($node)
-      error=1
-      found_warning "SDC was not found on node: $node"
-    fi
-  done
-  check_error error
-}
-
-function verify_powerstore_node_configuration() {
-  if [ ${NODE_VERIFY} -eq 0 ]; then
-    return
-  fi
-
-  log step "Verifying PowerStore node configuration"
-  decho
-
-  if ls "${VALUES}" >/dev/null; then
-    if grep -c "scsiProtocol:[[:blank:]]\+FC" "${VALUES}" >/dev/null; then
-      log arrow
-      verify_fc_installation
-    elif grep -c "scsiProtocol:[[:blank:]]\+ISCSI" "${VALUES}" >/dev/null; then
-      log arrow
-      verify_iscsi_installation "small"
-    elif grep -c "scsiProtocol:[[:blank:]]\+auto" "${VALUES}" >/dev/null; then
-      log arrow
-      verify_iscsi_installation "small"
-      log arrow
-      verify_fc_installation "small"
-    elif grep -c "scsiProtocol:[[:blank:]]\+None" "${VALUES}" >/dev/null; then
-      log step_warning
-      found_warning "Neither FC nor iSCSI connection is activated, please be sure that NFS settings are correct"
-    else
-      log step_failure
-      found_error "Incorrect scsiProtocol value, must be 'FC', 'ISCSI', 'auto' or 'None'"
-    fi
-  else
-    log step_failure
-    found_error "${VALUES} doesn't exists"
-  fi
 }
 
 # Check if the iSCSI client is installed
@@ -225,48 +119,6 @@ function verify_iscsi_installation() {
     fi
   done
 
-  check_error error
-}
-
-
-function verify_unity_protocol_installation() {
-if [ ${NODE_VERIFY} -eq 0 ]; then
-    return
-  fi
-
-  log smart_step "Verifying sshpass installation.."
-  SSHPASS=$(which sshpass)
-  if [ -z "$SSHPASS" ]; then
-   found_warning "sshpass is not installed. It is mandatory to have ssh pass software for multi node kubernetes setup."
-  fi
-  
-   
-  log smart_step "Verifying iSCSI installation" "$1"
-
-  error=0
-  for node in $MINION_NODES; do
-    # check if the iSCSI client is installed
-    echo
-    echo -n "Enter the ${NODEUSER} password of ${node}: "
-    read -s nodepassword
-    echo
-    echo "$nodepassword" > protocheckfile
-    chmod 0400 protocheckfile
-    unset nodepassword
-    run_command sshpass -f protocheckfile ssh -o StrictHostKeyChecking=no ${NODEUSER}@"${node}" "cat /etc/iscsi/initiatorname.iscsi" > /dev/null 2>&1
-    rv=$?
-    if [ $rv -ne 0 ]; then
-      error=1
-      found_warning "iSCSI client is either not found on node: $node or not able to verify"
-    fi
-    run_command sshpass -f protocheckfile ssh -o StrictHostKeyChecking=no ${NODEUSER}@"${node}" "pgrep iscsid" > /dev/null 2>&1
-    rv1=$?
-    if [ $rv1 -ne 0 ]; then
-      error=1
-      found_warning "iscsid service is either not running on node: $node or not able to verify"
-    fi
-    rm -f protocheckfile
-  done
   check_error error
 }
 
@@ -429,32 +281,28 @@ function verify_alpha_snap_resources() {
   check_error error
 }
 
-# verify that the requirements for beta snapshot support exist
-function verify_beta_snap_requirements() {
-  log step "Verifying beta snapshot support"
+# verify that the requirements for snapshot support exist
+function verify_snap_requirements() {
+  log step "Verifying snapshot support"
   decho
   log arrow
-  log smart_step "Verifying that beta snapshot CRDs are available" "small"
+  log smart_step "Verifying that snapshot CRDs are available" "small"
 
   error=0
   # check for the CRDs. These are required for installation
   CRDS=("VolumeSnapshotClasses" "VolumeSnapshotContents" "VolumeSnapshots")
   for C in "${CRDS[@]}"; do
     # Verify if snapshot related CRDs are there on the system. If not install them.
-    run_command kubectl explain ${C} 2> /dev/null | grep "^VERSION.*v1beta1$" --quiet
+    run_command kubectl explain ${C} 2>&1 >/dev/null
     if [ $? -ne 0 ]; then
       error=1
-      if [ "${INSTALL_CRD}" == "yes" ]; then
-        found_warning "The beta CRD for ${C} is not installed. They will be installed because --snapshot-crd was specified"
-      else
-        found_error "The beta CRD for ${C} is not installed. These can be installed by specifying --snapshot-crd during installation"
-      fi
+      found_error "The CRD for ${C} is not installed. These need to be installed by the Kubernetes administrator"
     fi
   done
   check_error error
 
   log arrow
-  log smart_step "Verifying that beta snapshot controller is available" "small"
+  log smart_step "Verifying that the snapshot controller is available" "small"
 
   error=0
   # check for the snapshot-controller. These are strongly suggested but not required
@@ -514,20 +362,12 @@ function summary() {
   decho
   log section "Verification Complete - ${VERSTATUS}"
   # print all the WARNINGS
-  NON_CRD_WARNINGS=0
   if [ "${#WARNINGS[@]}" -ne 0 ]; then
     log warnings
     for E in "${WARNINGS[@]}"; do
       decho "- ${E}"
-      decho ${E} | grep --quiet "^The beta CRD for VolumeSnapshot"
-      if [ $? -ne 0 ]; then
-        NON_CRD_WARNINGS=1
-      fi
     done
     RC=$EXIT_WARNING
-    if [ "${INSTALL_CRD}" == "yes" -a ${NON_CRD_WARNINGS} -eq 0 ]; then
-      RC=$EXIT_SUCCESS
-    fi
   fi
 
   # print all the ERRORS
@@ -593,8 +433,6 @@ EXIT_ERROR=99
 WARNINGS=()
 ERRORS=()
 
-INSTALL_CRD="no"
-
 # make sure kubectl is available
 kubectl --help >&/dev/null || {
   decho "kubectl required for verification... exiting"
@@ -619,10 +457,6 @@ while getopts ":h-:" optchar; do
   case "${optchar}" in
   -)
     case "${OPTARG}" in
-    # INSTALL_CRD. Signifies that we were asked to install the CRDs
-    snapshot-crd)
-      INSTALL_CRD="yes"
-      ;;
     skip-verify-node)
       NODE_VERIFY=0
       ;;

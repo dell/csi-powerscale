@@ -11,6 +11,12 @@ Feature: Isilon CSI interface
       And I call CreateVolume "volume1"
       Then a valid CreateVolumeResponse is returned
 
+    Scenario: Create volume good scenario with persistent metadata
+      Given a Isilon service
+      When I call Probe
+      And I call CreateVolume with persistent metadata "volume1"
+      Then a valid CreateVolumeResponse is returned
+
     Scenario: Create volume good scenario with quota enabled
       Given a Isilon service
       And I enable quota
@@ -33,22 +39,31 @@ Feature: Isilon CSI interface
      | "GetExportInternalError"            | "EOF"                                              |
      | "none"                              | "none"                                             |
 
-    Scenario Outline: Create volume with parameters
+   Scenario Outline: Create volume with parameters
       Given a Isilon service
       When I call Probe
-      And I call CreateVolume with params <volumeName> <rangeInGiB> <accessZone> <isiPath> <AzServiceIP>
+      And I call CreateVolume with params <volumeName> <rangeInGiB> <accessZone> <isiPath> <AzServiceIP> <clusterName>
       Then the error contains <errormsg>
 
      Examples:
-     | volumeName    | rangeInGiB    | accessZone      | isiPath                   | AzServiceIP         | errormsg                 |
-     | "volume1"     | 8             | ""              | "/ifs/data/csi-isilon"    | "127.0.0.1"         | "none"                   |
-     | "volume1"     | 8             | "System"        | ""                        | "127.0.0.1"         | "none"                   |
-     | "volume1"     | 8             | "none"          | "/ifs/data/csi-isilon"    | "127.0.0.1"         | "none"                   |
-     | "volume1"     | 8             | "System"        | "none"                    | "127.0.0.1"         | "none"                   |
-     | "volume1"     | 8             | "System"        | "/ifs/data/csi-isilon"    | "none"              | "none"                   |
-     | "volume1"     | -1            | "System"        | "/ifs/data/csi-isilon"    | "none"              | "must not be negative"   |
-     | ""            | 0             | "System"        | "/ifs/data/csi-isilon"    | "none"              | "name cannot be empty"   |
-     | "volume1"     | 8             | "none"          | "/ifs/data/csi-isilon"    | ""                  | "none"                   |
+     | volumeName    | rangeInGiB    | accessZone      | isiPath                   | AzServiceIP         | clusterName    | errormsg               |
+     | "volume1"     | 8             | ""              | "/ifs/data/csi-isilon"    | "127.0.0.1"         | "none"         | "none"                 |
+     | "volume1"     | 8             | "System"        | ""                        | "127.0.0.1"         | "none"         | "none"                 |
+     | "volume1"     | 8             | "none"          | "/ifs/data/csi-isilon"    | "127.0.0.1"         | "none"         | "none"                 |
+     | "volume1"     | 8             | "System"        | "none"                    | "127.0.0.1"         | "none"         | "none"                 |
+     | "volume1"     | 8             | "System"        | "/ifs/data/csi-isilon"    | "none"              | "none"         | "none"                 |
+     | "volume1"     | -1            | "System"        | "/ifs/data/csi-isilon"    | "none"              | "none"         | "must not be negative" |
+     | ""            | 0             | "System"        | "/ifs/data/csi-isilon"    | "none"              | "none"         | "name cannot be empty" |
+     | "volume1"     | 8             | "none"          | "/ifs/data/csi-isilon"    | "none"              | "none"         | "none"                 |
+     | "volume1"     | 8             | ""              | "/ifs/data/csi-isilon"    | "127.0.0.1"         | "cluster1"     | "none"                 |
+     | "volume1"     | 8             | "System"        | ""                        | "127.0.0.1"         | "cluster1"     | "none"                 |
+     | "volume1"     | 8             | "none"          | "/ifs/data/csi-isilon"    | "127.0.0.1"         | "cluster1"     | "none"                 |
+     | "volume1"     | 8             | "System"        | "none"                    | "127.0.0.1"         | "cluster1"     | "none"                 |
+     | "volume1"     | 8             | "System"        | "/ifs/data/csi-isilon"    | "none"              | "cluster1"     | "none"                 |
+     | "volume1"     | -1            | "System"        | "/ifs/data/csi-isilon"    | "none"              | "cluster1"     | "must not be negative" |
+     | ""            | 0             | "System"        | "/ifs/data/csi-isilon"    | "none"              | "cluster1"     | "name cannot be empty" |
+     | "volume1"     | 8             | "none"          | "/ifs/data/csi-isilon"    | "none"              | "cluster1"     | "none"                 |
+     | "volume1"     | 8             | "none"          | "/ifs/data/csi-isilon"    | "127.0.0.1"         | "cluster2"     | "failed to get cluster config details for clusterName: 'cluster2'" |
 
     Scenario Outline: Create volume with different volume and export status and induce server errors
       Given a Isilon service
@@ -103,10 +118,12 @@ Feature: Isilon CSI interface
       Then the error contains <errormsg>
 
      Examples:
-     | volumeID                         | errormsg                                                          |
-     | "volume1=_=_=43=_=_=System"      | "none"                                                            |
-     | "volume1=_=_=43"                 | "failed to parse volume ID"                                       |
-     | ""                               | "no volume id is provided by the DeleteVolumeRequest instance"    |
+     | volumeID                                 | errormsg                                                           |
+     | "volume1=_=_=43=_=_=System"              | "none"                                                             |
+     | "volume1=_=_=43=_=_=System=_=_=cluster1" | "none"                                                             |
+     | "volume1=_=_=43"                         | "failed to parse volume ID"                                        |
+     | ""                                       | "no volume id is provided by the DeleteVolumeRequest instance"     |
+     | "volume1=_=_=43=_=_=System=_=_=cluster2" | "failed to get cluster config details for clusterName: 'cluster2'" |
 
     Scenario Outline: Delete volume with induced errors
       Given a Isilon service
