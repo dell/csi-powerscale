@@ -9,5 +9,5 @@
   unused-packages = true
 
 [[constraint]]
-  name = "github.com/rexray/gocsi"
-  version = "0.4.0"
+  name = "github.com/dell/gocsi"
+  version = "1.2.3"

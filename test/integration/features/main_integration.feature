@@ -45,7 +45,7 @@ Feature: Isilon CSI interface
       Then there is not a directory "integration0"
       Then there is not an export "integration0"
   
-  @v1.0
+  @todo
     Scenario Outline: ListVolumes with different max entries and starting token
       Given a Isilon service
       When I call ListVolumes with max entries <entry> starting token <token>
@@ -77,11 +77,11 @@ Feature: Isilon CSI interface
   @v1.0
     Scenario: Ephemeral Inline Volume basic and idempotency tests
       Given a Isilon service
-      When I call EphemeralNodePublishVolume "datadir0"
-      And I call EphemeralNodePublishVolume "datadir0"
+      When I call EphemeralNodePublishVolume "datadir9"
+      And I call EphemeralNodePublishVolume "datadir9"
       Then there are no errors
-      When I call EphemeralNodeUnpublishVolume "datadir0"
-      And I call EphemeralNodeUnpublishVolume "datadir0"
+      When I call EphemeralNodeUnpublishVolume "datadir9"
+      And I call EphemeralNodeUnpublishVolume "datadir9"
       Then there are no errors
  
   @v1.0
@@ -548,3 +548,4 @@ Feature: Isilon CSI interface
     | numberOfVolumes |
     | 2               |
     | 4               |
+

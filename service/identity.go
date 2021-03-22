@@ -87,7 +87,7 @@ func (s *service) Probe(
 	rep := new(csi.ProbeResponse)
 	rep.Ready = ready
 
-	if err := s.probe(ctx); err != nil {
+	if err := s.probeAllClusters(ctx); err != nil {
 		rep.Ready.Value = false
 		return rep, err
 	}

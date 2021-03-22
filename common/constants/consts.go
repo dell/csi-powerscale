@@ -53,4 +53,7 @@ const (
 
 	// VolumeSnapshotsPath is the snapshot directory base path on PowerScale array
 	VolumeSnapshotsPath = "/ifs/.snapshot"
+
+	//IsilonConfigFile isilon-creds file with credential info of isilon clusters
+	IsilonConfigFile = "/isilon-configs/config"
 )

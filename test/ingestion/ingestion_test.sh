@@ -1,10 +1,10 @@
 #!/bin/bash
 # Copyright: (c) 2020, Dell EMC
 
-# volumename  volumehandle  storageclass  accessmode  storagesize   pvname   pvcname
-#     1             2            3             4            5         6         7
+# volumename  volumehandle  storageclass  accessmode  storagesize   pvname   pvcname  clustername
+#     1             2            3             4            5         6         7          8
 
-if [[ $2 =~ ^[a-zA-Z0-9_-]+=_=_=[0-9]+=_=_=[a-zA-Z0-9_-]+$ ]]
+if [[ $2 =~ ^[a-zA-Z0-9_-]+=_=_=[0-9]+=_=_=[a-zA-Z0-9_-]+=_=_=[a-zA-Z0-9_-]+$ ]]
 then
   echo "Volume handle pattern matched"
 

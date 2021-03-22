@@ -21,7 +21,7 @@ import (
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/common/constants"
 	"github.com/dell/csi-isilon/common/utils"
-	log "github.com/sirupsen/logrus"
+	csiutils "github.com/dell/csi-isilon/csi-utils"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -63,43 +63,64 @@ func (s *service) NodePublishVolume(
 	ctx context.Context,
 	req *csi.NodePublishVolumeRequest) (
 	*csi.NodePublishVolumeResponse, error) {
+
+	// Fetch log handler
+	ctx, log, runID := GetRunIDLog(ctx)
+
+	volumeContext := req.GetVolumeContext()
+	if volumeContext == nil {
+		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "VolumeContext is nil, skip NodePublishVolume"))
+	}
+	utils.LogMap(ctx, "VolumeContext", volumeContext)
+
+	isEphemeralVolume := volumeContext["csi.storage.k8s.io/ephemeral"] == "true"
+	var clusterName string
+	var err error
+	if isEphemeralVolume {
+		clusterName = volumeContext["ClusterName"]
+	} else {
+		// parse the input volume id and fetch it's components
+		_, _, _, clusterName, _ = utils.ParseNormalizedVolumeID(ctx, req.GetVolumeId())
+	}
+
+	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
+
 	// Probe the node if required and make sure startup called
-	if err := s.autoProbe(ctx); err != nil {
+	if err := s.autoProbe(ctx, isiConfig); err != nil {
 		log.Error("nodeProbe failed with error :" + err.Error())
 		return nil, err
 	}
 
-	volumeContext := req.GetVolumeContext()
-	if volumeContext == nil {
-		return nil, status.Error(codes.InvalidArgument, "VolumeContext is nil, skip NodePublishVolume")
-	}
-
-	utils.LogMap("VolumeContext", volumeContext)
-
-	isEphemeralVolume := volumeContext["csi.storage.k8s.io/ephemeral"] == "true"
 	if isEphemeralVolume {
 		return s.ephemeralNodePublish(ctx, req)
 	}
 	path := volumeContext["Path"]
 
 	if path == "" {
-		return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("no entry keyed by 'Path' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no entry keyed by 'Path' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
 	}
 	volName := volumeContext["Name"]
 	if volName == "" {
-		return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("no entry keyed by 'Name' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no entry keyed by 'Name' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
 	}
 
-	isROVolumeFromSnapshot := s.isiSvc.isROVolumeFromSnapshot(path)
+	isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(path)
 	if isROVolumeFromSnapshot {
 		log.Info("Volume source is snapshot")
-		if export, err := s.isiSvc.GetExportWithPathAndZone(path, ""); err != nil || export == nil {
-			return nil, status.Errorf(codes.Internal, "error retrieving export for '%s'", path)
+		if export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, path, ""); err != nil || export == nil {
+			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "error retrieving export for '%s'", path))
 		}
 	} else {
 		// Parse the target path and empty volume name to get the volume
 		isiPath := utils.GetIsiPathFromExportPath(path)
-		if _, err := s.getVolByName(isiPath, volName); err != nil {
+
+		if _, err := s.getVolByName(ctx, isiPath, volName, isiConfig); err != nil {
 			log.Errorf("Error in getting '%s' Volume '%v'", volName, err)
 			return nil, err
 		}
@@ -109,19 +130,19 @@ func (s *service) NodePublishVolume(
 	// Set azServiceIP to updated endpoint when custom topology is enabled
 	var azServiceIP string
 	if s.opts.CustomTopologyEnabled {
-		azServiceIP = s.opts.Endpoint
+		azServiceIP = isiConfig.IsiIP
 	} else {
 		azServiceIP = volumeContext[AzServiceIPParam]
 	}
 
-	f := log.Fields{
+	f := map[string]interface{}{
 		"ID":          req.VolumeId,
 		"Name":        volumeContext["Name"],
 		"TargetPath":  req.GetTargetPath(),
 		"AzServiceIP": azServiceIP,
 	}
 	log.WithFields(f).Info("Calling publishVolume")
-	if err := publishVolume(req, s.isiSvc.GetNFSExportURLForPath(azServiceIP, path), s.opts.NfsV3); err != nil {
+	if err := publishVolume(ctx, req, isiConfig.isiSvc.GetNFSExportURLForPath(azServiceIP, path), s.opts.NfsV3); err != nil {
 		return nil, err
 	}
 
@@ -132,17 +153,32 @@ func (s *service) NodeUnpublishVolume(
 	ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest) (
 	*csi.NodeUnpublishVolumeResponse, error) {
+	// Fetch log handler
+	ctx, log, runID := GetRunIDLog(ctx)
 
 	log.Debug("executing NodeUnpublishVolume")
 	volID := req.GetVolumeId()
 	if volID == "" {
-		return nil, status.Error(codes.FailedPrecondition, "no VolumeID found in request")
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no VolumeID found in request"))
 	}
 	log.Infof("The volume ID fetched from NodeUnPublish req is %s", volID)
 
-	volName, exportID, accessZone, _ := utils.ParseNormalizedVolumeID(req.GetVolumeId())
+	volName, exportID, accessZone, clusterName, _ := utils.ParseNormalizedVolumeID(ctx, req.GetVolumeId())
 	if volName == "" {
 		volName = volID
+	}
+
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
+	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Probe the node if required
+	if err := s.autoProbe(ctx, isiConfig); err != nil {
+		log.Error("nodeProbe failed with error :" + err.Error())
+		return nil, err
 	}
 
 	ephemeralVolName := fmt.Sprintf("ephemeral-%s", volID)
@@ -169,19 +205,19 @@ func (s *service) NodeUnpublishVolume(
 	// Check if it is a RO volume from snapshot
 	// We need not execute this logic for ephemeral volumes.
 	if !isExportIDEmpty {
-		export, err := s.isiSvc.GetExportByIDWithZone(exportID, accessZone)
+		export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
 		if err != nil {
 			return nil, err
 		}
 		exportPath := (*export.Paths)[0]
-		isROVolumeFromSnapshot := s.isiSvc.isROVolumeFromSnapshot(exportPath)
+		isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(exportPath)
 		// If it is a RO volume from snapshot
 		if isROVolumeFromSnapshot {
 			volName = exportPath
 		}
 	}
 
-	if err := unpublishVolume(req, volName); err != nil {
+	if err := unpublishVolume(ctx, req, volName); err != nil {
 		return nil, err
 	}
 
@@ -195,22 +231,24 @@ func (s *service) NodeUnpublishVolume(
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
-func (s *service) nodeProbe(ctx context.Context) error {
+func (s *service) nodeProbe(ctx context.Context, isiConfig *IsilonClusterConfig) error {
 
-	if err := s.validateOptsParameters(); err != nil {
+	// Fetch log handler
+	ctx, _, _ = GetRunIDLog(ctx)
+
+	if err := s.validateOptsParameters(isiConfig); err != nil {
 		return fmt.Errorf("node probe failed : '%v'", err)
 	}
 
-	if s.isiSvc == nil {
-
-		return errors.New("s.isiSvc (type isiService) is nil, probe failed")
-
+	if isiConfig.isiSvc == nil {
+		return errors.New("clusterConfig.isiSvc (type isiService) is nil, probe failed")
 	}
 
-	if err := s.isiSvc.TestConnection(); err != nil {
+	if err := isiConfig.isiSvc.TestConnection(ctx); err != nil {
 		return fmt.Errorf("node probe failed : '%v'", err)
 	}
 
+	ctx, log := setClusterContext(ctx, isiConfig.ClusterName)
 	log.Debug("node probe succeeded")
 
 	return nil
@@ -253,35 +291,50 @@ func (s *service) NodeGetInfo(
 	req *csi.NodeGetInfoRequest) (
 	*csi.NodeGetInfoResponse, error) {
 
+	// Fetch log handler
+	ctx, log, _ := GetRunIDLog(ctx)
+
 	nodeID, err := s.getPowerScaleNodeID(ctx)
+	log.Debugf("Node ID of worker node is '%s'", nodeID)
 	if (err) != nil {
 		return nil, err
 	}
 
+	// If Custom Topology is enabled we do not add node labels to the worker node
 	if s.opts.CustomTopologyEnabled {
 		return &csi.NodeGetInfoResponse{NodeId: nodeID}, nil
 	}
 
-	// As NodeGetInfo is invoked only once during driver registration, we validate
-	// connectivity with backend PowerScale Array upto MaxIsiConnRetries, before adding topology keys
-	var connErr error
-	for i := 0; i < constants.MaxIsiConnRetries; i++ {
-		connErr = s.isiSvc.TestConnection()
-		if connErr == nil {
-			break
+	// If Custom Topology is not enabled, proceed with adding node labels for all
+	// PowerScale clusters part of secret.json
+	isiClusters := s.getIsilonClusters()
+	topology := make(map[string]string)
+
+	for cluster := range isiClusters {
+		// Validate if we have valid clusterConfig
+		if isiClusters[cluster].isiSvc == nil {
+			continue
 		}
-		time.Sleep(RetrySleepTime)
+
+		// As NodeGetInfo is invoked only once during driver registration, we validate
+		// connectivity with backend PowerScale Array upto MaxIsiConnRetries, before adding topology keys
+		var connErr error
+		for i := 0; i < constants.MaxIsiConnRetries; i++ {
+			connErr = isiClusters[cluster].isiSvc.TestConnection(ctx)
+			if connErr == nil {
+				break
+			}
+			time.Sleep(RetrySleepTime)
+		}
+
+		if connErr != nil {
+			continue
+		}
+
+		// Create the topology keys
+		// <provisionerName>.dellemc.com/<powerscaleIP>: <provisionerName>
+		topology[constants.PluginName+"/"+isiClusters[cluster].IsiIP] = constants.PluginName
 	}
-
-	if connErr != nil {
-		return &csi.NodeGetInfoResponse{NodeId: nodeID}, nil
-	}
-
-	// Create the topology keys
-	// <provisionerName>.dellemc.com/<powerscaleIP>: <provisionerName>
-	topology := map[string]string{}
-	topology[constants.PluginName+"/"+s.opts.Endpoint] = constants.PluginName
-
 	// Create NodeGetInfoResponse including nodeID and AccessibleTopology information
 	return &csi.NodeGetInfoResponse{
 		NodeId: nodeID,
@@ -297,6 +350,9 @@ func (s *service) NodeGetVolumeStats(
 }
 
 func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
+	// Fetch log handler
+	ctx, log, _ := GetRunIDLog(ctx)
+
 	log.Info("Received request to node publish Ephemeral Volume..")
 
 	volID := req.GetVolumeId()
@@ -408,11 +464,14 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 func (s *service) ephemeralNodeUnpublish(
 	ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest) error {
+	// Fetch log handler
+	ctx, log, runID := GetRunIDLog(ctx)
+
 	log.Infof("Request received for Ephemeral NodeUnpublish..")
 	volumeID := req.GetVolumeId()
 	log.Infof("The volID is %s", volumeID)
 	if volumeID == "" {
-		return status.Error(codes.InvalidArgument, "volume ID is required")
+		return status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "volume ID is required"))
 	}
 
 	nodeID, nodeIDErr := s.getPowerScaleNodeID(ctx)
@@ -432,7 +491,7 @@ func (s *service) ephemeralNodeUnpublish(
 
 	// Before deleting the volume on PowerScale,
 	// Cleaning up the directories we created.
-	volName, _, _, err := utils.ParseNormalizedVolumeID(req.GetVolumeId())
+	volName, _, _, _, err := utils.ParseNormalizedVolumeID(ctx, req.GetVolumeId())
 	if err != nil {
 		return err
 	}
@@ -456,13 +515,28 @@ func (s *service) ephemeralNodeUnpublish(
 }
 
 func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
+	var nodeIP string
+	var err error
 
-	nodeIP, err := s.GetCSINodeIP(ctx)
-	if (err) != nil {
-		return "", err
+	// Fetch log handler
+	ctx, log, _ := GetRunIDLog(ctx)
+
+	// When valid list of allowedNetworks is being given as part of values.yaml, we need
+	// to fetch first IP from matching network
+	if len(s.opts.allowedNetworks) > 0 {
+		log.Debugf("Fetching IP address of custom network for NFS I/O traffic")
+		nodeIP, err = csiutils.GetNFSClientIP(s.opts.allowedNetworks)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		nodeIP, err = s.GetCSINodeIP(ctx)
+		if (err) != nil {
+			return "", err
+		}
 	}
 
-	nodeFQDN, err := utils.GetFQDNByIP(nodeIP)
+	nodeFQDN, err := utils.GetFQDNByIP(ctx, nodeIP)
 	if (err) != nil {
 		return "", err
 	}

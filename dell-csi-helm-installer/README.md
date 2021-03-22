@@ -77,7 +77,6 @@ Options:
   --node-verify-user[=]<username>          Username to SSH to worker nodes as, used to validate node requirements. Default is root
   --skip-verify                            Skip the kubernetes configuration verification to use the CSI driver, default will run verification
   --skip-verify-node                       Skip worker node verification checks
-  --snapshot-crd                           Install snapshot CRDs. Default will not install Snapshot classes.
   -h                                       Help
 ```
 
@@ -105,7 +104,6 @@ Options:
   --node-verify-user[=]<username>          Username to SSH to worker nodes as, used to validate node requirements. Default is root
   --skip-verify                            Skip the kubernetes configuration verification to use the CSI driver, default will run verification
   --skip-verify-node                       Skip worker node verification checks
-  --snapshot-crd                           Install snapshot CRDs. Default will not install Snapshot classes.
   -h                                       Help
 ```
 

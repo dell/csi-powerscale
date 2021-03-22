@@ -30,7 +30,6 @@ rules:
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
     verbs: ["get", "list", "watch", "update"]
-
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -61,8 +60,10 @@ spec:
     spec:
       serviceAccount: {{ .Release.Name }}-node
       hostNetwork: true
-      containers:  
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
         - name: driver
+          command: ["/csi-isilon"]
           securityContext:
             privileged: true
             capabilities:
@@ -70,7 +71,6 @@ spec:
             allowPrivilegeEscalation: true
           image: {{ required "Must provide the Isilon driver container image." .Values.images.driver }}
           imagePullPolicy: Always
-          command: [ "/csi-isilon" ]
           env:
             - name: CSI_ENDPOINT
               value: /var/lib/kubelet/plugins/csi-isilon/csi_sock
@@ -79,47 +79,39 @@ spec:
             - name: X_CSI_DEBUG
               value: "{{ .Values.enableDebug }}"
             - name: X_CSI_ISI_INSECURE
-              value: "{{ .Values.isiInsecure }}"                
+              value: "{{ .Values.isiInsecure }}"
+            - name: X_CSI_ALLOWED_NETWORKS
+              value: "{{ .Values.allowedNetworks }}"
             - name: X_CSI_VERBOSE
-              value: "{{ .Values.verbose }}"              
+              value: "{{ .Values.verbose }}"
             - name: X_CSI_PRIVATE_MOUNT_DIR
               value: "/var/lib/kubelet/plugins/csi-isilon/disks"
-            - name: X_CSI_ISI_ENDPOINT
-              value: {{ required "Must provide an Isilon REST API gateway HTTPS endpoint." .Values.isiIP }}   
             - name: X_CSI_ISI_PORT
               value: "{{ .Values.isiPort }}"
             - name: X_CSI_ISI_PATH
-              value: {{ .Values.isiPath }}                
+              value: {{ .Values.isiPath }}
             - name: X_CSI_ISILON_NO_PROBE_ON_START
-              value: "{{ .Values.noProbeOnStart }}"  
+              value: "{{ .Values.noProbeOnStart }}"
             - name: X_CSI_ISILON_NFS_V3
-              value: "{{ .Values.nfsV3 }}"                        
-            - name: X_CSI_ISI_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-creds
-                  key: username
-            - name: X_CSI_ISI_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-creds
-                  key: password
+              value: "{{ .Values.nfsV3 }}"
             - name: X_CSI_ISI_AUTOPROBE
-              value: "{{ .Values.autoProbe }}"       
+              value: "{{ .Values.autoProbe }}"
             - name: X_CSI_NODE_NAME
               valueFrom:
                 fieldRef:
-                  fieldPath: spec.nodeName 
+                  fieldPath: spec.nodeName
             - name: X_CSI_NODE_IP
               valueFrom:
                 fieldRef:
-                  fieldPath: status.hostIP       
+                  fieldPath: status.hostIP
             - name: SSL_CERT_DIR
-              value: /certs    
+              value: /certs
             - name: X_CSI_ISI_QUOTA_ENABLED
               value: "{{ .Values.enableQuota }}"
             - name: X_CSI_CUSTOM_TOPOLOGY_ENABLED
               value: "{{ .Values.enableCustomTopology }}"
+            - name: X_CSI_ISILON_CONFIG_PATH
+              value: /isilon-configs/config
           volumeMounts:
             - name: driver-path
               mountPath: /var/lib/kubelet/plugins/csi-isilon
@@ -129,18 +121,17 @@ spec:
               mountPath: /var/lib/kubelet/pods
               mountPropagation: "Bidirectional"
             - name: dev
-              mountPath: /dev   
+              mountPath: /dev
             - name: certs
               mountPath: /certs
-              readOnly: true      
+              readOnly: true
+            - name: isilon-configs
+              mountPath: /isilon-configs
         - name: registrar
           image: {{ required "Must provide the CSI node registrar container image." .Values.images.registrar }}
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
-            #- --mode=node-register
-            #- --driver-requires-attachment=true
-            #- --pod-info-mount-version=v1
             - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-isilon/csi_sock
           env:
             - name: ADDRESS
@@ -177,5 +168,15 @@ spec:
             path: /dev
             type: Directory
         - name: certs
+          projected:
+            sources:
+{{- range $i, $e := until (int .Values.certSecretCount ) }}
+              - secret:
+                  name: {{ print $.Release.Name "-certs-" $e }}
+                  items:
+                    - key: cert-{{ $e }}
+                      path: cert-{{ $e }}
+{{- end }}
+        - name: isilon-configs
           secret:
-              secretName: {{ .Release.Name }}-certs    
+            secretName: {{ .Release.Name }}-creds

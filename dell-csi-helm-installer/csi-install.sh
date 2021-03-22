@@ -11,14 +11,12 @@
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 DRIVERDIR="${SCRIPTDIR}/../helm"
 VERIFYSCRIPT="${SCRIPTDIR}/verify.sh"
-SNAPCLASSDIR="${SCRIPTDIR}/beta-snapshot-crd"
 PROG="${0}"
 NODE_VERIFY=1
 VERIFY=1
 MODE="install"
 WATCHLIST=""
-# version of Snapshot CRD to install. Default is none ("")
-INSTALL_CRD=""
+
 # export the name of the debug log, so child processes will see it
 export DEBUGLOG="${SCRIPTDIR}/install-debug.log"
 declare -a VALIDDRIVERS
@@ -47,7 +45,6 @@ function usage() {
   decho "  --node-verify-user[=]<username>          Username to SSH to worker nodes as, used to validate node requirements. Default is root"
   decho "  --skip-verify                            Skip the kubernetes configuration verification to use the CSI driver, default will run verification"
   decho "  --skip-verify-node                       Skip worker node verification checks"
-  decho "  --snapshot-crd                           Install snapshot CRDs. Default will not install Snapshot classes."
   decho "  -h                                       Help"
   decho
 
@@ -257,41 +254,6 @@ function kubectl_safe() {
 }
 
 #
-# install_snapshot_crds
-# Downloads and installs snapshot CRDs
-function install_snapshot_crd() {
-  if [ "${INSTALL_CRD}" == "" ]; then
-    return
-  fi
-  log step "Checking and installing snapshot crds"
-
-  declare -A SNAPCLASSES=(
-    ["volumesnapshotclasses"]="snapshot.storage.k8s.io_volumesnapshotclasses.yaml"
-    ["volumesnapshotcontents"]="snapshot.storage.k8s.io_volumesnapshotcontents.yaml"
-    ["volumesnapshots"]="snapshot.storage.k8s.io_volumesnapshots.yaml"
-  )
-
-  for C in "${!SNAPCLASSES[@]}"; do
-    F="${SNAPCLASSES[$C]}"
-    # check if custom resource exists
-    kubectl_safe "get customresourcedefinitions" "Failed to get crds" | grep "${C}" --quiet
-
-    if [[ $? -ne 0 ]]; then
-      # make sure CRD exists
-      if [ ! -f "${SNAPCLASSDIR}/${SNAPCLASSES[$C]}" ]; then
-        decho "Unable to to find Snapshot Classes at ${SNAPCLASSDIR}"
-        exit 1
-      fi
-      # create the custom resource
-      kubectl_safe "create -f ${SNAPCLASSDIR}/${SNAPCLASSES[$C]}" "Failed to create Volume Snapshot Beta CRD: ${C}"
-    fi
-  done
-
-  sleep 10s
-  log step_success
-}
-
-#
 # verify_kubernetes
 # will run a driver specific function to verify environmental requirements
 function verify_kubernetes() {
@@ -301,9 +263,6 @@ function verify_kubernetes() {
   else
     if [ $NODE_VERIFY -eq 0 ]; then
       EXTRA_OPTS="$EXTRA_OPTS --skip-verify-node"
-    fi
-    if [ "${INSTALL_CRD}" == "yes" ]; then
-      EXTRA_OPTS="$EXTRA_OPTS --snapshot-crd"
     fi
     "${VERIFYSCRIPT}" --namespace "${NS}" --release "${RELEASE}" --values "${VALUES}" --node-verify-user "${NODEUSER}" ${EXTRA_OPTS}
     VERIFYRC=$?
@@ -343,10 +302,6 @@ while getopts ":h-:" optchar; do
       ;;
     skip-verify-node)
       NODE_VERIFY=0
-      ;;
-      # SNAPSHOT_CRD
-    snapshot-crd)
-      INSTALL_CRD="yes"
       ;;
     upgrade)
       MODE="upgrade"
@@ -434,11 +389,6 @@ validate_params "${MODE}"
 header
 check_for_driver "${MODE}"
 verify_kubernetes
-
-if [[ "${INSTALL_CRD}" != "" ]]; then
-  install_snapshot_crd
-fi
-
 
 # all good, keep processing
 install_driver "${MODE}"

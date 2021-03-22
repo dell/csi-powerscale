@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gopkg.in/yaml.v2"
 	"net"
 	"os"
 	"path"
@@ -31,9 +32,9 @@ import (
 	gournal "github.com/akutz/gournal"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/common/constants"
+	csictx "github.com/dell/gocsi/context"
 	isi "github.com/dell/goisilon"
 	"github.com/google/uuid"
-	csictx "github.com/rexray/gocsi/context"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -81,6 +82,7 @@ func ConfigureLogger(debugEnabled bool) context.Context {
 
 // ParseBooleanFromContext parses an environment variable into a boolean value. If an error is encountered, default is set to false, and error is logged
 func ParseBooleanFromContext(ctx context.Context, key string) bool {
+	log := GetRunIDLogger(ctx)
 	if val, ok := csictx.LookupEnv(ctx, key); ok {
 		b, err := strconv.ParseBool(val)
 		if err != nil {
@@ -93,8 +95,24 @@ func ParseBooleanFromContext(ctx context.Context, key string) bool {
 	return false
 }
 
+// ParseArrayFromContext parses an environment variable into an array of string
+func ParseArrayFromContext(ctx context.Context, key string) []string {
+	log := GetRunIDLogger(ctx)
+	var values []string
+
+	if val, ok := csictx.LookupEnv(ctx, key); ok {
+		err := yaml.Unmarshal([]byte(val), &values)
+		if err != nil {
+			log.Errorf("invalid array value for '%s'", key)
+			return values
+		}
+	}
+	return values
+}
+
 // ParseUintFromContext parses an environment variable into a uint value. If an error is encountered, default is set to 0, and error is logged
 func ParseUintFromContext(ctx context.Context, key string) uint {
+	log := GetRunIDLogger(ctx)
 	if val, ok := csictx.LookupEnv(ctx, key); ok {
 		i, err := strconv.ParseUint(val, 10, 0)
 		if err != nil {
@@ -152,8 +170,8 @@ func GetNewUUID() (string, error) {
 }
 
 // LogMap logs the key-value entries of a given map
-func LogMap(mapName string, m map[string]string) {
-
+func LogMap(ctx context.Context, mapName string, m map[string]string) {
+	log := GetRunIDLogger(ctx)
 	log.Debugf("map '%s':", mapName)
 	for key, value := range m {
 		log.Debugf("    [%s]='%s'", key, value)
@@ -187,6 +205,9 @@ var QuotaIDPattern = regexp.MustCompile(fmt.Sprintf("^%s(.*)", CSIQuotaIDPrefix)
 // VolumeIDSeparator is the separator that separates volume name and export ID (two components that a normalized volume ID is comprised of)
 var VolumeIDSeparator = "=_=_="
 
+// SnapshotIDSeparator is the separator that separates snapshot id and cluster name (two components that a normalized snapshot ID is comprised of)
+var SnapshotIDSeparator = "=_=_="
+
 // VolumeIDPattern is the regex pattern that identifies the quota id set in the export's description field set by csi driver
 var VolumeIDPattern = regexp.MustCompile(fmt.Sprintf("^(.+)%s(\\d+)%s(.+)$", VolumeIDSeparator, VolumeIDSeparator))
 
@@ -199,6 +220,9 @@ var NodeIDPattern = regexp.MustCompile(fmt.Sprintf("^(.+)%s(.+)%s(.+)$", NodeIDS
 // ExportConflictMessagePattern is the regex pattern that identifies the error message of export conflict
 var ExportConflictMessagePattern = regexp.MustCompile(fmt.Sprintf("^Export rules (\\d+) and (\\d+) conflict on '(.+)'$"))
 
+// DummyHostNodeID is nodeID used for adding dummy client in client field of export
+var DummyHostNodeID = "localhost=#=#=localhost=#=#=127.0.0.1"
+
 // GetQuotaIDWithCSITag formats a given quota id with the CSI tag, e.g. AABpAQEAAAAAAAAAAAAAQA0AAAAAAAAA -> CSI_QUOTA_ID:AABpAQEAAAAAAAAAAAAAQA0AAAAAAAAA
 func GetQuotaIDWithCSITag(quotaID string) string {
 
@@ -210,7 +234,8 @@ func GetQuotaIDWithCSITag(quotaID string) string {
 }
 
 // GetQuotaIDFromDescription extracts quota id from the description field of export
-func GetQuotaIDFromDescription(export isi.Export) (string, error) {
+func GetQuotaIDFromDescription(ctx context.Context, export isi.Export) (string, error) {
+	log := GetRunIDLogger(ctx)
 
 	log.Debugf("try to extract quota id from the description field of export (id:'%d', path: '%s', description : '%s')", export.ID, export.Paths, export.Description)
 
@@ -234,7 +259,8 @@ func GetQuotaIDFromDescription(export isi.Export) (string, error) {
 }
 
 // GetFQDNByIP returns the FQDN based on the parsed ip address
-func GetFQDNByIP(ip string) (string, error) {
+func GetFQDNByIP(ctx context.Context, ip string) (string, error) {
+	log := GetRunIDLogger(ctx)
 	names, err := net.LookupAddr(ip)
 	if err != nil {
 		log.Errorf("error getting FQDN: '%s'", err)
@@ -330,41 +356,83 @@ func GetAccessMode(req *csi.ControllerPublishVolumeRequest) (*csi.VolumeCapabili
 	return &(am.Mode), nil
 }
 
-// GetNormalizedVolumeID combines volume name (i.e. the directory name), export ID and access zone to form the normalized volume ID
-// e.g. k8s-e89c9d089e + 19 + csi0zone => k8s-e89c9d089e=_=_=19=_=_=csi0zone
-func GetNormalizedVolumeID(volName string, exportID int, accessZone string) string {
+// GetNormalizedVolumeID combines volume name (i.e. the directory name), export ID, access zone and clusterName to form the normalized volume ID
+// e.g. k8s-e89c9d089e + 19 + csi0zone + cluster1 => k8s-e89c9d089e=_=_=19=_=_=csi0zone=_=_=cluster1
+func GetNormalizedVolumeID(ctx context.Context, volName string, exportID int, accessZone, clusterName string) string {
+	log := GetRunIDLogger(ctx)
 
-	volID := fmt.Sprintf("%s%s%s%s%s", volName, VolumeIDSeparator, strconv.Itoa(exportID), VolumeIDSeparator, accessZone)
+	volID := fmt.Sprintf("%s%s%s%s%s%s%s", volName, VolumeIDSeparator, strconv.Itoa(exportID), VolumeIDSeparator, accessZone, VolumeIDSeparator, clusterName)
 
-	log.Debugf("combined volume name '%s' with export ID '%d' and access zone '%s' to form volume ID '%s'",
-		volName, exportID, accessZone, volID)
+	log.Debugf("combined volume name '%s' with export ID '%d', access zone '%s' and cluster name '%s' to form volume ID '%s'",
+		volName, exportID, accessZone, clusterName, volID)
 
 	return volID
 }
 
-// ParseNormalizedVolumeID parses the volume ID (following the pattern '^(.+)=_=_=(d+)=_=_=(.+)$') to extract the volume name, export ID and access zone that make up the volume ID
-// e.g. k8s-e89c9d089e=_=_=19=_=_=csi0zone => k8s-e89c9d089e, 19, csi0zone
-func ParseNormalizedVolumeID(volID string) (string, int, string, error) {
-
-	matches := VolumeIDPattern.FindStringSubmatch(volID)
-
-	if len(matches) < 4 {
-		return "", 0, "", fmt.Errorf("volume ID '%s' cannot match the expected '^(.+)=_=_=(d+)=_=_=(.+)$' pattern", volID)
+// ParseNormalizedVolumeID parses the volume ID(using VolumeIDSeparator) to extract the volume name, export ID, access zone and cluster name(optional) that make up the volume ID
+// e.g. k8s-e89c9d089e=_=_=19=_=_=csi0zone => k8s-e89c9d089e, 19, csi0zone, ""
+// e.g. k8s-e89c9d089e=_=_=19=_=_=csi0zone=_=_=cluster1 => k8s-e89c9d089e, 19, csi0zone, cluster1
+func ParseNormalizedVolumeID(ctx context.Context, volID string) (string, int, string, string, error) {
+	log := GetRunIDLogger(ctx)
+	tokens := strings.Split(volID, VolumeIDSeparator)
+	if len(tokens) < 3 {
+		return "", 0, "", "", fmt.Errorf("volume ID '%s' cannot be split into tokens", volID)
 	}
 
-	exportID, err := strconv.Atoi(matches[2])
+	var clusterName string
+	exportID, err := strconv.Atoi(tokens[1])
 	if err != nil {
-		return "", 0, "", err
+		return "", 0, "", "", err
 	}
 
-	log.Debugf("volume ID '%s' parsed into volume name '%s', export ID '%d' and access zone '%s'",
-		volID, matches[1], exportID, matches[3])
+	if len(tokens) > 3 {
+		clusterName = tokens[3]
+	}
 
-	return matches[1], exportID, matches[3], nil
+	log.Debugf("volume ID '%s' parsed into volume name '%s', export ID '%d', access zone '%s' and cluster name '%s'",
+		volID, tokens[0], exportID, tokens[2], clusterName)
+
+	return tokens[0], exportID, tokens[2], clusterName, nil
+}
+
+// GetNormalizedSnapshotID combines snapshotID ID and cluster name to form the normalized snapshot ID
+// e.g. 12345 + cluster1  => 12345=_=_=cluster1
+func GetNormalizedSnapshotID(ctx context.Context, snapshotID, clusterName string) string {
+	log := GetRunIDLogger(ctx)
+
+	snapID := fmt.Sprintf("%s%s%s", snapshotID, SnapshotIDSeparator, clusterName)
+
+	log.Debugf("combined snapshot id '%s' and cluster name '%s' to form normalized snapshot ID '%s'",
+		snapshotID, clusterName, snapID)
+
+	return snapID
+}
+
+// ParseNormalizedSnapshotID parses the normalized snapshot ID(using SnapshotIDSeparator) to extract the snapshot ID and cluster name(optional) that make up the normalized snapshot ID
+// e.g. 12345 => 12345, ""
+// e.g. 12345=_=_=cluster1 => 12345, cluster1
+func ParseNormalizedSnapshotID(ctx context.Context, snapID string) (string, string, error) {
+	log := GetRunIDLogger(ctx)
+	tokens := strings.Split(snapID, SnapshotIDSeparator)
+	if len(tokens) < 1 {
+		return "", "", fmt.Errorf("snapshot ID '%s' cannot be split into tokens", snapID)
+	}
+
+	var clusterName string
+	if len(tokens) > 1 {
+		clusterName = tokens[1]
+	}
+
+	log.Debugf("normalized snapshot ID '%s' parsed into snapshot ID '%s' and cluster name '%s'",
+		snapID, tokens[0], clusterName)
+
+	return tokens[0], clusterName, nil
 }
 
 //ParseNodeID parses NodeID to node name, node FQDN and IP address using pattern '^(.+)=#=#=(.+)=#=#=(.+)'
-func ParseNodeID(nodeID string) (string, string, string, error) {
+func ParseNodeID(ctx context.Context, nodeID string) (string, string, string, error) {
+	log := GetRunIDLogger(ctx)
+
 	matches := NodeIDPattern.FindStringSubmatch(nodeID)
 
 	if len(matches) < 4 {
@@ -410,4 +478,10 @@ func GetVolumeNameFromExportPath(exportPath string) string {
 		exportPath = fmt.Sprint(exportPath[0:strings.LastIndex(exportPath, "/")])
 	}
 	return fmt.Sprint(exportPath[strings.LastIndex(exportPath, "/")+1:])
+}
+
+// GetMessageWithRunID returns message with runID information
+func GetMessageWithRunID(runid string, format string, args ...interface{}) string {
+	str := fmt.Sprintf(format, args...)
+	return fmt.Sprintf(" runid=%s %s", runid, str)
 }

@@ -27,7 +27,7 @@ import (
 	"strings"
 
 	"github.com/dell/csi-isilon/provider"
-	"github.com/rexray/gocsi"
+	"github.com/dell/gocsi"
 )
 
 // main is ignored when this package is built as a go plug-in
@@ -94,4 +94,7 @@ const usage = `   X_CSI_ISI_ENDPOINT
         Specifies the name of the Isilon system to interact with.
 
         The default value is default.
+
+    X_CSI_ISILON_CONFIG_PATH
+        Specifies the filepath containing Isilon cluster's config details.
 `

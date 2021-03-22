@@ -59,6 +59,17 @@ Feature: Isilon CSI interface
       When I call GetCapacity
       Then a valid GetCapacityResponse is returned
 
+    Scenario: Call GetCapacity with cluster name
+      Given a Isilon service
+      When I call GetCapacity with params "cluster1"
+      Then a valid GetCapacityResponse is returned
+
+    Scenario: Call GetCapacity with non-existing cluster config
+      Given a Isilon service
+      When I call Probe
+      And I call GetCapacity with params "cluster2"
+      Then the error contains "failed to get cluster config details for clusterName: 'cluster2'"
+
     Scenario: Call GetCapacity with invalid capabilities
       Given a Isilon service
       When I call Probe
@@ -74,8 +85,8 @@ Feature: Isilon CSI interface
 
      Examples:
      | induced               | errormsg                                                           |
-     | "StatsError"          | "Could not retrieve capacity. Data returned error 'Error'"         |
-     | "InstancesError"      | "Could not retrieve capacity. Error 'Error retrieving Statistics'" |
+     | "StatsError"          | "runid=Could not retrieve capacity. Data returned error"         |
+     | "InstancesError"      | "runid=1 Could not retrieve capacity. Error 'Error retrieving Statistics'" |
      | "none"                | "none"                                                             |
     
     Scenario: Call NodeGetInfo
@@ -110,6 +121,8 @@ Feature: Isilon CSI interface
       Examples:
       | volumeID                       | accessType                | errormsg                            |
       | "volume2=_=_=43=_=_=System"    | "single-writer"           | "none"                              |
+      | "volume2=_=_=43=_=_=System=_=_=cluster1" | "single-writer" | "none"                              |
+      | "volume2=_=_=43=_=_=System=_=_=cluster2" | "single-writer" | "failed to get cluster config details for clusterName: 'cluster2'" |
       | "volume2=_=_=43"               | "single-writer"           | "failed to parse volume ID"         |
       | "volume2=_=_=0=_=_=System"     | "single-writer"           | "invalid export ID"                 |
       | "volume2=_=_=43=_=_=System"    | "multiple-reader"         | "none"                              |
@@ -134,6 +147,7 @@ Feature: Isilon CSI interface
       | ""                     | "ControllerUnpublishVolumeRequest.VolumeId is empty"    |
       | "volume2=_=_=43"       | "failed to parse volume ID"                             |
 
+    @todo
     Scenario Outline: Calls to ListVolumes
       Given a Isilon service
       When I call ListVolumes with max entries <entry> starting token <token>
@@ -194,13 +208,13 @@ Feature: Isilon CSI interface
       Examples:
       | user        | mode           | serviceErr              | connectionErr                        | errormsg                              |
       | "blah"      | "controller"   | "none"                  | "none"                               | "none"                                |
-      | "blah"      | "controller"   | "none"                  | "ControllerHasNoConnectionError"     | "controller probe failed"             |
-      | ""          | "controller"   | "none"                  | "none"                               | "controller probe failed"             |
+      | "blah"      | "controller"   | "none"                  | "ControllerHasNoConnectionError"     | "probe of all isilon clusters failed" |
+      | ""          | "controller"   | "none"                  | "none"                               | "probe of all isilon clusters failed" |
       | "blah"      | "node"         | "none"                  | "none"                               | "none"                                |
-      | "blah"      | "node"         | "none"                  | "NodeHasNoConnectionError"           | "node probe failed"                   |
-      | "blah"      | "unknown"      | "none"                  | "none"                               | "Service mode not set"                |
-      | "blah"      | "controller"   | "noIsiService"          | "none"                               | "s.isiSvc (type isiService) is nil"   |
-      | "blah"      | "node"         | "noIsiService"          | "none"                               | "s.isiSvc (type isiService) is nil"   |
+      | "blah"      | "node"         | "none"                  | "NodeHasNoConnectionError"           | "probe of all isilon clusters failed" |
+      | "blah"      | "unknown"      | "none"                  | "none"                               | "probe of all isilon clusters failed" |
+      | "blah"      | "controller"   | "noIsiService"          | "none"                               | "probe of all isilon clusters failed" |
+      | "blah"      | "node"         | "noIsiService"          | "none"                               | "probe of all isilon clusters failed" |
 
     Scenario Outline: Calling logStatistics different times
       Given a Isilon service
@@ -211,6 +225,7 @@ Feature: Isilon CSI interface
       | times    | errormsg     |
       | 100      | "none"       |
 
+    @todo
     Scenario: Calling BeforeServe
       Given a Isilon service
       When I call BeforeServe
@@ -232,7 +247,7 @@ Feature: Isilon CSI interface
       Given I induce error "noIsiService"
       And a Isilon service with params "blah" "controller"
       When I call autoProbe
-      Then the error contains "s.isiSvc (type isiService) is nil, probe failed"
+      Then the error contains "clusterConfig.isiSvc (type isiService) is nil, probe failed"
     
     Scenario: Calling functions with autoProbe failed
       Given a Isilon service

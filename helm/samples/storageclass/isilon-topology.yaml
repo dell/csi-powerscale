@@ -1,16 +1,13 @@
-# This is a sample manifest for utilizing the topology feature and mount options.
+# This is a sample manifest for utilizing the topology feature.
 # PVCs created using this storage class will be scheduled 
 # only on the nodes with access to Isilon
 
 # Change all instances of <ISILON_IP> to the IP of the PowerScale OneFS API server
 
-# Provide mount options through "mountOptions" attribute 
-# to create PVCs with mount options.
-
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: isilon
+  name: isilon-topology
 provisioner: csi-isilon.dellemc.com
 reclaimPolicy: Delete
 allowVolumeExpansion: true
@@ -40,5 +37,3 @@ allowedTopologies:
       - key: csi-isilon.dellemc.com/<ISILON_IP>
         values:
           - csi-isilon.dellemc.com
-
-mountOptions: ["<mountOption1>", "<mountOption2>", ..., "<mountOptionN>"]
