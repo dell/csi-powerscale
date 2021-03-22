@@ -223,8 +223,8 @@ func (f *feature) getService() *service {
 	svc.opts = opts
 	svc.mode = "controller"
 	f.service = svc
-	f.service.nodeID = fmt.Sprintf("k8s-rhel76-qual=#=#=10.247.98.140=#=#=#{clusterName1}")
-	f.service.nodeIP = "10.247.98.140"
+	f.service.nodeID = fmt.Sprintf("k8s-rhel76-qual=#=#=1.2.3.4=#=#=#{clusterName1}")
+	f.service.nodeIP = "1.2.3.4"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -1945,7 +1945,7 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	f.service = svc
 	f.service.nodeID = host
 	// TODO - IP has to be updated before release
-	f.service.nodeIP = "10.247.98.140"
+	f.service.nodeIP = "1.2.3.4"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -1983,8 +1983,8 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	svc.opts = opts
 	svc.mode = mode
 	f.service = svc
-	f.service.nodeID = fmt.Sprintf("k8s-rhel76-qual=#=#=10.247.98.140=#=#=#{clusterName1}")
-	f.service.nodeIP = "10.247.98.140"
+	f.service.nodeID = fmt.Sprintf("k8s-rhel76-qual=#=#=1.2.3.4=#=#=#{clusterName1}")
+	f.service.nodeIP = "1.2.3.4"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
