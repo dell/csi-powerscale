@@ -195,8 +195,6 @@ spec:
               value: /var/run/csi/csi.sock
             - name: X_CSI_MODE
               value: controller
-            - name: X_CSI_DEBUG
-              value: "{{ .Values.enableDebug }}"
             - name: X_CSI_ISI_INSECURE
               value: "{{ .Values.isiInsecure }}"
             - name: X_CSI_VERBOSE
@@ -247,3 +245,4 @@ spec:
         - name: isilon-configs
           secret:
             secretName: {{ .Release.Name }}-creds
+

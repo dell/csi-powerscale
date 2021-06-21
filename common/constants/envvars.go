@@ -74,4 +74,7 @@ const (
 
 	// EnvIsilonConfigFile specifies the filepath containing Isilon cluster's config details
 	EnvIsilonConfigFile = "X_CSI_ISILON_CONFIG_PATH"
+
+	// EnvMaxVolumesPerNode specifies maximum number of volumes that controller can publish to the node.
+	EnvMaxVolumesPerNode = "X_CSI_MAX_VOLUMES_PER_NODE"
 )

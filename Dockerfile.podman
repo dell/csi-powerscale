@@ -16,7 +16,8 @@ RUN CGO_ENABLED=0 \
 FROM $BASEIMAGE AS driver
 # install necessary packages
 # alphabetical order for easier maintenance
-RUN microdnf install -y \
+RUN microdnf update -y && \
+        microdnf install -y \
         e4fsprogs \
         libaio \
         libuuid \
@@ -32,6 +33,7 @@ ENTRYPOINT ["/csi-isilon"]
 # will break image build if CRITICAL issues found
 # will print out all HIGH issues found
 FROM driver as cvescan
+COPY ./.trivyignore .
 # run trivy and clean up all traces after
 RUN microdnf install -y --enablerepo=ubi-8-baseos tar && \
     microdnf clean all && \
@@ -39,7 +41,8 @@ RUN microdnf install -y --enablerepo=ubi-8-baseos tar && \
     trivy fs -s CRITICAL --exit-code 1 / && \
     trivy fs -s HIGH / && \
     trivy image --reset && \
-    rm ./bin/trivy
+    rm ./bin/trivy && \
+    rm ./.trivyignore
 
 # final stage
 # simple stage to use the driver image as the resultant image
@@ -49,7 +52,7 @@ LABEL vendor="Dell Inc." \
       name="csi-isilon" \
       summary="CSI Driver for Dell EMC PowerScale" \
       description="CSI Driver for provisioning persistent storage from Dell EMC PowerScale" \
-      version="1.5.0" \
+      version="1.6.0" \
       license="Apache-2.0"
 
 COPY ./licenses /licenses

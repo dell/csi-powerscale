@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
-
 	"golang.org/x/net/context"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
@@ -81,7 +79,7 @@ func (s *service) Probe(
 	ctx context.Context,
 	req *csi.ProbeRequest) (
 	*csi.ProbeResponse, error) {
-
+	ctx, log := GetLogger(ctx)
 	ready := new(wrappers.BoolValue)
 	ready.Value = true
 	rep := new(csi.ProbeResponse)
@@ -91,6 +89,6 @@ func (s *service) Probe(
 		rep.Ready.Value = false
 		return rep, err
 	}
-	log.Debug(fmt.Sprintf("Probe returning: %v", rep.Ready.GetValue()))
+	log.Debugf(fmt.Sprintf("Probe returning: %v", rep.Ready.GetValue()))
 	return rep, nil
 }

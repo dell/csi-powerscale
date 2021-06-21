@@ -4,7 +4,7 @@ certSecretCount: 1
 
 # Custom networks for PowerScale export
 # Please specify list of networks which can be used for NFS I/O traffic, CIDR format should be used
-# ex: 192.168.1.0/24
+# ex: [192.168.1.0/24, 192.168.100.0/22]
 allowedNetworks: []
 
 # "isiPort" defines the HTTPs port number of the PowerScale OneFS API server
@@ -22,9 +22,6 @@ volumeNamePrefix: k8s
 # "controllerCount" defines the number of csi-powerscale controller pods to deploy to
 # the Kubernetes release.
 controllerCount: 2
-
-# Indicates whether debug level logs should be logged
-enableDebug: "true"
 
 # Indicates what content of the OneFS REST API message should be logged in debug level logs
 # Values:
@@ -56,6 +53,11 @@ nfsV3: "false"
 # If enableCustomTopology is set to true, then do not specify allowedTopologies in storage class
 enableCustomTopology: "false"
 
+# Specify default value for maximum number of volumes that controller can publish to the node.
+# If value is zero CO SHALL decide how many volumes of this type can be published by the controller to the node.
+# This limit is applicable to all the nodes in the cluster for which node label 'max-isilon-volumes-per-node' is not set.
+maxIsilonVolumesPerNode: 0
+
 controller:
 
   # Define nodeSelector for the controllers, if required
@@ -68,3 +70,30 @@ controller:
   #    operator: "Equal"
   #    value: "true"
   #    effect: "NoSchedule"
+
+# "node" allows to configure node specific parameters
+node:
+  # "node.nodeSelector" defines what nodes would be selected for pods of node daemonset
+  # Leave as blank to use all nodes
+  nodeSelector:
+  #  node-role.kubernetes.io/master: ""
+
+  # "node.tolerations" defines tolerations that would be applied to node daemonset
+  # Add/Remove tolerations as per requirement
+  # Leave as blank if you wish to not apply any tolerations
+  tolerations:
+#    - key: "node.kubernetes.io/memory-pressure"
+#      operator: "Exists"
+#      effect: "NoExecute"
+#    - key: "node.kubernetes.io/disk-pressure"
+#      operator: "Exists"
+#      effect: "NoExecute"
+#    - key: "node.kubernetes.io/network-unavailable"
+#      operator: "Exists"
+#      effect: "NoExecute"
+
+  # Determines the DNS Policy of the Node service.
+  # ClusterFirstWithHostNet is the recommended DNS policy.
+  # Prior to v1.5 of the driver, the default DNS policy was ClusterFirst.
+  # In certain scenarios, users might need to change the default dnsPolicy.
+  dnsPolicy: "ClusterFirstWithHostNet"

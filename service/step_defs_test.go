@@ -30,7 +30,6 @@ import (
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
-	"github.com/dell/csi-isilon/common/utils"
 	"github.com/dell/gocsi"
 	"github.com/dell/gofsutil"
 	"golang.org/x/net/context"
@@ -109,6 +108,7 @@ const (
 	datafile2    = "test/tmp/datafile2"
 	datadir2     = "test/tmp/datadir2"
 	clusterName1 = "cluster1"
+	logLevel     = constants.DefaultLogLevel
 )
 
 func (f *feature) aIsilonService() error {
@@ -161,7 +161,7 @@ func (f *feature) aIsilonService() error {
 	} else {
 		f.server = nil
 	}
-	isiSvc, _ := f.service.GetIsiService(context.Background(), clusterConfig)
+	isiSvc, _ := f.service.GetIsiService(context.Background(), clusterConfig, logLevel)
 	updatedClusterConfig, _ := f.service.isiClusters.Load(clusterName1)
 	updatedClusterConfig.(*IsilonClusterConfig).isiSvc = isiSvc
 	f.service.isiClusters.Store(clusterName1, updatedClusterConfig)
@@ -192,6 +192,7 @@ func (f *feature) getService() *service {
 	opts.Insecure = true
 	opts.DebugEnabled = true
 	opts.Verbose = 1
+	opts.KubeConfigPath = "/etc/kubernetes/admin.conf"
 
 	newConfig := IsilonClusterConfig{}
 	newConfig.ClusterName = clusterName1
@@ -202,7 +203,8 @@ func (f *feature) getService() *service {
 	newConfig.Password = "blah"
 	newConfig.IsiInsecure = &opts.Insecure
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
-	newConfig.IsDefaultCluster = true
+	boolTrue := true
+	newConfig.IsDefaultCluster = &boolTrue
 
 	if os.Getenv("CSI_ISILON_ENDPOINT") != "" {
 		newConfig.EndpointURL = os.Getenv("CSI_ISILON_ENDPOINT")
@@ -223,13 +225,11 @@ func (f *feature) getService() *service {
 	svc.opts = opts
 	svc.mode = "controller"
 	f.service = svc
-	f.service.nodeID = fmt.Sprintf("k8s-rhel76-qual=#=#=1.2.3.4=#=#=#{clusterName1}")
-	f.service.nodeIP = "1.2.3.4"
+	f.service.nodeID, _ = os.Hostname()
+	f.service.nodeIP = "10.247.98.140"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
-
-	utils.ConfigureLogger(opts.DebugEnabled)
 
 	return svc
 }
@@ -281,6 +281,11 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call GetCapacity with Invalid access mode$`, f.iCallGetCapacityWithInvalidAccessMode)
 	s.Step(`^I call NodeGetInfo$`, f.iCallNodeGetInfo)
 	s.Step(`^a valid NodeGetInfoResponse is returned$`, f.aValidNodeGetInfoResponseIsReturned)
+	s.Step(`^I call set attribute MaxVolumesPerNode "([^"]*)"$`, f.iCallSetAttributeMaxVolumesPerNode)
+	s.Step(`^a valid NodeGetInfoResponse is returned with volume limit "([^"]*)"$`, f.aValidNodeGetInfoResponseIsReturnedWithVolumeLimit)
+	s.Step(`^I call NodeGetInfo with invalid volume limit "([^"]*)"$`, f.iCallNodeGetInfoWithInvalidVolumeLimit)
+	s.Step(`^I call apply node label "([^"]*)"$`, f.iCallApplyNodeLabel)
+	s.Step(`^I call remove node labels$`, f.iCallRemoveNodeLabels)
 	s.Step(`^I call NodeGetCapabilities$`, f.iCallNodeGetCapabilities)
 	s.Step(`^a valid NodeGetCapabilitiesResponse is returned$`, f.aValidNodeGetCapabilitiesResponseIsReturned)
 	s.Step(`^I have a Node "([^"]*)" with AccessZone$`, f.iHaveANodeWithAccessZone)
@@ -319,6 +324,9 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call init Service object$`, f.iCallInitServiceObject)
 	s.Step(`^I call ControllerExpandVolume "([^"]*)" "(\d+)"$`, f.iCallControllerExpandVolume)
 	s.Step(`^a valid ControllerExpandVolumeResponse is returned$`, f.aValidControllerExpandVolumeResponseIsReturned)
+	s.Step(`^I call set allowed networks "([^"]*)"$`, f.iCallSetAllowedNetworks)
+	s.Step(`^I call set allowed networks with multiple networks "([^"]*)" "([^"]*)"$`, f.iCallSetAllowedNetworkswithmultiplenetworks)
+	s.Step(`^I call NodeGetInfo with invalid networks$`, f.iCallNodeGetInfowithinvalidnetworks)
 
 }
 
@@ -988,6 +996,22 @@ func (f *feature) iCallNodeGetInfo() error {
 	return nil
 }
 
+func (f *feature) iCallSetAttributeMaxVolumesPerNode(volumeLimit int64) error {
+	f.service.opts.MaxVolumesPerNode = volumeLimit
+	return nil
+}
+
+func (f *feature) iCallNodeGetInfoWithInvalidVolumeLimit(volumeLimit int64) error {
+	req := new(csi.NodeGetInfoRequest)
+	f.service.opts.MaxVolumesPerNode = volumeLimit
+	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
+	if f.err != nil {
+		log.Printf("NodeGetInfo call failed: %s\n", f.err.Error())
+		return nil
+	}
+	return nil
+}
+
 func (f *feature) iCallNodeGetCapabilities() error {
 	req := new(csi.NodeGetCapabilitiesRequest)
 	f.nodeGetCapabilitiesResponse, f.err = f.service.NodeGetCapabilities(context.Background(), req)
@@ -1003,6 +1027,24 @@ func (f *feature) aValidNodeGetInfoResponseIsReturned() error {
 		return f.err
 	}
 	fmt.Printf("The node ID is %s\n", f.nodeGetInfoResponse.NodeId)
+	fmt.Printf("Default volume limit is %v\n", f.nodeGetInfoResponse.MaxVolumesPerNode)
+	if f.nodeGetInfoResponse.MaxVolumesPerNode != 0 {
+		return fmt.Errorf("default volume limit is not set to 0")
+	}
+
+	return nil
+}
+
+func (f *feature) aValidNodeGetInfoResponseIsReturnedWithVolumeLimit(volumeLimit int64) error {
+	if f.err != nil {
+		return f.err
+	}
+	fmt.Printf("The node ID is %s\n", f.nodeGetInfoResponse.NodeId)
+	fmt.Printf("Default volume limit is %v\n", f.nodeGetInfoResponse.MaxVolumesPerNode)
+	if f.nodeGetInfoResponse.MaxVolumesPerNode != volumeLimit {
+		return fmt.Errorf("default volume limit is not set to %v", volumeLimit)
+	}
+
 	return nil
 }
 
@@ -1712,7 +1754,7 @@ func (f *feature) aIsilonServiceWithParams(user, mode string) error {
 	} else {
 		f.server = nil
 	}
-	isiSvc, _ := f.service.GetIsiService(context.Background(), clusterConfig)
+	isiSvc, _ := f.service.GetIsiService(context.Background(), clusterConfig, logLevel)
 	updatedClusterConfig, _ := f.service.isiClusters.Load(clusterName1)
 	updatedClusterConfig.(*IsilonClusterConfig).isiSvc = isiSvc
 	f.service.isiClusters.Store(clusterName1, updatedClusterConfig)
@@ -1778,7 +1820,7 @@ func (f *feature) aIsilonServiceWithParamsForCustomTopology(user, mode string) e
 	} else {
 		f.server = nil
 	}
-	isiSvc, err := f.service.GetIsiService(context.Background(), clusterConfig)
+	isiSvc, err := f.service.GetIsiService(context.Background(), clusterConfig, logLevel)
 	f.err = err
 	updatedClusterConfig, _ := f.service.isiClusters.Load(clusterName1)
 	updatedClusterConfig.(*IsilonClusterConfig).isiSvc = isiSvc
@@ -1846,7 +1888,7 @@ func (f *feature) aIsilonServiceWithParamsForCustomTopologyNoLabel(user, mode st
 	} else {
 		f.server = nil
 	}
-	isiSvc, _ := f.service.GetIsiService(context.Background(), clusterConfig)
+	isiSvc, _ := f.service.GetIsiService(context.Background(), clusterConfig, logLevel)
 	updatedClusterConfig, _ := f.service.isiClusters.Load(clusterName1)
 	updatedClusterConfig.(*IsilonClusterConfig).isiSvc = isiSvc
 	f.service.isiClusters.Store(clusterName1, updatedClusterConfig)
@@ -1874,8 +1916,9 @@ func removeNodeLabels(host string) (result bool) {
 	// Iterate node labels and check if required label is available and if found remove it
 	for lkey, lval := range node.Labels {
 		log.Printf("Label is: %s:%s\n", lkey, lval)
-		if strings.HasPrefix(lkey, constants.PluginName+"/") && lval == constants.PluginName {
-			log.Printf("Topology label %s:%s available on node", lkey, lval)
+		if (strings.HasPrefix(lkey, constants.PluginName+"/") && lval == constants.PluginName) ||
+			(strings.HasPrefix(lkey, "max-isilon-volumes-per-node")) {
+			log.Printf("label %s:%s available on node", lkey, lval)
 			cmd := exec.Command("/bin/bash", "-c", "kubectl label nodes "+host+" "+lkey+"-")
 			err := cmd.Run()
 			if err != nil {
@@ -1887,8 +1930,8 @@ func removeNodeLabels(host string) (result bool) {
 	return true
 }
 
-func applyNodeLabel(host string) (result bool) {
-	cmd := exec.Command("kubectl", "label", "nodes", host, "csi-isilon.dellemc.com/127.0.0.1=csi-isilon.dellemc.com")
+func applyNodeLabel(host, label string) (result bool) {
+	cmd := exec.Command("kubectl", "label", "nodes", host, label)
 	err := cmd.Run()
 	if err != nil {
 		log.Printf("Applying label on node %s failed", host)
@@ -1896,6 +1939,23 @@ func applyNodeLabel(host string) (result bool) {
 	}
 	return true
 }
+
+func (f *feature) iCallApplyNodeLabel(nodeLabel string) error {
+	host, _ := os.Hostname()
+	if !applyNodeLabel(host, nodeLabel) {
+		return fmt.Errorf("failed to create node lable '%s'", nodeLabel)
+	}
+	return nil
+}
+
+func (f *feature) iCallRemoveNodeLabels() error {
+	host, _ := os.Hostname()
+	if !removeNodeLabels(host) {
+		return fmt.Errorf("failed to remove node lables")
+	}
+	return nil
+}
+
 func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, applyLabel bool) *service {
 	testControllerHasNoConnection = false
 	testNodeHasNoConnection = false
@@ -1919,7 +1979,8 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	newConfig.Password = "blah"
 	newConfig.IsiInsecure = &opts.Insecure
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
-	newConfig.IsDefaultCluster = true
+	boolTrue := true
+	newConfig.IsDefaultCluster = &boolTrue
 
 	host, _ := os.Hostname()
 	result := removeNodeLabels(host)
@@ -1928,9 +1989,10 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	}
 
 	if applyLabel {
-		result = applyNodeLabel(host)
+		label := "csi-isilon.dellemc.com/127.0.0.1=csi-isilon.dellemc.com"
+		result = applyNodeLabel(host, label)
 		if !result {
-			log.Fatal("Applying csi-isilon.dellemc.com/127.0.0.1=csi-isilon.dellemc.com label on node failed")
+			log.Fatalf("Applying '%s' label on node failed", label)
 		}
 	}
 
@@ -1945,11 +2007,11 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	f.service = svc
 	f.service.nodeID = host
 	// TODO - IP has to be updated before release
-	f.service.nodeIP = "1.2.3.4"
+	f.service.nodeIP = "10.247.98.140"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
-	utils.ConfigureLogger(opts.DebugEnabled)
+
 	return svc
 }
 
@@ -1973,7 +2035,8 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	newConfig.Password = "blah"
 	newConfig.IsiInsecure = &opts.Insecure
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
-	newConfig.IsDefaultCluster = true
+	boolTrue := true
+	newConfig.IsDefaultCluster = &boolTrue
 
 	if inducedErrors.autoProbeNotEnabled {
 		opts.AutoProbe = false
@@ -1983,12 +2046,11 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	svc.opts = opts
 	svc.mode = mode
 	f.service = svc
-	f.service.nodeID = fmt.Sprintf("k8s-rhel76-qual=#=#=1.2.3.4=#=#=#{clusterName1}")
-	f.service.nodeIP = "1.2.3.4"
+	f.service.nodeID, _ = os.Hostname()
+	f.service.nodeIP = "10.247.98.140"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
-	utils.ConfigureLogger(opts.DebugEnabled)
 	return svc
 }
 
@@ -2029,6 +2091,7 @@ func (f *feature) iCallUnimplementedFunctions() error {
 	_, f.err = f.service.ControllerExpandVolume(context.Background(), new(csi.ControllerExpandVolumeRequest))
 	_, f.err = f.service.NodeExpandVolume(context.Background(), new(csi.NodeExpandVolumeRequest))
 	_, f.err = f.service.NodeGetVolumeStats(context.Background(), new(csi.NodeGetVolumeStatsRequest))
+	_, f.err = f.service.ControllerGetVolume(context.Background(), new(csi.ControllerGetVolumeRequest))
 	return nil
 }
 
@@ -2038,6 +2101,28 @@ func (f *feature) iCallInitServiceObject() error {
 		f.err = errors.New("failed to initialize Service object")
 	} else {
 		f.err = nil
+	}
+	return nil
+}
+
+func (f *feature) iCallSetAllowedNetworks(envIP1 string) error {
+	var envIP = []string{envIP1}
+	f.service.opts.allowedNetworks = envIP
+	return nil
+}
+
+func (f *feature) iCallSetAllowedNetworkswithmultiplenetworks(envIP1 string, envIP2 string) error {
+	var envIP = []string{envIP1, envIP2}
+	f.service.opts.allowedNetworks = envIP
+	return nil
+}
+
+func (f *feature) iCallNodeGetInfowithinvalidnetworks() error {
+	req := new(csi.NodeGetInfoRequest)
+	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
+	if f.err != nil {
+		log.Printf("NodeGetInfo call failed: %s\n", f.err.Error())
+		return nil
 	}
 	return nil
 }

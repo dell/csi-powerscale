@@ -6,7 +6,7 @@ metadata:
 spec:
   storageClassName: isilon
   dataSource:
-    name: newsnap
+    name: pvcsnap
     kind: VolumeSnapshot
     apiGroup: snapshot.storage.k8s.io
   accessModes:

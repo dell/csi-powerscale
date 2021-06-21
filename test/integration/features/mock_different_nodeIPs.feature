@@ -83,5 +83,5 @@ Feature: Isilon CSI interface
     When I call ControllerUnpublishVolume "X_CSI_NODE_NAME"
     Then check Isilon client not exists "X_CSI_NODE_NAME"
     When I call DeleteVolume
-    Then there is not a directory "integration0"
-    Then there is not an export "integration0" 
+    Then there is not a directory "integration2"
+    Then there is not an export "integration2" 

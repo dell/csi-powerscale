@@ -3,9 +3,8 @@ package utils
 import (
 	"context"
 	"fmt"
-	"github.com/dell/gocsi"
+	"github.com/dell/csi-isilon/common/constants"
 	"github.com/sirupsen/logrus"
-	"os"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -111,29 +110,22 @@ func GetLogger() *logrus.Logger {
 	once.Do(func() {
 		singletonLog = logrus.New()
 		fmt.Println("csi-powerscale logger initiated. This should be called only once.")
-		var debug bool
-		debugStr := os.Getenv(gocsi.EnvVarDebug)
-		debug, _ = strconv.ParseBool(debugStr)
-		if debug {
-			singletonLog.Level = logrus.DebugLevel
-			singletonLog.SetReportCaller(true)
-			singletonLog.Formatter = &Formatter{
-				CallerPrettyfier: func(f *runtime.Frame) (string, string) {
-					filename1 := strings.Split(f.File, "dell/csi-powerscale")
-					if len(filename1) > 1 {
-						return fmt.Sprintf("%s()", f.Function), fmt.Sprintf("dell/csi-powerscale%s:%d", filename1[1], f.Line)
-					}
+		singletonLog.Level = constants.DefaultLogLevel
+		singletonLog.SetReportCaller(true)
+		singletonLog.Formatter = &Formatter{
+			CallerPrettyfier: func(f *runtime.Frame) (string, string) {
+				filename1 := strings.Split(f.File, "dell/csi-powerscale")
+				if len(filename1) > 1 {
+					return fmt.Sprintf("%s()", f.Function), fmt.Sprintf("dell/csi-powerscale%s:%d", filename1[1], f.Line)
+				}
 
-					filename2 := strings.Split(f.File, "dell/goisilon")
-					if len(filename2) > 1 {
-						return fmt.Sprintf("%s()", f.Function), fmt.Sprintf("dell/goisilon%s:%d", filename2[1], f.Line)
-					}
+				filename2 := strings.Split(f.File, "dell/goisilon")
+				if len(filename2) > 1 {
+					return fmt.Sprintf("%s()", f.Function), fmt.Sprintf("dell/goisilon%s:%d", filename2[1], f.Line)
+				}
 
-					return fmt.Sprintf("%s()", f.Function), fmt.Sprintf("%s:%d", f.File, f.Line)
-				},
-			}
-		} else {
-			singletonLog.Formatter = &Formatter{}
+				return fmt.Sprintf("%s()", f.Function), fmt.Sprintf("%s:%d", f.File, f.Line)
+			},
 		}
 	})
 
@@ -146,5 +138,16 @@ func GetRunIDLogger(ctx context.Context) *logrus.Entry {
 	if ctx.Value(PowerScaleLogger) != nil && reflect.TypeOf(tempLog) == reflect.TypeOf(&logrus.Entry{}) {
 		return ctx.Value(PowerScaleLogger).(*logrus.Entry)
 	}
-	return nil
+
+	return GetLogger().WithFields(logrus.Fields{})
+}
+
+// ParseLogLevel returns the logrus.Level of input log level string
+func ParseLogLevel(lvl string) (logrus.Level, error) {
+	return logrus.ParseLevel(lvl)
+}
+
+// UpdateLogLevel updates the log level
+func UpdateLogLevel(lvl logrus.Level) {
+	singletonLog.Level = lvl
 }
