@@ -226,7 +226,7 @@ func (f *feature) getService() *service {
 	svc.mode = "controller"
 	f.service = svc
 	f.service.nodeID, _ = os.Hostname()
-	f.service.nodeIP = "10.247.98.140"
+	f.service.nodeIP = "1.2.3.4"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -2007,7 +2007,7 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	f.service = svc
 	f.service.nodeID = host
 	// TODO - IP has to be updated before release
-	f.service.nodeIP = "10.247.98.140"
+	f.service.nodeIP = "1.2.3.5"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -2047,7 +2047,7 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	svc.mode = mode
 	f.service = svc
 	f.service.nodeID, _ = os.Hostname()
-	f.service.nodeIP = "10.247.98.140"
+	f.service.nodeIP = "1.2.3.6"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
