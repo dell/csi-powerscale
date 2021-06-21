@@ -29,6 +29,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+//TODO: All WithFields call containing logrus have to be converted to log
 func publishVolume(
 	ctx context.Context,
 	req *csi.NodePublishVolumeRequest,
@@ -86,7 +87,7 @@ func publishVolume(
 		"ExportPath": nfsExportURL,
 		"AccessMode": accMode.GetMode(),
 	}
-	log.WithFields(f).Info("Node publish volume params ")
+	logrus.WithFields(f).Info("Node publish volume params ")
 	mnts, err := gofsutil.GetMounts(ctx)
 	if err != nil {
 		return status.Errorf(codes.Internal,
@@ -102,18 +103,18 @@ func publishVolume(
 				if m.Path == target {
 					//as per specs, T1=T2, P1=P2 - return OK
 					if contains(m.Opts, rwOption) {
-						log.WithFields(f).Debug(
+						logrus.WithFields(f).Debug(
 							"mount already in place with same options")
 						return nil
 					}
 					//T1=T2, P1!=P2 - return AlreadyExists
-					log.WithFields(f).Error("Mount point already in use by device with different options")
+					logrus.WithFields(f).Error("Mount point already in use by device with different options")
 					return status.Error(codes.AlreadyExists, "Mount point already in use by device with different options")
 				}
 				//T1!=T2, P1==P2 || P1 != P2 - return FailedPrecondition for single node
 				if accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER ||
 					accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY {
-					log.WithFields(f).Error("Mount point already in use for same device")
+					logrus.WithFields(f).Error("Mount point already in use for same device")
 					return status.Error(codes.FailedPrecondition, "Mount point already in use for same device")
 				}
 
@@ -183,15 +184,14 @@ func unpublishVolume(
 // return pair is a bool flag of whether dir was created, and an error
 func mkdir(ctx context.Context, path string) (bool, error) {
 	// Fetch log handler
-	ctx, log := GetLogger(ctx)
 	st, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		if err := os.Mkdir(path, 0750); err != nil {
-			log.WithField("dir", path).WithError(
+			logrus.WithField("dir", path).WithError(
 				err).Error("Unable to create dir")
 			return false, err
 		}
-		log.WithField("path", path).Debug("created directory")
+		logrus.WithField("path", path).Debug("created directory")
 		return true, nil
 	}
 	if !st.IsDir() {

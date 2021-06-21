@@ -5,7 +5,7 @@
 apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshotClass
 metadata:
-  name: "isilon-snapclass-custom"
+  name: "isilon-snapclass"
 driver: csi-isilon.dellemc.com
 #The deletionPolicy of a volume snapshot class can either be Retain or Delete
 #If the deletionPolicy is Delete, then the underlying storage snapshot will be deleted along with the VolumeSnapshotContent object.
@@ -13,4 +13,4 @@ driver: csi-isilon.dellemc.com
 deletionPolicy: Delete
 parameters:
 #IsiPath should match with respective storageClass IsiPath
-  IsiPath: "/ifs/custom"
+  IsiPath: "/ifs/data/csi"

@@ -3,8 +3,8 @@
 #
 
 # DEFAULT values
-DEFAULT_BASEIMAGE="registry.access.redhat.com/ubi8/ubi-minimal:8.3-230"
-DEFAULT_GOVERSION="1.15.6"
+DEFAULT_BASEIMAGE="registry.access.redhat.com/ubi8/ubi-minimal:8.3-291"
+DEFAULT_GOVERSION="1.16.3"
 DEFAULT_REGISTRY=""
 DEFAULT_IMAGENAME="isilon"
 DEFAULT_BUILDSTAGE="final"
@@ -12,7 +12,7 @@ ifeq ($(origin BUILD_TIMESTAMP), undefined)
 BUILD_TIMESTAMP := $(shell date +%Y%m%d%H%M%S)
 endif
 DEFAULT_IMAGETAG=$(BUILD_TIMESTAMP)
-DEFAULT_GOPROXY="direct"
+DEFAULT_GOPROXY=""
 
 # set the BASEIMAGE if needed
 ifeq ($(BASEIMAGE),)

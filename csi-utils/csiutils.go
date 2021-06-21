@@ -3,14 +3,14 @@ package csi_utils
 import (
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	"github.com/dell/csi-isilon/common/utils"
 	"net"
 )
 
 // GetNFSClientIP is used to fetch IP address from networks on which NFS traffic is allowed
 func GetNFSClientIP(allowedNetworks []string) (string, error) {
 	var nodeIP string
-
+	log := utils.GetLogger()
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		log.Errorf("Encountered error while fetching system IP addresses: %+v\n", err.Error())

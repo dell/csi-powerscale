@@ -30,6 +30,10 @@ rules:
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
     verbs: ["get", "list", "watch", "update"]
+  - apiGroups: [ "security.openshift.io" ]
+    resourceNames: [ "privileged" ]
+    resources: [ "securitycontextconstraints" ]
+    verbs: [ "use" ]
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -59,8 +63,16 @@ spec:
         app: {{ .Release.Name }}-node
     spec:
       serviceAccount: {{ .Release.Name }}-node
+      {{ if .Values.node.nodeSelector }}
+      nodeSelector:
+      {{- toYaml .Values.node.nodeSelector | nindent 8 }}
+      {{ end }}
+      {{ if .Values.node.tolerations }}
+      tolerations:
+      {{- toYaml .Values.node.tolerations | nindent 8 }}
+      {{ end }}
       hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: {{ .Values.node.dnsPolicy }}
       containers:
         - name: driver
           command: ["/csi-isilon"]
@@ -76,8 +88,6 @@ spec:
               value: /var/lib/kubelet/plugins/csi-isilon/csi_sock
             - name: X_CSI_MODE
               value: node
-            - name: X_CSI_DEBUG
-              value: "{{ .Values.enableDebug }}"
             - name: X_CSI_ISI_INSECURE
               value: "{{ .Values.isiInsecure }}"
             - name: X_CSI_ALLOWED_NETWORKS
@@ -112,6 +122,8 @@ spec:
               value: "{{ .Values.enableCustomTopology }}"
             - name: X_CSI_ISILON_CONFIG_PATH
               value: /isilon-configs/config
+            - name: X_CSI_MAX_VOLUMES_PER_NODE
+              value: "{{ .Values.maxIsilonVolumesPerNode }}"
           volumeMounts:
             - name: driver-path
               mountPath: /var/lib/kubelet/plugins/csi-isilon
@@ -180,3 +192,4 @@ spec:
         - name: isilon-configs
           secret:
             secretName: {{ .Release.Name }}-creds
+

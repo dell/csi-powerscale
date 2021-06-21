@@ -20,12 +20,12 @@ import (
 	"github.com/dell/csi-isilon/common/utils"
 	"github.com/dell/csi-isilon/service"
 	"github.com/dell/gocsi"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
 // New returns a new Storage Plug-in Provider.
 func New() gocsi.StoragePluginProvider {
+	log := utils.GetLogger()
 
 	// TODO during the test, for some reason, when the controller & node pods start,
 	// the sock files always exist right from the beginning, even if you manually

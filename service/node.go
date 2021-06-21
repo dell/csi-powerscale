@@ -22,11 +22,13 @@ import (
 	"github.com/dell/csi-isilon/common/constants"
 	"github.com/dell/csi-isilon/common/utils"
 	csiutils "github.com/dell/csi-isilon/csi-utils"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -141,7 +143,8 @@ func (s *service) NodePublishVolume(
 		"TargetPath":  req.GetTargetPath(),
 		"AzServiceIP": azServiceIP,
 	}
-	log.WithFields(f).Info("Calling publishVolume")
+	// TODO: Replace logrus with log
+	logrus.WithFields(f).Info("Calling publishVolume")
 	if err := publishVolume(ctx, req, isiConfig.isiSvc.GetNFSExportURLForPath(azServiceIP, path), s.opts.NfsV3); err != nil {
 		return nil, err
 	}
@@ -172,6 +175,7 @@ func (s *service) NodeUnpublishVolume(
 	log.Debugf("Cluster Name: %v", clusterName)
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
+		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
 
@@ -218,6 +222,7 @@ func (s *service) NodeUnpublishVolume(
 	}
 
 	if err := unpublishVolume(ctx, req, volName); err != nil {
+		log.Error("Error while calling Unbuplish Volume", err.Error())
 		return nil, err
 	}
 
@@ -225,6 +230,7 @@ func (s *service) NodeUnpublishVolume(
 		req.VolumeId = string(data)
 		err := s.ephemeralNodeUnpublish(ctx, req)
 		if err != nil {
+			log.Error("Error while calling Ephemeral Node Unpublish", err.Error())
 			return nil, err
 		}
 	}
@@ -295,8 +301,9 @@ func (s *service) NodeGetInfo(
 	ctx, log, _ := GetRunIDLog(ctx)
 
 	nodeID, err := s.getPowerScaleNodeID(ctx)
-	log.Debugf("Node ID of worker node is '%s'", nodeID)
+	log.Infof("Node ID of worker node is '%s'", nodeID)
 	if (err) != nil {
+		log.Error("Failed to create Node ID with error", err.Error())
 		return nil, err
 	}
 
@@ -335,12 +342,39 @@ func (s *service) NodeGetInfo(
 		// <provisionerName>.dellemc.com/<powerscaleIP>: <provisionerName>
 		topology[constants.PluginName+"/"+isiClusters[cluster].IsiIP] = constants.PluginName
 	}
+
+	// Check for node label 'max-isilon-volumes-per-node'. If present set 'MaxVolumesPerNode' to this value.
+	// If node label is not present, set 'MaxVolumesPerNode' to default value i.e., 0
+	var maxIsilonVolumesPerNode int64
+	labels, err := s.GetNodeLabels()
+	if err != nil {
+		log.Error("failed to get Node Labels with error", err.Error())
+		return nil, err
+	}
+
+	if val, ok := labels["max-isilon-volumes-per-node"]; ok {
+		maxIsilonVolumesPerNode, err = strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid value '%s' specified for 'max-isilon-volumes-per-node' node label", val)
+		}
+		log.Infof("node label 'max-isilon-volumes-per-node' is available and is set to value '%v'", maxIsilonVolumesPerNode)
+	} else {
+		// As per the csi spec the plugin MUST NOT set negative values to
+		// 'MaxVolumesPerNode' in the NodeGetInfoResponse response
+		if s.opts.MaxVolumesPerNode < 0 {
+			return nil, fmt.Errorf("maxIsilonVolumesPerNode MUST NOT be set to negative value")
+		}
+		maxIsilonVolumesPerNode = s.opts.MaxVolumesPerNode
+		log.Infof("node label 'max-isilon-volumes-per-node' is not available. Using default volume limit '%v'", maxIsilonVolumesPerNode)
+	}
+
 	// Create NodeGetInfoResponse including nodeID and AccessibleTopology information
 	return &csi.NodeGetInfoResponse{
 		NodeId: nodeID,
 		AccessibleTopology: &csi.Topology{
 			Segments: topology,
 		},
+		MaxVolumesPerNode: maxIsilonVolumesPerNode,
 	}, nil
 }
 
@@ -527,6 +561,7 @@ func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
 		log.Debugf("Fetching IP address of custom network for NFS I/O traffic")
 		nodeIP, err = csiutils.GetNFSClientIP(s.opts.allowedNetworks)
 		if err != nil {
+			log.Error("Failed to find IP address corresponding to the allowed network with error", err.Error())
 			return "", err
 		}
 	} else {

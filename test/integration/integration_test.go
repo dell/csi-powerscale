@@ -70,7 +70,7 @@ func TestMain(m *testing.M) {
 		fmt.Printf("'%s': '%s'\n", datadir, err)
 	}
 
-	write, err := os.Create("powerscale_integration_test_results.xml")
+	write, err := os.Create("Powerscale_integration_test_results.xml")
 	exitVal := godog.RunWithOptions("godog", func(s *godog.Suite) {
 		FeatureContext(s)
 	}, godog.Options{

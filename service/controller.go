@@ -118,15 +118,16 @@ func (s *service) CreateVolume(
 		}
 	}
 
-	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
-	if err != nil {
-		return nil, err
-	}
-
 	// Fetch log handler
 	ctx, _, runID := GetRunIDLog(ctx)
 	ctx, log := setClusterContext(ctx, clusterName)
 	log.Debugf("Cluster Name: %v", clusterName)
+
+	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
+	if err != nil {
+		log.Error("Failed to get Isilon config with error ", err.Error())
+		return nil, err
+	}
 
 	// auto probe
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
@@ -567,11 +568,13 @@ func (s *service) DeleteVolume(
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
+		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
 
 	// probe
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
+		log.Error("Failed to probe with error: " + err.Error())
 		return nil, err
 	}
 	s.logStatistics()
@@ -748,6 +751,7 @@ func (s *service) ControllerExpandVolume(
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
+		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
 
@@ -829,10 +833,12 @@ func (s *service) ControllerPublishVolume(
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
+		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
 
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
+		log.Error("Failed to probe with error: " + err.Error())
 		return nil, err
 	}
 
@@ -969,10 +975,12 @@ func (s *service) ValidateVolumeCapabilities(
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
+		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
 
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
+		log.Error("Failed to probe with error: " + err.Error())
 		return nil, err
 	}
 
@@ -1103,6 +1111,7 @@ func (s *service) ControllerUnpublishVolume(
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
+		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
 
@@ -1149,6 +1158,7 @@ func (s *service) GetCapacity(
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
+		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
 
@@ -1295,6 +1305,7 @@ func (s *service) CreateSnapshot(
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
+		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
 
@@ -1431,10 +1442,12 @@ func (s *service) DeleteSnapshot(
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
+		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
 
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
+		log.Error("Failed to probe with error: " + err.Error())
 		return nil, err
 	}
 
@@ -1482,6 +1495,7 @@ func (s *service) DeleteSnapshot(
 	// Note: This is true only for RO volumes from snapshots
 	if export != nil {
 		if err := s.processSnapshotTrackingDirectoryDuringDeleteSnapshot(ctx, export, snapshotIsiPath, &deleteSnapshot, isiConfig); err != nil {
+			log.Error("Failed to get RO volume from snapshot ", err.Error())
 			return nil, err
 		}
 	}
@@ -1616,4 +1630,8 @@ func addMetaData(params map[string]string) map[string]string {
 		headerMetadata[headerPersistentVolumeClaimNamespace] = params[csiPersistentVolumeClaimNamespace]
 	}
 	return headerMetadata
+}
+func (s *service) ControllerGetVolume(context.Context,
+	*csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
 }

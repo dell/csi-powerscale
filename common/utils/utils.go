@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"net"
 	"os"
 	"path"
@@ -29,56 +29,14 @@ import (
 	"strings"
 
 	"github.com/Showmax/go-fqdn"
-	gournal "github.com/akutz/gournal"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/common/constants"
 	csictx "github.com/dell/gocsi/context"
 	isi "github.com/dell/goisilon"
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
-
-// ConfigureLogger sets log level for the logger
-func ConfigureLogger(debugEnabled bool) context.Context {
-
-	clientCtx := context.Background()
-
-	if debugEnabled {
-
-		//logrus
-		log.SetLevel(log.DebugLevel)
-
-		//gournal
-		clientCtx = context.WithValue(
-			clientCtx,
-			gournal.LevelKey(),
-			gournal.DebugLevel)
-
-		gournal.DefaultLevel = gournal.DebugLevel
-
-		log.Infof("log level for logrus and gournal configured to DEBUG")
-
-		return clientCtx
-
-	}
-
-	// logrus
-	log.SetLevel(log.InfoLevel)
-
-	// gournal
-	clientCtx = context.WithValue(
-		clientCtx,
-		gournal.LevelKey(),
-		gournal.InfoLevel)
-
-	gournal.DefaultLevel = gournal.InfoLevel
-
-	log.Infof("log level for logrus and gournal configured to INFO")
-
-	return clientCtx
-}
 
 // ParseBooleanFromContext parses an environment variable into a boolean value. If an error is encountered, default is set to false, and error is logged
 func ParseBooleanFromContext(ctx context.Context, key string) bool {
@@ -96,18 +54,16 @@ func ParseBooleanFromContext(ctx context.Context, key string) bool {
 }
 
 // ParseArrayFromContext parses an environment variable into an array of string
-func ParseArrayFromContext(ctx context.Context, key string) []string {
-	log := GetRunIDLogger(ctx)
+func ParseArrayFromContext(ctx context.Context, key string) ([]string, error) {
 	var values []string
 
 	if val, ok := csictx.LookupEnv(ctx, key); ok {
 		err := yaml.Unmarshal([]byte(val), &values)
 		if err != nil {
-			log.Errorf("invalid array value for '%s'", key)
-			return values
+			return values, fmt.Errorf("invalid array value for '%s'", key)
 		}
 	}
-	return values
+	return values, nil
 }
 
 // ParseUintFromContext parses an environment variable into a uint value. If an error is encountered, default is set to 0, and error is logged
@@ -125,9 +81,21 @@ func ParseUintFromContext(ctx context.Context, key string) uint {
 	return 0
 }
 
+// ParseInt64FromContext parses an environment variable into an int64 value.
+func ParseInt64FromContext(ctx context.Context, key string) (int64, error) {
+	if val, ok := csictx.LookupEnv(ctx, key); ok {
+		i, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid int64 value '%v' specified for '%s'", val, key)
+		}
+		return i, nil
+	}
+	return 0, nil
+}
+
 // RemoveExistingCSISockFile When the sock file that the gRPC server is going to be listening on already exists, error will be thrown saying the address is already in use, thus remove it first
 func RemoveExistingCSISockFile() error {
-
+	log := GetLogger()
 	protoAddr := os.Getenv(constants.EnvCSIEndpoint)
 
 	log.Debugf("check if sock file '%s' has already been created", protoAddr)
@@ -160,6 +128,7 @@ func RemoveExistingCSISockFile() error {
 // GetNewUUID generates a UUID
 func GetNewUUID() (string, error) {
 
+	log := GetLogger()
 	id, err := uuid.NewUUID()
 	if err != nil {
 		log.Errorf("error generating UUID : '%s'", err)
@@ -263,7 +232,7 @@ func GetFQDNByIP(ctx context.Context, ip string) (string, error) {
 	log := GetRunIDLogger(ctx)
 	names, err := net.LookupAddr(ip)
 	if err != nil {
-		log.Errorf("error getting FQDN: '%s'", err)
+		log.Debugf("error getting FQDN: '%s'", err)
 		return "", err
 	}
 	// The first one is FQDN

@@ -271,7 +271,7 @@ func getDetails(configBytes []byte, clusterName string) (string, string, string,
 			if config.ClusterName == clusterName {
 				return config.User, config.Password, config.IsiIP, nil
 			}
-		} else if config.IsDefaultCluster {
+		} else if *config.IsDefaultCluster {
 			return config.User, config.Password, config.IsiIP, nil
 		}
 	}

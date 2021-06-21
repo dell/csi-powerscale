@@ -88,11 +88,37 @@ Feature: Isilon CSI interface
      | "StatsError"          | "runid=Could not retrieve capacity. Data returned error"         |
      | "InstancesError"      | "runid=1 Could not retrieve capacity. Error 'Error retrieving Statistics'" |
      | "none"                | "none"                                                             |
-    
+
     Scenario: Call NodeGetInfo
       Given a Isilon service
       When I call NodeGetInfo
       Then a valid NodeGetInfoResponse is returned
+
+    Scenario: Call NodeGetInfo with volume limit
+      Given a Isilon service
+      When I call set attribute MaxVolumesPerNode "1234"
+      And I call NodeGetInfo
+      Then a valid NodeGetInfoResponse is returned with volume limit "1234"
+
+    Scenario: Call NodeGetInfo with invalid volume limit
+      Given a Isilon service
+      When I call NodeGetInfo with invalid volume limit "-1"
+      Then the error contains "maxIsilonVolumesPerNode MUST NOT be set to negative value"
+
+    Scenario: Call NodeGetInfo with max-isilon-volumes-per-node node label set
+      Given a Isilon service
+      When I call apply node label "max-isilon-volumes-per-node=5"
+      And I call NodeGetInfo
+      Then a valid NodeGetInfoResponse is returned with volume limit "5"
+      And I call remove node labels
+
+    Scenario: Call NodeGetInfo with both max-isilon-volumes-per-node node label and maxIsilonVolumesPerNode attribute set
+      Given a Isilon service
+      When I call set attribute MaxVolumesPerNode "1"
+      And I call apply node label "max-isilon-volumes-per-node=2"
+      And I call NodeGetInfo
+      Then a valid NodeGetInfoResponse is returned with volume limit "2"
+      And I call remove node labels
 
     Scenario: Call NodeGetCapabilities
       Given a Isilon service
@@ -161,14 +187,12 @@ Feature: Isilon CSI interface
       | 2        | "1-1-MAAA1"               | "none"                                                     |
       | 2        | "invalid"                 | "The starting token is not valid"                          |
 
-@todo
     Scenario: Create volume from snapshot good scenario
       Given a Isilon service
       When I call Probe
       And I call CreateVolumeFromSnapshot "2" "volume1"
       Then a valid CreateVolumeResponse is returned
 
-@todo
     Scenario Outline: Create volume from snapshot with negative or idempotent arguments
       Given a Isilon service
       When I call CreateVolumeFromSnapshot <snapshotID> <volumeName>
@@ -176,7 +200,7 @@ Feature: Isilon CSI interface
 
       Examples:
       | snapshotID             | volumeName                          | errormsg                        |
-      | "1"                    | "volume1"                           | "failed to get snapshot"        |
+      | "1"                    | "volume1"                           | "Error retrieving Snapshot"     |
       | "2"                    | "volume2"                           | "none"                          |
 
 @todo
@@ -265,3 +289,21 @@ Feature: Isilon CSI interface
     Scenario: Initialize Service object
       When I call init Service object
       Then the error contains "none"
+
+    Scenario: Verify Custom Networks
+      Given a Isilon service
+      When I call set allowed networks "127.0.0.0/8"
+      And I call NodeGetInfo
+      Then a valid NodeGetInfoResponse is returned
+
+    Scenario: Verify Invalid Custom Networks
+      Given a Isilon service
+      When I call set allowed networks "1.2.3.4/33"
+      And I call NodeGetInfo with invalid networks
+      Then the error contains "No valid IP address found matching against allowedNetworks"
+
+    Scenario: Verify Multiple Custom Networks
+      Given a Isilon service
+      When I call set allowed networks with multiple networks "1.2.3.4/33" "127.0.0.0/8"
+      And I call NodeGetInfo
+      Then a valid NodeGetInfoResponse is returned

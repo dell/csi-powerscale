@@ -9,9 +9,9 @@ spec:
   volumeMode: Filesystem
   resources:
     requests:
-      storage: 50Gi
+      storage: 5Gi
   storageClassName: isilon
   dataSource:
     kind: PersistentVolumeClaim
-    name: existing-pvc
+    name: testvolclaim1
     apiGroup: ""

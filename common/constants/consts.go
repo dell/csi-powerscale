@@ -1,5 +1,7 @@
 package constants
 
+import "github.com/sirupsen/logrus"
+
 /*
  Copyright (c) 2019 Dell Inc, or its subsidiaries.
 
@@ -56,4 +58,7 @@ const (
 
 	//IsilonConfigFile isilon-creds file with credential info of isilon clusters
 	IsilonConfigFile = "/isilon-configs/config"
+
+	//DefaultLogLevel for csi logs
+	DefaultLogLevel = logrus.DebugLevel
 )

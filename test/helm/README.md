@@ -12,7 +12,7 @@
 | Name           | Usage |
 |----------------|-------|
 | deletepvcs.sh  | Script to delete all PVCS in a namespace
-| get.volume.ids | Script to list the volume IDs for all PVS in a namespace
+| get.volume.ids | Script to list the volume IDs for all PVS
 | logit.sh       | Script to print number of pods and pvcs in a namespace
 | starttest.sh   | Used to instantiate one of the helm charts above. Requires argument of helm chart
 | stoptest.sh    | Stops currently running helm chart and deletes all PVCS 
