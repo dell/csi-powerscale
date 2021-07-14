@@ -10,7 +10,7 @@
 ## Description
 CSI Driver for Dell EMC PowerScale is a Container Storage Interface ([CSI](https://github.com/container-storage-interface/spec)) driver that provides support for provisioning persistent storage using Dell EMC PowerScale storage array. 
 
-It supports CSI specification version 1.2.
+It supports CSI specification version 1.3.
 
 This project may be compiled as a stand-alone binary using Golang that, when run, provides a valid CSI endpoint. It also can be used as a precompiled container image.
 
