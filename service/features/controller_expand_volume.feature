@@ -27,7 +27,7 @@ Feature: Isilon CSI interface
     Given a Isilon service
     When I call ControllerExpandVolume "volume1=_=_=557=_=_=System" "108589934592"
     Then a valid ControllerExpandVolumeResponse is returned
-   
+
   Scenario: Controller Expand volume idempotent scenario with Quota enabled
     Given a Isilon service
     And I enable quota
@@ -38,11 +38,11 @@ Feature: Isilon CSI interface
     Given a Isilon service
     And I enable quota
     When I call ControllerExpandVolume <volumeID> <requiredBytes>
-    Then the error contains <errormsg>
+    Then a valid ControllerExpandVolumeResponse is returned
 
     Examples:
-    | volumeID                      | reqiuredBytes   | errormsg                          |
-    | "volume1"                     | "108589934592"  | "cannot match the expected"       |
+    | volumeID                          | requiredBytes     |
+    | "volume1=_=_=557=_=_=System"      | "-108589934592"    |
 
    Scenario Outline: Controller Expand volume with induced errors and Quota enabled
       Given a Isilon service
@@ -54,3 +54,4 @@ Feature: Isilon CSI interface
      Examples:
      | induced                             | errormsg                                           |
      | "UpdateQuotaError"                  | "failed to update quota"                           |
+

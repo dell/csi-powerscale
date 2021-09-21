@@ -1,99 +1,216 @@
-# Represents number of certificate secrets, which user is going to create for ssl authentication. (isilon-cert-0..isilon-cert-n)
-# Minimum value should be 1
+## K8S/DRIVER ATTRIBUTES
+########################
+# version: version of this values file
+# Note: Do not change this value
+version: "2.0.0"
+
+# CSI driver log level
+# Allowed values: "error", "warn"/"warning", "info", "debug"
+# Default value: "debug"
+logLevel: "debug"
+
+# certSecretCount: Represents number of certificate secrets, which user is going to create for
+# ssl authentication. (isilon-cert-0..isilon-cert-n)
+# Allowed values: n, where n > 0
+# Default value: None
 certSecretCount: 1
 
-# Custom networks for PowerScale export
-# Please specify list of networks which can be used for NFS I/O traffic, CIDR format should be used
-# ex: [192.168.1.0/24, 192.168.100.0/22]
+# allowedNetworks: Custom networks for PowerScale export
+#   Specify list of networks which can be used for NFS I/O traffic; CIDR format should be used.
+# Allowed values: list of one or more networks
+# Default value: None
+# Examples: [192.168.1.0/24, 192.168.100.0/22]
 allowedNetworks: []
 
-# "isiPort" defines the HTTPs port number of the PowerScale OneFS API server
-isiPort: "8080"
-
-# "isiInsecure" specifies whether the PowerScale OneFS API server's certificate chain and host name should be verified.
-isiInsecure: "true"
-
-# The name of the access zone a volume can be created in
-isiAccessZone: "System"
-
-# "volumeNamePrefix" defines a string prepended to each volume created by the CSI driver.
-volumeNamePrefix: k8s
-
-# "controllerCount" defines the number of csi-powerscale controller pods to deploy to
-# the Kubernetes release.
-controllerCount: 2
-
-# Indicates what content of the OneFS REST API message should be logged in debug level logs
-# Values:
-#   0 - log full content of the HTTP request and response
-#   1 - log without the HTTP response body
-#   2 - log only 1st line of the HTTP request and response
-verbose: 1
-
-# Indicates whether the provisioner should attempt to set (later unset) quota on a newly provisioned volume
-# This requires SmartQuotas to be enabled.
-enableQuota: "true"
-
-# Indicates whether the controller/node should probe during initialization
-noProbeOnStart: "false"
-
-# The default base path for the volumes to be created, this will be used if a storage class does not have the IsiPath parameter specified
-# Ensure that this path exists on PowerScale.
-isiPath: "/ifs/data/csi"
-
-# Enable auto probe.
-autoProbe: "true"
-
-# Specify whether to set the version to v3 when mounting an NFS export. If the value is "false", then the default version supported will be used (i.e. the mount command will not explicitly specify "-o vers=3" option)
-# This flag has now been deprecated and will be removed in a future release.
-# Please use StorageClass.mountOptions if you want to specify 'vers=3' as a mount option.
-nfsV3: "false"
-
-# Specify if custom topology label <provisionerName>.dellemc.com/<powerscalefqdnorip>:<provisionerName> has to be used for making connection to backend PowerScale Array
-# If enableCustomTopology is set to true, then do not specify allowedTopologies in storage class
-enableCustomTopology: "false"
-
-# Specify default value for maximum number of volumes that controller can publish to the node.
+# maxIsilonVolumesPerNode: Specify default value for maximum number of volumes that controller can publish to the node.
 # If value is zero CO SHALL decide how many volumes of this type can be published by the controller to the node.
 # This limit is applicable to all the nodes in the cluster for which node label 'max-isilon-volumes-per-node' is not set.
+# Allowed values: n, where n >= 0
+# Default value: 0
 maxIsilonVolumesPerNode: 0
 
-controller:
+# imagePullPolicy: Policy to determine if the image should be pulled prior to starting the container.
+# Allowed values:
+#  Always: Always pull the image.
+#  IfNotPresent: Only pull the image if it does not already exist on the node.
+#  Never: Never pull the image.
+# Default value: None
+imagePullPolicy: IfNotPresent
 
-  # Define nodeSelector for the controllers, if required
+# verbose: Indicates what content of the OneFS REST API message should be logged in debug level logs
+# Allowed Values:
+#   0: log full content of the HTTP request and response
+#   1: log without the HTTP response body
+#   2: log only 1st line of the HTTP request and response
+# Default value: 0
+verbose: 1
+
+# Specify kubelet config dir path.
+# Ensure that the config.yaml file is present at this path.
+# Default value: None
+kubeletConfigDir: /var/lib/kubelet
+
+# enableCustomTopology: Specify if custom topology label <provisionerName>.dellemc.com/<powerscalefqdnorip>:<provisionerName>
+# has to be used for making connection to backend PowerScale Array.
+# If enableCustomTopology is set to true, then do not specify allowedTopologies in storage class.
+# Allowed values:
+#   true : enable custom topology
+#   false: disable custom topology
+# Default value: false
+enableCustomTopology: false
+
+# controller: configure controller pod specific parameters
+controller:
+  # controllerCount: defines the number of csi-powerscale controller pods to deploy to
+  # the Kubernetes release.
+  # Allowed values: n, where n > 0
+  # Default value: None
+  controllerCount: 2
+
+  # volumeNamePrefix: Prefix of PersistentVolume names created
+  # Allowed values: string
+  # Default value: None
+  volumeNamePrefix: k8s
+
+  snapshot:
+    # enabled: Enable/Disable volume snapshot feature
+    # Allowed values:
+    #   true: enable volume snapshot feature(install snapshotter sidecar)
+    #   false: disable volume snapshot feature(do not install snapshotter sidecar)
+    # Default value: None
+    enabled: true
+
+    # snapNamePrefix: Prefix to apply to the names of a created snapshots
+    # Allowed values: string
+    # Default value: None
+    snapNamePrefix: snapshot
+
+  resizer:
+    # enabled: Enable/Disable volume expansion feature
+    # Allowed values:
+    #   true: enable volume expansion feature(install resizer sidecar)
+    #   false: disable volume snapshot feature(do not install resizer sidecar)
+    # Default value: None
+    enabled: true
+
+  # nodeSelector: Define node selection constraints for pods of controller deployment.
+  # For the pod to be eligible to run on a node, the node must have each
+  # of the indicated key-value pairs as labels.
+  # Leave as blank to consider all nodes
+  # Allowed values: map of key-value pairs
+  # Default value: None
+  # Examples:
+  #   node-role.kubernetes.io/master: ""
   nodeSelector:
   #  node-role.kubernetes.io/master: ""
 
-  # Define tolerations for the controllers, if required
+  # tolerations: Define tolerations for the controller deployment, if required.
+  # Default value: None
   tolerations:
   #  - key: "node-role.kubernetes.io/master"
   #    operator: "Equal"
   #    value: "true"
   #    effect: "NoSchedule"
 
-# "node" allows to configure node specific parameters
+
+# node: configure node pod specific parameters
 node:
-  # "node.nodeSelector" defines what nodes would be selected for pods of node daemonset
-  # Leave as blank to use all nodes
+  # nodeSelector: Define node selection constraints for pods of node daemonset
+  # For the pod to be eligible to run on a node, the node must have each
+  # of the indicated key-value pairs as labels.
+  # Leave as blank to consider all nodes
+  # Allowed values: map of key-value pairs
+  # Default value: None
+  # Examples:
+  #   node-role.kubernetes.io/master: ""
   nodeSelector:
   #  node-role.kubernetes.io/master: ""
 
-  # "node.tolerations" defines tolerations that would be applied to node daemonset
-  # Add/Remove tolerations as per requirement
-  # Leave as blank if you wish to not apply any tolerations
+  # tolerations: Define tolerations for the node daemonset, if required.
+  # Default value: None
   tolerations:
-#    - key: "node.kubernetes.io/memory-pressure"
-#      operator: "Exists"
-#      effect: "NoExecute"
-#    - key: "node.kubernetes.io/disk-pressure"
-#      operator: "Exists"
-#      effect: "NoExecute"
-#    - key: "node.kubernetes.io/network-unavailable"
-#      operator: "Exists"
-#      effect: "NoExecute"
+  #  - key: "node.kubernetes.io/memory-pressure"
+  #    operator: "Exists"
+  #    effect: "NoExecute"
+  #  - key: "node.kubernetes.io/disk-pressure"
+  #    operator: "Exists"
+  #    effect: "NoExecute"
+  #  - key: "node.kubernetes.io/network-unavailable"
+  #    operator: "Exists"
+  #    effect: "NoExecute"
 
-  # Determines the DNS Policy of the Node service.
+  # dnsPolicy: Determines the DNS Policy of the Node service.
+  # Allowed values:
+  #   Default: The Pod inherits the name resolution configuration from the node that the pods run on.
+  #   ClusterFirst: Any DNS query that does not match the configured cluster domain suffix, such as "www.kubernetes.io",
+  #   is forwarded to the upstream nameserver inherited from the node.
+  #   ClusterFirstWithHostNet:  For Pods running with hostNetwork, you should explicitly set this DNS policy.
+  #   None: It allows a Pod to ignore DNS settings from the Kubernetes environment.
+  #   All DNS settings are supposed to be provided using the dnsConfig field in the Pod Spec.
+  # Default value: ClusterFirst
   # ClusterFirstWithHostNet is the recommended DNS policy.
   # Prior to v1.5 of the driver, the default DNS policy was ClusterFirst.
   # In certain scenarios, users might need to change the default dnsPolicy.
-  dnsPolicy: "ClusterFirstWithHostNet"
+  dnsPolicy: ClusterFirstWithHostNet
+
+
+## PLATFORM ATTRIBUTES
+######################
+# endpointPort: Specify the HTTPs port number of the PowerScale OneFS API server
+# Formerly this attribute was named as "isiPort"
+# This value acts as a default value for endpointPort, if not specified for a cluster config in secret
+# Allowed value: valid port number
+# Default value: 8080
+endpointPort: 8080
+
+# skipCertificateValidation: Specify whether the PowerScale OneFS API server's certificate chain and host name should be verified.
+# Formerly this attribute was named as "isiInsecure"
+# This value acts as a default value for skipCertificateValidation, if not specified for a cluster config in secret
+# Allowed values:
+#   true: skip OneFS API server's certificate verification
+#   false: verify OneFS API server's certificates
+# Default value: false
+skipCertificateValidation: true
+
+# isiAccessZone: The name of the access zone a volume can be created in.
+# If storageclass is missing with AccessZone parameter, then value of isiAccessZone is used for the same.
+# Default value: System
+# Examples: System, zone1
+isiAccessZone: System
+
+# enableQuota: Indicates whether the provisioner should attempt to set (later unset) quota
+# on a newly provisioned volume.
+# This requires SmartQuotas to be enabled on PowerScale cluster.
+# Allowed values:
+#   true: set quota for volume
+#   false: do not set quota for volume
+enableQuota: true
+
+# isiPath: The base path for the volumes to be created on PowerScale cluster.
+# This value acts as a default value for isiPath, if not specified for a cluster config in secret
+# Ensure that this path exists on PowerScale cluster.
+# Allowed values: unix absolute path
+# Default value: /ifs
+# Examples: /ifs/data/csi, /ifs/engineering
+isiPath: /ifs/data/csi
+
+# isiVolumePathPermissions: The permissions for isi volume directory path
+# This value acts as a default value for isiVolumePathPermissions, if not specified for a cluster config in secret
+# Allowed values: valid octal mode number
+# Default value: "0777"
+# Examples: "0777", "777", "0755"
+isiVolumePathPermissions: "0777"
+
+# noProbeOnStart: Indicates whether the controller/node should probe all the PowerScale clusters during driver initialization
+# Allowed values:
+#   true : do not probe all PowerScale clusters during driver initialization
+#   false: probe all PowerScale clusters during driver initialization
+# Default value: false
+noProbeOnStart: false
+
+# autoProbe: automatically probe the PowerScale cluster if not done already during CSI calls.
+# Allowed values:
+#   true : enable auto probe.
+#   false: disable auto probe.
+# Default value: false
+autoProbe: true

@@ -136,6 +136,12 @@ function install_driver() {
     log step "Installing Driver"
   fi
 
+  # run driver specific install script
+  local SCRIPTNAME="install-${DRIVER}.sh"
+  if [ -f "${SCRIPTDIR}/${SCRIPTNAME}" ]; then
+    source "${SCRIPTDIR}/${SCRIPTNAME}"
+  fi
+
   HELMOUTPUT="/tmp/csi-install.$$.out"
   run_command helm ${1} \
     --set openshift=${OPENSHIFT} \

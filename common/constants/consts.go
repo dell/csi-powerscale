@@ -47,6 +47,9 @@ const (
 	// no proper isiPath value set in neither storageclass.yaml nor values.yaml
 	DefaultIsiPath = "/ifs"
 
+	// DefaultIsiVolumePathPermissions are the default permissions for volume directory path
+	DefaultIsiVolumePathPermissions = "0777"
+
 	// MaxIsiConnRetries is the max number of retries to validate connection to PowerScale Array
 	MaxIsiConnRetries = 10
 
@@ -61,4 +64,7 @@ const (
 
 	//DefaultLogLevel for csi logs
 	DefaultLogLevel = logrus.DebugLevel
+
+	//ParamCSILogLevel csi driver log level
+	ParamCSILogLevel = "CSI_LOG_LEVEL"
 )

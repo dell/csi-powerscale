@@ -1,7 +1,7 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: volume-from-volume
+  name: pvc-from-pvc
   namespace: default 
 spec:
   accessModes:
@@ -13,5 +13,5 @@ spec:
   storageClassName: isilon
   dataSource:
     kind: PersistentVolumeClaim
-    name: testvolclaim1
+    name: test-pvc
     apiGroup: ""

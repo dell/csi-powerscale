@@ -17,7 +17,6 @@ package integration_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -35,6 +34,7 @@ import (
 	"github.com/dell/csi-isilon/service"
 	isi "github.com/dell/goisilon"
 	apiv1 "github.com/dell/goisilon/api/v1"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -46,6 +46,8 @@ const (
 	IsiPathParam     = "IsiPath"
 	ClusterNameParam = "ClusterName"
 	EnvClusterName   = "X_CSI_CLUSTER_NAME"
+	AZServiceIPParam = "AzServiceIP"
+	EnvAZServiceIP   = "X_CSI_ISI_AZ_SERVICE_IP"
 )
 
 var (
@@ -132,11 +134,12 @@ func (f *feature) aBasicVolumeRequest(name string, size int64) error {
 	capabilities = append(capabilities, capability)
 	req.VolumeCapabilities = capabilities
 	parameters := make(map[string]string)
-	parameters[AccessZoneParam] = "csi0zone"
-	parameters[IsiPathParam] = "/ifs/data/csi/integration"
+	parameters[AccessZoneParam] = os.Getenv(constants.EnvAccessZone)
+	parameters[IsiPathParam] = os.Getenv(constants.EnvPath)
 	if _, isPresent := os.LookupEnv(EnvClusterName); isPresent {
 		parameters[ClusterNameParam] = os.Getenv(EnvClusterName)
 	}
+	parameters[AZServiceIPParam] = os.Getenv(EnvAZServiceIP)
 	req.Parameters = parameters
 	f.createVolumeRequest = req
 	f.isiPath = parameters[IsiPathParam]
@@ -249,7 +252,8 @@ func createIsilonClient() (*isi.Client, error) {
 		user,
 		"",
 		password,
-		os.Getenv(constants.EnvPath))
+		os.Getenv(constants.EnvPath),
+		os.Getenv(constants.DefaultIsiVolumePathPermissions))
 	if err != nil {
 		fmt.Printf("error creating isilon client: '%s'\n", err.Error())
 	}
@@ -258,7 +262,7 @@ func createIsilonClient() (*isi.Client, error) {
 
 func getDetails(configBytes []byte, clusterName string) (string, string, string, error) {
 	jsonConfig := new(service.IsilonClusters)
-	err := json.Unmarshal(configBytes, &jsonConfig)
+	err := yaml.Unmarshal(configBytes, &jsonConfig)
 	if err != nil {
 		return "", "", "", fmt.Errorf("unable to parse isilon clusters' config details [%v]", err)
 	}
@@ -269,10 +273,10 @@ func getDetails(configBytes []byte, clusterName string) (string, string, string,
 	for _, config := range jsonConfig.IsilonClusters {
 		if len(clusterName) > 0 {
 			if config.ClusterName == clusterName {
-				return config.User, config.Password, config.IsiIP, nil
+				return config.User, config.Password, config.Endpoint, nil
 			}
-		} else if *config.IsDefaultCluster {
-			return config.User, config.Password, config.IsiIP, nil
+		} else if *config.IsDefault {
+			return config.User, config.Password, config.Endpoint, nil
 		}
 	}
 	err = errors.New("")
@@ -525,11 +529,12 @@ func (f *feature) aVolumeRequest(name string, size int64) error {
 	f.capability.AccessType = mountType
 	req.VolumeCapabilities = f.capabilities
 	parameters := make(map[string]string)
-	parameters[AccessZoneParam] = "csi0zone"
-	parameters[IsiPathParam] = "/ifs/data/csi/integration"
+	parameters[AccessZoneParam] = os.Getenv(constants.EnvAccessZone)
+	parameters[IsiPathParam] = os.Getenv(constants.EnvPath)
 	if _, isPresent := os.LookupEnv(EnvClusterName); isPresent {
 		parameters[ClusterNameParam] = os.Getenv(EnvClusterName)
 	}
+	parameters[AZServiceIPParam] = os.Getenv(EnvAZServiceIP)
 	req.Parameters = parameters
 	f.createVolumeRequest = req
 	f.accssZone = parameters[AccessZoneParam]
@@ -914,7 +919,7 @@ func (f *feature) iCallCreateSnapshot(snapshotName string, sourceVolName string)
 	req.SourceVolumeId = f.volNameID[sourceVolName]
 	req.Name = snapshotName
 	parameters := make(map[string]string)
-	parameters[IsiPathParam] = "/ifs/data/csi/integration"
+	parameters[IsiPathParam] = os.Getenv(constants.EnvPath)
 	req.Parameters = parameters
 	f.createSnapshotRequest = req
 	f.createSnapshotResponse, err = f.createSnapshot(f.createSnapshotRequest)
@@ -1123,13 +1128,15 @@ func (f *feature) getMountVolumeRequest(name string) *csi.CreateVolumeRequest {
 	f.capability = capability
 	capabilities := make([]*csi.VolumeCapability, 0)
 	capabilities = append(capabilities, capability)
+	f.capabilities = capabilities
 	req.VolumeCapabilities = capabilities
 	parameters := make(map[string]string)
-	parameters[AccessZoneParam] = "csi0zone"
-	parameters[IsiPathParam] = "/ifs/data/csi/integration"
+	parameters[AccessZoneParam] = os.Getenv(constants.EnvAccessZone)
+	parameters[IsiPathParam] = os.Getenv(constants.EnvPath)
 	if _, isPresent := os.LookupEnv(EnvClusterName); isPresent {
 		parameters[ClusterNameParam] = os.Getenv(EnvClusterName)
 	}
+	parameters[AZServiceIPParam] = os.Getenv(EnvAZServiceIP)
 	req.Parameters = parameters
 	f.createVolumeRequest = req
 	f.accssZone = parameters[AccessZoneParam]

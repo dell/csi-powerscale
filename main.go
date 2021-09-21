@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/dell/csi-isilon/common/constants"
 	"github.com/dell/csi-isilon/common/k8sutils"
+	"github.com/dell/csi-isilon/service"
 	"os"
 	"strings"
 
@@ -30,12 +31,23 @@ import (
 	"github.com/dell/gocsi"
 )
 
+func init() {
+	os.Setenv(constants.EnvGOCSIDebug, "true")
+}
+
 // main is ignored when this package is built as a go plug-in
 func main() {
 	enableLeaderElection := flag.Bool("leader-election", false, "Enables leader election.")
 	leaderElectionNamespace := flag.String("leader-election-namespace", "", "The namespace where leader election lease will be created. Defaults to the pod namespace if not set.")
+	driverConfigParamsfile := flag.String("driver-config-params", "", "yaml file with driver config params")
 	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	flag.Parse()
+
+	if *driverConfigParamsfile == "" {
+		fmt.Fprintf(os.Stderr, "driver-config-params argument is mandatory")
+		os.Exit(1)
+	}
+	service.DriverConfigParamsFile = *driverConfigParamsfile
 
 	run := func(ctx context.Context) {
 		gocsi.Run(
@@ -84,7 +96,7 @@ const usage = `   X_CSI_ISI_ENDPOINT
 
         The default value is empty.
 
-    X_CSI_ISI_INSECURE 
+    X_CSI_ISI_SKIP_CERTIFICATE_VALIDATION 
         Specifies that the ISILON Gateway's hostname and certificate chain
 	should not be verified.
 
@@ -95,6 +107,6 @@ const usage = `   X_CSI_ISI_ENDPOINT
 
         The default value is default.
 
-    X_CSI_ISILON_CONFIG_PATH
+    X_CSI_ISI_CONFIG_PATH
         Specifies the filepath containing Isilon cluster's config details.
 `

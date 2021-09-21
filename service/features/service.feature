@@ -156,11 +156,21 @@ Feature: Isilon CSI interface
       | "volume2=_=_=43=_=_=System"    | "single-reader"           | "unsupported access mode"           |
       | "volume2=_=_=43=_=_=System"    | "unknown"                 | "unknown or unsupported access mode"|
 
+    Scenario: ControllerPublishVolume With RootClient Enabled good scenario
+      Given a Isilon service
+      When I call Probe
+      And I set RootClientEnabled to "true"
+      And I call CreateVolume "volume2"
+      And I call ControllerPublishVolume with name "volume2=_=_=43=_=_=System" and access type "multiple-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
+      And I set RootClientEnabled to "false"
+      Then a valid ControllerPublishVolumeResponse is returned
+      Then a valid CreateVolumeResponse is returned
+
     Scenario: ControllerUnpublishVolume good scenario
       Given a Isilon service
       When I call Probe
       And I call ControllerUnpublishVolume with name "volume2=_=_=43=_=_=System" and access type "single-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
-      Then valid ControllerUnpublishVolumeResponse is returned
+      Then a valid ControllerUnpublishVolumeResponse is returned
     
     Scenario Outline: ControllerUnpublishVolume bad calls
       Given a Isilon service
@@ -249,11 +259,10 @@ Feature: Isilon CSI interface
       | times    | errormsg     |
       | 100      | "none"       |
 
-    @todo
     Scenario: Calling BeforeServe
       Given a Isilon service
       When I call BeforeServe
-      Then the error contains "Service mode not set"
+      Then the error contains "probe of all isilon clusters failed"
       
     Scenario: Calling unimplemented functions
       Given a Isilon service
@@ -307,3 +316,4 @@ Feature: Isilon CSI interface
       When I call set allowed networks with multiple networks "1.2.3.4/33" "127.0.0.0/8"
       And I call NodeGetInfo
       Then a valid NodeGetInfoResponse is returned
+

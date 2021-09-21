@@ -151,3 +151,8 @@ func ParseLogLevel(lvl string) (logrus.Level, error) {
 func UpdateLogLevel(lvl logrus.Level) {
 	singletonLog.Level = lvl
 }
+
+// GetCurrentLogLevel updates the log level
+func GetCurrentLogLevel() logrus.Level {
+	return singletonLog.Level
+}

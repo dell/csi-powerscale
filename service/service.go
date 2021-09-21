@@ -17,12 +17,8 @@ package service
 */
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/akutz/gournal"
-	"google.golang.org/grpc/metadata"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"net"
 	"path/filepath"
@@ -31,6 +27,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/akutz/gournal"
+	"google.golang.org/grpc/metadata"
+	"gopkg.in/yaml.v3"
 
 	"github.com/dell/csi-isilon/common/k8sutils"
 
@@ -43,6 +43,7 @@ import (
 	isi "github.com/dell/goisilon"
 	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,6 +52,9 @@ import (
 //To maintain runid for Non debug mode. Note: CSI will not generate runid if CSI_DEBUG=false
 var runid int64
 var isilonConfigFile string
+
+// DriverConfigParamsFile is the name of the input driver config params file
+var DriverConfigParamsFile string
 
 // Manifest is the SP's manifest.
 var Manifest = map[string]string{
@@ -70,19 +74,18 @@ type Service interface {
 
 // Opts defines service configuration options.
 type Opts struct {
-	Port                  string
-	AccessZone            string
-	Path                  string
-	Insecure              bool
-	AutoProbe             bool
-	QuotaEnabled          bool
-	DebugEnabled          bool
-	Verbose               uint
-	NfsV3                 bool
-	CustomTopologyEnabled bool
-	KubeConfigPath        string
-	allowedNetworks       []string
-	MaxVolumesPerNode     int64
+	Port                      string
+	AccessZone                string
+	Path                      string
+	IsiVolumePathPermissions  string
+	SkipCertificateValidation bool
+	AutoProbe                 bool
+	QuotaEnabled              bool
+	Verbose                   uint
+	CustomTopologyEnabled     bool
+	KubeConfigPath            string
+	allowedNetworks           []string
+	MaxVolumesPerNode         int64
 }
 
 type service struct {
@@ -95,33 +98,31 @@ type service struct {
 	defaultIsiClusterName string
 }
 
-//IsilonClusters To unmarshal secret.json file
+//IsilonClusters To unmarshal secret.yaml file
 type IsilonClusters struct {
-	IsilonClusters []IsilonClusterConfig `json:"isilonClusters" yaml:"isilonClusters"`
-	LogLevel       string                `json:"logLevel,omitempty" yaml:"logLevel,omitempty"`
+	IsilonClusters []IsilonClusterConfig `yaml:"isilonClusters"`
 }
 
 //IsilonClusterConfig To hold config details of a isilon cluster
 type IsilonClusterConfig struct {
-	ClusterName               string `json:"clusterName" yaml:"clusterName"`
-	IsiIP                     string `json:"isiIP,omitempty" yaml:"isiIP,omitempty"` // deprecate this attribute in future release
-	Endpoint                  string `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
-	IsiPort                   string `json:"isiPort,omitempty" yaml:"isiPort,omitempty"`
+	ClusterName               string `yaml:"clusterName"`
+	Endpoint                  string `yaml:"endpoint"`
+	EndpointPort              string `yaml:"endpointPort,omitempty"`
+	MountEndpoint             string `yaml:"mountEndpoint,omitempty"` // This field is used to retain the orignal Endpoint after CSM-Authorization has been injected
 	EndpointURL               string
-	User                      string `json:"username" yaml:"username"`
-	Password                  string `json:"password" yaml:"password"`
-	IsiInsecure               *bool  `json:"isiInsecure,omitempty" yaml:"isiInsecure,omitempty"` // deprecate this attribute in future release
-	SkipCertificateValidation *bool  `json:"skipCertificateValidation,omitempty" yaml:"skipCertificateValidation,omitempty"`
-	IsiPath                   string `json:"isiPath,omitempty" yaml:"isiPath,omitempty"`
-	IsDefaultCluster          *bool  `json:"isDefaultCluster,omitempty" yaml:"isDefaultCluster,omitempty"` // deprecate this attribute in future release
-	IsDefault                 *bool  `json:"isDefault,omitempty" yaml:"isDefault,omitempty"`
+	User                      string `yaml:"username"`
+	Password                  string `yaml:"password"`
+	SkipCertificateValidation *bool  `yaml:"skipCertificateValidation,omitempty"`
+	IsiPath                   string `yaml:"isiPath,omitempty"`
+	IsiVolumePathPermissions  string `yaml:"isiVolumePathPermissions,omitempty"`
+	IsDefault                 *bool  `yaml:"isDefault,omitempty"`
 	isiSvc                    *isiService
 }
 
 //To display the IsilonClusterConfig of a cluster
 func (s IsilonClusterConfig) String() string {
-	return fmt.Sprintf("ClusterName: %s, IsiIP: %s, IsiPort: %s, EndpointURL: %s, User: %s, IsiInsecure: %v, IsiPath: %s, IsDefaultCluster: %v, isiSvc: %v",
-		s.ClusterName, s.IsiIP, s.IsiPort, s.EndpointURL, s.User, *s.IsiInsecure, s.IsiPath, *s.IsDefaultCluster, s.isiSvc)
+	return fmt.Sprintf("ClusterName: %s, Endpoint: %s, EndpointPort: %s, EndpointURL: %s, User: %s, SkipCertificateValidation: %v, IsiPath: %s, IsiVolumePathPermissions: %s, IsDefault: %v, isiSvc: %v",
+		s.ClusterName, s.Endpoint, s.EndpointPort, s.EndpointURL, s.User, *s.SkipCertificateValidation, s.IsiPath, s.IsiVolumePathPermissions, *s.IsDefault, s.isiSvc)
 }
 
 // New returns a new Service.
@@ -150,6 +151,15 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 		opts.Path = path
 	} else {
 		opts.Path = constants.DefaultIsiPath
+	}
+
+	if isiVolumePathPermissions, ok := csictx.LookupEnv(ctx, constants.EnvIsiVolumePathPermissions); ok {
+		if isiVolumePathPermissions == "" {
+			isiVolumePathPermissions = constants.DefaultIsiVolumePathPermissions
+		}
+		opts.IsiVolumePathPermissions = isiVolumePathPermissions
+	} else {
+		opts.IsiVolumePathPermissions = constants.DefaultIsiVolumePathPermissions
 	}
 
 	if accessZone, ok := csictx.LookupEnv(ctx, constants.EnvAccessZone); ok {
@@ -194,11 +204,9 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 	opts.allowedNetworks = allowedNetworks
 
 	opts.QuotaEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvQuotaEnabled)
-	opts.Insecure = utils.ParseBooleanFromContext(ctx, constants.EnvInsecure)
+	opts.SkipCertificateValidation = utils.ParseBooleanFromContext(ctx, constants.EnvSkipCertificateValidation)
 	opts.AutoProbe = utils.ParseBooleanFromContext(ctx, constants.EnvAutoProbe)
-	opts.DebugEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvDebug)
 	opts.Verbose = utils.ParseUintFromContext(ctx, constants.EnvVerbose)
-	opts.NfsV3 = utils.ParseBooleanFromContext(ctx, constants.EnvNfsV3)
 	opts.CustomTopologyEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvCustomTopologyEnabled)
 
 	s.opts = opts
@@ -303,12 +311,12 @@ func (s *service) probeOnStart(ctx context.Context) error {
 	ctx, log := GetLogger(ctx)
 	if utils.ParseBooleanFromContext(ctx, constants.EnvNoProbeOnStart) {
 
-		log.Debug("X_CSI_ISILON_NO_PROBE_ON_START is true, skip 'probeOnStart'")
+		log.Debug("X_CSI_ISI_NO_PROBE_ON_START is true, skip 'probeOnStart'")
 
 		return nil
 	}
 
-	log.Debug("X_CSI_ISILON_NO_PROBE_ON_START is false, executing 'probeOnStart'")
+	log.Debug("X_CSI_ISI_NO_PROBE_ON_START is false, executing 'probeOnStart'")
 
 	return s.probeAllClusters(ctx)
 }
@@ -336,7 +344,7 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 	// First we fetch node labels using kubernetes API and check, if label
 	// <provisionerName>.dellemc.com/<powerscalefqdnorip>: <provisionerName>
 	// exists on node, if exists we use corresponding PowerScale FQDN or IP for creating connection
-	// to PowerScale Array or else we fallback to using isiIP
+	// to PowerScale Array or else we fallback to using endpoint
 
 	customTopologyFound := false
 	if s.opts.CustomTopologyEnabled {
@@ -352,12 +360,12 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 				log.Infof("Topology label %s:%s available on node", lkey, lval)
 				tList := strings.SplitAfter(lkey, "/")
 				if len(tList) != 0 {
-					isiConfig.IsiIP = tList[1]
-					isiConfig.EndpointURL = fmt.Sprintf("https://%s:%s", isiConfig.IsiIP, isiConfig.IsiPort)
+					isiConfig.Endpoint = tList[1]
+					isiConfig.EndpointURL = fmt.Sprintf("https://%s:%s", isiConfig.Endpoint, isiConfig.EndpointPort)
 					customTopologyFound = true
 				} else {
-					log.Errorf("Fetching PowerScale FQDN/IP from topology label %s:%s failed, using isiIP "+
-						"%s as PowerScale FQDN/IP", lkey, lval, isiConfig.IsiIP)
+					log.Errorf("Fetching PowerScale FQDN/IP from topology label %s:%s failed, using endpoint "+
+						"%s as PowerScale FQDN/IP", lkey, lval, isiConfig.Endpoint)
 				}
 				break
 			}
@@ -389,12 +397,13 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 	client, err := isi.NewClientWithArgs(
 		clientCtx,
 		isiConfig.EndpointURL,
-		*isiConfig.IsiInsecure,
+		*isiConfig.SkipCertificateValidation,
 		s.opts.Verbose,
 		isiConfig.User,
 		"",
 		isiConfig.Password,
 		isiConfig.IsiPath,
+		isiConfig.IsiVolumePathPermissions,
 	)
 	if err != nil {
 		log.Errorf("init client failed for isilon cluster '%s': '%s'", isiConfig.ClusterName, err.Error())
@@ -417,14 +426,14 @@ func (s *service) GetIsiService(clientCtx context.Context, isiConfig *IsilonClus
 	}
 
 	return &isiService{
-		endpoint: isiConfig.IsiIP,
+		endpoint: isiConfig.Endpoint,
 		client:   isiClient,
 	}, nil
 }
 
 func (s *service) validateOptsParameters(clusterConfig *IsilonClusterConfig) error {
-	if clusterConfig.User == "" || clusterConfig.Password == "" || clusterConfig.IsiIP == "" {
-		return fmt.Errorf("invalid isi service parameters, at least one of endpoint, username and password is empty. endpoint : endpoint '%s', username : '%s'", clusterConfig.IsiIP, clusterConfig.User)
+	if clusterConfig.User == "" || clusterConfig.Password == "" || clusterConfig.Endpoint == "" {
+		return fmt.Errorf("invalid isi service parameters, at least one of endpoint, username and password is empty. endpoint : endpoint '%s', username : '%s'", clusterConfig.Endpoint, clusterConfig.User)
 	}
 
 	return nil
@@ -433,12 +442,12 @@ func (s *service) validateOptsParameters(clusterConfig *IsilonClusterConfig) err
 func (s *service) logServiceStats() {
 
 	fields := map[string]interface{}{
-		"path":         s.opts.Path,
-		"insecure":     s.opts.Insecure,
-		"autoprobe":    s.opts.AutoProbe,
-		"accesspoint":  s.opts.AccessZone,
-		"quotaenabled": s.opts.QuotaEnabled,
-		"mode":         s.mode,
+		"path":                      s.opts.Path,
+		"skipCertificateValidation": s.opts.SkipCertificateValidation,
+		"autoprobe":                 s.opts.AutoProbe,
+		"accesspoint":               s.opts.AccessZone,
+		"quotaenabled":              s.opts.QuotaEnabled,
+		"mode":                      s.mode,
 	}
 	// TODO: Replace logrus with log
 	logrus.WithFields(fields).Infof("Configured '%s'", constants.PluginName)
@@ -446,19 +455,38 @@ func (s *service) logServiceStats() {
 
 func (s *service) BeforeServe(
 	ctx context.Context, sp *gocsi.StoragePlugin, lis net.Listener) error {
+	log := utils.GetLogger()
+
 	if err := s.initializeServiceOpts(ctx); err != nil {
 		return err
 	}
+
 	s.logServiceStats()
 
-	//Update the storage array list
+	// Update the storage array list
 	s.isiClusters = new(sync.Map)
-	err := s.syncIsilonConfigs(ctx)
-	if err != nil {
+
+	// Update config params
+	vc := viper.New()
+	vc.AutomaticEnv()
+	vc.SetConfigFile(DriverConfigParamsFile)
+	if err := vc.ReadInConfig(); err != nil {
+		log.Warnf("unable to read driver config params from file '%s'. Using defaults.", DriverConfigParamsFile)
+	}
+	if err := s.updateDriverConfigParams(ctx, vc); err != nil {
 		return err
 	}
 
-	//Dynamically load the config
+	// Watch for changes to driver config params file
+	vc.WatchConfig()
+	vc.OnConfigChange(func(e fsnotify.Event) {
+		log.Infof("Driver config params file changed")
+		if err := s.updateDriverConfigParams(ctx, vc); err != nil {
+			log.Warn(err)
+		}
+	})
+
+	// Dynamically load the config
 	go s.loadIsilonConfigs(ctx, isilonConfigFile)
 
 	return s.probeOnStart(ctx)
@@ -485,7 +513,7 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 					err := s.syncIsilonConfigs(ctx)
 					if err != nil {
 						log.Debug("Cluster configuration array length:", s.getIsilonClusterLength())
-						log.Error("Invalid configuration in secret.json. Error:", err)
+						log.Error("Invalid configuration in secret.yaml. Error:", err)
 					}
 				}
 
@@ -533,7 +561,7 @@ func (s *service) syncIsilonConfigs(ctx context.Context) error {
 	if string(configBytes) != "" {
 		log.Debugf("Current isilon configs:")
 		s.isiClusters.Range(handler)
-		newIsilonConfigs, defaultClusterName, logLevel, err := s.getNewIsilonConfigs(ctx, configBytes)
+		newIsilonConfigs, defaultClusterName, err := s.getNewIsilonConfigs(ctx, configBytes)
 		if err != nil {
 			return err
 		}
@@ -554,22 +582,10 @@ func (s *service) syncIsilonConfigs(ctx context.Context) error {
 		if s.defaultIsiClusterName == "" {
 			log.Warnf("no default cluster name/config available")
 		}
-
-		//Initialize logger if not done already, before updating log level
-		_ = utils.GetLogger()
-		utils.UpdateLogLevel(logLevel)
-		log.Warnf("log level set to '%s'", logLevel)
-
 	} else {
 		return errors.New("isilon cluster details are not provided in isilon-creds secret")
 	}
 	return nil
-}
-
-func unmarshalJSONContent(configBytes []byte) (*IsilonClusters, error) {
-	jsonConfig := new(IsilonClusters)
-	err := json.Unmarshal(configBytes, &jsonConfig)
-	return jsonConfig, err
 }
 
 func unmarshalYAMLContent(configBytes []byte) (*IsilonClusters, error) {
@@ -578,138 +594,110 @@ func unmarshalYAMLContent(configBytes []byte) (*IsilonClusters, error) {
 	return yamlConfig, err
 }
 
-func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (map[interface{}]interface{}, string, logrus.Level, error) {
+func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (map[interface{}]interface{}, string, error) {
 	var noOfDefaultClusters int
 	var defaultIsiClusterName string
-	logLevel := constants.DefaultLogLevel
+	logLevel := utils.GetCurrentLogLevel()
 	log := utils.GetLogger()
 
 	var inputConfigs *IsilonClusters
-	inputConfigs, jsonErr := unmarshalJSONContent(configBytes)
-	if jsonErr != nil {
-		log.Debugf("unable to parse isilon clusters' config details as json data, error: %v", jsonErr)
-		log.Debugf("trying to parse isilon clusters' config details as yaml data")
-		var yamlErr error
-		inputConfigs, yamlErr = unmarshalYAMLContent(configBytes)
-		if yamlErr != nil {
-			log.Errorf("failed to parse isilon clusters' config details as yaml data, error: %v", yamlErr)
-			return nil, defaultIsiClusterName, logLevel, fmt.Errorf("failed to parse isilon clusters' config details as yaml data")
-		}
+	var yamlErr error
+	inputConfigs, yamlErr = unmarshalYAMLContent(configBytes)
+	if yamlErr != nil {
+		log.Errorf("failed to parse isilon clusters' config details as yaml data, error: %v", yamlErr)
+		return nil, defaultIsiClusterName, fmt.Errorf("failed to parse isilon clusters' config details as yaml data")
 	}
 
 	if len(inputConfigs.IsilonClusters) == 0 {
-		return nil, defaultIsiClusterName, logLevel, errors.New("cluster details are not provided in isilon-creds secret")
+		return nil, defaultIsiClusterName, errors.New("cluster details are not provided in isilon-creds secret")
 	}
 
 	if len(inputConfigs.IsilonClusters) > 1 && s.opts.CustomTopologyEnabled {
-		return nil, defaultIsiClusterName, logLevel, errors.New("custom topology is enabled and it expects single cluster config in secret")
+		return nil, defaultIsiClusterName, errors.New("custom topology is enabled and it expects single cluster config in secret")
 	}
 
 	newIsiClusters := make(map[interface{}]interface{})
 	for i, config := range inputConfigs.IsilonClusters {
 		log.Debugf("parsing config details for cluster %v", config.ClusterName)
 		if config.ClusterName == "" {
-			return nil, defaultIsiClusterName, logLevel, fmt.Errorf("invalid value for clusterName at index [%d]", i)
+			return nil, defaultIsiClusterName, fmt.Errorf("invalid value for clusterName at index [%d]", i)
 		}
 		if config.User == "" {
-			return nil, defaultIsiClusterName, logLevel, fmt.Errorf("invalid value for username at index [%d]", i)
+			return nil, defaultIsiClusterName, fmt.Errorf("invalid value for username at index [%d]", i)
 		}
 		if config.Password == "" {
-			return nil, defaultIsiClusterName, logLevel, fmt.Errorf("invalid value for password at index [%d]", i)
+			return nil, defaultIsiClusterName, fmt.Errorf("invalid value for password at index [%d]", i)
 		}
-		if config.IsiIP == "" && config.Endpoint == "" {
-			return nil, defaultIsiClusterName, logLevel, fmt.Errorf("invalid value for isiIP/endpoint at index [%d]", i)
-		}
-		if config.IsiIP != "" && config.Endpoint != "" {
-			return nil, defaultIsiClusterName, logLevel, fmt.Errorf("specify either of isiIP or endpoint attribute at index [%d]", i)
+		if config.Endpoint == "" {
+			return nil, defaultIsiClusterName, fmt.Errorf("invalid value for endpoint at index [%d]", i)
 		}
 
-		if config.Endpoint != "" {
-			config.IsiIP = config.Endpoint
-		}
-
-		// Let IsiIP be generic.
+		// Let Endpoint be generic.
 		// Take out https prefix from it, if present, and let it's consumers to use it the way they want
-		if strings.HasPrefix(config.IsiIP, "https://") {
-			config.IsiIP = strings.TrimLeft(config.IsiIP, "https://")
+		if strings.HasPrefix(config.Endpoint, "https://") {
+			config.Endpoint = strings.TrimLeft(config.Endpoint, "https://")
 		}
 
-		if config.IsiPort == "" {
-			config.IsiPort = s.opts.Port
+		if config.EndpointPort == "" {
+			config.EndpointPort = s.opts.Port
 		}
 
-		if config.IsiInsecure == nil && config.SkipCertificateValidation == nil {
-			config.IsiInsecure = &s.opts.Insecure
-		}
-		if config.IsiInsecure != nil && config.SkipCertificateValidation != nil {
-			return nil, defaultIsiClusterName, logLevel, fmt.Errorf("specify either of isiInsecure or skipCertificateValidation attribute at index [%d]", i)
-		}
-		if config.SkipCertificateValidation != nil {
-			config.IsiInsecure = config.SkipCertificateValidation
+		if config.SkipCertificateValidation == nil {
+			config.SkipCertificateValidation = &s.opts.SkipCertificateValidation
 		}
 
 		if config.IsiPath == "" {
 			config.IsiPath = s.opts.Path
 		}
 
-		config.EndpointURL = fmt.Sprintf("https://%s:%s", config.IsiIP, config.IsiPort)
-
-		if inputConfigs.LogLevel != "" {
-			var err error
-			logLevel, err = utils.ParseLogLevel(inputConfigs.LogLevel)
-			if err != nil {
-				return nil, "", logLevel, fmt.Errorf("not a valid log level: %q", inputConfigs.LogLevel)
-			}
+		if config.IsiVolumePathPermissions == "" {
+			config.IsiVolumePathPermissions = s.opts.IsiVolumePathPermissions
 		}
 
+		config.EndpointURL = fmt.Sprintf("https://%s:%s", config.Endpoint, config.EndpointPort)
 		clientCtx, _ := GetLogger(ctx)
 		config.isiSvc, _ = s.GetIsiService(clientCtx, &config, logLevel)
 
-		if config.IsDefaultCluster != nil && config.IsDefault != nil {
-			return nil, defaultIsiClusterName, logLevel, fmt.Errorf("specify either of isDefaultCluster or isDefault attribute at index [%d]", i)
-		}
-		if config.IsDefaultCluster == nil && config.IsDefault == nil {
+		if config.IsDefault == nil {
 			defaultBoolValue := false
-			config.IsDefaultCluster = &defaultBoolValue
-		}
-		if config.IsDefault != nil {
-			config.IsDefaultCluster = config.IsDefault
+			config.IsDefault = &defaultBoolValue
 		}
 
-		if *config.IsDefaultCluster == true {
+		if *config.IsDefault == true {
 			noOfDefaultClusters++
 			if noOfDefaultClusters > 1 {
-				return nil, defaultIsiClusterName, logLevel, fmt.Errorf("'isDefaultCluster' attribute set for multiple isilon cluster configs in 'isilonClusters': %s. Only one cluster should be marked as default cluster", config.ClusterName)
+				return nil, defaultIsiClusterName, fmt.Errorf("'IsDefault' attribute set for multiple isilon cluster configs in 'isilonClusters': %s. Only one cluster should be marked as default cluster", config.ClusterName)
 			}
 		}
 
 		if _, ok := newIsiClusters[config.ClusterName]; ok {
-			return nil, defaultIsiClusterName, logLevel, fmt.Errorf("duplicate cluster name [%s] found in input isilonClusters", config.ClusterName)
+			return nil, defaultIsiClusterName, fmt.Errorf("duplicate cluster name [%s] found in input isilonClusters", config.ClusterName)
 		}
 
 		newConfig := IsilonClusterConfig{}
 		newConfig = config
 
 		newIsiClusters[config.ClusterName] = &newConfig
-		if *config.IsDefaultCluster {
+		if *config.IsDefault {
 			defaultIsiClusterName = config.ClusterName
 		}
 
 		fields := map[string]interface{}{
-			"ClusterName":      config.ClusterName,
-			"IsiIP":            config.IsiIP,
-			"IsiPort":          config.IsiPort,
-			"Username":         config.User,
-			"Password":         "*******",
-			"IsiInsecure":      *config.IsiInsecure,
-			"IsiPath":          config.IsiPath,
-			"IsDefaultCluster": *config.IsDefaultCluster,
+			"ClusterName":               config.ClusterName,
+			"Endpoint":                  config.Endpoint,
+			"EndpointPort":              config.EndpointPort,
+			"Username":                  config.User,
+			"Password":                  "*******",
+			"SkipCertificateValidation": *config.SkipCertificateValidation,
+			"IsiPath":                   config.IsiPath,
+			"IsiVolumePathPermissions":  config.IsiVolumePathPermissions,
+			"IsDefault":                 *config.IsDefault,
 		}
 		// TODO: Replace logrus with log
 		logrus.WithFields(fields).Infof("new config details for cluster %s", config.ClusterName)
 	}
 
-	return newIsiClusters, defaultIsiClusterName, logLevel, nil
+	return newIsiClusters, defaultIsiClusterName, nil
 }
 
 func handler(key, value interface{}) bool {
@@ -734,6 +722,32 @@ func (s *service) getIsilonClusters() []*IsilonClusterConfig {
 		return true
 	})
 	return list
+}
+
+// Update configurable params from configmap
+func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) error {
+	log := utils.GetLogger()
+	logLevel := constants.DefaultLogLevel
+	if v.IsSet(constants.ParamCSILogLevel) {
+		inputLogLevel := v.GetString(constants.ParamCSILogLevel)
+		if inputLogLevel != "" {
+			inputLogLevel = strings.ToLower(inputLogLevel)
+			var err error
+			logLevel, err = utils.ParseLogLevel(inputLogLevel)
+			if err != nil {
+				return fmt.Errorf("input log level %q is not valid", inputLogLevel)
+			}
+		}
+	}
+	utils.UpdateLogLevel(logLevel)
+	log.Infof("log level set to '%s'", logLevel)
+
+	err := s.syncIsilonConfigs(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // GetCSINodeID gets the id of the CSI node which regards the node name as node id

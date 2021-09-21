@@ -48,6 +48,7 @@ const (
 	AccessZoneParam               = "AccessZone"
 	ExportPathParam               = "Path"
 	IsiPathParam                  = "IsiPath"
+	IsiVolumePathPermissionsParam = "IsiVolumePathPermissions"
 	AzServiceIPParam              = "AzServiceIP"
 	RootClientEnabledParam        = "RootClientEnabled"
 	RootClientEnabledParamDefault = "false"
@@ -91,6 +92,7 @@ func (s *service) CreateVolume(
 	var (
 		accessZone                        string
 		isiPath                           string
+		volumePathPermissions             string
 		path                              string
 		azServiceIP                       string
 		rootClientEnabled                 string
@@ -119,15 +121,16 @@ func (s *service) CreateVolume(
 	}
 
 	// Fetch log handler
-	ctx, _, runID := GetRunIDLog(ctx)
-	ctx, log := setClusterContext(ctx, clusterName)
-	log.Debugf("Cluster Name: %v", clusterName)
+	ctx, log, runID := GetRunIDLog(ctx)
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
+
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
 
 	// auto probe
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
@@ -161,19 +164,30 @@ func (s *service) CreateVolume(
 		isiPath = isiConfig.IsiPath
 	}
 
+	if _, ok := params[IsiVolumePathPermissionsParam]; ok {
+		if params[IsiVolumePathPermissionsParam] == "" {
+			volumePathPermissions = isiConfig.IsiVolumePathPermissions
+		} else {
+			volumePathPermissions = params[IsiVolumePathPermissionsParam]
+		}
+	} else {
+		// use the default volumePathPermissions if not set in the storage class
+		volumePathPermissions = isiConfig.IsiVolumePathPermissions
+	}
+
 	// When custom topology is enabled it takes precedence over the current default behavior
 	// Set azServiceIP to updated endpoint when custom topology is enabled
 	if s.opts.CustomTopologyEnabled {
-		azServiceIP = isiConfig.IsiIP
+		azServiceIP = isiConfig.Endpoint
 	} else if _, ok := params[AzServiceIPParam]; ok {
 		azServiceIP = params[AzServiceIPParam]
 		if azServiceIP == "" {
 			// use the endpoint if empty in the storage class
-			azServiceIP = isiConfig.IsiIP
+			azServiceIP = isiConfig.Endpoint
 		}
 	} else {
 		// use the endpoint if not set in the storage class
-		azServiceIP = isiConfig.IsiIP
+		azServiceIP = isiConfig.Endpoint
 	}
 
 	if val, ok := params[RootClientEnabledParam]; ok {
@@ -284,10 +298,10 @@ func (s *service) CreateVolume(
 
 	if !foundVol && isROVolumeFromSnapshot {
 		// Create an entry for this volume in snapshot tracking dir
-		if err = isiConfig.isiSvc.CreateVolume(ctx, isiPath, snapshotTrackingDir); err != nil {
+		if err = isiConfig.isiSvc.CreateVolume(ctx, isiPath, snapshotTrackingDir, volumePathPermissions); err != nil {
 			return nil, err
 		}
-		if err = isiConfig.isiSvc.CreateVolume(ctx, isiPath, snapshotTrackingDirEntryForVolume); err != nil {
+		if err = isiConfig.isiSvc.CreateVolume(ctx, isiPath, snapshotTrackingDirEntryForVolume, volumePathPermissions); err != nil {
 			return nil, err
 		}
 	}
@@ -324,12 +338,12 @@ func (s *service) CreateVolume(
 	// create volume (directory) with ACL 0777
 	if !isROVolumeFromSnapshot {
 		if len(headerMetadata) == 0 {
-			if err = isiConfig.isiSvc.CreateVolume(ctx, isiPath, req.GetName()); err != nil {
+			if err = isiConfig.isiSvc.CreateVolume(ctx, isiPath, req.GetName(), volumePathPermissions); err != nil {
 				return nil, err
 			}
 		} else {
 			log.Debugf("create volume with header metadata '%s' has been resolved to '%v'", req.GetName(), headerMetadata)
-			if err = isiConfig.isiSvc.CreateVolumeWithMetaData(ctx, isiPath, req.GetName(), headerMetadata); err != nil {
+			if err = isiConfig.isiSvc.CreateVolumeWithMetaData(ctx, isiPath, req.GetName(), volumePathPermissions, headerMetadata); err != nil {
 				return nil, err
 			}
 		}
@@ -550,7 +564,7 @@ func (s *service) DeleteVolume(
 	*csi.DeleteVolumeResponse, error) {
 	// TODO more checks need to be done, e.g. if access mode is VolumeCapability_AccessMode_MULTI_NODE_XXX, then other nodes might still be using this volume, thus the delete should be skipped
 	// Fetch log handler
-	ctx, _, _ = GetRunIDLog(ctx)
+	ctx, log, _ := GetRunIDLog(ctx)
 
 	// validate request
 	if err := s.ValidateDeleteVolumeRequest(ctx, req); err != nil {
@@ -563,14 +577,14 @@ func (s *service) DeleteVolume(
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
 
-	ctx, log := setClusterContext(ctx, clusterName)
-	log.Debugf("Cluster Name: %v", clusterName)
-
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
+
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
 
 	// probe
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
@@ -739,21 +753,21 @@ func (s *service) ControllerExpandVolume(
 	ctx context.Context,
 	req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	// Fetch log handler
-	ctx, _, _ = GetRunIDLog(ctx)
+	ctx, log, _ := GetRunIDLog(ctx)
 
 	volName, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetVolumeId())
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
 
-	ctx, log := setClusterContext(ctx, clusterName)
-	log.Debugf("Cluster Name: %v", clusterName)
-
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
+
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
 
 	// auto probe
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
@@ -828,14 +842,14 @@ func (s *service) ControllerPublishVolume(
 		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "failed to parse volume ID '%s', error : '%v'", volID, err))
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
-	log.Debugf("Cluster Name: %v", clusterName)
-
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
+
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
 
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
 		log.Error("Failed to probe with error: " + err.Error())
@@ -970,14 +984,14 @@ func (s *service) ValidateVolumeCapabilities(
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
-	log.Debugf("Cluster Name: %v", clusterName)
-
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
+
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
 
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
 		log.Error("Failed to probe with error: " + err.Error())
@@ -1070,7 +1084,7 @@ func (s *service) ListVolumes(ctx context.Context,
 				// The value is not relevant here so just pass default value "false" here.
 				//<TODO> update with input cluster config
 				clusterConfig := IsilonClusterConfig{}
-				volume := s.getCSIVolume(export.ID, volName, path, export.Zone, 0, clusterConfig.IsiIP, "false", "", "", "")
+				volume := s.getCSIVolume(export.ID, volName, path, export.Zone, 0, clusterConfig.Endpoint, "false", "", "", "")
 				entries[i] = &csi.ListVolumesResponse_Entry{
 					Volume: volume,
 				}
@@ -1106,14 +1120,14 @@ func (s *service) ControllerUnpublishVolume(
 		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "failed to parse volume ID '%s', error : '%s'", req.VolumeId, err.Error()))
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
-	log.Debugf("Cluster Name: %v", clusterName)
-
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
+
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
 
 	// auto probe
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
@@ -1153,14 +1167,14 @@ func (s *service) GetCapacity(
 		}
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
-	log.Debugf("Cluster Name: %v", clusterName)
-
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
+
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
 
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
 		log.Error("Failed to probe with error: " + err.Error())
@@ -1300,14 +1314,14 @@ func (s *service) CreateSnapshot(
 		return nil, status.Error(codes.NotFound, utils.GetMessageWithRunID(runID, err.Error()))
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
-	log.Debugf("Cluster Name: %v", clusterName)
-
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
+
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
 
 	// auto probe
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
@@ -1437,14 +1451,14 @@ func (s *service) DeleteSnapshot(
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to parse snapshot ID '%s', error : '%v'", req.GetSnapshotId(), err))
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
-	log.Debugf("Cluster Name: %v", clusterName)
-
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
+
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
 
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
 		log.Error("Failed to probe with error: " + err.Error())
@@ -1547,7 +1561,7 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteSnapshot(
 		// Set a marker in snapshot tracking dir to delete snapshot, once
 		// all the volumes created from this snapshot were deleted
 		log.Debugf("set DeleteSnapshotMarker marker in snapshot tracking dir")
-		if err := isiConfig.isiSvc.CreateVolume(ctx, isiPath, snapshotTrackingDirDeleteMarker); err != nil {
+		if err := isiConfig.isiSvc.CreateVolume(ctx, isiPath, snapshotTrackingDirDeleteMarker, isiConfig.IsiVolumePathPermissions); err != nil {
 			return err
 		}
 	}
