@@ -87,7 +87,7 @@ Feature: Isilon CSI interface
      | "VolumeNotExistError"    | "ExportNotFoundError"     | "CreateExportError"  | "DeleteQuotaError"     | "EOF"                                    |
      | "VolumeNotExistError"    | "ExportNotFoundError"     | "CreateExportError"  | "DeleteVolumeError"    | "EOF"                                    |
 
-   @todo
+
     Scenario: Create volume from volume good scenario
       Given a Isilon service
       When I call CreateVolumeFromVolume "volume2=_=_=19=_=_=System" "volume1"

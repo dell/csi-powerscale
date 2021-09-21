@@ -85,6 +85,7 @@ type feature struct {
 	volumeIDList                       []string
 	snapshotIDList                     []string
 	snapshotIndex                      int
+	rootClientEnabled                  string
 }
 
 var inducedErrors struct {
@@ -189,22 +190,21 @@ func (f *feature) getService() *service {
 
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
-	opts.Insecure = true
-	opts.DebugEnabled = true
+	opts.SkipCertificateValidation = true
 	opts.Verbose = 1
 	opts.KubeConfigPath = "/etc/kubernetes/admin.conf"
 
 	newConfig := IsilonClusterConfig{}
 	newConfig.ClusterName = clusterName1
-	newConfig.IsiIP = "127.0.0.1"
-	newConfig.IsiPort = "8080"
+	newConfig.Endpoint = "127.0.0.1"
+	newConfig.EndpointPort = "8080"
 	newConfig.EndpointURL = "http://127.0.0.1"
 	newConfig.User = "blah"
 	newConfig.Password = "blah"
-	newConfig.IsiInsecure = &opts.Insecure
+	newConfig.SkipCertificateValidation = &opts.SkipCertificateValidation
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
 	boolTrue := true
-	newConfig.IsDefaultCluster = &boolTrue
+	newConfig.IsDefault = &boolTrue
 
 	if os.Getenv("CSI_ISILON_ENDPOINT") != "" {
 		newConfig.EndpointURL = os.Getenv("CSI_ISILON_ENDPOINT")
@@ -226,7 +226,7 @@ func (f *feature) getService() *service {
 	svc.mode = "controller"
 	f.service = svc
 	f.service.nodeID, _ = os.Hostname()
-	f.service.nodeIP = "1.2.3.4"
+	f.service.nodeIP = "10.247.98.140"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -322,12 +322,12 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call get export related functions in isiService$`, f.iCallGetExportRelatedFunctionsInIsiService)
 	s.Step(`^I call unimplemented functions$`, f.iCallUnimplementedFunctions)
 	s.Step(`^I call init Service object$`, f.iCallInitServiceObject)
-	s.Step(`^I call ControllerExpandVolume "([^"]*)" "(\d+)"$`, f.iCallControllerExpandVolume)
+	s.Step(`^I call ControllerExpandVolume "([^"]*)" "([^"]*)"$`, f.iCallControllerExpandVolume)
 	s.Step(`^a valid ControllerExpandVolumeResponse is returned$`, f.aValidControllerExpandVolumeResponseIsReturned)
 	s.Step(`^I call set allowed networks "([^"]*)"$`, f.iCallSetAllowedNetworks)
 	s.Step(`^I call set allowed networks with multiple networks "([^"]*)" "([^"]*)"$`, f.iCallSetAllowedNetworkswithmultiplenetworks)
 	s.Step(`^I call NodeGetInfo with invalid networks$`, f.iCallNodeGetInfowithinvalidnetworks)
-
+	s.Step(`^I set RootClientEnabled to "([^"]*)"$`, f.iSetRootClientEnabledTo)
 }
 
 // GetPluginInfo
@@ -541,6 +541,9 @@ func getAccessMode(accessType string) *csi.VolumeCapability_AccessMode {
 
 func (f *feature) iCallCreateVolume(name string) error {
 	req := getTypicalCreateVolumeRequest()
+	if f.rootClientEnabled != "" {
+		req.Parameters[RootClientEnabledParam] = f.rootClientEnabled
+	}
 	f.createVolumeRequest = req
 	req.Name = name
 	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
@@ -1239,6 +1242,9 @@ func (f *feature) getControllerPublishVolumeRequest(accessType, nodeID string) *
 	// add in the context
 	attributes := map[string]string{}
 	attributes[AccessZoneParam] = f.accessZone
+	if f.rootClientEnabled != "" {
+		attributes[RootClientEnabledParam] = f.rootClientEnabled
+	}
 	req.VolumeContext = attributes
 	return req
 }
@@ -1816,7 +1822,7 @@ func (f *feature) aIsilonServiceWithParamsForCustomTopology(user, mode string) e
 		clusterConfig.EndpointURL = f.server.URL
 		urlList := strings.Split(f.server.URL, ":")
 		log.Printf("urlList: %v", urlList)
-		clusterConfig.IsiPort = urlList[2]
+		clusterConfig.EndpointPort = urlList[2]
 	} else {
 		f.server = nil
 	}
@@ -1884,7 +1890,7 @@ func (f *feature) aIsilonServiceWithParamsForCustomTopologyNoLabel(user, mode st
 		clusterConfig.EndpointURL = f.server.URL
 		urlList := strings.Split(f.server.URL, ":")
 		log.Printf("urlList: %v", urlList)
-		clusterConfig.IsiPort = urlList[2]
+		clusterConfig.EndpointPort = urlList[2]
 	} else {
 		f.server = nil
 	}
@@ -1964,23 +1970,22 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
-	opts.Insecure = true
-	opts.DebugEnabled = true
+	opts.SkipCertificateValidation = true
 	opts.Verbose = 1
 	opts.CustomTopologyEnabled = true
 	opts.KubeConfigPath = "/etc/kubernetes/admin.conf"
 
 	newConfig := IsilonClusterConfig{}
 	newConfig.ClusterName = clusterName1
-	newConfig.IsiIP = "127.0.0.1"
-	newConfig.IsiPort = "8080"
+	newConfig.Endpoint = "127.0.0.1"
+	newConfig.EndpointPort = "8080"
 	newConfig.EndpointURL = "http://127.0.0.1"
 	newConfig.User = user
 	newConfig.Password = "blah"
-	newConfig.IsiInsecure = &opts.Insecure
+	newConfig.SkipCertificateValidation = &opts.SkipCertificateValidation
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
 	boolTrue := true
-	newConfig.IsDefaultCluster = &boolTrue
+	newConfig.IsDefault = &boolTrue
 
 	host, _ := os.Hostname()
 	result := removeNodeLabels(host)
@@ -2007,7 +2012,7 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	f.service = svc
 	f.service.nodeID = host
 	// TODO - IP has to be updated before release
-	f.service.nodeIP = "1.2.3.5"
+	f.service.nodeIP = "10.247.98.140"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -2022,21 +2027,20 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	var opts Opts
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
-	opts.Insecure = true
-	opts.DebugEnabled = true
+	opts.SkipCertificateValidation = true
 	opts.Verbose = 1
 
 	newConfig := IsilonClusterConfig{}
 	newConfig.ClusterName = clusterName1
-	newConfig.IsiIP = "127.0.0.1"
-	newConfig.IsiPort = "8080"
+	newConfig.Endpoint = "127.0.0.1"
+	newConfig.EndpointPort = "8080"
 	newConfig.EndpointURL = "http://127.0.0.1"
 	newConfig.User = user
 	newConfig.Password = "blah"
-	newConfig.IsiInsecure = &opts.Insecure
+	newConfig.SkipCertificateValidation = &opts.SkipCertificateValidation
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
 	boolTrue := true
-	newConfig.IsDefaultCluster = &boolTrue
+	newConfig.IsDefault = &boolTrue
 
 	if inducedErrors.autoProbeNotEnabled {
 		opts.AutoProbe = false
@@ -2047,7 +2051,7 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	svc.mode = mode
 	f.service = svc
 	f.service.nodeID, _ = os.Hostname()
-	f.service.nodeIP = "1.2.3.6"
+	f.service.nodeIP = "10.247.98.140"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -2124,5 +2128,9 @@ func (f *feature) iCallNodeGetInfowithinvalidnetworks() error {
 		log.Printf("NodeGetInfo call failed: %s\n", f.err.Error())
 		return nil
 	}
+	return nil
+}
+func (f *feature) iSetRootClientEnabledTo(val string) error {
+	f.rootClientEnabled = val
 	return nil
 }

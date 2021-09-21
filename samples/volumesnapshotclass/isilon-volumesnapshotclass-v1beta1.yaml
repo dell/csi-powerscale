@@ -1,0 +1,19 @@
+# For kubernetes version 18 and 19 (beta snaps)
+apiVersion: snapshot.storage.k8s.io/v1beta1
+kind: VolumeSnapshotClass
+metadata:
+  name: isilon-snapclass
+driver: csi-isilon.dellemc.com
+
+# Configure what happens to a VolumeSnapshotContent when the VolumeSnapshot object
+# it is bound to is to be deleted
+# Allowed values:
+#   Delete: the underlying storage snapshot will be deleted along with the VolumeSnapshotContent object.
+#   Retain: both the underlying snapshot and VolumeSnapshotContent remain.
+deletionPolicy: Delete
+
+parameters:
+  # The base path of the volumes on Isilon cluster for which snapshot is being created.
+  # This path should be same as the IsiPath from the storageClass.
+  # Optional: false
+  IsiPath: /ifs/data/csi

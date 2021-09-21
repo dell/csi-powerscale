@@ -64,11 +64,16 @@ Feature: Isilon CSI interface
       And a basic volume request "integration0" "8"
       When I call CreateVolume
       Then there is a directory "integration0"
+      Then there is an export "integration0"
+      When I call ControllerPublishVolume "X_CSI_NODE_NAME"
+      Then check Isilon client exists "X_CSI_NODE_NAME"
       When I call NodePublishVolume "datadir0"
       And I call NodePublishVolume "datadir0"
       Then there are no errors
       When I call NodeUnpublishVolume "datadir0"
       And I call NodeUnpublishVolume "datadir0"
+      When I call ControllerUnpublishVolume "X_CSI_NODE_NAME"
+      Then check Isilon client not exists "X_CSI_NODE_IP"
       Then there are no errors
       When I call DeleteVolume
       Then there is not a directory "integration0"
@@ -91,7 +96,8 @@ Feature: Isilon CSI interface
       When I call CreateVolume
       And I call CreateSnapshot "snapshot0" "integration0"
       Then there is a snapshot "snapshot0"
-      When I call DeleteVolume 
+      When I call DeleteVolume
+      Then there is not a directory "integration0"
       Then there is a snapshot "snapshot0"
       When I call DeleteSnapshot
       Then there is not a snapshot "snapshot0" 
@@ -107,6 +113,7 @@ Feature: Isilon CSI interface
       Then there are no errors
       When I call DeleteSnapshot
       And I call DeleteSnapshot
+      Then there is not a snapshot "snapshot0"
       Then there are no errors
       When I call DeleteVolume
       Then there is not a directory "integration0"
@@ -151,6 +158,7 @@ Feature: Isilon CSI interface
       When I call DeleteAllVolumes
       When I call DeleteSnapshot
       Then there is not a snapshot "snapshot0"
+      Then there is not a directory "volFromSnap0"
 
   @v1.0
     Scenario: Create volume, create snapshot, delete old volume, create RO volume from snapshot, delete RO volume, delete snapshot
@@ -197,7 +205,7 @@ Feature: Isilon CSI interface
       When I call DeleteAllVolumes
       Then there is not a snapshot "snapshot0"
 
-  @v1.0
+  @ROvolumefailure
     Scenario: create RO volume from snapshot, ControllerPublishVolume, NodePublishVolume, NodeUnpublishVolume, ControllerUnpublishVolume, delete snapshot, delete RO volume
       Given a Isilon service
       And a basic volume request "integration0" "8"
@@ -226,7 +234,7 @@ Feature: Isilon CSI interface
       When I call DeleteAllVolumes
       Then there is not a snapshot "snapshot0"
 
-  @v1.0
+  @ROvolumefailure
     Scenario: idempotency check- create RO volume from snapshot, ControllerPublishVolume, NodePublishVolume, NodeUnpublishVolume, ControllerUnpublishVolume, delete snapshot, delete RO volume
       Given a Isilon service
       And a basic volume request "integration0" "8"
@@ -548,4 +556,18 @@ Feature: Isilon CSI interface
     | numberOfVolumes |
     | 2               |
     | 4               |
+
+  @v1.0
+    Scenario: Cleanup all the files created
+      Given a Isilon service
+      When I call DeleteAllVolumes
+      Then there is not a directory "integration0"
+      And there is not a quota "integration0"
+      Then there is not a directory "integration1"
+      And there is not a quota "integration1"
+      Then there is not a directory "volFromSnap0"
+      And there is not a quota "volFromSnap0"
+      When I call DeleteAllSnapshots
+      Then there is not a snapshot "snapshot0"
+      Then there are no errors
 

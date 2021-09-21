@@ -81,13 +81,13 @@ func (svc *isiService) CreateSnapshot(ctx context.Context, path, snapshotName st
 	return snapshot, nil
 }
 
-func (svc *isiService) CreateVolume(ctx context.Context, isiPath, volName string) error {
+func (svc *isiService) CreateVolume(ctx context.Context, isiPath, volName, isiVolumePathPermissions string) error {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
 	log.Debugf("begin to create volume '%s'", volName)
 
-	if _, err := svc.client.CreateVolumeWithIsipath(ctx, isiPath, volName); err != nil {
+	if _, err := svc.client.CreateVolumeWithIsipath(ctx, isiPath, volName, isiVolumePathPermissions); err != nil {
 		log.Errorf("create volume failed, '%s'", err.Error())
 		return err
 	}
@@ -95,14 +95,14 @@ func (svc *isiService) CreateVolume(ctx context.Context, isiPath, volName string
 	return nil
 }
 
-func (svc *isiService) CreateVolumeWithMetaData(ctx context.Context, isiPath, volName string, metadata map[string]string) error {
+func (svc *isiService) CreateVolumeWithMetaData(ctx context.Context, isiPath, volName, isiVolumePathPermissions string, metadata map[string]string) error {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
 	log.Debugf("begin to create volume '%s'", volName)
 	log.Debugf("header metadata '%v'", metadata)
 
-	if _, err := svc.client.CreateVolumeWithIsipathMetaData(ctx, isiPath, volName, metadata); err != nil {
+	if _, err := svc.client.CreateVolumeWithIsipathMetaData(ctx, isiPath, volName, isiVolumePathPermissions, metadata); err != nil {
 		log.Errorf("create volume failed, '%s'", err.Error())
 		return err
 	}
@@ -485,7 +485,7 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 		return nil
 	}
 
-	log.Errorf("failed to add client FQDN '%s' to export id '%d' : '%v'", clientFQDN, exportID, err)
+	log.Warnf("failed to add client FQDN '%s' to export id '%d' : '%v'", clientFQDN, exportID, err)
 
 	if err := addClientFunc(ctx, exportID, accessZone, clientIP); err != nil {
 		return fmt.Errorf("failed to add client ip '%s' to export id '%d' : '%v'", clientIP, exportID, err)

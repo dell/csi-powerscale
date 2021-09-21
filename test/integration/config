@@ -1,20 +1,13 @@
-{
-  "isilonClusters": [
-    {
-      "clusterName": "cluster1",
-      "username": "user",
-      "password": "password",
-      "isiIP": "1.2.3.4",
-      "isDefaultCluster": true
-    },
-    {
-      "clusterName": "cluster2",
-      "username": "user",
-      "password": "password",
-      "isiIP": "1.2.3.5",
-      "isiPort": "8080",
-      "isiInsecure": true,
-      "isiPath": "/ifs/data/csi",
-    }
-  ]
-}
+isilonClusters:
+  - clusterName: "cluster1"
+    username: "user"
+    password: "password"
+    isDefault: true
+    endpoint: "1.2.3.4"
+    skipCertificateValidation: true
+  - clusterName: "cluster2"
+    username: "user"
+    password: "password"
+    isDefault: false
+    endpoint: "1.2.3.5"
+    skipCertificateValidation: true

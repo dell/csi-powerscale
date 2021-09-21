@@ -76,34 +76,34 @@ spec:
       containers:
         - name: driver
           command: ["/csi-isilon"]
+          args:
+            - "--driver-config-params=/csi-isilon-config-params/driver-config-params.yaml"
           securityContext:
             privileged: true
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
           image: {{ required "Must provide the Isilon driver container image." .Values.images.driver }}
-          imagePullPolicy: Always
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
           env:
             - name: CSI_ENDPOINT
-              value: /var/lib/kubelet/plugins/csi-isilon/csi_sock
+              value: "{{ .Values.kubeletConfigDir }}/plugins/csi-isilon/csi_sock"
             - name: X_CSI_MODE
               value: node
-            - name: X_CSI_ISI_INSECURE
-              value: "{{ .Values.isiInsecure }}"
+            - name: X_CSI_ISI_SKIP_CERTIFICATE_VALIDATION
+              value: "{{ .Values.skipCertificateValidation }}"
             - name: X_CSI_ALLOWED_NETWORKS
               value: "{{ .Values.allowedNetworks }}"
             - name: X_CSI_VERBOSE
               value: "{{ .Values.verbose }}"
             - name: X_CSI_PRIVATE_MOUNT_DIR
-              value: "/var/lib/kubelet/plugins/csi-isilon/disks"
+              value: "{{ .Values.kubeletConfigDir }}/plugins/csi-isilon/disks"
             - name: X_CSI_ISI_PORT
-              value: "{{ .Values.isiPort }}"
+              value: "{{ .Values.endpointPort }}"
             - name: X_CSI_ISI_PATH
               value: {{ .Values.isiPath }}
-            - name: X_CSI_ISILON_NO_PROBE_ON_START
+            - name: X_CSI_ISI_NO_PROBE_ON_START
               value: "{{ .Values.noProbeOnStart }}"
-            - name: X_CSI_ISILON_NFS_V3
-              value: "{{ .Values.nfsV3 }}"
             - name: X_CSI_ISI_AUTOPROBE
               value: "{{ .Values.autoProbe }}"
             - name: X_CSI_NODE_NAME
@@ -120,17 +120,17 @@ spec:
               value: "{{ .Values.enableQuota }}"
             - name: X_CSI_CUSTOM_TOPOLOGY_ENABLED
               value: "{{ .Values.enableCustomTopology }}"
-            - name: X_CSI_ISILON_CONFIG_PATH
+            - name: X_CSI_ISI_CONFIG_PATH
               value: /isilon-configs/config
             - name: X_CSI_MAX_VOLUMES_PER_NODE
               value: "{{ .Values.maxIsilonVolumesPerNode }}"
           volumeMounts:
             - name: driver-path
-              mountPath: /var/lib/kubelet/plugins/csi-isilon
+              mountPath: {{ .Values.kubeletConfigDir }}/plugins/csi-isilon
             - name: volumedevices-path
-              mountPath: /var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices
+              mountPath: {{ .Values.kubeletConfigDir }}/plugins/kubernetes.io/csi/volumeDevices
             - name: pods-path
-              mountPath: /var/lib/kubelet/pods
+              mountPath: {{ .Values.kubeletConfigDir }}/pods
               mountPropagation: "Bidirectional"
             - name: dev
               mountPath: /dev
@@ -139,12 +139,15 @@ spec:
               readOnly: true
             - name: isilon-configs
               mountPath: /isilon-configs
+            - name: csi-isilon-config-params
+              mountPath: /csi-isilon-config-params
         - name: registrar
           image: {{ required "Must provide the CSI node registrar container image." .Values.images.registrar }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
-            - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-isilon/csi_sock
+            - --kubelet-registration-path={{ .Values.kubeletConfigDir }}/plugins/csi-isilon/csi_sock
           env:
             - name: ADDRESS
               value: /csi/csi_sock
@@ -161,19 +164,19 @@ spec:
       volumes:
         - name: registration-dir
           hostPath:
-            path: /var/lib/kubelet/plugins_registry/
+            path: {{ .Values.kubeletConfigDir }}/plugins_registry/
             type: DirectoryOrCreate
         - name: driver-path
           hostPath:
-            path: /var/lib/kubelet/plugins/csi-isilon
+            path: {{ .Values.kubeletConfigDir }}/plugins/csi-isilon
             type: DirectoryOrCreate
         - name: volumedevices-path
           hostPath:
-            path: /var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices
+            path: {{ .Values.kubeletConfigDir }}/plugins/kubernetes.io/csi/volumeDevices
             type: DirectoryOrCreate
         - name: pods-path
           hostPath:
-            path: /var/lib/kubelet/pods
+            path: {{ .Values.kubeletConfigDir }}/pods
             type: Directory
         - name: dev
           hostPath:
@@ -192,4 +195,7 @@ spec:
         - name: isilon-configs
           secret:
             secretName: {{ .Release.Name }}-creds
+        - name: csi-isilon-config-params
+          configMap:
+             name: {{ .Release.Name }}-config-params
 

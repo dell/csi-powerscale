@@ -33,7 +33,7 @@ import (
 func publishVolume(
 	ctx context.Context,
 	req *csi.NodePublishVolumeRequest,
-	nfsExportURL string, nfsV3 bool) error {
+	nfsExportURL string) error {
 
 	// Fetch log handler
 	ctx, log := GetLogger(ctx)
@@ -73,10 +73,6 @@ func publishVolume(
 	rwOption := "rw"
 	if roFlag {
 		rwOption = "ro"
-	}
-
-	if nfsV3 {
-		rwOption = fmt.Sprintf("%s,%s", rwOption, "vers=3")
 	}
 
 	mntOptions = append(mntOptions, rwOption)

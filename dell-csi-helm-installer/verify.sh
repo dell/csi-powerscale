@@ -25,7 +25,7 @@ declare -a VALIDDRIVERS
 # source-verify-driver will call the proper method to source verification method scripts
 function source-verify-driver() {
   if [ -z "${1}" ]; then
-    decho "Expected one argument, the driver name, to verify-driver. Received none."
+    decho "Expected one argument: 'the driver name' to verify-driver. Received none."
     exit $EXIT_ERROR
   fi
   local D="${1}"
@@ -45,7 +45,7 @@ function source-verify-driver() {
 # verify-driver will call the proper method to verify a specific driver
 function verify-driver() {
   if [ -z "${1}" ]; then
-    decho "Expected one argument, the driver name, to verify-driver. Received none."
+    decho "Expected one argument: 'the driver name' to verify-driver. Received none."
     exit $EXIT_ERROR
   fi
   local D="${1}"
@@ -137,7 +137,7 @@ function verify_fc_installation() {
     rv=$?
     if [[ ${rv} -ne 0 ]]; then
       error=1
-      found_warning "can't find any FC hosts on node: $node"
+      found_warning "Can't find any FC hosts on node: $node"
     fi
   done
 
@@ -180,7 +180,7 @@ function verify_k8s_versions() {
   if [ "${OPENSHIFT}" == "true" ]; then
     return
   fi
-  log step "Verifying Kubernetes versions"
+  log step "Verifying Kubernetes version"
   decho
 
   local MIN=${1}
@@ -192,7 +192,7 @@ function verify_k8s_versions() {
   error=0
   if [[ ${V} < ${MIN} ]]; then
     error=1
-    found_error "Kubernetes version, ${V}, is too old. Minimum required version is: ${MIN}"
+    found_error "Kubernetes version ${V} is too old. Minimum required version is: ${MIN}"
   fi
   check_error error
 
@@ -202,7 +202,7 @@ function verify_k8s_versions() {
   error=0
   if [[ ${V} > ${MAX} ]]; then
     error=1
-    found_warning "Kubernetes version, ${V}, is newer than has been tested. Latest tested version is: ${MAX}"
+    found_warning "Kubernetes version ${V} is newer than the version that has been tested. Latest tested version is: ${MAX}"
   fi
   check_error error
 
@@ -213,7 +213,7 @@ function verify_openshift_versions() {
   if [ "${OPENSHIFT}" != "true" ]; then
     return
   fi
-  log step "Verifying OpenShift versions"
+  log step "Verifying OpenShift version"
   decho
 
   local MIN=${1}
@@ -225,7 +225,7 @@ function verify_openshift_versions() {
   error=0
   if [[ ${V} < ${MIN} ]]; then
     error=1
-    found_error "OpenShift version, ${V}, is too old. Minimum required version is: ${MIN}"
+    found_error "OpenShift version ${V} is too old. Minimum required version is: ${MIN}"
   fi
   check_error error
 
@@ -235,7 +235,7 @@ function verify_openshift_versions() {
   error=0
   if [[ ${V} > ${MAX} ]]; then
     error=1
-    found_warning "OpenShift version, ${V}, is newer than has been tested. Latest tested version is: ${MAX}"
+    found_warning "OpenShift version ${V} is newer than the version that has been tested. Latest tested version is: ${MAX}"
   fi
   check_error error
 }
@@ -272,7 +272,7 @@ function verify_alpha_snap_resources() {
     run_command kubectl explain ${C} 2> /dev/null | grep "^VERSION.*v1alpha1$" --quiet
     if [ $? -eq 0 ]; then
       error=1
-      found_error "The alhpa CRD for ${C} is installed. Please uninstall it"
+      found_error "The alpha CRD for ${C} is installed. Please uninstall it"
       if [[ $(run_command kubectl get ${C} -A --no-headers 2>/dev/null | wc -l) -ne 0 ]]; then
         found_error " Found CR for alpha CRD ${C}. Please delete it"
       fi
@@ -415,6 +415,37 @@ function validate_params() {
     usage
     exit 1
   fi
+}
+
+# verify helm values file version matches helm chart version, which is the driver version
+# args: expected values version
+function verify_helm_values_version() {
+  log step "Verifying helm values version"
+
+  error=0
+  values_version=$(grep ^version: $VALUES | awk '{print $2}' | tr -d '"')
+  # if values version is not found, it's ok
+  if [ -z $values_version ]; then
+    error=1
+    found_error "Helm values file version not found"
+    check_error error
+    return
+  fi
+
+  match=false
+  for expected_version in "$@"; do
+    if [ "$expected_version" = "$values_version" ]; then
+      match=true
+      break
+    fi
+  done
+
+  if [ "$match" = false ]; then
+    error=1
+    found_error "Incompatible helm values file specified - expected: `echo $@| tr " " "/ "`, found: $values_version"
+  fi
+
+  check_error error
 }
 
 #

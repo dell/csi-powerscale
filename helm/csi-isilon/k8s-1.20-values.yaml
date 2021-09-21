@@ -4,18 +4,18 @@ kubeversion: "v1.20"
 images:
   # "images.attacher" defines the container images used for the csi attacher
   # container.
-  attacher: k8s.gcr.io/sig-storage/csi-attacher:v3.2.1
+  attacher: k8s.gcr.io/sig-storage/csi-attacher:v3.3.0
 
   # "images.provisioner" defines the container images used for the csi provisioner
   # container.
-  provisioner: k8s.gcr.io/sig-storage/csi-provisioner:v2.2.1
+  provisioner: k8s.gcr.io/sig-storage/csi-provisioner:v2.2.2
 
   # "images.snapshotter" defines the container image used for the csi snapshotter
-  snapshotter: k8s.gcr.io/sig-storage/csi-snapshotter:v4.1.0
+  snapshotter: k8s.gcr.io/sig-storage/csi-snapshotter:v4.1.1
 
   # "images.registrar" defines the container images used for the csi registrar
   # container.
-  registrar: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.2.0
+  registrar: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.3.0
   
   # "images.resizer" defines the container images used for the csi resizer
   # container.

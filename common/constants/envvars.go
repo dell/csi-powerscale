@@ -25,13 +25,16 @@ const (
 	// HTTPS port number of the Isilon OneFS API server
 	EnvPort = "X_CSI_ISI_PORT"
 
-	// EnvInsecure is the name of the enviroment variable used to specify
+	// EnvSkipCertificateValidation is the name of the enviroment variable used to specify
 	// that the Isilon OneFS API server's certificate chain and host name should not
 	// be verified
-	EnvInsecure = "X_CSI_ISI_INSECURE"
+	EnvSkipCertificateValidation = "X_CSI_ISI_SKIP_CERTIFICATE_VALIDATION"
 
 	// EnvPath is the root path under which all the volumes (directories) will be provisioned, e.g. /ifs/engineering
 	EnvPath = "X_CSI_ISI_PATH"
+
+	// EnvIsiVolumePathPermissions is the default permissions for volume directory path, e.g. 0777
+	EnvIsiVolumePathPermissions = "X_CSI_ISI_VOLUME_PATH_PERMISSIONS"
 
 	// EnvAutoProbe is the name of the environment variable used to specify
 	// that the controller service should automatically probe itself if it
@@ -39,8 +42,8 @@ const (
 	// violation of the CSI spec
 	EnvAutoProbe = "X_CSI_ISI_AUTOPROBE"
 
-	// EnvDebug indicates whether the driver is in debug mode
-	EnvDebug = "X_CSI_DEBUG"
+	// EnvGOCSIDebug indicates whether to print REQUESTs and RESPONSEs of all CSI method calls(from gocsi)
+	EnvGOCSIDebug = "X_CSI_DEBUG"
 
 	// EnvVerbose indicates whether the driver should log OneFS REST API response body content
 	EnvVerbose = "X_CSI_VERBOSE"
@@ -52,10 +55,7 @@ const (
 	EnvAccessZone = "X_CSI_ISI_ACCESS_ZONE"
 
 	// EnvNoProbeOnStart indicates whether a probe should be attempted upon start
-	EnvNoProbeOnStart = "X_CSI_ISILON_NO_PROBE_ON_START"
-
-	// EnvNfsV3 indicates whether to add "-o ver=3" option to the mount command when mounting an NFS export
-	EnvNfsV3 = "X_CSI_ISILON_NFS_V3"
+	EnvNoProbeOnStart = "X_CSI_ISI_NO_PROBE_ON_START"
 
 	// EnvNodeName is the name of a k8s node
 	EnvNodeName = "X_CSI_NODE_NAME"
@@ -73,7 +73,7 @@ const (
 	EnvAllowedNetworks = "X_CSI_ALLOWED_NETWORKS"
 
 	// EnvIsilonConfigFile specifies the filepath containing Isilon cluster's config details
-	EnvIsilonConfigFile = "X_CSI_ISILON_CONFIG_PATH"
+	EnvIsilonConfigFile = "X_CSI_ISI_CONFIG_PATH"
 
 	// EnvMaxVolumesPerNode specifies maximum number of volumes that controller can publish to the node.
 	EnvMaxVolumesPerNode = "X_CSI_MAX_VOLUMES_PER_NODE"

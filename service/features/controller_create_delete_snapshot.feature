@@ -47,6 +47,14 @@ Feature: Isilon CSI interface
     | "volume2=_=_=19=_=_=System"    | "create_snapshot_name"                        | "none"                     | "none"                                 |
     | "volume2=_=_=19=_=_=System"    | ""                                            | "/ifs/data/csi-isilon"     | "name cannot be empty"                 |
 
+@todo
+@createROVolumeFromSnapshot
+  Scenario: Create RO volume from snapshot good scenario
+    Given a Isilon service
+    When I call Probe
+    And I call CreateROVolumeFromSnapshot "2" "volume1"
+    Then a valid CreateVolumeResponse is returned
+
 @deleteSnapshot
 @v1.0.0
 @todo
@@ -60,8 +68,8 @@ Feature: Isilon CSI interface
     Examples:
     | induced                 | errormsg                                        |
     | "GetSnapshotError"      | "cannot check the existence of the snapshot"    |
-    | "DeleteSnapshotError"   | "error deleteing snapshot"                      |
-   
+    | "DeleteSnapshotError"   | "error deleting snapshot"                      |
+  
 @todo
   Scenario Outline: Controller delete snapshot various use cases from examples
     Given a Isilon service
@@ -76,3 +84,4 @@ Feature: Isilon CSI interface
     | ""           | "snapshot id to be deleted is required"  |
     | "404"        | "none"                                   |
     | "str"        | "cannot convert snapshot to integer"     |
+

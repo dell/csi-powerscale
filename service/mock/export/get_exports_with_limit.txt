@@ -9,7 +9,7 @@
       "case_preserving": true,
       "chown_restricted": false,
       "clients": [
-        "1.2.3.4"
+        "10.110.25.198"
       ],
       "commit_asynchronous": false,
       "conflicting_paths": [],

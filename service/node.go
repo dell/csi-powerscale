@@ -18,6 +18,12 @@ package service
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/common/constants"
 	"github.com/dell/csi-isilon/common/utils"
@@ -26,10 +32,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"io/ioutil"
-	"os"
-	"strconv"
-	"time"
 )
 
 func (s *service) NodeExpandVolume(
@@ -132,9 +134,13 @@ func (s *service) NodePublishVolume(
 	// Set azServiceIP to updated endpoint when custom topology is enabled
 	var azServiceIP string
 	if s.opts.CustomTopologyEnabled {
-		azServiceIP = isiConfig.IsiIP
+		azServiceIP = isiConfig.Endpoint
 	} else {
 		azServiceIP = volumeContext[AzServiceIPParam]
+	}
+
+	if strings.Contains(azServiceIP, "localhost") {
+		azServiceIP = isiConfig.MountEndpoint
 	}
 
 	f := map[string]interface{}{
@@ -145,7 +151,7 @@ func (s *service) NodePublishVolume(
 	}
 	// TODO: Replace logrus with log
 	logrus.WithFields(f).Info("Calling publishVolume")
-	if err := publishVolume(ctx, req, isiConfig.isiSvc.GetNFSExportURLForPath(azServiceIP, path), s.opts.NfsV3); err != nil {
+	if err := publishVolume(ctx, req, isiConfig.isiSvc.GetNFSExportURLForPath(azServiceIP, path)); err != nil {
 		return nil, err
 	}
 
@@ -171,13 +177,14 @@ func (s *service) NodeUnpublishVolume(
 		volName = volID
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
-	log.Debugf("Cluster Name: %v", clusterName)
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
 	}
+
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
 
 	// Probe the node if required
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
@@ -313,7 +320,7 @@ func (s *service) NodeGetInfo(
 	}
 
 	// If Custom Topology is not enabled, proceed with adding node labels for all
-	// PowerScale clusters part of secret.json
+	// PowerScale clusters part of secret.yaml
 	isiClusters := s.getIsilonClusters()
 	topology := make(map[string]string)
 
@@ -340,7 +347,7 @@ func (s *service) NodeGetInfo(
 
 		// Create the topology keys
 		// <provisionerName>.dellemc.com/<powerscaleIP>: <provisionerName>
-		topology[constants.PluginName+"/"+isiClusters[cluster].IsiIP] = constants.PluginName
+		topology[constants.PluginName+"/"+isiClusters[cluster].Endpoint] = constants.PluginName
 	}
 
 	// Check for node label 'max-isilon-volumes-per-node'. If present set 'MaxVolumesPerNode' to this value.

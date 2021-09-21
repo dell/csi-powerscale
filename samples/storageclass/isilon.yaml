@@ -1,0 +1,70 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: isilon
+provisioner: csi-isilon.dellemc.com
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+parameters:
+  # The name of the access zone a volume can be created in
+  # Optional: true
+  # Default value: default value specified in values.yaml
+  # Examples: System, zone1
+  AccessZone: System
+
+  # The base path for the volumes to be created on PowerScale cluster.
+  # Ensure that this path exists on PowerScale cluster.
+  # Allowed values: unix absolute path
+  # Optional: true
+  # Default value: value specified in values.yaml for isiPath
+  # Examples: /ifs/data/csi, /ifs/engineering
+  IsiPath: /ifs/data/csi
+
+  # The permissions for isi volume directory path
+  # This value overrides the isiVolumePathPermissions attribute of corresponding cluster config in secret, if present
+  # Allowed values: valid octal mode number
+  # Default value: "0777"
+  # Examples: "0777", "777", "0755"
+  #IsiVolumePathPermissions: "0777"
+
+  # AccessZone groupnet service IP. Update AzServiceIP if different than endpoint.
+  # Optional: true
+  # Default value: endpoint of the cluster ClusterName
+  #AzServiceIP : 192.168.2.1
+
+  # When a PVC is being created, this parameter determines, when a node mounts the PVC,
+  # whether to add the k8s node to the "Root clients" field or "Clients" field of the NFS export
+  # Allowed values:
+  #   "true": adds k8s node to the "Root clients" field of the NFS export
+  #   "false": adds k8s node to the "Clients" field of the NFS export
+  # Optional: true
+  # Default value: "false"
+  RootClientEnabled: "false"
+
+  # Name of PowerScale cluster, where pv will be provisioned.
+  # This name should match with name of one of the cluster configs in isilon-creds secret.
+  # If this parameter is not specified, then default cluster config in isilon-creds secret
+  # will be considered if available.
+  # Optional: true
+  #ClusterName: <cluster_name>
+
+# volumeBindingMode controls when volume binding and dynamic provisioning should occur.
+# Allowed values:
+#   Immediate: indicates that volume binding and dynamic provisioning occurs once the
+#   PersistentVolumeClaim is created
+#   WaitForFirstConsumer: will delay the binding and provisioning of a PersistentVolume
+#   until a Pod using the PersistentVolumeClaim is created
+# Default value: Immediate
+volumeBindingMode: Immediate
+
+# allowedTopologies helps scheduling pods on worker nodes which match all of below expressions.
+# If enableCustomTopology is set to true in helm values.yaml, then do not specify allowedTopologies
+# Change all instances of <ISILON_IP> to the IP of the PowerScale OneFS API server
+#allowedTopologies:
+#  - matchLabelExpressions:
+#      - key: csi-isilon.dellemc.com/<ISILON_IP>
+#        values:
+#          - csi-isilon.dellemc.com
+
+# specify additional mount options for when a Persistent Volume is being mounted on a node.
+#mountOptions: ["<mountOption1>", "<mountOption2>", ..., "<mountOptionN>"]

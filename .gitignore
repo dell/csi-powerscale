@@ -15,3 +15,4 @@
 helm/myvalues.yaml
 semver.mk
 goisilon
+gocsi
