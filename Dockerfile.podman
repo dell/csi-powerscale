@@ -14,6 +14,23 @@ RUN CGO_ENABLED=0 \
 
 # Stage to build the driver image
 FROM $BASEIMAGE AS driver
+RUN echo $'[rhel-8-baseos]\n\
+name=Red Hat Enterprise Linux 8 (BaseOS) - $basearch\n\
+baseurl=http://hb.us.dell.com/pub/redhat/RHEL8/stable/BaseOS/x86_64/os/\n\
+enabled=1\n\
+gpgcheck=1\n\
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release,file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-beta\n\
+skip_if_unavailable=1\n\
+\n\
+[rhel-8-appstream]\n\
+name=Red Hat Enterprise Linux 8 (AppStream) - $basearch\n\
+baseurl=http://hb.us.dell.com/pub/redhat/RHEL8/stable/AppStream/x86_64/os/\n\
+enabled=1\n\
+gpgcheck=1\n\
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release,file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-beta\n\
+skip_if_unavailable=1\n'\
+>> /etc/yum.repos.d/dell-rpm.repo
+
 # install necessary packages
 # alphabetical order for easier maintenance
 RUN microdnf update -y && \
@@ -52,7 +69,7 @@ LABEL vendor="Dell Inc." \
       name="csi-isilon" \
       summary="CSI Driver for Dell EMC PowerScale" \
       description="CSI Driver for provisioning persistent storage from Dell EMC PowerScale" \
-      version="1.6.0" \
+      version="1.6.1" \
       license="Apache-2.0"
 
 COPY ./licenses /licenses
