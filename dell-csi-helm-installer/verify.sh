@@ -355,6 +355,11 @@ function verify_authorization_proxy_server() {
  
   error=0
   code=0
+
+  for node in $MINION_NODES; do
+      WGET=$(ssh ${NODEUSER}@"${node}" "which wget")
+      CURL=$(ssh ${NODEUSER}@"${node}" "which curl")
+
   if [ ! -x "${WGET}" ]; then
     if [ ! -x "${CURL}" ]; then
     error=1
@@ -367,19 +372,20 @@ function verify_authorization_proxy_server() {
     log info "Making HTTP request to https://"${proxyHost}"; expecting response code 502"
     if [ "${insecure}" == "true" ]
     then
-      code=$(curl -kIs https://"${proxyHost}" 2>&1 | grep "HTTP/1.1"| awk '{print $2}')
+      code=$(ssh ${NODEUSER}@"${node}" curl -kIs https://"${proxyHost}" 2>&1 | grep "HTTP/1.1"| awk '{print $2}')
     else
-      code=$(curl -Is https://"${proxyHost}" 2>&1 | grep "HTTP/1.1"| awk '{print $2}')
+      code=$(ssh ${NODEUSER}@"${node}" curl -Is https://"${proxyHost}" 2>&1 | grep "HTTP/1.1"| awk '{print $2}')
     fi
   fi
 
   log info "Making HTTP request to https://"${proxyHost}"; expecting response code 502"
   if [ "${insecure}" == "true" ]
     then
-      code=$(wget --no-check-certificate --server-response --spider --quiet https://"${proxyHost}"  2>&1 | awk 'NR==1{print $2}')
+      code=$(ssh ${NODEUSER}@"${node}" wget --no-check-certificate --server-response --spider --quiet https://"${proxyHost}"  2>&1 | awk 'NR==1{print $2}')
     else
-      code=$(wget --server-response --spider --quiet https:"${proxyHost}" 2>&1 | awk 'NR==1{print $2}')
+      code=$(ssh ${NODEUSER}@"${node}" wget --server-response --spider --quiet https:"${proxyHost}" 2>&1 | awk 'NR==1{print $2}')
   fi
+  done
 
   if [ "${code}" != "502" ]; then
     error=1
