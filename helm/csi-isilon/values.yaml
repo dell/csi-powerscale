@@ -214,3 +214,17 @@ noProbeOnStart: false
 #   false: disable auto probe.
 # Default value: false
 autoProbe: true
+
+# authorization: enable csm-authorization for RBAC
+authorization:
+  # enable: Enable/Disable csm-authorization
+  enabled: true
+
+  # sidecarProxyImage: the container images used for the csm-authorization-sidecar.
+  sidecarProxyImage: dellemc/csm-authorization-sidecar:v1.0.0
+
+  # proxyHost: hostname of the csm-authorization server
+  proxyHost:
+
+  # insecure: Enable/Disable certificate validation of the csm-authorization server
+  insecure: true
