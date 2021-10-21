@@ -336,6 +336,60 @@ function verify_helm_3() {
   check_error error
 }
 
+function verify_authorization_proxy_server() {
+  if [ ${NODE_VERIFY} -eq 0 ]; then
+    return
+  fi
+
+  log step "Verifying csm-authorization connectivity"
+
+  enabled=$(grep -v "#" $VALUES | grep -A1 "authorization:" | grep enabled | xargs | awk '{print $2}')
+  if [ "${enabled}" == "false"  ]; then
+    return
+  fi
+  
+  proxyHost=$(grep -v "#" $VALUES | grep proxyHost | xargs | awk '{print $2}')
+  insecure=$(grep -v "#" $VALUES | grep -A10 "authorization:" | grep insecure | xargs | awk '{print $2}')
+  WGET=`which wget`
+  CURL=`which curl`
+ 
+  error=0
+  code=0
+  if [ ! -x "${WGET}" ]; then
+    if [ ! -x "${CURL}" ]; then
+    error=1
+    found_error "Unable to find wget or curl in the path. Install wget or curl to verify the csm-authorization proxy-server"
+    log step_failure
+    check_error error
+    return
+    fi
+
+    log info "Making HTTP request to https://"${proxyHost}"; expecting response code 502"
+    if [ "${insecure}" == "true" ]
+    then
+      code=$(curl -kIs https://"${proxyHost}" 2>&1 | grep "HTTP/1.1"| awk '{print $2}')
+    else
+      code=$(curl -Is https://"${proxyHost}" 2>&1 | grep "HTTP/1.1"| awk '{print $2}')
+    fi
+  fi
+
+  log info "Making HTTP request to https://"${proxyHost}"; expecting response code 502"
+  if [ "${insecure}" == "true" ]
+    then
+      code=$(wget --no-check-certificate --server-response --spider --quiet https://"${proxyHost}"  2>&1 | awk 'NR==1{print $2}')
+    else
+      code=$(wget --server-response --spider --quiet https:"${proxyHost}" 2>&1 | awk 'NR==1{print $2}')
+  fi
+
+  if [ "${code}" != "502" ]; then
+    error=1
+    found_error "did not get expected response code 502 from the the csm-authorization proxy-server, got "${code}""
+    log step_failure
+  fi
+
+   check_error error
+}
+
 # found_error, installation will not continue
 function found_error() {
   for N in "$@"; do
