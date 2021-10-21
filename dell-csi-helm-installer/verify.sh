@@ -350,8 +350,6 @@ function verify_authorization_proxy_server() {
   
   proxyHost=$(grep -v "#" $VALUES | grep proxyHost | xargs | awk '{print $2}')
   insecure=$(grep -v "#" $VALUES | grep -A10 "authorization:" | grep insecure | xargs | awk '{print $2}')
-  WGET=`which wget`
-  CURL=`which curl`
  
   error=0
   code=0
