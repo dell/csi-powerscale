@@ -5,17 +5,16 @@ on:
   pull_request:
     branches: [ main ]
 jobs:
-  sanitize:
-    name: Check for forbidden words
+  code-check:
+    name: Check Go formatting, linting, vetting
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
         uses: actions/checkout@v2
-      - name: Run the forbidden words scan
-        uses: dell/common-github-actions/code-sanitizer@main
+      - name: Run the formatter, linter, and vetter
+        uses: dell/common-github-actions/go-code-formatter-linter-vetter@main
         with:
-          args: /github/workspace
-          skip-list: "master"
+          directories: ./...
   go_security_scan:
     name: Go security
     runs-on: ubuntu-latest
