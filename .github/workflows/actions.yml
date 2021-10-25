@@ -34,3 +34,15 @@ jobs:
         with:
           directories: .
           options: -ri
+  test:
+    name: Run Go unit tests and check package coverage
+    runs-on: ubuntu-latest
+    services:
+      # Label used to access the service container
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v2
+      - name: Run unit tests and check package coverage
+        uses: dell/common-github-actions/go-code-tester@main
+        with:
+          threshold: 90
