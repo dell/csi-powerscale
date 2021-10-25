@@ -26,6 +26,7 @@ import (
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/common/constants"
+	"github.com/dell/csi-isilon/common/k8sutils"
 	"github.com/dell/csi-isilon/common/utils"
 	csiutils "github.com/dell/csi-isilon/csi-utils"
 	"github.com/sirupsen/logrus"
@@ -280,14 +281,20 @@ func (s *service) NodeGetCapabilities(
 						Type: csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
 					},
 				},
-			},
-			/*{
+			}, {
 				Type: &csi.NodeServiceCapability_Rpc{
 					Rpc: &csi.NodeServiceCapability_RPC{
 						Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
 					},
 				},
-			},{
+			}, {
+				Type: &csi.NodeServiceCapability_Rpc{
+					Rpc: &csi.NodeServiceCapability_RPC{
+						Type: csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
+					},
+				},
+			},
+			/*{
 				Type: &csi.NodeServiceCapability_Rpc{
 					Rpc: &csi.NodeServiceCapability_RPC{
 						Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
@@ -387,7 +394,78 @@ func (s *service) NodeGetInfo(
 
 func (s *service) NodeGetVolumeStats(
 	ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+
+	// Fetch log handler
+	ctx, _, runID := GetRunIDLog(ctx)
+
+	volID := req.GetVolumeId()
+	if volID == "" {
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no VolumeID found in request"))
+	}
+	volPath := req.GetVolumePath()
+	if volPath == "" {
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no Volume Path found in request"))
+	}
+
+	//check whether the original volume is mounted
+	volName, _, _, _, _ := utils.ParseNormalizedVolumeID(ctx, volID)
+	if volName == "" {
+		volName = volID
+	}
+
+	mounted, err := isVolumeMounted(ctx, volName, volPath)
+	if !mounted {
+		return &csi.NodeGetVolumeStatsResponse{
+			Usage: nil,
+			VolumeCondition: &csi.VolumeCondition{
+				Abnormal: true,
+				Message:  fmt.Sprintf("No Volume is mounted at path: %s", err),
+			},
+		}, nil
+	}
+
+	//check whether volume path is accessible
+	_, err = os.ReadDir(volPath)
+	if err != nil {
+		return &csi.NodeGetVolumeStatsResponse{
+			Usage: nil,
+			VolumeCondition: &csi.VolumeCondition{
+				Abnormal: true,
+				Message:  fmt.Sprintf("volume Path is not accessible: %s", err),
+			},
+		}, nil
+
+	}
+
+	//Get Volume stats metrics
+	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := k8sutils.GetStats(ctx, volPath)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf(
+			"failed to get volume stats metrics : %s",
+			err,
+		))
+	}
+
+	return &csi.NodeGetVolumeStatsResponse{
+		Usage: []*csi.VolumeUsage{
+			{
+				Unit:      csi.VolumeUsage_BYTES,
+				Available: availableBytes,
+				Total:     totalBytes,
+				Used:      usedBytes,
+			},
+			{
+				Unit:      csi.VolumeUsage_INODES,
+				Available: freeInodes,
+				Total:     totalInodes,
+				Used:      usedInodes,
+			},
+		},
+		VolumeCondition: &csi.VolumeCondition{
+			Abnormal: false,
+			Message:  "Volume is Healthy",
+		},
+	}, nil
 }
 
 func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {

@@ -160,6 +160,21 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
+        - name: external-health-monitor-controller
+          image: {{ required "Must provide the CSI external-health-monitor-controller container image." .Values.images.externalhealthmonitorcontroller }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--v=5"
+            - "--leader-election"
+            - "--timeout=180s"
+            - "--enable-node-watcher=true"
+          env:
+            - name: ADDRESS
+              value: /var/run/csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
         - name: provisioner
           image: {{ required "Must provide the CSI provisioner container image." .Values.images.provisioner }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
@@ -230,7 +245,7 @@ spec:
             - name: X_CSI_ISI_VOLUME_PATH_PERMISSIONS
               value: "{{ .Values.isiVolumePathPermissions }}"
             - name: X_CSI_ISI_NO_PROBE_ON_START
-              value: "{{ .Values.noProbeOnStart }}"    
+              value: "{{ .Values.noProbeOnStart }}"
             - name: X_CSI_NODE_NAME
               valueFrom:
                 fieldRef:
@@ -268,3 +283,4 @@ spec:
         - name: csi-isilon-config-params
           configMap:
              name: {{ .Release.Name }}-config-params
+

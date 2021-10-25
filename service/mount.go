@@ -141,30 +141,11 @@ func unpublishVolume(
 	}
 
 	log.Debugf("attempting to unmount '%s'", target)
-	mnts, err := gofsutil.GetMounts(ctx)
+	mounted, err := isVolumeMounted(ctx, filterStr, target)
 	if err != nil {
-		return status.Errorf(codes.Internal,
-			"could not reliably determine existing mount status: '%s'",
-			err.Error())
+		return err
 	}
-	if len(mnts) != 0 {
-		// Idempotence check not to return error if not published
-		mounted := false
-		for _, m := range mnts {
-			if strings.Contains(m.Device, filterStr) {
-				if m.Path == target {
-					mounted = true
-					break
-				}
-			}
-		}
-		if mounted == false {
-			log.Debugf("target '%s' does not exist", target)
-			return nil
-		}
-	} else {
-		// No mount exists also means not published
-		log.Debugf("target '%s' does not exist", target)
+	if !mounted {
 		return nil
 	}
 	if err := gofsutil.Unmount(context.Background(), target); err != nil {
@@ -203,4 +184,39 @@ func contains(list []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func isVolumeMounted(ctx context.Context, filterStr string, target string) (bool, error) {
+
+	// Fetch log handler
+	ctx, log := GetLogger(ctx)
+
+	mnts, err := gofsutil.GetMounts(ctx)
+	if err != nil {
+		return false, status.Errorf(codes.Internal,
+			"could not reliably determine existing mount status: '%s'",
+			err.Error())
+	}
+
+	if len(mnts) != 0 {
+		// Idempotence check not to return error if not published
+		mounted := false
+		for _, m := range mnts {
+			if strings.Contains(m.Device, filterStr) {
+				if m.Path == target {
+					mounted = true
+					return mounted, nil
+				}
+			}
+		}
+		if mounted == false {
+			log.Debugf("target '%s' does not exist", target)
+			return mounted, nil
+		}
+	} else {
+		// No mount exists also means not published
+		log.Debugf("target '%s' does not exist", target)
+		return false, nil
+	}
+	return false, nil
 }

@@ -19,5 +19,9 @@ images:
   
   # "images.resizer" defines the container images used for the csi resizer
   # container.
-  resizer: k8s.gcr.io/sig-storage/csi-resizer:v1.2.0 
+  resizer: k8s.gcr.io/sig-storage/csi-resizer:v1.2.0
+
+  # "images.externalhealthmonitorcontroller" defines the container images used for the csi external health monitor controller
+  # container.
+  externalhealthmonitorcontroller: k8s.gcr.io/sig-storage/csi-external-health-monitor-controller:v0.4.0
 
