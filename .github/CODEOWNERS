@@ -1,0 +1,20 @@
+# CODEOWNERS
+#
+# documentation for this file can be found at:
+# https://help.github.com/en/articles/about-code-owners
+
+# These are the default owners for the code and will
+# be requested for review when someone opens a pull request.
+# order is alphabetical for easier maintenance.
+#
+# Bahubali Jain (bpjain2004)
+# Nitesh Rewatkar (nitesh3108)
+# Prasanna Muthukumaraswamy (prablr79)
+# Randeep Sharma (randeepsharma)
+# Sakshi Makkar (Sakshi-dell)
+# Shefali Malhotra (shefali-malhotra)
+# Tharunika Jvr (Tharun-vr)
+
+
+# for all files:
+* @bpjain2004 @nitesh3108 @prablr79 @randeepsharma @Sakshi-dell @shefali-malhotra @Tharun-vr
