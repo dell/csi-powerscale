@@ -317,3 +317,29 @@ Feature: Isilon CSI interface
       And I call NodeGetInfo
       Then a valid NodeGetInfoResponse is returned
 
+   Scenario: ControllerGetVolume good scenario
+    Given a Isilon service
+    When I call Probe
+    And I call ControllerGetVolume with name "volume2=_=_=43=_=_=System=_=_=cluster1"
+    Then a valid ControllerGetVolumeResponse is returned
+
+  Scenario: ControllerGetVolume volume does not exist scenario
+    Given a Isilon service
+    When I call Probe
+    And I induce error "VolumeNotExistError"
+    And I call ControllerGetVolume with name ""
+    Then the error contains "no VolumeID found in request"
+
+  Scenario: NodeGetVolumeStats volume does not exist scenario
+    Given a Isilon service
+    When I call Probe
+    And I induce error "VolumeNotExistError"
+    And I call NodeGetVolumeStats with name "" and path ""
+    Then the error contains "no VolumeID found in request"
+
+  Scenario: NodeGetVolumeStats volume does not exist scenario
+    Given a Isilon service
+    When I call Probe
+    And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1" and path ""
+    Then the error contains "no Volume Path found in request"
+

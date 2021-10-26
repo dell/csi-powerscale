@@ -62,6 +62,8 @@ type feature struct {
 	deleteVolumeRequest                *csi.DeleteVolumeRequest
 	controllerExpandVolumeRequest      *csi.ControllerExpandVolumeRequest
 	controllerExpandVolumeResponse     *csi.ControllerExpandVolumeResponse
+	controllerGetVolumeRequest         *csi.ControllerGetVolumeRequest
+	controllerGetVolumeResponse        *csi.ControllerGetVolumeResponse
 	listVolumesRequest                 *csi.ListVolumesRequest
 	listVolumesResponse                *csi.ListVolumesResponse
 	listSnapshotsRequest               *csi.ListSnapshotsRequest
@@ -79,6 +81,8 @@ type feature struct {
 	nodePublishVolumeRequest           *csi.NodePublishVolumeRequest
 	nodeUnpublishVolumeRequest         *csi.NodeUnpublishVolumeRequest
 	nodeUnpublishVolumeResponse        *csi.NodeUnpublishVolumeResponse
+	nodeGetVolumeStatsRequest          *csi.NodeGetVolumeStatsRequest
+	nodeGetVolumeStatsResponse         *csi.NodeGetVolumeStatsResponse
 	deleteSnapshotRequest              *csi.DeleteSnapshotRequest
 	deleteSnapshotResponse             *csi.DeleteSnapshotResponse
 	createSnapshotRequest              *csi.CreateSnapshotRequest
@@ -226,7 +230,7 @@ func (f *feature) getService() *service {
 	svc.mode = "controller"
 	f.service = svc
 	f.service.nodeID, _ = os.Hostname()
-	f.service.nodeIP = "1.2.3.4"
+	f.service.nodeIP = "127.0.0.1"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -328,6 +332,9 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call set allowed networks with multiple networks "([^"]*)" "([^"]*)"$`, f.iCallSetAllowedNetworkswithmultiplenetworks)
 	s.Step(`^I call NodeGetInfo with invalid networks$`, f.iCallNodeGetInfowithinvalidnetworks)
 	s.Step(`^I set RootClientEnabled to "([^"]*)"$`, f.iSetRootClientEnabledTo)
+	s.Step(`^I call ControllerGetVolume with name "([^"]*)"$`, f.iCallControllerGetVolume)
+	s.Step(`^a valid ControllerGetVolumeResponse is returned$`, f.aValidControllerGetVolumeResponseIsReturned)
+	s.Step(`^I call NodeGetVolumeStats with name "([^"]*)" and path "([^"]*)"$`, f.iCallNodeGetVolumeStats)
 }
 
 // GetPluginInfo
@@ -809,11 +816,15 @@ func (f *feature) aValidControllerGetCapabilitiesResponseIsReturned() error {
 				count = count + 1
 			case csi.ControllerServiceCapability_RPC_EXPAND_VOLUME:
 				count = count + 1
+			case csi.ControllerServiceCapability_RPC_VOLUME_CONDITION:
+				count = count + 1
+			case csi.ControllerServiceCapability_RPC_GET_VOLUME:
+				count = count + 1
 			default:
 				return fmt.Errorf("received unexpected capability: %v", rpcType)
 			}
 		}
-		if count != 7 /*7*/ {
+		if count != 8 {
 			return errors.New("Did not retrieve all the expected capabilities")
 		}
 		return nil
@@ -1065,13 +1076,15 @@ func (f *feature) aValidNodeGetCapabilitiesResponseIsReturned() error {
 				count = count + 1
 			case csi.NodeServiceCapability_RPC_GET_VOLUME_STATS:
 				count = count + 1
+			case csi.NodeServiceCapability_RPC_VOLUME_CONDITION:
+				count = count + 1
 			case csi.NodeServiceCapability_RPC_EXPAND_VOLUME:
 				count = count + 1
 			default:
 				return fmt.Errorf("Received unexpected capability: %v", rpcType)
 			}
 		}
-		if count != 1 /*3*/ {
+		if count != 3 {
 			return errors.New("Did not retrieve all the expected capabilities")
 		}
 		return nil
@@ -1154,7 +1167,7 @@ func (f *feature) iCallNodeUnpublishVolume() error {
 	if inducedErrors.badVolumeIdentifier {
 		req.VolumeId = "bad volume identifier"
 	}
-	fmt.Printf("Calling NodePublishVolume\n")
+	fmt.Printf("Calling NodeUnPublishVolume\n")
 
 	f.nodeUnpublishVolumeResponse, f.err = f.service.NodeUnpublishVolume(context.Background(), req)
 	if f.err != nil {
@@ -1483,7 +1496,50 @@ func (f *feature) iCallControllerPublishVolume(volID string, accessMode string, 
 	f.publishVolumeRequest = nil
 	return nil
 }
+func (f *feature) iCallControllerGetVolume(volID string) error {
 
+	header := metadata.New(map[string]string{"csi.requestid": "1"})
+	ctx := metadata.NewIncomingContext(context.Background(), header)
+
+	req := new(csi.ControllerGetVolumeRequest)
+	req.VolumeId = volID
+
+	f.controllerGetVolumeRequest = req
+	fmt.Printf("Calling controllerGetVolume")
+	f.controllerGetVolumeResponse, f.err = f.service.ControllerGetVolume(ctx, req)
+	if f.err != nil {
+		log.Printf("Controller GetVolume call failed: %s\n", f.err.Error())
+	}
+	f.controllerGetVolumeRequest = nil
+	return nil
+}
+func (f *feature) aValidControllerGetVolumeResponseIsReturned() error {
+	if f.err != nil {
+		return f.err
+	}
+	fmt.Printf("The volume ID is %v\n", f.controllerGetVolumeResponse.Volume)
+	fmt.Printf("The volume condition is '%s'\n", f.controllerGetVolumeResponse.Status)
+
+	return nil
+}
+
+func (f *feature) iCallNodeGetVolumeStats(volID string, path string) error {
+
+	header := metadata.New(map[string]string{"csi.requestid": "1"})
+	ctx := metadata.NewIncomingContext(context.Background(), header)
+
+	req := new(csi.NodeGetVolumeStatsRequest)
+	req.VolumeId = volID
+
+	f.nodeGetVolumeStatsRequest = req
+	fmt.Printf("Calling NodeGetVolumeStats")
+	f.nodeGetVolumeStatsResponse, f.err = f.service.NodeGetVolumeStats(ctx, req)
+	if f.err != nil {
+		log.Printf("Node GetVolumeStats call failed: %s\n", f.err.Error())
+	}
+	f.nodeGetVolumeStatsRequest = nil
+	return nil
+}
 func (f *feature) iCallControllerUnPublishVolume(volID string, accessMode string, nodeID string) error {
 	req := f.getControllerUnPublishVolumeRequest(accessMode, nodeID)
 	f.unpublishVolumeRequest = req
@@ -2012,7 +2068,7 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	f.service = svc
 	f.service.nodeID = host
 	// TODO - IP has to be updated before release
-	f.service.nodeIP = "1.2.3.4"
+	f.service.nodeIP = "127.0.0.1"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -2051,7 +2107,7 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	svc.mode = mode
 	f.service = svc
 	f.service.nodeID, _ = os.Hostname()
-	f.service.nodeIP = "1.2.3.4"
+	f.service.nodeIP = "127.0.0.1"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -2091,11 +2147,8 @@ func (f *feature) iCallGetExportRelatedFunctionsInIsiService() error {
 
 func (f *feature) iCallUnimplementedFunctions() error {
 	_, f.err = f.service.ListSnapshots(context.Background(), new(csi.ListSnapshotsRequest))
-	_, f.err = f.service.NodeUnpublishVolume(context.Background(), new(csi.NodeUnpublishVolumeRequest))
 	_, f.err = f.service.ControllerExpandVolume(context.Background(), new(csi.ControllerExpandVolumeRequest))
 	_, f.err = f.service.NodeExpandVolume(context.Background(), new(csi.NodeExpandVolumeRequest))
-	_, f.err = f.service.NodeGetVolumeStats(context.Background(), new(csi.NodeGetVolumeStatsRequest))
-	_, f.err = f.service.ControllerGetVolume(context.Background(), new(csi.ControllerGetVolumeRequest))
 	return nil
 }
 
