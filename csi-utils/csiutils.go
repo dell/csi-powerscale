@@ -1,7 +1,6 @@
-package csi_utils
+package csiutils
 
 import (
-	"errors"
 	"fmt"
 	"github.com/dell/csi-isilon/common/utils"
 	"net"
@@ -45,7 +44,7 @@ func GetNFSClientIP(allowedNetworks []string) (string, error) {
 
 	// If a valid IP address matching allowedNetworks is not found return error
 	if nodeIP == "" {
-		return "", errors.New(fmt.Sprintf("No valid IP address found matching against allowedNetworks %v", allowedNetworks))
+		return "", fmt.Errorf("no valid IP address found matching against allowedNetworks %v", allowedNetworks)
 	}
 
 	return nodeIP, nil
