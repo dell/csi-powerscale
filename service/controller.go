@@ -1679,14 +1679,16 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
+	isiPath := isiConfig.IsiPath
 
-	exportPath := utils.GetPathForVolume(s.opts.Path, volName)
-	isiPath := utils.GetIsiPathFromExportPath(exportPath)
+	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, volName, "") {
+		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "volume does not exists at this path %v", isiPath))
+	}
 
 	//Fetch volume details
 	volume, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)
 	if err != nil {
-		log.Errorf("Error in getting '%s' Volume '%v'", volName, err)
+		log.Errorf("error in getting '%s' volume '%v'", volName, err)
 		return nil, err
 	}
 
@@ -1702,7 +1704,7 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 		return nil, err
 	}
 
-	abnormal, message := s.getVolumeCondition(ctx, isiConfig, isiPath, volName)
+	abnormal, message := s.getVolumeCondition(ctx, isiConfig)
 	//remove localhost from the clients
 	exportList := removeString(*exports.Clients, "localhost")
 	return &csi.ControllerGetVolumeResponse{
@@ -1719,14 +1721,11 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 	}, nil
 }
 
-func (s *service) getVolumeCondition(ctx context.Context, isiConfig *IsilonClusterConfig, isiPath string, volName string) (bool, string) {
+func (s *service) getVolumeCondition(ctx context.Context, isiConfig *IsilonClusterConfig) (bool, string) {
 	if err := s.controllerProbe(ctx, isiConfig); err != nil {
 		return true, fmt.Sprintf(err.Error())
 	}
-	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, volName, "") {
-		return true, "Volume does not exists at this path"
-	}
-	return false, "Volume is Healthy"
+	return false, "Volume is healthy"
 }
 
 func removeString(exportList []string, strToRemove string) []string {

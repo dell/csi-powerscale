@@ -167,8 +167,8 @@ spec:
             - "--csi-address=$(ADDRESS)"
             - "--v=5"
             - "--leader-election"
-            - "--timeout=180s"
             - "--enable-node-watcher=true"
+            - "--http-endpoint=:8080"
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock

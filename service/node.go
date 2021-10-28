@@ -407,14 +407,22 @@ func (s *service) NodeGetVolumeStats(
 		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no Volume Path found in request"))
 	}
 
-	//check whether the original volume is mounted
-	volName, _, _, _, _ := utils.ParseNormalizedVolumeID(ctx, volID)
+	volName, _, _, clusterName, _ := utils.ParseNormalizedVolumeID(ctx, volID)
 	if volName == "" {
 		volName = volID
 	}
 
-	mounted, err := isVolumeMounted(ctx, volName, volPath)
-	if !mounted {
+	// Check if given volume exists
+	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
+	isiPath := isiConfig.IsiPath
+
+	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, volName, "") {
+		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "volume does not exists at this path %v", isiPath))
+	}
+
+	//check whether the original volume is mounted
+	isMounted, err := isVolumeMounted(ctx, volName, volPath)
+	if !isMounted {
 		return &csi.NodeGetVolumeStatsResponse{
 			Usage: nil,
 			VolumeCondition: &csi.VolumeCondition{
@@ -463,7 +471,7 @@ func (s *service) NodeGetVolumeStats(
 		},
 		VolumeCondition: &csi.VolumeCondition{
 			Abnormal: false,
-			Message:  "Volume is Healthy",
+			Message:  "Volume is healthy",
 		},
 	}, nil
 }

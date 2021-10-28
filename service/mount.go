@@ -141,11 +141,11 @@ func unpublishVolume(
 	}
 
 	log.Debugf("attempting to unmount '%s'", target)
-	mounted, err := isVolumeMounted(ctx, filterStr, target)
+	isMounted, err := isVolumeMounted(ctx, filterStr, target)
 	if err != nil {
 		return err
 	}
-	if !mounted {
+	if !isMounted {
 		return nil
 	}
 	if err := gofsutil.Unmount(context.Background(), target); err != nil {
