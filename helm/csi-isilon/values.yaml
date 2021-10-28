@@ -59,6 +59,11 @@ kubeletConfigDir: /var/lib/kubelet
 # Default value: false
 enableCustomTopology: false
 
+# healthMonitorInterval: Interval of monitoring volume health condition
+# Allowed values: Number followed by unit of time (s,m,h)
+# Default value: 60s
+volumeHealthMonitorInterval: 60s
+
 # controller: configure controller pod specific parameters
 controller:
   # controllerCount: defines the number of csi-powerscale controller pods to deploy to
