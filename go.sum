@@ -64,8 +64,8 @@ github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDk
 github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=
 github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
 github.com/container-storage-interface/spec v1.2.0/go.mod h1:6URME8mwIBbpVyZV93Ce5St17xBiQJQY67NDsuohiy4=
-github.com/container-storage-interface/spec v1.4.0 h1:ozAshSKxpJnYUfmkpZCTYyF/4MYeYlhdXbAvPvfGmkg=
-github.com/container-storage-interface/spec v1.4.0/go.mod h1:6URME8mwIBbpVyZV93Ce5St17xBiQJQY67NDsuohiy4=
+github.com/container-storage-interface/spec v1.5.0 h1:lvKxe3uLgqQeVQcrnL2CPQKISoKjTJxojEs9cBk+HXo=
+github.com/container-storage-interface/spec v1.5.0/go.mod h1:8K96oQNkJ7pFcC2R9Z1ynGGBB1I93kcS6PGg3SsOk8s=
 github.com/coreos/bbolt v1.3.2/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=
 github.com/coreos/etcd v3.3.13+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
 github.com/coreos/go-semver v0.3.0 h1:wkHLiw0WNATZnSG7epLsujiMCgPAc9xhjJ4tgnAxmfM=
@@ -86,8 +86,8 @@ github.com/cucumber/messages-go/v10 v10.0.3/go.mod h1:9jMZ2Y8ZxjLY6TG2+x344nt5rX
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dell/gocsi v1.4.0 h1:bwR/NMa7RbHr3WO8sLohQ0A8T0Z0h94bVVF2LlMvWRE=
-github.com/dell/gocsi v1.4.0/go.mod h1:bcLfnn4DL8YTYn3RN0JxsYbOpfKjuy3QvC5y1W2mboU=
+github.com/dell/gocsi v1.4.1-0.20211014153731-e18975a3a38c h1:aZb2rtCMt5I8T0eNbJ259NmIOroGavUUsp694d/tcBY=
+github.com/dell/gocsi v1.4.1-0.20211014153731-e18975a3a38c/go.mod h1:nIsIXXB5JpAvOQ0//gtPGULC2+NUddpi5qwpBeMhiLs=
 github.com/dell/gofsutil v1.6.0 h1:u5PiMJIyecAWpSlPloov1/3LF5OWrcjJwoFF8dWkjcA=
 github.com/dell/gofsutil v1.6.0/go.mod h1:98Wpcg7emz4iGgY16fd4MKpnal2SX2hBiwP5ghHlvhg=
 github.com/dell/goisilon v1.5.0 h1:DyIxpc6t74eySvr/WbOIo3QvdcqC+ZhW29e8WVVAYiY=
