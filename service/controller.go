@@ -1704,7 +1704,7 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 		return nil, err
 	}
 
-	abnormal, message := s.getVolumeCondition(ctx, isiConfig)
+	abnormal, message := s.isVolumeAbnormal(ctx, isiConfig)
 	//remove localhost from the clients
 	exportList := removeString(*exports.Clients, "localhost")
 	return &csi.ControllerGetVolumeResponse{
@@ -1721,7 +1721,7 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 	}, nil
 }
 
-func (s *service) getVolumeCondition(ctx context.Context, isiConfig *IsilonClusterConfig) (bool, string) {
+func (s *service) isVolumeAbnormal(ctx context.Context, isiConfig *IsilonClusterConfig) (bool, string) {
 	if err := s.controllerProbe(ctx, isiConfig); err != nil {
 		return true, fmt.Sprintf(err.Error())
 	}
