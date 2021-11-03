@@ -170,13 +170,13 @@ spec:
         {{- if hasKey .Values "authorization" }}
         {{- if eq .Values.authorization.enabled true }}
         - name: karavi-authorization-proxy
-          imagePullPolicy: Always
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
           image: {{ required "Must provide the authorization sidecar container image." .Values.authorization.sidecarProxyImage }}
           env:
             - name: PROXY_HOST
               value: "{{ .Values.authorization.proxyHost }}"
             - name: INSECURE
-              value: "{{ .Values.authorization.insecure }}"
+              value: "{{ .Values.authorization.skipCertificateValidation }}"
             - name: PLUGIN_IDENTIFIER
               value: powerscale
             - name: ACCESS_TOKEN
