@@ -159,6 +159,7 @@ node:
 # endpointPort: Specify the HTTPs port number of the PowerScale OneFS API server
 # Formerly this attribute was named as "isiPort"
 # This value acts as a default value for endpointPort, if not specified for a cluster config in secret
+# If authorization is enabled, endpointPort must match the port specified in the endpoint parameter of the karavi-authorization-config secret
 # Allowed value: valid port number
 # Default value: 8080
 endpointPort: 8080
@@ -218,7 +219,7 @@ autoProbe: true
 # authorization: enable csm-authorization for RBAC
 authorization:
   # enable: Enable/Disable csm-authorization
-  enabled: true
+  enabled: false
 
   # sidecarProxyImage: the container images used for the csm-authorization-sidecar.
   sidecarProxyImage: dellemc/csm-authorization-sidecar:v1.0.0
@@ -226,5 +227,5 @@ authorization:
   # proxyHost: hostname of the csm-authorization server
   proxyHost:
 
-  # insecure: Enable/Disable certificate validation of the csm-authorization server
-  insecure: true
+  # skipCertificateValidation: Enable/Disable certificate validation of the csm-authorization server
+  skipCertificateValidation: true
