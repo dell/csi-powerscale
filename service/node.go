@@ -398,6 +398,9 @@ func (s *service) NodeGetVolumeStats(
 	// Fetch log handler
 	ctx, _, runID := GetRunIDLog(ctx)
 
+	abnormal := false
+	message := ""
+
 	volID := req.GetVolumeId()
 	if volID == "" {
 		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no VolumeID found in request"))
@@ -417,61 +420,82 @@ func (s *service) NodeGetVolumeStats(
 	isiPath := isiConfig.IsiPath
 
 	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, volName, "") {
-		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "volume does not exists at this path %v", isiPath))
+		abnormal = true
+		message = fmt.Sprintf("volume does not exists at this path %v", isiPath)
 	}
 
 	//check whether the original volume is mounted
-	isMounted, err := isVolumeMounted(ctx, volName, volPath)
-	if !isMounted {
-		return &csi.NodeGetVolumeStatsResponse{
-			Usage: nil,
-			VolumeCondition: &csi.VolumeCondition{
-				Abnormal: true,
-				Message:  fmt.Sprintf("No Volume is mounted at path: %s", err),
-			},
-		}, nil
+	if !abnormal {
+		isMounted, err := isVolumeMounted(ctx, volName, volPath)
+		if !isMounted {
+			abnormal = true
+			message = fmt.Sprintf("no volume is mounted at path: %s", err)
+		}
 	}
 
 	//check whether volume path is accessible
-	_, err = os.ReadDir(volPath)
-	if err != nil {
-		return &csi.NodeGetVolumeStatsResponse{
-			Usage: nil,
-			VolumeCondition: &csi.VolumeCondition{
-				Abnormal: true,
-				Message:  fmt.Sprintf("volume Path is not accessible: %s", err),
-			},
-		}, nil
-
+	if !abnormal {
+		_, err = os.ReadDir(volPath)
+		if err != nil {
+			abnormal = true
+			message = fmt.Sprintf("volume Path is not accessible: %s", err)
+		}
 	}
 
 	//Get Volume stats metrics
-	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := k8sutils.GetStats(ctx, volPath)
-	if err != nil {
-		return nil, status.Error(codes.Internal, fmt.Sprintf(
-			"failed to get volume stats metrics : %s",
-			err,
-		))
+	if !abnormal {
+		availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := k8sutils.GetStats(ctx, volPath)
+		if err != nil {
+			return &csi.NodeGetVolumeStatsResponse{
+				Usage: []*csi.VolumeUsage{
+					{
+						Unit:      csi.VolumeUsage_UNKNOWN,
+						Available: availableBytes,
+						Total:     totalBytes,
+						Used:      usedBytes,
+					},
+				},
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: false,
+					Message:  fmt.Sprintf("failed to get volume stats metrics : %s", err),
+				},
+			}, nil
+		}
+
+		return &csi.NodeGetVolumeStatsResponse{
+			Usage: []*csi.VolumeUsage{
+				{
+					Unit:      csi.VolumeUsage_BYTES,
+					Available: availableBytes,
+					Total:     totalBytes,
+					Used:      usedBytes,
+				},
+				{
+					Unit:      csi.VolumeUsage_INODES,
+					Available: freeInodes,
+					Total:     totalInodes,
+					Used:      usedInodes,
+				},
+			},
+			VolumeCondition: &csi.VolumeCondition{
+				Abnormal: abnormal,
+				Message:  message,
+			},
+		}, nil
 	}
 
 	return &csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
 			{
-				Unit:      csi.VolumeUsage_BYTES,
-				Available: availableBytes,
-				Total:     totalBytes,
-				Used:      usedBytes,
-			},
-			{
-				Unit:      csi.VolumeUsage_INODES,
-				Available: freeInodes,
-				Total:     totalInodes,
-				Used:      usedInodes,
+				Unit:      csi.VolumeUsage_UNKNOWN,
+				Available: 0,
+				Total:     0,
+				Used:      0,
 			},
 		},
 		VolumeCondition: &csi.VolumeCondition{
-			Abnormal: false,
-			Message:  "Volume is healthy",
+			Abnormal: abnormal,
+			Message:  message,
 		},
 	}, nil
 }

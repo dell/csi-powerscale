@@ -1665,6 +1665,9 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
 
+	abnormal := false
+	message := ""
+
 	volID := req.GetVolumeId()
 	if volID == "" {
 		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no VolumeID found in request"))
@@ -1681,8 +1684,17 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	isiPath := isiConfig.IsiPath
 
+	//check if volume exists
 	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, volName, "") {
-		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "volume does not exists at this path %v", isiPath))
+		return &csi.ControllerGetVolumeResponse{
+			Volume: nil,
+			Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: true,
+					Message:  fmt.Sprintf("volume does not exists at this path %v", isiPath),
+				},
+			},
+		}, nil
 	}
 
 	//Fetch volume details
@@ -1695,16 +1707,21 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 	//Fetch export clients list
 	exports, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
 	if err != nil {
-		jsonError, ok := err.(*isiApi.JSONError)
-		if ok {
-			if jsonError.StatusCode != 404 {
-				return nil, err
-			}
-		}
-		return nil, err
+		return &csi.ControllerGetVolumeResponse{
+			Volume: &csi.Volume{
+				VolumeId: volume.Name,
+			},
+			Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+				PublishedNodeIds: nil,
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: abnormal,
+					Message:  fmt.Sprintf("unable to fetch export list"),
+				},
+			},
+		}, nil
 	}
 
-	abnormal, message := s.isVolumeAbnormal(ctx, isiConfig)
+	abnormal, message = s.isVolumeAbnormal(ctx, isiConfig)
 	//remove localhost from the clients
 	exportList := removeString(*exports.Clients, "localhost")
 	return &csi.ControllerGetVolumeResponse{
