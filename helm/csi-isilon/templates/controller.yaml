@@ -138,6 +138,17 @@ spec:
             - "--leader-election"
             - "--timeout=120s"
             - "--v=5"
+            {{- if hasKey .Values.controller "leaderElection" }}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionRenewDeadline" }}
+            - "--leader-election-renew-deadline={{ .Values.controller.leaderElection.leaderElectionRenewDeadline }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-lease-duration={{ .Values.controller.leaderElection.leaderElectionLeaseDuration }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-retry-period={{ .Values.controller.leaderElection.leaderElectionRetryPeriod }}"
+            {{end}}
+            {{end}}
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
@@ -154,6 +165,17 @@ spec:
             - "--v=5"
             - "--leader-election"
             - "--timeout=180s"
+            {{- if hasKey .Values.controller "leaderElection" }}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionRenewDeadline" }}
+            - "--leader-election-renew-deadline={{ .Values.controller.leaderElection.leaderElectionRenewDeadline }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-lease-duration={{ .Values.controller.leaderElection.leaderElectionLeaseDuration }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-retry-period={{ .Values.controller.leaderElection.leaderElectionRetryPeriod }}"
+            {{end}}
+            {{end}}
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
@@ -173,6 +195,17 @@ spec:
             - "--feature-gates=Topology=true"
             - "--leader-election"
             - "--extra-create-metadata"
+            {{- if hasKey .Values.controller "leaderElection" }}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionRenewDeadline" }}
+            - "--leader-election-renew-deadline={{ .Values.controller.leaderElection.leaderElectionRenewDeadline }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-lease-duration={{ .Values.controller.leaderElection.leaderElectionLeaseDuration }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-retry-period={{ .Values.controller.leaderElection.leaderElectionRetryPeriod }}"
+            {{end}}
+            {{end}}
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
@@ -191,6 +224,17 @@ spec:
             - "--v=5"
             - "--snapshot-name-prefix={{ required "Must privided a Snapshot Name Prefix" .Values.controller.snapshot.snapNamePrefix }}"
             - "--leader-election"
+            {{- if hasKey .Values.controller "leaderElection" }}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionRenewDeadline" }}
+            - "--leader-election-renew-deadline={{ .Values.controller.leaderElection.leaderElectionRenewDeadline }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-lease-duration={{ .Values.controller.leaderElection.leaderElectionLeaseDuration }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-retry-period={{ .Values.controller.leaderElection.leaderElectionRetryPeriod }}"
+            {{end}}
+            {{end}}
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
@@ -205,6 +249,17 @@ spec:
           command: [ "/csi-isilon" ]
           args:
             - "--leader-election"
+            {{- if hasKey .Values.controller "leaderElection" }}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionRenewDeadline" }}
+            - "--leader-election-renew-deadline={{ .Values.controller.leaderElection.leaderElectionRenewDeadline }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-lease-duration={{ .Values.controller.leaderElection.leaderElectionLeaseDuration }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-retry-period={{ .Values.controller.leaderElection.leaderElectionRetryPeriod }}"
+            {{end}}
+            {{end}}
             - "--driver-config-params=/csi-isilon-config-params/driver-config-params.yaml"
           env:
             - name: CSI_ENDPOINT

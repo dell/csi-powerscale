@@ -72,6 +72,23 @@ controller:
   # Default value: None
   volumeNamePrefix: k8s
 
+  # leaderElection: configure leader election parameters
+  leaderElection:
+    # Duration, that non-leader candidates will wait to force acquire leadership
+    # Allowed values: Duration, in seconds. Must be greater than leaderElectionRenewDeadline
+    # Default value: 15s
+    leaderElectionLeaseDuration: 15s
+
+    # Duration, that the acting leader will retry refreshing leadership before giving up
+    # Allowed values: Duration, in seconds. Must be greater than leaderElectionRetryPeriod
+    # Default value: 10s
+    leaderElectionRenewDeadline: 10s
+
+    # Duration, the LeaderElector clients should wait between tries of actions.
+    # Allowed values: Duration, in seconds
+    # Default value: 5s
+    leaderElectionRetryPeriod: 5s
+
   snapshot:
     # enabled: Enable/Disable volume snapshot feature
     # Allowed values:

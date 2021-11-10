@@ -8,6 +8,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"os"
+	"time"
 )
 
 type leaderElection interface {
@@ -44,9 +45,13 @@ func CreateKubeClientSet(kubeconfig string) (*kubernetes.Clientset, error) {
 }
 
 // LeaderElection - Initialize leader election
-func LeaderElection(clientset *kubernetes.Clientset, lockName string, namespace string, runFunc func(ctx context.Context)) {
+func LeaderElection(clientset *kubernetes.Clientset, lockName string, namespace string,
+	leaderElectionRenewDeadline, leaderElectionLeaseDuration, leaderElectionRetryPeriod time.Duration, runFunc func(ctx context.Context)) {
 	le := leaderelection.NewLeaderElection(clientset, lockName, runFunc)
 	le.WithNamespace(namespace)
+	le.WithLeaseDuration(leaderElectionLeaseDuration)
+	le.WithRenewDeadline(leaderElectionRenewDeadline)
+	le.WithRetryPeriod(leaderElectionRetryPeriod)
 	if err := le.Run(); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "failed to initialize leader election: %v", err)
 		os.Exit(1)

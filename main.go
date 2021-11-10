@@ -26,6 +26,7 @@ import (
 	"github.com/dell/csi-isilon/service"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/dell/csi-isilon/provider"
 	"github.com/dell/gocsi"
@@ -39,6 +40,9 @@ func init() {
 func main() {
 	enableLeaderElection := flag.Bool("leader-election", false, "Enables leader election.")
 	leaderElectionNamespace := flag.String("leader-election-namespace", "", "The namespace where leader election lease will be created. Defaults to the pod namespace if not set.")
+	leaderElectionLeaseDuration := flag.Duration("leader-election-lease-duration", 15 * time.Second, "Duration, in seconds, that non-leader candidates will wait to force acquire leadership")
+	leaderElectionRenewDeadline := flag.Duration("leader-election-renew-deadline", 10 * time.Second, "Duration, in seconds, that the acting leader will retry refreshing leadership before giving up.")
+	leaderElectionRetryPeriod := flag.Duration("leader-election-retry-period", 5 * time.Second, "Duration, in seconds, the LeaderElector clients should wait between tries of actions")
 	driverConfigParamsfile := flag.String("driver-config-params", "", "yaml file with driver config params")
 	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	flag.Parse()
@@ -69,7 +73,8 @@ func main() {
 			os.Exit(1)
 		}
 		// Attempt to become leader and start the driver
-		k8sutils.LeaderElection(k8sclientset, lockName, *leaderElectionNamespace, run)
+		k8sutils.LeaderElection(k8sclientset, lockName, *leaderElectionNamespace,
+			*leaderElectionRenewDeadline, *leaderElectionLeaseDuration, *leaderElectionRetryPeriod, run)
 	}
 }
 
