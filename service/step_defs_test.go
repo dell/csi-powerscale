@@ -226,7 +226,7 @@ func (f *feature) getService() *service {
 	svc.mode = "controller"
 	f.service = svc
 	f.service.nodeID, _ = os.Hostname()
-	f.service.nodeIP = "1.2.3.4"
+	f.service.nodeIP = "127.0.0.1"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -809,11 +809,13 @@ func (f *feature) aValidControllerGetCapabilitiesResponseIsReturned() error {
 				count = count + 1
 			case csi.ControllerServiceCapability_RPC_EXPAND_VOLUME:
 				count = count + 1
+			case csi.ControllerServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER:
+				count = count + 1
 			default:
 				return fmt.Errorf("received unexpected capability: %v", rpcType)
 			}
 		}
-		if count != 7 /*7*/ {
+		if count != 8 /*7*/ {
 			return errors.New("Did not retrieve all the expected capabilities")
 		}
 		return nil
@@ -854,6 +856,10 @@ func (f *feature) iCallValidateVolumeCapabilitiesWithVoltypeAccess(voltype, acce
 		accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
 	case "multi-node-single-writer":
 		accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER
+	case "single-node-single-writer":
+		accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER
+	case "single-node-multiple-writer":
+		accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER
 	}
 	capability.AccessMode = accessMode
 	capabilities := make([]*csi.VolumeCapability, 0)
@@ -1067,11 +1073,13 @@ func (f *feature) aValidNodeGetCapabilitiesResponseIsReturned() error {
 				count = count + 1
 			case csi.NodeServiceCapability_RPC_EXPAND_VOLUME:
 				count = count + 1
+			case csi.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER:
+				count = count + 1
 			default:
 				return fmt.Errorf("Received unexpected capability: %v", rpcType)
 			}
 		}
-		if count != 1 /*3*/ {
+		if count != 2 /*3*/ {
 			return errors.New("Did not retrieve all the expected capabilities")
 		}
 		return nil
@@ -1331,6 +1339,10 @@ func (f *feature) aCapabilityWithVoltypeAccess(voltype, access string) error {
 		accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY
 	case "single-writer":
 		accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER
+	case "single-node-single-writer":
+		accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER
+	case "single-node-multiple-writer":
+		accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER
 	case "multiple-writer":
 		accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
 	case "multiple-reader":
@@ -2012,7 +2024,7 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	f.service = svc
 	f.service.nodeID = host
 	// TODO - IP has to be updated before release
-	f.service.nodeIP = "1.2.3.4"
+	f.service.nodeIP = "127.0.0.1"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -2051,7 +2063,7 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	svc.mode = mode
 	f.service = svc
 	f.service.nodeID, _ = os.Hostname()
-	f.service.nodeIP = "1.2.3.4"
+	f.service.nodeIP = "127.0.0.1"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)

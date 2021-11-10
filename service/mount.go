@@ -109,11 +109,11 @@ func publishVolume(
 				}
 				//T1!=T2, P1==P2 || P1 != P2 - return FailedPrecondition for single node
 				if accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER ||
-					accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY {
+					accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY ||
+					accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER {
 					logrus.WithFields(f).Error("Mount point already in use for same device")
 					return status.Error(codes.FailedPrecondition, "Mount point already in use for same device")
 				}
-
 			}
 		}
 	}
