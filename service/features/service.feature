@@ -311,7 +311,7 @@ Feature: Isilon CSI interface
       Given a Isilon service
       When I call set allowed networks "1.2.3.4/33"
       And I call NodeGetInfo with invalid networks
-      Then the error contains "No valid IP address found matching against allowedNetworks"
+      Then the error contains "no valid IP address found matching against allowedNetworks"
 
     Scenario: Verify Multiple Custom Networks
       Given a Isilon service

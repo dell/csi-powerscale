@@ -819,7 +819,7 @@ func (f *feature) aValidControllerGetCapabilitiesResponseIsReturned() error {
 			case csi.ControllerServiceCapability_RPC_VOLUME_CONDITION:
 				count = count + 1
 			case csi.ControllerServiceCapability_RPC_GET_VOLUME:
-        count = count + 1
+				count = count + 1
 			case csi.ControllerServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER:
 				count = count + 1
 			default:
