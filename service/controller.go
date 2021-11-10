@@ -936,7 +936,9 @@ func (s *service) ControllerPublishVolume(
 		}
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
 		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportReadOnlyClientByIDWithZone)
-	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
+	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+		csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
+		csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER:
 		if isROVolumeFromSnapshot {
 			err = fmt.Errorf("unsupported access mode: '%s'", am.String())
 			break
@@ -944,7 +946,7 @@ func (s *service) ControllerPublishVolume(
 		if isiConfig.isiSvc.OtherClientsAlreadyAdded(ctx, exportID, accessZone, nodeID) {
 			return nil, status.Errorf(codes.FailedPrecondition, utils.GetMessageWithRunID(runID,
 				"export '%d' in access zone '%s' already has other clients added to it, and the access mode is "+
-					"SINGLE_NODE_WRITER, thus the request fails", exportID, accessZone))
+					"%s, thus the request fails", exportID, accessZone, am.Mode))
 		}
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
@@ -1282,6 +1284,7 @@ func (s *service) ControllerGetCapabilities(
 				Type: &csi.ControllerServiceCapability_Rpc{
 					Rpc: &csi.ControllerServiceCapability_RPC{
 						Type: csi.ControllerServiceCapability_RPC_GET_VOLUME,
+						Type: csi.ControllerServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
 					},
 				},
 			},
@@ -1607,6 +1610,10 @@ func validateVolumeCaps(
 			supported = false
 			reason = errUnknownAccessMode
 		case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
+			break
+		case csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER:
+			break
+		case csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER:
 			break
 		case csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY:
 			supported = false

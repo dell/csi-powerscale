@@ -3,9 +3,9 @@ module github.com/dell/csi-isilon
 require (
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/akutz/gournal v0.5.0
-	github.com/container-storage-interface/spec v1.4.0
+	github.com/container-storage-interface/spec v1.5.0
 	github.com/cucumber/godog v0.10.0
-	github.com/dell/gocsi v1.4.0
+	github.com/dell/gocsi v1.4.1-0.20211014153731-e18975a3a38c
 	github.com/dell/gofsutil v1.6.0
 	github.com/dell/goisilon v1.5.0
 	github.com/fsnotify/fsnotify v1.4.9

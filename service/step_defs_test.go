@@ -819,12 +819,14 @@ func (f *feature) aValidControllerGetCapabilitiesResponseIsReturned() error {
 			case csi.ControllerServiceCapability_RPC_VOLUME_CONDITION:
 				count = count + 1
 			case csi.ControllerServiceCapability_RPC_GET_VOLUME:
+        count = count + 1
+			case csi.ControllerServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER:
 				count = count + 1
 			default:
 				return fmt.Errorf("received unexpected capability: %v", rpcType)
 			}
 		}
-		if count != 8 {
+		if count != 9 {
 			return errors.New("Did not retrieve all the expected capabilities")
 		}
 		return nil
@@ -865,6 +867,10 @@ func (f *feature) iCallValidateVolumeCapabilitiesWithVoltypeAccess(voltype, acce
 		accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
 	case "multi-node-single-writer":
 		accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER
+	case "single-node-single-writer":
+		accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER
+	case "single-node-multiple-writer":
+		accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER
 	}
 	capability.AccessMode = accessMode
 	capabilities := make([]*csi.VolumeCapability, 0)
@@ -1080,11 +1086,13 @@ func (f *feature) aValidNodeGetCapabilitiesResponseIsReturned() error {
 				count = count + 1
 			case csi.NodeServiceCapability_RPC_EXPAND_VOLUME:
 				count = count + 1
+			case csi.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER:
+				count = count + 1
 			default:
 				return fmt.Errorf("Received unexpected capability: %v", rpcType)
 			}
 		}
-		if count != 3 {
+		if count != 4 {
 			return errors.New("Did not retrieve all the expected capabilities")
 		}
 		return nil
@@ -1344,6 +1352,10 @@ func (f *feature) aCapabilityWithVoltypeAccess(voltype, access string) error {
 		accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY
 	case "single-writer":
 		accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER
+	case "single-node-single-writer":
+		accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER
+	case "single-node-multiple-writer":
+		accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER
 	case "multiple-writer":
 		accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
 	case "multiple-reader":

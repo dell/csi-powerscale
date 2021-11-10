@@ -336,6 +336,89 @@ function verify_helm_3() {
   check_error error
 }
 
+function verify_authorization_proxy_server() {
+  if [ ${NODE_VERIFY} -eq 0 ]; then
+    return
+  fi
+
+  enabled=$(grep -v "#" $VALUES | grep -A1 "authorization:" | grep enabled | xargs | awk '{print $2}')
+  if [ "${enabled}" != "true"  ]; then
+    return
+  fi
+  
+  log step "Verifying csm-authorization connectivity"
+  
+  proxyHost=$(grep -v "#" $VALUES | grep proxyHost | sed 's/\r$//' | xargs | awk '{print $2}')
+  insecure=$(grep -v "#" $VALUES | grep -A10 "authorization:" | grep skipCertificateValidation | xargs | awk '{print $2}')
+ 
+  error=0
+  code=0
+
+  for node in $MINION_NODES; do
+    run_command ssh ${NODEUSER}@"${node}" echo >/dev/null 2>&1
+    rv=$?
+    if [ $rv -ne 0 ]; then
+      error=1
+      found_warning "Unable to ssh into node ${node}. Cannot verify node connectivity to Authorization Proxy Server"
+      continue
+    fi
+
+    log info "Making HTTP request to https://"${proxyHost}" from "${node}"; expecting response code 502"
+  
+    log info "Checking if wget is installed on "${node}""
+    WGET=$(ssh ${NODEUSER}@"${node}" "which wget")
+    if [ -x "${WGET}" ]; then
+      log info "Running wget on "${node}""
+      if [ "${insecure}" == "true" ]
+      then
+        resp=$(ssh ${NODEUSER}@"${node}" wget --no-check-certificate --server-response --spider --quiet https://"${proxyHost}" 2>&1)
+        log info "${resp}"
+        code=$(echo "${resp}" | awk 'NR==1{print $2}')
+      else
+        resp=$(ssh ${NODEUSER}@"${node}" wget --server-response --spider --quiet https:"${proxyHost}" 2>&1)
+        log info "${resp}"
+        code=$(echo "${resp}" | awk 'NR==1{print $2}')
+      fi
+
+      if [ "${code}" != "502" ]; then
+        error=1
+        found_error "did not get expected response code 502 from the the csm-authorization proxy-server"
+        break
+      fi
+      continue
+    fi
+
+    log info "Checking if curl is installed on "${node}""
+    CURL=$(ssh ${NODEUSER}@"${node}" "which curl")
+    if [ -x "${CURL}" ]; then
+      log info "Running curl on "${node}""
+      if [ "${insecure}" == "true" ]
+      then
+        resp=$(ssh ${NODEUSER}@"${node}" curl -kIs https://"${proxyHost}")
+        log info "${resp}"
+        code=$(echo "${resp}" | grep "HTTP/1.1"| awk '{print $2}')
+      else
+        resp=$(ssh ${NODEUSER}@"${node}" curl -Is https://"${proxyHost}")
+        log info "${resp}"
+        code=$(echo "${resp}" | grep "HTTP/1.1"| awk '{print $2}')
+      fi
+
+      if [ "${code}" != "502" ]; then
+        error=1
+        found_error "did not get expected response code 502 from the the csm-authorization proxy-server"
+        break
+      fi
+      continue
+    fi
+
+    error=1
+    found_error "wget or curl not found on "${node}". Install wget or curl on "${node}""
+    break
+  done
+
+  check_error error
+}
+
 # found_error, installation will not continue
 function found_error() {
   for N in "$@"; do

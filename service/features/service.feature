@@ -46,6 +46,8 @@ Feature: Isilon CSI interface
       Examples:
       | voltype    | access                     | errormsg                                                   |
       | "mount"    | "single-writer"            | "none"                                                     |
+      | "mount"    | "single-node-single-writer"   | "none"                                                     |
+      | "mount"    | "single-node-multiple-writer" | "none"                                                     |
       | "mount"    | "single-reader"            | "Single node only reader access mode is not supported"     |
       | "mount"    | "multi-reader"             | "none"                                                     |
       | "mount"    | "multi-writer"             | "none"                                                     |
