@@ -112,6 +112,10 @@ controller:
   #    value: "true"
   #    effect: "NoSchedule"
 
+  # healthMonitorInterval: Interval of monitoring volume health condition
+  # Allowed values: Number followed by unit of time (s,m,h)
+  # Default value: 60s
+  volumeHealthMonitorInterval: 60s
 
 # node: configure node pod specific parameters
 node:

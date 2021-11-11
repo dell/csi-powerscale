@@ -17,6 +17,7 @@ package service
 */
 import (
 	"fmt"
+	"github.com/dell/csi-isilon/common/constants"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -31,6 +32,8 @@ func TestMain(m *testing.M) {
 	go http.ListenAndServe("localhost:6060", nil)
 	fmt.Printf("starting godog...\n")
 
+	configFile := "mock/secret/secret.yaml"
+	os.Setenv(constants.EnvIsilonConfigFile, configFile)
 	status = godog.RunWithOptions("godog", func(s *godog.Suite) {
 		FeatureContext(s)
 	}, godog.Options{

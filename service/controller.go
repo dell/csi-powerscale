@@ -1224,13 +1224,13 @@ func (s *service) ControllerGetCapabilities(
 					},
 				},
 			},
-			{
+			/*{
 				Type: &csi.ControllerServiceCapability_Rpc{
 					Rpc: &csi.ControllerServiceCapability_RPC{
 						Type: csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
 					},
 				},
-			},
+			},*/
 			{
 				Type: &csi.ControllerServiceCapability_Rpc{
 					Rpc: &csi.ControllerServiceCapability_RPC{
@@ -1270,6 +1270,20 @@ func (s *service) ControllerGetCapabilities(
 				Type: &csi.ControllerServiceCapability_Rpc{
 					Rpc: &csi.ControllerServiceCapability_RPC{
 						Type: csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
+					},
+				},
+			},
+			{
+				Type: &csi.ControllerServiceCapability_Rpc{
+					Rpc: &csi.ControllerServiceCapability_RPC{
+						Type: csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
+					},
+				},
+			},
+			{
+				Type: &csi.ControllerServiceCapability_Rpc{
+					Rpc: &csi.ControllerServiceCapability_RPC{
+						Type: csi.ControllerServiceCapability_RPC_GET_VOLUME,
 					},
 				},
 			},
@@ -1658,7 +1672,97 @@ func addMetaData(params map[string]string) map[string]string {
 	}
 	return headerMetadata
 }
-func (s *service) ControllerGetVolume(context.Context,
-	*csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+func (s *service) ControllerGetVolume(ctx context.Context,
+	req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+
+	// Fetch log handler
+	ctx, log, runID := GetRunIDLog(ctx)
+
+	abnormal := false
+	message := ""
+
+	volID := req.GetVolumeId()
+	if volID == "" {
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no VolumeID found in request"))
+	}
+	volName, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, volID)
+
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, err.Error()))
+	}
+
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
+
+	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
+	isiPath := isiConfig.IsiPath
+
+	//check if volume exists
+	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, volName, "") {
+		return &csi.ControllerGetVolumeResponse{
+			Volume: nil,
+			Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: true,
+					Message:  fmt.Sprintf("volume does not exists at this path %v", isiPath),
+				},
+			},
+		}, nil
+	}
+
+	//Fetch volume details
+	volume, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)
+	if err != nil {
+		log.Errorf("error in getting '%s' volume '%v'", volName, err)
+		return nil, err
+	}
+
+	//Fetch export clients list
+	exports, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
+	if err != nil {
+		return &csi.ControllerGetVolumeResponse{
+			Volume: &csi.Volume{
+				VolumeId: volume.Name,
+			},
+			Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+				PublishedNodeIds: nil,
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: abnormal,
+					Message:  fmt.Sprintf("unable to fetch export list"),
+				},
+			},
+		}, nil
+	}
+
+	abnormal, message = s.isVolumeAbnormal(ctx, isiConfig)
+	//remove localhost from the clients
+	exportList := removeString(*exports.Clients, "localhost")
+	return &csi.ControllerGetVolumeResponse{
+		Volume: &csi.Volume{
+			VolumeId: volume.Name,
+		},
+		Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+			PublishedNodeIds: exportList,
+			VolumeCondition: &csi.VolumeCondition{
+				Abnormal: abnormal,
+				Message:  message,
+			},
+		},
+	}, nil
+}
+
+func (s *service) isVolumeAbnormal(ctx context.Context, isiConfig *IsilonClusterConfig) (bool, string) {
+	if err := s.controllerProbe(ctx, isiConfig); err != nil {
+		return true, fmt.Sprintf(err.Error())
+	}
+	return false, "Volume is healthy"
+}
+
+func removeString(exportList []string, strToRemove string) []string {
+	for index, export := range exportList {
+		if export == strToRemove {
+			return append(exportList[:index], exportList[index+1:]...)
+		}
+	}
+	return exportList
 }
