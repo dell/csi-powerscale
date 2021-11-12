@@ -46,6 +46,8 @@ Feature: Isilon CSI interface
       Examples:
       | voltype    | access                     | errormsg                                                   |
       | "mount"    | "single-writer"            | "none"                                                     |
+      | "mount"    | "single-node-single-writer"   | "none"                                                     |
+      | "mount"    | "single-node-multiple-writer" | "none"                                                     |
       | "mount"    | "single-reader"            | "Single node only reader access mode is not supported"     |
       | "mount"    | "multi-reader"             | "none"                                                     |
       | "mount"    | "multi-writer"             | "none"                                                     |
@@ -309,11 +311,37 @@ Feature: Isilon CSI interface
       Given a Isilon service
       When I call set allowed networks "1.2.3.4/33"
       And I call NodeGetInfo with invalid networks
-      Then the error contains "No valid IP address found matching against allowedNetworks"
+      Then the error contains "no valid IP address found matching against allowedNetworks"
 
     Scenario: Verify Multiple Custom Networks
       Given a Isilon service
       When I call set allowed networks with multiple networks "1.2.3.4/33" "127.0.0.0/8"
       And I call NodeGetInfo
       Then a valid NodeGetInfoResponse is returned
+
+   Scenario: ControllerGetVolume good scenario
+    Given a Isilon service
+    When I call Probe
+    And I call ControllerGetVolume with name "volume2=_=_=43=_=_=System=_=_=cluster1"
+    Then a valid ControllerGetVolumeResponse is returned
+
+  Scenario: ControllerGetVolume volume does not exist scenario
+    Given a Isilon service
+    When I call Probe
+    And I induce error "VolumeNotExistError"
+    And I call ControllerGetVolume with name ""
+    Then the error contains "no VolumeID found in request"
+
+  Scenario: NodeGetVolumeStats volume does not exist scenario
+    Given a Isilon service
+    When I call Probe
+    And I induce error "VolumeNotExistError"
+    And I call NodeGetVolumeStats with name "" and path ""
+    Then the error contains "no VolumeID found in request"
+
+  Scenario: NodeGetVolumeStats volume does not exist scenario
+    Given a Isilon service
+    When I call Probe
+    And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1" and path ""
+    Then the error contains "no Volume Path found in request"
 
