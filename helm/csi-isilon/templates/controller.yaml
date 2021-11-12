@@ -199,6 +199,17 @@ spec:
             - "--monitor-interval={{ .Values.volumeHealthMonitorInterval | default "60s" }}"
             - "--timeout=180s"
             - "--http-endpoint=:8080"
+            {{- if hasKey .Values.controller "leaderElection" }}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionRenewDeadline" }}
+            - "--leader-election-renew-deadline={{ .Values.controller.leaderElection.leaderElectionRenewDeadline }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-lease-duration={{ .Values.controller.leaderElection.leaderElectionLeaseDuration }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-retry-period={{ .Values.controller.leaderElection.leaderElectionRetryPeriod }}"
+            {{end}}
+            {{end}}
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
