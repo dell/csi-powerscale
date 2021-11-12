@@ -15,6 +15,7 @@ PROG="${0}"
 NODE_VERIFY=1
 VERIFY=1
 MODE="install"
+DEFAULT_DRIVER_VERSION="2.0.0"
 WATCHLIST=""
 
 # export the name of the debug log, so child processes will see it
@@ -42,6 +43,7 @@ function usage() {
   decho "  Optional"
   decho "  --release[=]<helm release>               Name to register with helm, default value will match the driver name"
   decho "  --upgrade                                Perform an upgrade of the specified driver, default is false"
+  decho "  --version                                Use this version for CSI Driver Image"
   decho "  --node-verify-user[=]<username>          Username to SSH to worker nodes as, used to validate node requirements. Default is root"
   decho "  --skip-verify                            Skip the kubernetes configuration verification to use the CSI driver, default will run verification"
   decho "  --skip-verify-node                       Skip worker node verification checks"
@@ -145,8 +147,6 @@ function install_driver() {
   HELMOUTPUT="/tmp/csi-install.$$.out"
   run_command helm ${1} \
     --set openshift=${OPENSHIFT} \
-    --values "${DRIVERDIR}/${DRIVER}/k8s-${kMajorVersion}.${kMinorVersion}-values.yaml" \
-    --values "${DRIVERDIR}/${DRIVER}/driver-image.yaml" \
     --values "${VALUES}" \
     --namespace ${NS} "${RELEASE}" \
     "${DRIVERDIR}/${DRIVER}" >"${HELMOUTPUT}" 2>&1
@@ -270,7 +270,7 @@ function verify_kubernetes() {
     if [ $NODE_VERIFY -eq 0 ]; then
       EXTRA_OPTS="$EXTRA_OPTS --skip-verify-node"
     fi
-    "${VERIFYSCRIPT}" --namespace "${NS}" --release "${RELEASE}" --values "${VALUES}" --node-verify-user "${NODEUSER}" ${EXTRA_OPTS}
+    "${VERIFYSCRIPT}" --version "${VERSION}" --driver-version "${DRIVER_VERSION}" --namespace "${NS}" --release "${RELEASE}" --values "${VALUES}" --node-verify-user "${NODEUSER}" ${EXTRA_OPTS}
     VERIFYRC=$?
     case $VERIFYRC in
     0) ;;
@@ -313,6 +313,11 @@ while getopts ":h-:" optchar; do
       MODE="upgrade"
       ;;
       # NAMESPACE
+    version)
+      DRIVER_VERSION="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
+      # DRIVER IMAGE VERSION
     namespace)
       NS="${!OPTIND}"
       if [[ -z ${NS} || ${NS} == "--skip-verify" ]]; then
@@ -371,6 +376,10 @@ done
 RELEASE=$(get_release_name "${DRIVER}")
 # by default, NODEUSER is root
 NODEUSER="${NODEUSER:-root}"
+if [[ -z ${DRIVER_VERSION} ]]; then
+   DRIVER_VERSION=${DEFAULT_DRIVER_VERSION}
+fi
+
 
 # make sure kubectl is available
 kubectl --help >&/dev/null || {
