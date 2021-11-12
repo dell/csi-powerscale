@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (c) 2020 Dell Inc., or its subsidiaries. All Rights Reserved.
+# Copyright (c) 2021 Dell Inc., or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -77,6 +77,7 @@ function usage() {
   decho "  Required"
   decho "  --namespace[=]<namespace>       Kubernetes namespace to install the CSI driver"
   decho "  --values[=]<values.yaml>        Values file, which defines configuration values"
+  decho "  --driver-verison                verify CSI Driver Image version is in values file"
 
   decho "  Optional"
   decho "  --skip-verify-node              Skip worker node verification checks"
@@ -341,7 +342,7 @@ function verify_authorization_proxy_server() {
     return
   fi
 
-  enabled=$(grep -v "#" $VALUES | grep -A1 "authorization:" | grep enabled | xargs | awk '{print $2}')
+  enabled=$(grep -v "#" $VALUES | grep -A1 "authorization:" | grep enabled | sed 's/\r$//' | xargs | awk '{print $2}')
   if [ "${enabled}" != "true"  ]; then
     return
   fi
@@ -349,7 +350,7 @@ function verify_authorization_proxy_server() {
   log step "Verifying csm-authorization connectivity"
   
   proxyHost=$(grep -v "#" $VALUES | grep proxyHost | sed 's/\r$//' | xargs | awk '{print $2}')
-  insecure=$(grep -v "#" $VALUES | grep -A10 "authorization:" | grep skipCertificateValidation | xargs | awk '{print $2}')
+  insecure=$(grep -v "#" $VALUES | grep -A10 "authorization:" | grep skipCertificateValidation | sed 's/\r$//' | xargs | awk '{print $2}')
  
   error=0
   code=0
@@ -375,7 +376,7 @@ function verify_authorization_proxy_server() {
         log info "${resp}"
         code=$(echo "${resp}" | awk 'NR==1{print $2}')
       else
-        resp=$(ssh ${NODEUSER}@"${node}" wget --server-response --spider --quiet https:"${proxyHost}" 2>&1)
+        resp=$(ssh ${NODEUSER}@"${node}" wget --server-response --spider --quiet https://"${proxyHost}" 2>&1)
         log info "${resp}"
         code=$(echo "${resp}" | awk 'NR==1{print $2}')
       fi
@@ -588,6 +589,14 @@ while getopts ":h-:" optchar; do
       if [[ -z ${NS} ]]; then NS=${DEFAULT_NS}; fi
       ;;
       # RELEASE
+    version)
+      VERSION="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
+    driver-version)
+      DRIVER_VERSION="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
     release)
       RELEASE="${!OPTIND}"
       OPTIND=$((OPTIND + 1))
