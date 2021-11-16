@@ -70,7 +70,7 @@ function validate_params() {
 function check_for_driver() {
     NUM=$(run_command helm list --namespace "${NAMESPACE}" | grep "^${RELEASE}\b" | wc -l)
     if [ "${NUM}" == "0" ]; then
-        log error "The CSI Driver is not installed."
+        log uninstall_error "The CSI Driver is not installed."
         exit 1
     fi
 }
