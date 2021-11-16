@@ -147,6 +147,8 @@ function install_driver() {
   HELMOUTPUT="/tmp/csi-install.$$.out"
   run_command helm ${1} \
     --set openshift=${OPENSHIFT} \
+    --values "${DRIVERDIR}/${DRIVER}/k8s-${kMajorVersion}.${kMinorVersion}-values.yaml" \
+    --values "${DRIVERDIR}/${DRIVER}/driver-image.yaml" \
     --values "${VALUES}" \
     --namespace ${NS} "${RELEASE}" \
     "${DRIVERDIR}/${DRIVER}" >"${HELMOUTPUT}" 2>&1

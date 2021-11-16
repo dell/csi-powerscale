@@ -42,6 +42,14 @@ function log() {
     debuglog_only "Installation cannot continue"
     exit 1
     ;;
+  uninstall_error)
+    log separator
+    printf "${RED}Error: $2\n"
+    printf "${RED}Uninstallation cannot continue${NC}\n"
+    debuglog_only "Error: $2"
+    debuglog_only "Uninstallation cannot continue"
+    exit 1
+    ;;
   step)
     printf "|\n|- %-65s" "$2"
     debuglog_only "${2}"
