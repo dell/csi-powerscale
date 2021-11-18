@@ -1680,6 +1680,7 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 
 	abnormal := false
 	message := ""
+	var volume isi.Volume
 
 	volID := req.GetVolumeId()
 	if volID == "" {
@@ -1699,22 +1700,29 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 
 	//check if volume exists
 	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, volName, "") {
+		abnormal = true
+		message = fmt.Sprintf("volume does not exists at this path %v", isiPath)
+	}
+
+	//Fetch volume details
+	if !abnormal {
+		volume, err = isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)
+		if err != nil {
+			abnormal = true
+			message = fmt.Sprintf("error in getting '%s' volume '%v'", volName, err)
+		}
+	}
+
+	if abnormal {
 		return &csi.ControllerGetVolumeResponse{
 			Volume: nil,
 			Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
 				VolumeCondition: &csi.VolumeCondition{
-					Abnormal: true,
-					Message:  fmt.Sprintf("volume does not exists at this path %v", isiPath),
+					Abnormal: abnormal,
+					Message:  message,
 				},
 			},
 		}, nil
-	}
-
-	//Fetch volume details
-	volume, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)
-	if err != nil {
-		log.Errorf("error in getting '%s' volume '%v'", volName, err)
-		return nil, err
 	}
 
 	//Fetch export clients list
@@ -1727,7 +1735,7 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 			Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
 				PublishedNodeIds: nil,
 				VolumeCondition: &csi.VolumeCondition{
-					Abnormal: abnormal,
+					Abnormal: true,
 					Message:  fmt.Sprintf("unable to fetch export list"),
 				},
 			},
