@@ -3,8 +3,8 @@
 #
 
 # DEFAULT values
-# ubi8/ubi-minimal:8.4-208
-DEFAULT_BASEIMAGE="registry.access.redhat.com/ubi8/ubi-minimal@sha256:9ef3aff29b55580c605697f5b8ae662b4b03a390adad86110719a4a2c687cfd1"
+# ubi8/ubi-minimal:8.5-204
+DEFAULT_BASEIMAGE="registry.access.redhat.com/ubi8/ubi-minimal@sha256:e0814339ffc6c933652bed0c5f8b6416b9a3d40be2f49f95e6e4128387d2a24a"
 DEFAULT_GOVERSION="1.16"
 DEFAULT_REGISTRY=""
 DEFAULT_IMAGENAME="isilon"
