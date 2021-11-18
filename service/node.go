@@ -425,6 +425,10 @@ func (s *service) NodeGetVolumeStats(
 
 	// Check if given volume exists
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
+	if err != nil {
+		return nil, err
+	}
+
 	isiPath := isiConfig.IsiPath
 
 	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, volName, "") {

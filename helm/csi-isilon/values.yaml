@@ -110,6 +110,19 @@ controller:
     # Default value: None
     enabled: true
 
+  healthMonitor:
+    # enabled: Enable/Disable health monitor of CSI volumes
+    # Allowed values:
+    #   true: enable checking of health condition of CSI volumes
+    #   false: disable checking of health condition of CSI volumes
+    # Default value: None
+    enabled: false
+
+    # healthMonitorInterval: Interval of monitoring volume health condition
+    # Allowed values: Number followed by unit of time (s,m,h)
+    # Default value: 60s
+    volumeHealthMonitorInterval: 60s
+
   # nodeSelector: Define node selection constraints for pods of controller deployment.
   # For the pod to be eligible to run on a node, the node must have each
   # of the indicated key-value pairs as labels.
@@ -128,11 +141,6 @@ controller:
   #    operator: "Equal"
   #    value: "true"
   #    effect: "NoSchedule"
-
-  # healthMonitorInterval: Interval of monitoring volume health condition
-  # Allowed values: Number followed by unit of time (s,m,h)
-  # Default value: 60s
-  volumeHealthMonitorInterval: 60s
 
 # node: configure node pod specific parameters
 node:
