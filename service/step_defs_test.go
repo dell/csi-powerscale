@@ -276,7 +276,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a valid DeleteVolumeResponse is returned$`, f.aValidDeleteVolumeResponseIsReturned)
 	s.Step(`^I induce error "([^"]*)"$`, f.iInduceError)
 	s.Step(`^the error contains "([^"]*)"$`, f.theErrorContains)
-	s.Step(`^I call ControllerGetCapabilities$`, f.iCallControllerGetCapabilities)
+	s.Step(`^I call ControllerGetCapabilities "([^"]*)"$`, f.iCallControllerGetCapabilities)
 	s.Step(`^a valid ControllerGetCapabilitiesResponse is returned$`, f.aValidControllerGetCapabilitiesResponseIsReturned)
 	s.Step(`^I call ValidateVolumeCapabilities with voltype "([^"]*)" access "([^"]*)"$`, f.iCallValidateVolumeCapabilitiesWithVoltypeAccess)
 	s.Step(`^I call GetCapacity$`, f.iCallGetCapacity)
@@ -780,7 +780,10 @@ func (f *feature) theErrorContains(arg1 string) error {
 	return fmt.Errorf("Expected error to contain %s but it was %s", arg1, f.err.Error())
 }
 
-func (f *feature) iCallControllerGetCapabilities() error {
+func (f *feature) iCallControllerGetCapabilities(isHealthMonitorEnabled string) error {
+	if isHealthMonitorEnabled == "true" {
+		f.service.opts.IsHealthMonitorEnabled = true
+	}
 	req := new(csi.ControllerGetCapabilitiesRequest)
 	f.controllerGetCapabilitiesResponse, f.err = f.service.ControllerGetCapabilities(context.Background(), req)
 	if f.err != nil {
@@ -826,9 +829,17 @@ func (f *feature) aValidControllerGetCapabilitiesResponseIsReturned() error {
 				return fmt.Errorf("received unexpected capability: %v", rpcType)
 			}
 		}
-		if count != 9 {
+
+		if f.service.opts.IsHealthMonitorEnabled && count != 9 {
+			// Set default value
+			f.service.opts.IsHealthMonitorEnabled = false
+			return errors.New("Did not retrieve all the expected capabilities")
+		} else if ! f.service.opts.IsHealthMonitorEnabled && count != 7 {
 			return errors.New("Did not retrieve all the expected capabilities")
 		}
+
+		// Set default value
+		f.service.opts.IsHealthMonitorEnabled = false
 		return nil
 	}
 	return errors.New("expected ControllerGetCapabilitiesResponse but didn't get one")

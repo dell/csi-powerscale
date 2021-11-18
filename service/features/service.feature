@@ -30,9 +30,14 @@ Feature: Isilon CSI interface
       And I call Probe
       Then an invalid ProbeResponse is returned  
 
-    Scenario: Call ControllerGetCapabilities
+    Scenario: Call ControllerGetCapabilities with health monitor feature enabled
       Given a Isilon service
-      When I call ControllerGetCapabilities
+      When I call ControllerGetCapabilities "true"
+      Then a valid ControllerGetCapabilitiesResponse is returned
+
+    Scenario: Call ControllerGetCapabilities with health monitor feature disabled
+      Given a Isilon service
+      When I call ControllerGetCapabilities "false"
       Then a valid ControllerGetCapabilitiesResponse is returned
 
     Scenario Outline: Calls to validate volume capabilities
