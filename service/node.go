@@ -248,21 +248,25 @@ func (s *service) NodeUnpublishVolume(
 func (s *service) nodeProbe(ctx context.Context, isiConfig *IsilonClusterConfig) error {
 
 	// Fetch log handler
-	ctx, _, _ = GetRunIDLog(ctx)
+	ctx, log, _ := GetRunIDLog(ctx)
 
 	if err := s.validateOptsParameters(isiConfig); err != nil {
 		return fmt.Errorf("node probe failed : '%v'", err)
 	}
 
 	if isiConfig.isiSvc == nil {
-		return errors.New("clusterConfig.isiSvc (type isiService) is nil, probe failed")
+		logLevel := utils.GetCurrentLogLevel()
+		isiConfig.isiSvc, _ = s.GetIsiService(ctx, isiConfig, logLevel)
+		if isiConfig.isiSvc == nil {
+			return errors.New("clusterConfig.isiSvc (type isiService) is nil, probe failed")
+		}
 	}
 
 	if err := isiConfig.isiSvc.TestConnection(ctx); err != nil {
 		return fmt.Errorf("node probe failed : '%v'", err)
 	}
 
-	ctx, log := setClusterContext(ctx, isiConfig.ClusterName)
+	ctx, log = setClusterContext(ctx, isiConfig.ClusterName)
 	log.Debug("node probe succeeded")
 
 	return nil
@@ -404,7 +408,7 @@ func (s *service) NodeGetVolumeStats(
 	ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 
 	// Fetch log handler
-	ctx, _, runID := GetRunIDLog(ctx)
+	ctx, log, runID := GetRunIDLog(ctx)
 
 	abnormal := false
 	message := ""
@@ -426,6 +430,12 @@ func (s *service) NodeGetVolumeStats(
 	// Check if given volume exists
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	isiPath := isiConfig.IsiPath
+
+	// Probe the node if required and make sure startup called
+	if err := s.autoProbe(ctx, isiConfig); err != nil {
+		log.Error("nodeProbe failed with error :" + err.Error())
+		return nil, err
+	}
 
 	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, volName, "") {
 		abnormal = true
