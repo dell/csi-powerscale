@@ -1308,9 +1308,13 @@ func (s *service) controllerProbe(ctx context.Context, clusterConfig *IsilonClus
 
 	if clusterConfig.isiSvc == nil {
 		logLevel := utils.GetCurrentLogLevel()
-		clusterConfig.isiSvc, _ = s.GetIsiService(ctx, clusterConfig, logLevel)
+		var err error
+		clusterConfig.isiSvc, err = s.GetIsiService(ctx, clusterConfig, logLevel)
 		if clusterConfig.isiSvc == nil {
 			return errors.New("clusterConfig.isiSvc (type isiService) is nil, probe failed")
+		}
+		if err != nil {
+			return err
 		}
 	}
 

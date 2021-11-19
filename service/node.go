@@ -256,9 +256,13 @@ func (s *service) nodeProbe(ctx context.Context, isiConfig *IsilonClusterConfig)
 
 	if isiConfig.isiSvc == nil {
 		logLevel := utils.GetCurrentLogLevel()
-		isiConfig.isiSvc, _ = s.GetIsiService(ctx, isiConfig, logLevel)
+		var err error
+		isiConfig.isiSvc, err = s.GetIsiService(ctx, isiConfig, logLevel)
 		if isiConfig.isiSvc == nil {
 			return errors.New("clusterConfig.isiSvc (type isiService) is nil, probe failed")
+		}
+		if err != nil {
+			return err
 		}
 	}
 
