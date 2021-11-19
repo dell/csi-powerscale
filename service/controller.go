@@ -1307,7 +1307,15 @@ func (s *service) controllerProbe(ctx context.Context, clusterConfig *IsilonClus
 	}
 
 	if clusterConfig.isiSvc == nil {
-		return errors.New("clusterConfig.isiSvc (type isiService) is nil, probe failed")
+		logLevel := utils.GetCurrentLogLevel()
+		var err error
+		clusterConfig.isiSvc, err = s.GetIsiService(ctx, clusterConfig, logLevel)
+		if clusterConfig.isiSvc == nil {
+			return errors.New("clusterConfig.isiSvc (type isiService) is nil, probe failed")
+		}
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := clusterConfig.isiSvc.TestConnection(ctx); err != nil {
@@ -1686,8 +1694,8 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 	if volID == "" {
 		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no VolumeID found in request"))
 	}
-	volName, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, volID)
 
+	volName, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, volID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, err.Error()))
 	}
@@ -1697,6 +1705,10 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	isiPath := isiConfig.IsiPath
+
+	if err := s.autoProbe(ctx, isiConfig); err != nil {
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, err.Error()))
+	}
 
 	//check if volume exists
 	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, volName, "") {
@@ -1742,7 +1754,6 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 		}, nil
 	}
 
-	abnormal, message = s.isVolumeAbnormal(ctx, isiConfig)
 	//remove localhost from the clients
 	exportList := removeString(*exports.Clients, "localhost")
 	return &csi.ControllerGetVolumeResponse{
@@ -1753,17 +1764,10 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 			PublishedNodeIds: exportList,
 			VolumeCondition: &csi.VolumeCondition{
 				Abnormal: abnormal,
-				Message:  message,
+				Message:  "Volume is healthy",
 			},
 		},
 	}, nil
-}
-
-func (s *service) isVolumeAbnormal(ctx context.Context, isiConfig *IsilonClusterConfig) (bool, string) {
-	if err := s.controllerProbe(ctx, isiConfig); err != nil {
-		return true, fmt.Sprintf(err.Error())
-	}
-	return false, "Volume is healthy"
 }
 
 func removeString(exportList []string, strToRemove string) []string {

@@ -249,8 +249,8 @@ Feature: Isilon CSI interface
       | "blah"      | "node"         | "none"                  | "none"                               | "none"                                |
       | "blah"      | "node"         | "none"                  | "NodeHasNoConnectionError"           | "probe of all isilon clusters failed" |
       | "blah"      | "unknown"      | "none"                  | "none"                               | "probe of all isilon clusters failed" |
-      | "blah"      | "controller"   | "noIsiService"          | "none"                               | "probe of all isilon clusters failed" |
-      | "blah"      | "node"         | "noIsiService"          | "none"                               | "probe of all isilon clusters failed" |
+      | "blah"      | "controller"   | "noIsiService"          | "none"                               | "none"                                |
+      | "blah"      | "node"         | "noIsiService"          | "none"                               | "none"                                |
 
     Scenario Outline: Calling logStatistics different times
       Given a Isilon service
@@ -282,7 +282,7 @@ Feature: Isilon CSI interface
       Given I induce error "noIsiService"
       And a Isilon service with params "blah" "controller"
       When I call autoProbe
-      Then the error contains "clusterConfig.isiSvc (type isiService) is nil, probe failed"
+      Then the error contains "none"
     
     Scenario: Calling functions with autoProbe failed
       Given a Isilon service
