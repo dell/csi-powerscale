@@ -118,10 +118,10 @@ controller:
     # Default value: None
     enabled: false
 
-    # healthMonitorInterval: Interval of monitoring volume health condition
+    # interval: Interval of monitoring volume health condition
     # Allowed values: Number followed by unit of time (s,m,h)
     # Default value: 60s
-    volumeHealthMonitorInterval: 60s
+    interval: 60s
 
   # nodeSelector: Define node selection constraints for pods of controller deployment.
   # For the pod to be eligible to run on a node, the node must have each
