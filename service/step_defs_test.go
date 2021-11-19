@@ -290,7 +290,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call NodeGetInfo with invalid volume limit "([^"]*)"$`, f.iCallNodeGetInfoWithInvalidVolumeLimit)
 	s.Step(`^I call apply node label "([^"]*)"$`, f.iCallApplyNodeLabel)
 	s.Step(`^I call remove node labels$`, f.iCallRemoveNodeLabels)
-	s.Step(`^I call NodeGetCapabilities$`, f.iCallNodeGetCapabilities)
+	s.Step(`^I call NodeGetCapabilities "([^"]*)"$`, f.iCallNodeGetCapabilities)
 	s.Step(`^a valid NodeGetCapabilitiesResponse is returned$`, f.aValidNodeGetCapabilitiesResponseIsReturned)
 	s.Step(`^I have a Node "([^"]*)" with AccessZone$`, f.iHaveANodeWithAccessZone)
 	s.Step(`^I call ControllerPublishVolume with "([^"]*)" to "([^"]*)"$`, f.iCallControllerPublishVolumeWithTo)
@@ -1043,8 +1043,11 @@ func (f *feature) iCallNodeGetInfoWithInvalidVolumeLimit(volumeLimit int64) erro
 	return nil
 }
 
-func (f *feature) iCallNodeGetCapabilities() error {
+func (f *feature) iCallNodeGetCapabilities(isHealthMonitorEnabled string) error {
 	req := new(csi.NodeGetCapabilitiesRequest)
+	if isHealthMonitorEnabled == "true" {
+		f.service.opts.IsHealthMonitorEnabled = true
+	}
 	f.nodeGetCapabilitiesResponse, f.err = f.service.NodeGetCapabilities(context.Background(), req)
 	if f.err != nil {
 		log.Printf("NodeGetCapabilities call failed: %s\n", f.err.Error())
@@ -1103,9 +1106,15 @@ func (f *feature) aValidNodeGetCapabilitiesResponseIsReturned() error {
 				return fmt.Errorf("Received unexpected capability: %v", rpcType)
 			}
 		}
-		if count != 4 {
+		if f.service.opts.IsHealthMonitorEnabled && count != 4 {
+			// Set default value
+			f.service.opts.IsHealthMonitorEnabled = false
+			return errors.New("Did not retrieve all the expected capabilities")
+		} else if !f.service.opts.IsHealthMonitorEnabled && count != 2 {
 			return errors.New("Did not retrieve all the expected capabilities")
 		}
+		// Set default value
+		f.service.opts.IsHealthMonitorEnabled = false
 		return nil
 	}
 	return errors.New("Expected NodeGetCapabilitiesResponse but didn't get one")

@@ -127,9 +127,14 @@ Feature: Isilon CSI interface
       Then a valid NodeGetInfoResponse is returned with volume limit "2"
       And I call remove node labels
 
-    Scenario: Call NodeGetCapabilities
+    Scenario: Call NodeGetCapabilities with health monitor feature enabled
       Given a Isilon service
-      When I call NodeGetCapabilities
+      When I call NodeGetCapabilities "true"
+      Then a valid NodeGetCapabilitiesResponse is returned
+
+    Scenario: Call NodeGetCapabilities with health monitor feature disabled
+      Given a Isilon service
+      When I call NodeGetCapabilities "false"
       Then a valid NodeGetCapabilitiesResponse is returned
 
     Scenario: ControllerPublishVolume bad scenario with empty access type
