@@ -198,7 +198,7 @@ spec:
             - "--v=5"
             - "--leader-election"
             - "--enable-node-watcher=true"
-            - "--monitor-interval={{ .Values.healthMonitor.volumeHealthMonitorInterval | default "60s" }}"
+            - "--monitor-interval={{ .Values.controller.healthMonitor.volumeHealthMonitorInterval | default "60s" }}"
             - "--timeout=180s"
             - "--http-endpoint=:8080"
             {{- if hasKey .Values.controller "leaderElection" }}
