@@ -86,6 +86,7 @@ type Opts struct {
 	KubeConfigPath            string
 	allowedNetworks           []string
 	MaxVolumesPerNode         int64
+	IsHealthMonitorEnabled    bool
 }
 
 type service struct {
@@ -208,6 +209,7 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 	opts.AutoProbe = utils.ParseBooleanFromContext(ctx, constants.EnvAutoProbe)
 	opts.Verbose = utils.ParseUintFromContext(ctx, constants.EnvVerbose)
 	opts.CustomTopologyEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvCustomTopologyEnabled)
+	opts.IsHealthMonitorEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvIsHealthMonitorEnabled)
 
 	s.opts = opts
 

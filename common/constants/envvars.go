@@ -77,4 +77,7 @@ const (
 
 	// EnvMaxVolumesPerNode specifies maximum number of volumes that controller can publish to the node.
 	EnvMaxVolumesPerNode = "X_CSI_MAX_VOLUMES_PER_NODE"
+
+	// EnvIsHealthMonitorEnabled specifies if health monitor is enabled.
+	EnvIsHealthMonitorEnabled = "X_CSI_HEALTH_MONITOR_ENABLED"
 )

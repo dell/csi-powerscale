@@ -30,9 +30,14 @@ Feature: Isilon CSI interface
       And I call Probe
       Then an invalid ProbeResponse is returned  
 
-    Scenario: Call ControllerGetCapabilities
+    Scenario: Call ControllerGetCapabilities with health monitor feature enabled
       Given a Isilon service
-      When I call ControllerGetCapabilities
+      When I call ControllerGetCapabilities "true"
+      Then a valid ControllerGetCapabilitiesResponse is returned
+
+    Scenario: Call ControllerGetCapabilities with health monitor feature disabled
+      Given a Isilon service
+      When I call ControllerGetCapabilities "false"
       Then a valid ControllerGetCapabilitiesResponse is returned
 
     Scenario Outline: Calls to validate volume capabilities
@@ -122,9 +127,14 @@ Feature: Isilon CSI interface
       Then a valid NodeGetInfoResponse is returned with volume limit "2"
       And I call remove node labels
 
-    Scenario: Call NodeGetCapabilities
+    Scenario: Call NodeGetCapabilities with health monitor feature enabled
       Given a Isilon service
-      When I call NodeGetCapabilities
+      When I call NodeGetCapabilities "true"
+      Then a valid NodeGetCapabilitiesResponse is returned
+
+    Scenario: Call NodeGetCapabilities with health monitor feature disabled
+      Given a Isilon service
+      When I call NodeGetCapabilities "false"
       Then a valid NodeGetCapabilitiesResponse is returned
 
     Scenario: ControllerPublishVolume bad scenario with empty access type

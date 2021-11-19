@@ -188,6 +188,8 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
+        {{- if hasKey .Values.controller "healthMonitor" }}
+        {{- if eq .Values.controller.healthMonitor.enabled true }}
         - name: external-health-monitor-controller
           image: {{ required "Must provide the CSI external-health-monitor-controller container image." .Values.images.externalhealthmonitorcontroller }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
@@ -196,7 +198,7 @@ spec:
             - "--v=5"
             - "--leader-election"
             - "--enable-node-watcher=true"
-            - "--monitor-interval={{ .Values.volumeHealthMonitorInterval | default "60s" }}"
+            - "--monitor-interval={{ .Values.controller.healthMonitor.volumeHealthMonitorInterval | default "60s" }}"
             - "--timeout=180s"
             - "--http-endpoint=:8080"
             {{- if hasKey .Values.controller "leaderElection" }}
@@ -216,6 +218,8 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
+        {{end}}
+        {{end}}
         - name: provisioner
           image: {{ required "Must provide the CSI provisioner container image." .Values.images.provisioner }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
@@ -320,6 +324,12 @@ spec:
               value: "{{ .Values.isiVolumePathPermissions }}"
             - name: X_CSI_ISI_NO_PROBE_ON_START
               value: "{{ .Values.noProbeOnStart }}"
+            {{- if hasKey .Values.controller "healthMonitor" }}
+            {{- if eq .Values.controller.healthMonitor.enabled true }}
+            - name: X_CSI_HEALTH_MONITOR_ENABLED
+              value: "{{ .Values.controller.healthMonitor.enabled }}"
+            {{end}}
+            {{end}}
             - name: X_CSI_NODE_NAME
               valueFrom:
                 fieldRef:
