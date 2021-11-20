@@ -15,6 +15,26 @@ jobs:
         uses: dell/common-github-actions/go-code-formatter-linter-vetter@main
         with:
           directories: ./...
+  test:
+    name: Run Go unit tests and check package coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v2
+      - name: Checkout csi-powerflex
+        uses: actions/checkout@v2
+        with:
+          # change these to your driver name
+          repository: 'dell/csi-powerflex'
+          path: 'csi-powerflex'
+      - name: Run unit tests and check package coverage
+        uses: dell/common-github-actions/go-code-tester@fix-csi-driver-unit-tests
+        # set these three to appropriate values
+        with:
+          threshold: 90
+          # test-folder should be accurate for all csi-drivers
+          test-folder: "./service"
+          skip-list: "podmon/test/ssh"
   go_security_scan:
     name: Go security
     runs-on: ubuntu-latest
