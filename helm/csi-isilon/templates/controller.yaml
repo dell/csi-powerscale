@@ -71,6 +71,20 @@ rules:
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]
     verbs: ["get", "watch", "list", "delete", "update", "create"]
+  # below for dell-csi-replicator
+  {{- if hasKey .Values.controller "replication" }}
+  {{- if eq .Values.controller.replication.enabled true}}
+  - apiGroups: ["replication.storage.dell.com"]
+    resources: ["dellcsireplicationgroups"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["replication.storage.dell.com"]
+    resources: ["dellcsireplicationgroups/status"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create", "delete", "get", "list", "watch", "update", "patch"]
+  {{- end}}
+  {{- end}}
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -134,6 +148,34 @@ spec:
       {{- toYaml .Values.controller.tolerations | nindent 8 }}
       {{ end }}
       containers:
+        {{- if hasKey .Values.controller "replication" }}
+        {{- if eq .Values.controller.replication.enabled true}}
+        - name: dell-csi-replicator
+          image: {{ required "Must provide the Dell CSI Replicator image." .Values.controller.replication.image}}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election=true"
+            - "--worker-threads=2"
+            - "--retry-interval-start=1s"
+            - "--retry-interval-max=300s"
+            - "--timeout=300s"
+            - "--context-prefix={{ .Values.controller.replication.replicationContextPrefix}}"
+            - "--prefix={{ .Values.controller.replication.replicationPrefix}}"
+          env:
+            - name: ADDRESS
+              value: /var/run/csi/csi.sock
+            - name: X_CSI_REPLICATION_CONFIG_DIR
+              value: /csi-isilon-config-params
+            - name: X_CSI_REPLICATION_CONFIG_FILE_NAME
+              value: driver-config-params.yaml
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
+            - name: csi-isilon-config-params
+              mountPath: /csi-isilon-config-params
+        {{- end }}
+        {{- end }}
         {{- if hasKey .Values.controller "resizer" }}
         {{- if eq .Values.controller.resizer.enabled true }}
         - name: resizer
@@ -324,6 +366,14 @@ spec:
               value: "{{ .Values.isiVolumePathPermissions }}"
             - name: X_CSI_ISI_NO_PROBE_ON_START
               value: "{{ .Values.noProbeOnStart }}"
+            {{- if hasKey .Values.controller "replication" }}
+            {{- if eq .Values.controller.replication.enabled true}}
+            - name: X_CSI_REPLICATION_CONTEXT_PREFIX
+              value: {{ .Values.controller.replication.replicationContextPrefix | default "powerscale"}}
+            - name: X_CSI_REPLICATION_PREFIX
+              value: {{ .Values.controller.replication.replicationPrefix | default "replication.storage.dell.com"}}
+            {{- end }}
+            {{- end }}
             {{- if hasKey .Values.controller "healthMonitor" }}
             {{- if eq .Values.controller.healthMonitor.enabled true }}
             - name: X_CSI_HEALTH_MONITOR_ENABLED

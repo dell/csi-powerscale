@@ -87,6 +87,8 @@ type Opts struct {
 	allowedNetworks           []string
 	MaxVolumesPerNode         int64
 	IsHealthMonitorEnabled    bool
+	replicationContextPrefix  string
+	replicationPrefix         string
 }
 
 type service struct {
@@ -189,7 +191,12 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 	} else {
 		isilonConfigFile = constants.IsilonConfigFile
 	}
-
+	if replicationContextPrefix, ok := csictx.LookupEnv(ctx, constants.EnvReplicationContextPrefix); ok {
+		opts.replicationContextPrefix = replicationContextPrefix
+	}
+	if replicationPrefix, ok := csictx.LookupEnv(ctx, constants.EnvReplicationPrefix); ok {
+		opts.replicationPrefix = replicationPrefix
+	}
 	if MaxVolumesPerNode, err := utils.ParseInt64FromContext(ctx, constants.EnvMaxVolumesPerNode); err != nil {
 		log.Warnf("error while parsing env variable '%s', %s, defaulting to 0", constants.EnvMaxVolumesPerNode, err)
 		opts.MaxVolumesPerNode = 0
@@ -949,4 +956,9 @@ func (s *service) GetNodeLabels() (map[string]string, error) {
 	log.Debugf("Node %s details\n", node)
 
 	return node.Labels, nil
+}
+
+// WithRP appends Replication Prefix to provided string
+func (s *service) WithRP(key string) string {
+	return s.opts.replicationPrefix + "/" + key
 }
