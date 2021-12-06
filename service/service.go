@@ -49,6 +49,10 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	isBasicAuth = true
+)
+
 //To maintain runid for Non debug mode. Note: CSI will not generate runid if CSI_DEBUG=false
 var runid int64
 var isilonConfigFile string
@@ -86,6 +90,7 @@ type Opts struct {
 	KubeConfigPath            string
 	allowedNetworks           []string
 	MaxVolumesPerNode         int64
+	IsBasicAuth               bool
 	IsHealthMonitorEnabled    bool
 }
 
@@ -117,6 +122,7 @@ type IsilonClusterConfig struct {
 	IsiPath                   string `yaml:"isiPath,omitempty"`
 	IsiVolumePathPermissions  string `yaml:"isiVolumePathPermissions,omitempty"`
 	IsDefault                 *bool  `yaml:"isDefault,omitempty"`
+	IsBasicAuth               *bool  `yaml:"isBasicAuth,omitempty"`
 	isiSvc                    *isiService
 }
 
@@ -206,6 +212,7 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 
 	opts.QuotaEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvQuotaEnabled)
 	opts.SkipCertificateValidation = utils.ParseBooleanFromContext(ctx, constants.EnvSkipCertificateValidation)
+	opts.IsBasicAuth = utils.ParseBooleanFromContext(ctx, constants.EnvIsBasicAuth)
 	opts.AutoProbe = utils.ParseBooleanFromContext(ctx, constants.EnvAutoProbe)
 	opts.Verbose = utils.ParseUintFromContext(ctx, constants.EnvVerbose)
 	opts.CustomTopologyEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvCustomTopologyEnabled)
@@ -406,6 +413,7 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 		isiConfig.Password,
 		isiConfig.IsiPath,
 		isiConfig.IsiVolumePathPermissions,
+		*isiConfig.IsBasicAuth,
 	)
 	if err != nil {
 		log.Errorf("init client failed for isilon cluster '%s': '%s'", isiConfig.ClusterName, err.Error())
@@ -648,6 +656,10 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 			config.SkipCertificateValidation = &s.opts.SkipCertificateValidation
 		}
 
+		if config.IsBasicAuth == nil {
+			config.IsBasicAuth = &s.opts.IsBasicAuth
+		}
+
 		if config.IsiPath == "" {
 			config.IsiPath = s.opts.Path
 		}
@@ -694,6 +706,7 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 			"IsiPath":                   config.IsiPath,
 			"IsiVolumePathPermissions":  config.IsiVolumePathPermissions,
 			"IsDefault":                 *config.IsDefault,
+			"IsBasicAuth":               *config.IsBasicAuth,
 		}
 		// TODO: Replace logrus with log
 		logrus.WithFields(fields).Infof("new config details for cluster %s", config.ClusterName)

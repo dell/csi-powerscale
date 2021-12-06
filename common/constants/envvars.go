@@ -30,6 +30,9 @@ const (
 	// be verified
 	EnvSkipCertificateValidation = "X_CSI_ISI_SKIP_CERTIFICATE_VALIDATION"
 
+	// EnvIsBasicAuth sets the default Authentication method as Basic Authentication
+	EnvIsBasicAuth = "X_CSI_ISI_IS_BASIC_AUTH"
+
 	// EnvPath is the root path under which all the volumes (directories) will be provisioned, e.g. /ifs/engineering
 	EnvPath = "X_CSI_ISI_PATH"
 

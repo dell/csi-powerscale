@@ -210,6 +210,12 @@ endpointPort: 8080
 # Default value: false
 skipCertificateValidation: true
 
+# isBasicAuth: Indicates whether the authentication will be session-based or basic.
+# Allowed values:
+#   true: enables basic Authentication
+#   false: enables session-based Authentication
+isBasicAuth: true
+
 # isiAccessZone: The name of the access zone a volume can be created in.
 # If storageclass is missing with AccessZone parameter, then value of isiAccessZone is used for the same.
 # Default value: System
@@ -257,6 +263,7 @@ authorization:
   enabled: false
   # sidecarProxyImage: the container image used for the csm-authorization-sidecar.
   # Default value: dellemc/csm-authorization-sidecar:v1.0.0
+  # Example: 0.0.0.1:5000/csm-authorization-sidecar:v1.0.0
   sidecarProxyImage: dellemc/csm-authorization-sidecar:v1.0.0
   # proxyHost: hostname of the csm-authorization server
   # Default value: None
