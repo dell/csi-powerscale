@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"google.golang.org/grpc"
 	"io/ioutil"
 	"net"
 	"path/filepath"
@@ -38,6 +39,7 @@ import (
 	"github.com/dell/csi-isilon/common/constants"
 	"github.com/dell/csi-isilon/common/utils"
 	"github.com/dell/csi-isilon/core"
+	csiext "github.com/dell/dell-csi-extensions/replication"
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
 	isi "github.com/dell/goisilon"
@@ -70,6 +72,7 @@ type Service interface {
 	csi.IdentityServer
 	csi.NodeServer
 	BeforeServe(context.Context, *gocsi.StoragePlugin, net.Listener) error
+	RegisterAdditionalServers(server *grpc.Server)
 }
 
 // Opts defines service configuration options.
@@ -499,6 +502,10 @@ func (s *service) BeforeServe(
 	go s.loadIsilonConfigs(ctx, isilonConfigFile)
 
 	return s.probeOnStart(ctx)
+}
+
+func (s *service) RegisterAdditionalServers(server *grpc.Server) {
+	csiext.RegisterReplicationServer(server, s)
 }
 
 func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) error {

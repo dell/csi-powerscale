@@ -332,22 +332,33 @@ func (s *service) CreateVolume(
 		if !ok {
 			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no volume group prefix specified in storage class")
 		}
+
 		rpo, ok := params[s.WithRP(KeyReplicationRPO)]
 		if !ok {
 			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no RPO specified in storage class")
 		}
+
 		rpoEnum := RPOEnum(rpo)
 		if err := rpoEnum.IsValid(); err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid rpo value")
 		}
+
 		rpoint, err := rpoEnum.ToInt()
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "unable to parse rpo seconds")
 		}
+
 		remoteSystemName, ok := params[s.WithRP(KeyReplicationRemoteSystem)]
 		if !ok {
 			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no remote system specified in storage class")
 		}
+
+		remoteIsiConfig, err := s.getIsilonConfig(ctx, &remoteSystemName)
+		if err != nil {
+			log.Error("Failed to get Isilon config with error ", err.Error())
+			return nil, status.Errorf(codes.InvalidArgument, "can't find cluster with name %s in driver config", remoteSystemName)
+		}
+		remoteSystemEndpoint := remoteIsiConfig.Endpoint
 
 		namespace := ""
 		if ignoreNS, ok := params[s.WithRP(KeyReplicationIgnoreNamespaces)]; ok && ignoreNS == "false" {
@@ -357,7 +368,7 @@ func (s *service) CreateVolume(
 			}
 		}
 
-		vgName := vgPrefix + "-" + namespace + remoteSystemName + "-" + rpo
+		vgName := vgPrefix + "-" + namespace + remoteSystemEndpoint + "-" + rpo
 		if len(vgName) > 128 {
 			vgName = vgName[:128]
 		}
@@ -371,21 +382,13 @@ func (s *service) CreateVolume(
 			if err != nil {
 				return nil, err
 			}
-		} else {
-			//already exists? what to do
-			// probably nothing
 		}
-		////////////////////////////////////////////////////////////
-		//ENSURE PP CLOUDIQ ETC                                   //
-		//ENSURE PP CLOUDIQ ETC                                   //
-		//ENSURE PP CLOUDIQ ETC                                   //
-		//ENSURE PP CLOUDIQ ETC                                   //
-		///////////////////////////////////////////////////////////
+
 		ppName := strings.ReplaceAll(vg.Name, ".", "-")
 		_, err = isiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 		if err != nil {
 			if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode == 404 {
-				err := isiConfig.isiSvc.client.CreatePolicy(ctx, ppName, rpoint, isiPath+"/"+vgName, isiPath+"/"+vgName, remoteSystemName)
+				err := isiConfig.isiSvc.client.CreatePolicy(ctx, ppName, rpoint, isiPath+"/"+vgName, isiPath+"/"+vgName, remoteSystemEndpoint)
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "can't create protection policy %s", err.Error())
 				}
@@ -393,9 +396,10 @@ func (s *service) CreateVolume(
 				return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
 			}
 		}
+
+		isiPath = isiPath + "/" + VolumeGroupDir
 	}
 
-	isiPath = isiPath + "/" + VolumeGroupDir
 	foundVol = false
 	if isROVolumeFromSnapshot {
 		if isReplication {
