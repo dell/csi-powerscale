@@ -33,15 +33,16 @@ type isiService struct {
 	client   *isi.Client
 }
 
-func (svc *isiService) CopySnapshot(ctx context.Context, isiPath string, srcSnapshotID int64, dstVolumeName string) (isi.Volume, error) {
+func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSourceVolumeIsiPath string, srcSnapshotID int64, dstVolumeName string) (isi.Volume, error) {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
 	log.Debugf("begin to copy snapshot '%d'", srcSnapshotID)
+	log.Debugf("####### DEBUG isiPath= %v, srcSnapshotID= %v, dstVolumeName= %v", isiPath, srcSnapshotID, dstVolumeName)
 
 	var volumeNew isi.Volume
 	var err error
-	if volumeNew, err = svc.client.CopySnapshotWithIsiPath(ctx, isiPath, srcSnapshotID, "", dstVolumeName); err != nil {
+	if volumeNew, err = svc.client.CopySnapshotWithIsiPath(ctx, isiPath, snapshotSourceVolumeIsiPath, srcSnapshotID, "", dstVolumeName); err != nil {
 		log.Errorf("copy snapshot failed, '%s'", err.Error())
 		return nil, err
 	}
@@ -747,4 +748,13 @@ func (svc *isiService) IsHostAlreadyAdded(ctx context.Context, exportID int, acc
 	}
 
 	return clientFieldsNotEmpty && isNodeInClientFields || isNodeFQDNInClientFields
+}
+
+func (svc *isiService) GetSnapshotSourceVolumeIsiPath(ctx context.Context, snapshotID string) (string, error) {
+	snapshot, err := svc.GetSnapshot(ctx, snapshotID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get snapshot id '%s', error '%v'", snapshotID, err)
+	}
+
+	return path.Dir(snapshot.Path), nil
 }

@@ -19,6 +19,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"path"
 	"strconv"
 	"strings"
@@ -108,6 +109,7 @@ func (s *service) CreateVolume(
 		snapshotTrackingDir               string
 		snapshotTrackingDirEntryForVolume string
 		clusterName                       string
+		snapshotSourceVolumeIsiPath       string
 	)
 
 	params := req.GetParameters()
@@ -230,7 +232,12 @@ func (s *service) CreateVolume(
 			log.Infof("Creating volume from snapshot ID: '%s'", sourceSnapshotID)
 
 			// Get snapshot path
-			if snapshotIsiPath, err = isiConfig.isiSvc.GetSnapshotIsiPath(ctx, isiPath, sourceSnapshotID); err != nil {
+			if snapshotSourceVolumeIsiPath, err = isiConfig.isiSvc.GetSnapshotSourceVolumeIsiPath(ctx, sourceSnapshotID); err != nil {
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+			log.Infof("Snapshot source volume isiPath is '%s'", snapshotSourceVolumeIsiPath)
+
+			if snapshotIsiPath, err = isiConfig.isiSvc.GetSnapshotIsiPath(ctx, snapshotSourceVolumeIsiPath, sourceSnapshotID); err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
 			log.Debugf("The Isilon directory path of snapshot is= '%s'", snapshotIsiPath)
@@ -444,14 +451,16 @@ func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *Isilo
 	if snapshotSrc, err = isiConfig.isiSvc.GetSnapshot(ctx, srcSnapshotID); err != nil {
 		return fmt.Errorf("failed to get snapshot id '%s', error '%v'", srcSnapshotID, err)
 	}
+	log.Debugf("####### DEBUG snapshotSrc= %#v", snapshotSrc)
 
 	// check source snapshot size
-	size := isiConfig.isiSvc.GetSnapshotSize(ctx, isiPath, snapshotSrc.Name)
+	snapshotSourceVolumeIsiPath := path.Dir(snapshotSrc.Path)
+	size := isiConfig.isiSvc.GetSnapshotSize(ctx, snapshotSourceVolumeIsiPath, snapshotSrc.Name)
 	if size > sizeInBytes {
 		return fmt.Errorf("specified size '%d' is smaller than source snapshot size '%d'", sizeInBytes, size)
 	}
 
-	if _, err = isiConfig.isiSvc.CopySnapshot(ctx, isiPath, snapshotSrc.Id, dstVolumeName); err != nil {
+	if _, err = isiConfig.isiSvc.CopySnapshot(ctx, isiPath, snapshotSourceVolumeIsiPath, snapshotSrc.Id, dstVolumeName); err != nil {
 		return fmt.Errorf("failed to copy snapshot id '%s', error '%s'", srcSnapshotID, err.Error())
 	}
 
@@ -485,6 +494,10 @@ func (s *service) createVolumeFromSource(
 	req *csi.CreateVolumeRequest,
 	sizeInBytes int64) error {
 	if contentSnapshot := contentSource.GetSnapshot(); contentSnapshot != nil {
+		log.Debugf("####### DEBUG contentSnapshot= %#v", contentSnapshot)
+		log.Debugf("####### DEBUG isiConfig= %#v", isiConfig)
+		log.Debugf("####### DEBUG isiPath= %#v", isiPath)
+		log.Debugf("####### DEBUG CreateVolumeRequest/req= %#v", req)
 		// create volume from source snapshot
 		if err := s.createVolumeFromSnapshot(ctx, isiConfig, isiPath, contentSnapshot.GetSnapshotId(), req.GetName(), sizeInBytes); err != nil {
 			return status.Error(codes.Internal, err.Error())
