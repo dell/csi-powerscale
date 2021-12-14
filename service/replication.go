@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"github.com/dell/csi-isilon/common/utils"
 	csiext "github.com/dell/dell-csi-extensions/replication"
+	isiApi "github.com/dell/goisilon/api"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"strings"
 	"time"
 )
 
@@ -210,11 +212,79 @@ func (s *service) CreateStorageProtectionGroup(ctx context.Context,
 	}, nil
 }
 
-func (s *service) DeleteStorageProtectionGroup(ctx context.Context, request *csiext.DeleteStorageProtectionGroupRequest) (*csiext.DeleteStorageProtectionGroupResponse, error) {
+// DeleteStorageProtectionGroup deletes storage protection group
+func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
+	req *csiext.DeleteStorageProtectionGroupRequest) (*csiext.DeleteStorageProtectionGroupResponse, error) {
+
 	ctx, log, _ := GetRunIDLog(ctx)
+	localParams := req.GetProtectionGroupAttributes()
+	groupID := req.GetProtectionGroupId()
+	isiPath := utils.GetIsiPathFromPgID(groupID)
+	log.Infof("IsiPath: %s", isiPath)
+	clusterName, ok := localParams[s.opts.replicationContextPrefix+"systemName"]
+	if !ok {
+		log.Error("Can't get systemName from PG params")
+	}
 
-	log.Info("not implemented yet")
+	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
+	if err != nil {
+		log.Error("Failed to get Isilon config with error ", err.Error())
+		return nil, err
+	}
 
+	fields := map[string]interface{}{
+		"ProtectedStorageGroup": groupID,
+	}
+
+	log.WithFields(fields).Info("Deleting storage protection group")
+
+	_, err = isiConfig.isiSvc.GetVolume(ctx, isiPath, "", "")
+	if e, ok := err.(*isiApi.JSONError); ok {
+		if e.StatusCode == 404 {
+			return &csiext.DeleteStorageProtectionGroupResponse{}, nil
+		}
+		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group")
+	}
+	childs, err := isiConfig.isiSvc.client.QueryVolumeChildren(ctx, strings.TrimPrefix(isiPath, isiConfig.IsiPath))
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Error: Unable to get VG's childs")
+	}
+	for key := range childs {
+		log.Info("Child Path: ", key)
+		export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, key, "")
+		if err == nil {
+			log.Error("Contains paths: ", export.Paths)
+			return nil, status.Errorf(codes.Internal, "VG is not empty")
+		}
+	}
+	//// DELETE VG, DELETE PP IF NO VOLUMES
+	//members, err := isiConfig.isiSvc.GetSubDirectoryCount(ctx, isiPath, "")
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if members != 0 {
+	//	log.Error("VG has members inside")
+	//	return nil, errors.New("volume Group is not empty")
+	//}
+	err = isiConfig.isiSvc.DeleteVolume(ctx, isiPath, "")
+	if err != nil {
+		return nil, err
+	}
+	ppName := strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(isiPath, isiConfig.IsiPath), "/", ""), ".", "-")
+	log.Info(ppName, "ppname")
+	err = isiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+	if err != nil {
+		if e, ok := err.(*isiApi.JSONError); ok {
+			if e.StatusCode == 404 {
+				log.Info("No PP Found")
+			} else {
+				log.Errorf("Failed to delete PP %s.", ppName)
+			}
+		} else {
+			log.Error("Unknown error while deleting PP")
+		}
+	}
+	log.Info("PP cleared out")
 	return &csiext.DeleteStorageProtectionGroupResponse{}, nil
 }
 
