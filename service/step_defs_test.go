@@ -195,6 +195,7 @@ func (f *feature) getService() *service {
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
 	opts.SkipCertificateValidation = true
+	opts.IsBasicAuth = true
 	opts.Verbose = 1
 	opts.KubeConfigPath = "/etc/kubernetes/admin.conf"
 
@@ -206,6 +207,7 @@ func (f *feature) getService() *service {
 	newConfig.User = "blah"
 	newConfig.Password = "blah"
 	newConfig.SkipCertificateValidation = &opts.SkipCertificateValidation
+	newConfig.IsBasicAuth = &opts.IsBasicAuth
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
 	boolTrue := true
 	newConfig.IsDefault = &boolTrue
@@ -257,6 +259,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a Isilon service with params "([^"]*)" "([^"]*)"$`, f.aIsilonServiceWithParams)
 	s.Step(`^a Isilon service with custom topology "([^"]*)" "([^"]*)"$`, f.aIsilonServiceWithParamsForCustomTopology)
 	s.Step(`^a Isilon service with custom topology and no label "([^"]*)" "([^"]*)"$`, f.aIsilonServiceWithParamsForCustomTopologyNoLabel)
+	s.Step(`^a Isilon service with isBasicAuth as false$`, f.aIsilonservicewithisBasicAuthasfalse)
 	s.Step(`^I render Isilon service unreachable$`, f.renderOneFSAPIUnreachable)
 	s.Step(`^I enable quota$`, f.enableQuota)
 	s.Step(`^I call GetPluginInfo$`, f.iCallGetPluginInfo)
@@ -628,11 +631,9 @@ func (f *feature) aValidCreateVolumeResponseIsReturned() error {
 }
 
 func (f *feature) aValidDeleteVolumeResponseIsReturned() error {
-
 	if f.err != nil {
 		return f.err
 	}
-
 	return nil
 }
 
@@ -1862,6 +1863,69 @@ func (f *feature) aIsilonServiceWithParams(user, mode string) error {
 	return nil
 }
 
+func (f *feature) aIsilonservicewithisBasicAuthasfalse() error {
+	f.checkGoRoutines("start aIsilonService")
+
+	f.err = nil
+	f.getPluginInfoResponse = nil
+	f.volumeIDList = f.volumeIDList[:0]
+	f.snapshotIDList = f.snapshotIDList[:0]
+
+	// configure gofsutil; we use a mock interface
+	gofsutil.UseMockFS()
+	gofsutil.GOFSMock.InduceBindMountError = false
+	gofsutil.GOFSMock.InduceMountError = false
+	gofsutil.GOFSMock.InduceGetMountsError = false
+	gofsutil.GOFSMock.InduceDevMountsError = false
+	gofsutil.GOFSMock.InduceUnmountError = false
+	gofsutil.GOFSMock.InduceFormatError = false
+	gofsutil.GOFSMock.InduceGetDiskFormatError = false
+	gofsutil.GOFSMock.InduceGetDiskFormatType = ""
+	gofsutil.GOFSMockMounts = gofsutil.GOFSMockMounts[:0]
+
+	// set induced errors
+	inducedErrors.badVolumeIdentifier = false
+	inducedErrors.invalidVolumeID = false
+	inducedErrors.noVolumeID = false
+	inducedErrors.differentVolumeID = false
+	inducedErrors.noNodeName = false
+	inducedErrors.noNodeID = false
+	inducedErrors.omitVolumeCapability = false
+	inducedErrors.omitAccessMode = false
+
+	// initialize volume and export existence status
+	stepHandlersErrors.ExportNotFoundError = true
+	stepHandlersErrors.VolumeNotExistError = true
+
+	// Get the httptest mock handler. Only set
+	// a new server if there isn't one already.
+	handler := getHandler()
+	// Get or reuse the cached service
+	f.getServiceWithbasicauthasfalse()
+	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
+	if handler != nil && os.Getenv("CSI_ISILON_ENDPOINT") == "" {
+		if f.server == nil {
+			f.server = httptest.NewServer(handler)
+		}
+		log.Printf("server url: %s\n", f.server.URL)
+		clusterConfig.EndpointURL = f.server.URL
+	} else {
+		f.server = nil
+	}
+	isiSvc, _ := f.service.GetIsiService(context.Background(), clusterConfig, logLevel)
+	updatedClusterConfig, _ := f.service.isiClusters.Load(clusterName1)
+	updatedClusterConfig.(*IsilonClusterConfig).isiSvc = isiSvc
+	f.service.isiClusters.Store(clusterName1, updatedClusterConfig)
+	f.checkGoRoutines("end aIsilonService")
+	f.service.logServiceStats()
+	if inducedErrors.noIsiService || inducedErrors.autoProbeNotEnabled {
+		updatedClusterConfig, _ := f.service.isiClusters.Load(clusterName1)
+		updatedClusterConfig.(*IsilonClusterConfig).isiSvc = nil
+		f.service.isiClusters.Store(clusterName1, updatedClusterConfig)
+	}
+	return nil
+}
+
 func (f *feature) aIsilonServiceWithParamsForCustomTopology(user, mode string) error {
 	f.checkGoRoutines("start aIsilonService")
 
@@ -2059,6 +2123,7 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
 	opts.SkipCertificateValidation = true
+	opts.IsBasicAuth = true
 	opts.Verbose = 1
 	opts.CustomTopologyEnabled = true
 	opts.KubeConfigPath = "/etc/kubernetes/admin.conf"
@@ -2071,6 +2136,7 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	newConfig.User = user
 	newConfig.Password = "blah"
 	newConfig.SkipCertificateValidation = &opts.SkipCertificateValidation
+	newConfig.IsBasicAuth = &opts.IsBasicAuth
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
 	boolTrue := true
 	newConfig.IsDefault = &boolTrue
@@ -2116,6 +2182,7 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
 	opts.SkipCertificateValidation = true
+	opts.IsBasicAuth = true
 	opts.Verbose = 1
 
 	newConfig := IsilonClusterConfig{}
@@ -2126,6 +2193,7 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	newConfig.User = user
 	newConfig.Password = "blah"
 	newConfig.SkipCertificateValidation = &opts.SkipCertificateValidation
+	newConfig.IsBasicAuth = &opts.IsBasicAuth
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
 	boolTrue := true
 	newConfig.IsDefault = &boolTrue
@@ -2137,6 +2205,46 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	}
 	svc.opts = opts
 	svc.mode = mode
+	f.service = svc
+	f.service.nodeID, _ = os.Hostname()
+	f.service.nodeIP = "127.0.0.1"
+	f.service.defaultIsiClusterName = clusterName1
+	f.service.isiClusters = new(sync.Map)
+	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
+	return svc
+}
+
+func (f *feature) getServiceWithbasicauthasfalse() *service {
+	testControllerHasNoConnection = false
+	testNodeHasNoConnection = false
+	svc := new(service)
+	var opts Opts
+	opts.AccessZone = "System"
+	opts.Path = "/ifs/data/csi-isilon"
+	opts.SkipCertificateValidation = true
+	opts.IsBasicAuth = false
+	opts.Verbose = 1
+
+	newConfig := IsilonClusterConfig{}
+	newConfig.ClusterName = clusterName1
+	newConfig.Endpoint = "127.0.0.1"
+	newConfig.EndpointPort = "8080"
+	newConfig.EndpointURL = "http://127.0.0.1"
+	newConfig.User = "blah"
+	newConfig.Password = "blah"
+	newConfig.SkipCertificateValidation = &opts.SkipCertificateValidation
+	newConfig.IsBasicAuth = &opts.IsBasicAuth
+	newConfig.IsiPath = "/ifs/data/csi-isilon"
+	boolTrue := false
+	newConfig.IsDefault = &boolTrue
+
+	if inducedErrors.autoProbeNotEnabled {
+		opts.AutoProbe = false
+	} else {
+		opts.AutoProbe = true
+	}
+	svc.opts = opts
+	svc.mode = "controller"
 	f.service = svc
 	f.service.nodeID, _ = os.Hostname()
 	f.service.nodeIP = "127.0.0.1"
