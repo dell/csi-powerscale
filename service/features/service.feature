@@ -19,7 +19,7 @@ Feature: Isilon CSI interface
       Then a valid ProbeResponse is returned
 
     Scenario: Identity Probe good call with session-based auth
-      Given a Isilon service with isBasicAuth as false
+      Given a Isilon service with IsiAuthType as false
       And I call Probe
       Then a valid ProbeResponse is returned
 

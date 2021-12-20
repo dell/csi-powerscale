@@ -195,7 +195,7 @@ func (f *feature) getService() *service {
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
 	opts.SkipCertificateValidation = true
-	opts.IsBasicAuth = true
+	opts.IsiAuthType = 0
 	opts.Verbose = 1
 	opts.KubeConfigPath = "/etc/kubernetes/admin.conf"
 
@@ -207,7 +207,7 @@ func (f *feature) getService() *service {
 	newConfig.User = "blah"
 	newConfig.Password = "blah"
 	newConfig.SkipCertificateValidation = &opts.SkipCertificateValidation
-	newConfig.IsBasicAuth = &opts.IsBasicAuth
+	newConfig.IsiAuthType = opts.IsiAuthType
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
 	boolTrue := true
 	newConfig.IsDefault = &boolTrue
@@ -259,7 +259,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a Isilon service with params "([^"]*)" "([^"]*)"$`, f.aIsilonServiceWithParams)
 	s.Step(`^a Isilon service with custom topology "([^"]*)" "([^"]*)"$`, f.aIsilonServiceWithParamsForCustomTopology)
 	s.Step(`^a Isilon service with custom topology and no label "([^"]*)" "([^"]*)"$`, f.aIsilonServiceWithParamsForCustomTopologyNoLabel)
-	s.Step(`^a Isilon service with isBasicAuth as false$`, f.aIsilonservicewithisBasicAuthasfalse)
+	s.Step(`^a Isilon service with IsiAuthType as false$`, f.aIsilonservicewithIsiAuthTypeasfalse)
 	s.Step(`^I render Isilon service unreachable$`, f.renderOneFSAPIUnreachable)
 	s.Step(`^I enable quota$`, f.enableQuota)
 	s.Step(`^I call GetPluginInfo$`, f.iCallGetPluginInfo)
@@ -1863,7 +1863,7 @@ func (f *feature) aIsilonServiceWithParams(user, mode string) error {
 	return nil
 }
 
-func (f *feature) aIsilonservicewithisBasicAuthasfalse() error {
+func (f *feature) aIsilonservicewithIsiAuthTypeasfalse() error {
 	f.checkGoRoutines("start aIsilonService")
 
 	f.err = nil
@@ -1901,7 +1901,7 @@ func (f *feature) aIsilonservicewithisBasicAuthasfalse() error {
 	// a new server if there isn't one already.
 	handler := getHandler()
 	// Get or reuse the cached service
-	f.getServiceWithbasicauthasfalse()
+	f.getServiceWithsessionauth()
 	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
 	if handler != nil && os.Getenv("CSI_ISILON_ENDPOINT") == "" {
 		if f.server == nil {
@@ -2123,7 +2123,7 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
 	opts.SkipCertificateValidation = true
-	opts.IsBasicAuth = true
+	opts.IsiAuthType = 0
 	opts.Verbose = 1
 	opts.CustomTopologyEnabled = true
 	opts.KubeConfigPath = "/etc/kubernetes/admin.conf"
@@ -2136,7 +2136,7 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	newConfig.User = user
 	newConfig.Password = "blah"
 	newConfig.SkipCertificateValidation = &opts.SkipCertificateValidation
-	newConfig.IsBasicAuth = &opts.IsBasicAuth
+	newConfig.IsiAuthType = opts.IsiAuthType
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
 	boolTrue := true
 	newConfig.IsDefault = &boolTrue
@@ -2182,7 +2182,7 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
 	opts.SkipCertificateValidation = true
-	opts.IsBasicAuth = true
+	opts.IsiAuthType = 0
 	opts.Verbose = 1
 
 	newConfig := IsilonClusterConfig{}
@@ -2193,7 +2193,7 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	newConfig.User = user
 	newConfig.Password = "blah"
 	newConfig.SkipCertificateValidation = &opts.SkipCertificateValidation
-	newConfig.IsBasicAuth = &opts.IsBasicAuth
+	newConfig.IsiAuthType = opts.IsiAuthType
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
 	boolTrue := true
 	newConfig.IsDefault = &boolTrue
@@ -2214,7 +2214,7 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	return svc
 }
 
-func (f *feature) getServiceWithbasicauthasfalse() *service {
+func (f *feature) getServiceWithsessionauth() *service {
 	testControllerHasNoConnection = false
 	testNodeHasNoConnection = false
 	svc := new(service)
@@ -2222,7 +2222,7 @@ func (f *feature) getServiceWithbasicauthasfalse() *service {
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
 	opts.SkipCertificateValidation = true
-	opts.IsBasicAuth = false
+	opts.IsiAuthType = 1
 	opts.Verbose = 1
 
 	newConfig := IsilonClusterConfig{}
@@ -2233,7 +2233,7 @@ func (f *feature) getServiceWithbasicauthasfalse() *service {
 	newConfig.User = "blah"
 	newConfig.Password = "blah"
 	newConfig.SkipCertificateValidation = &opts.SkipCertificateValidation
-	newConfig.IsBasicAuth = &opts.IsBasicAuth
+	newConfig.IsiAuthType = opts.IsiAuthType
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
 	boolTrue := false
 	newConfig.IsDefault = &boolTrue

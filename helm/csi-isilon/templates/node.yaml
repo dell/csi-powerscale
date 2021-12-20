@@ -98,8 +98,8 @@ spec:
               value: node
             - name: X_CSI_ISI_SKIP_CERTIFICATE_VALIDATION
               value: "{{ .Values.skipCertificateValidation }}"
-            - name: X_CSI_ISI_IS_BASIC_AUTH
-              value: "{{ .Values.isBasicAuth }}"
+            - name: X_CSI_ISI_AUTH_TYPE
+              value: "{{ .Values.isiAuthType }}"
             - name: X_CSI_ALLOWED_NETWORKS
               value: "{{ .Values.allowedNetworks }}"
             - name: X_CSI_VERBOSE
