@@ -725,7 +725,8 @@ func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
 
 	nodeFQDN, err := utils.GetFQDNByIP(ctx, nodeIP)
 	if (err) != nil {
-		return "", err
+		nodeFQDN = nodeIP
+		log.Warnf("Setting nodeFQDN to %s as failed to resolve IP to FQDN due to %v", nodeIP, err)
 	}
 
 	nodeID, err := s.GetCSINodeID(ctx)
