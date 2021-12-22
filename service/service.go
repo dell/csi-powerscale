@@ -86,7 +86,7 @@ type Opts struct {
 	KubeConfigPath            string
 	allowedNetworks           []string
 	MaxVolumesPerNode         int64
-	IsiAuthType               uint
+	isiAuthType               uint8
 	IsHealthMonitorEnabled    bool
 }
 
@@ -118,7 +118,6 @@ type IsilonClusterConfig struct {
 	IsiPath                   string `yaml:"isiPath,omitempty"`
 	IsiVolumePathPermissions  string `yaml:"isiVolumePathPermissions,omitempty"`
 	IsDefault                 *bool  `yaml:"isDefault,omitempty"`
-	IsiAuthType               uint   `yaml:"isiAuthType,omitempty"`
 	isiSvc                    *isiService
 }
 
@@ -208,7 +207,7 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 
 	opts.QuotaEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvQuotaEnabled)
 	opts.SkipCertificateValidation = utils.ParseBooleanFromContext(ctx, constants.EnvSkipCertificateValidation)
-	opts.IsiAuthType = utils.ParseUintFromContext(ctx, constants.EnvIsiAuthType)
+	opts.isiAuthType = uint8(utils.ParseUintFromContext(ctx, constants.EnvIsiAuthType))
 	opts.AutoProbe = utils.ParseBooleanFromContext(ctx, constants.EnvAutoProbe)
 	opts.Verbose = utils.ParseUintFromContext(ctx, constants.EnvVerbose)
 	opts.CustomTopologyEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvCustomTopologyEnabled)
@@ -409,7 +408,7 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 		isiConfig.Password,
 		isiConfig.IsiPath,
 		isiConfig.IsiVolumePathPermissions,
-		isiConfig.IsiAuthType,
+		s.opts.isiAuthType,
 	)
 	if err != nil {
 		log.Errorf("init client failed for isilon cluster '%s': '%s'", isiConfig.ClusterName, err.Error())
@@ -652,8 +651,6 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 			config.SkipCertificateValidation = &s.opts.SkipCertificateValidation
 		}
 
-		config.IsiAuthType = s.opts.IsiAuthType
-
 		if config.IsiPath == "" {
 			config.IsiPath = s.opts.Path
 		}
@@ -700,7 +697,6 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 			"IsiPath":                   config.IsiPath,
 			"IsiVolumePathPermissions":  config.IsiVolumePathPermissions,
 			"IsDefault":                 *config.IsDefault,
-			"IsiAuthType":               config.IsiAuthType,
 		}
 		// TODO: Replace logrus with log
 		logrus.WithFields(fields).Infof("new config details for cluster %s", config.ClusterName)
