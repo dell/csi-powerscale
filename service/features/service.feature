@@ -215,6 +215,12 @@ Feature: Isilon CSI interface
       And I call CreateVolumeFromSnapshot "2" "volume1"
       Then a valid CreateVolumeResponse is returned
 
+    Scenario: Create volume from snapshot with different isi path good scenario
+      Given a Isilon service
+      When I call Probe
+      And I call CreateVolumeFromSnapshot "4" "volume1"
+      Then a valid CreateVolumeResponse is returned
+
     Scenario Outline: Create volume from snapshot with negative or idempotent arguments
       Given a Isilon service
       When I call CreateVolumeFromSnapshot <snapshotID> <volumeName>
