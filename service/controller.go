@@ -19,7 +19,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"path"
 	"strconv"
 	"strings"

@@ -461,10 +461,10 @@ func handleGetExportsWithResume(w http.ResponseWriter, r *http.Request) {
 // This function regards snapshot id 404 as an unexisted snapshot id
 func handleGetSnapshotByID(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	snapId := vars["snapshot_id"]
+	snapID := vars["snapshot_id"]
 
 	fileName := "get_existent_snapshot_2.txt"
-	if snapId == "4" {
+	if snapID == "4" {
 		fileName = "get_existent_snapshot_4.txt"
 	}
 
