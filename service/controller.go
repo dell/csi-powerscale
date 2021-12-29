@@ -451,7 +451,6 @@ func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *Isilo
 	if snapshotSrc, err = isiConfig.isiSvc.GetSnapshot(ctx, srcSnapshotID); err != nil {
 		return fmt.Errorf("failed to get snapshot id '%s', error '%v'", srcSnapshotID, err)
 	}
-	log.Debugf("####### DEBUG snapshotSrc= %#v", snapshotSrc)
 
 	// check source snapshot size
 	snapshotSourceVolumeIsiPath := path.Dir(snapshotSrc.Path)
@@ -494,10 +493,6 @@ func (s *service) createVolumeFromSource(
 	req *csi.CreateVolumeRequest,
 	sizeInBytes int64) error {
 	if contentSnapshot := contentSource.GetSnapshot(); contentSnapshot != nil {
-		log.Debugf("####### DEBUG contentSnapshot= %#v", contentSnapshot)
-		log.Debugf("####### DEBUG isiConfig= %#v", isiConfig)
-		log.Debugf("####### DEBUG isiPath= %#v", isiPath)
-		log.Debugf("####### DEBUG CreateVolumeRequest/req= %#v", req)
 		// create volume from source snapshot
 		if err := s.createVolumeFromSnapshot(ctx, isiConfig, isiPath, contentSnapshot.GetSnapshotId(), req.GetName(), sizeInBytes); err != nil {
 			return status.Error(codes.Internal, err.Error())

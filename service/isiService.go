@@ -38,7 +38,6 @@ func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSource
 	log := utils.GetRunIDLogger(ctx)
 
 	log.Debugf("begin to copy snapshot '%d'", srcSnapshotID)
-	log.Debugf("####### DEBUG isiPath= %v, srcSnapshotID= %v, dstVolumeName= %v", isiPath, srcSnapshotID, dstVolumeName)
 
 	var volumeNew isi.Volume
 	var err error
