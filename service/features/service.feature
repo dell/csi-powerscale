@@ -127,6 +127,11 @@ Feature: Isilon CSI interface
       Then a valid NodeGetInfoResponse is returned with volume limit "2"
       And I call remove node labels
 
+    Scenario: Call NodeGetInfo When reverse DNS is absent
+      Given a Isilon service
+      When I call iCallNodeGetInfoWithNoFQDN
+      Then a valid NodeGetInfoResponse is returned
+
     Scenario: Call NodeGetCapabilities with health monitor feature enabled
       Given a Isilon service
       When I call NodeGetCapabilities "true"
