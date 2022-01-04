@@ -18,6 +18,11 @@ Feature: Isilon CSI interface
       When I call Probe
       Then a valid ProbeResponse is returned
 
+    Scenario: Identity Probe good call with session-based auth
+      Given a Isilon service with IsiAuthType as session based
+      And I call Probe
+      Then a valid ProbeResponse is returned
+
     Scenario: Identity Probe bad call with invalid OneFS REST connection
       Given a Isilon service
       When I render Isilon service unreachable

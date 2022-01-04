@@ -86,6 +86,7 @@ type Opts struct {
 	KubeConfigPath            string
 	allowedNetworks           []string
 	MaxVolumesPerNode         int64
+	isiAuthType               uint8
 	IsHealthMonitorEnabled    bool
 }
 
@@ -206,6 +207,7 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 
 	opts.QuotaEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvQuotaEnabled)
 	opts.SkipCertificateValidation = utils.ParseBooleanFromContext(ctx, constants.EnvSkipCertificateValidation)
+	opts.isiAuthType = uint8(utils.ParseUintFromContext(ctx, constants.EnvIsiAuthType))
 	opts.AutoProbe = utils.ParseBooleanFromContext(ctx, constants.EnvAutoProbe)
 	opts.Verbose = utils.ParseUintFromContext(ctx, constants.EnvVerbose)
 	opts.CustomTopologyEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvCustomTopologyEnabled)
@@ -406,6 +408,7 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 		isiConfig.Password,
 		isiConfig.IsiPath,
 		isiConfig.IsiVolumePathPermissions,
+		s.opts.isiAuthType,
 	)
 	if err != nil {
 		log.Errorf("init client failed for isilon cluster '%s': '%s'", isiConfig.ClusterName, err.Error())

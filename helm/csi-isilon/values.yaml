@@ -210,6 +210,13 @@ endpointPort: 8080
 # Default value: false
 skipCertificateValidation: true
 
+# isiAuthType: Indicates whether the authentication will be session-based or basic.
+# Allowed values:
+#   0: enables basic Authentication
+#   1: enables session-based Authentication
+# Default value: 0
+isiAuthType: 0
+
 # isiAccessZone: The name of the access zone a volume can be created in.
 # If storageclass is missing with AccessZone parameter, then value of isiAccessZone is used for the same.
 # Default value: System
