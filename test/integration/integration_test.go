@@ -60,7 +60,7 @@ func TestMain(m *testing.M) {
 		nodeName := host + nodeIDSeparator + hostFQDN + nodeIDSeparator + nodeIP
 		os.Setenv("X_CSI_NODE_NAME", nodeName)
 	}
-	nodeNameWithoutFQDN  := host + nodeIDSeparator + nodeIP + nodeIDSeparator + nodeIP
+	nodeNameWithoutFQDN := host + nodeIDSeparator + nodeIP + nodeIDSeparator + nodeIP
 	os.Setenv("X_CSI_NODE_NAME_NO_FQDN", nodeNameWithoutFQDN)
 
 	// Make the file needed for NodeStage:
