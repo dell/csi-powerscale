@@ -370,15 +370,24 @@ function verify_authorization_proxy_server() {
     WGET=$(ssh ${NODEUSER}@"${node}" "which wget")
     if [ -x "${WGET}" ]; then
       log info "Running wget on "${node}""
+      nr=1
       if [ "${insecure}" == "true" ]
       then
         resp=$(ssh ${NODEUSER}@"${node}" wget --no-check-certificate --server-response --spider --quiet https://"${proxyHost}" 2>&1)
         log info "${resp}"
-        code=$(echo "${resp}" | awk 'NR==1{print $2}')
+        if [ "${resp}" == "Warning"* ]
+        then
+          nr=2
+        fi
+        code=$(echo "${resp}" | awk -v var=$nr 'NR==var {print $2}')
       else
         resp=$(ssh ${NODEUSER}@"${node}" wget --server-response --spider --quiet https://"${proxyHost}" 2>&1)
         log info "${resp}"
-        code=$(echo "${resp}" | awk 'NR==1{print $2}')
+        if [ "${resp}" == "Warning"* ]
+        then
+          nr=2
+        fi
+        code=$(echo "${resp}" | awk -v var=$nr 'NR==var {print $2}')
       fi
 
       if [ "${code}" != "502" ]; then
