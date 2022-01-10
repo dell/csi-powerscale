@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	isiapi "github.com/dell/goisilon/api"
@@ -103,6 +104,8 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/volume2", handleGetExistentVolume).Methods("GET")
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/volume1", handleCopySnapshot).Methods("PUT").
 		Headers("X-Isi-Ifs-Copy-Source", "/namespace/ifs/.snapshot/existent_snapshot_name/data/csi-isilon/nfs_1").Queries("merge", "True")
+	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/volume1", handleCopySnapshot).Methods("PUT").
+		Headers("X-Isi-Ifs-Copy-Source", "/namespace/ifs/.snapshot/existent_snapshot_name_4/data/csi-isilon/nfs_4").Queries("merge", "True")
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/volume1", handleCopyVolume).Methods("PUT").
 		Headers("X-Isi-Ifs-Copy-Source", "/namespace/ifs/data/csi-isilon/volume2").Queries("merge", "True")
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/volume1", handleVolumeCreation).Methods("PUT")
@@ -121,7 +124,7 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/create_snapshot_name/", handleGetNonexistentSnapshot).Methods("GET")
 	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/1/", handleGetNonexistentSnapshot).Methods("GET")
 	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/existent_snapshot_name/", handleGetExistentSnapshot).Methods("GET")
-	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/2/", handleGetExistentSnapshot).Methods("GET")
+	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/existent_snapshot_name_4/", handleGetExistentSnapshot).Methods("GET")
 	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/existent_comp_snapshot_name/", handleGetExistentCompatibleSnapshot).Methods("GET")
 	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/3/", handleGetExistentCompatibleSnapshot).Methods("GET")
 	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/{snapshot_id}/", handleDeleteSnapshot).Methods("DELETE")
@@ -457,6 +460,14 @@ func handleGetExportsWithResume(w http.ResponseWriter, r *http.Request) {
 // handleGetSnapshotByID implements GET /platform/1/snapshot/snapshots/{snapshot_id}
 // This function regards snapshot id 404 as an unexisted snapshot id
 func handleGetSnapshotByID(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	snapID := vars["snapshot_id"]
+
+	fileName := "get_existent_snapshot_2.txt"
+	if snapID == "4" {
+		fileName = "get_existent_snapshot_4.txt"
+	}
+
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -469,7 +480,7 @@ func handleGetSnapshotByID(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(readFromFile("mock/snapshot/get_non_existent_snapshot.txt"))
 	}
-	w.Write(readFromFile("mock/snapshot/get_existent_snapshot.txt"))
+	w.Write(readFromFile(fmt.Sprintf("mock/snapshot/%s", fileName)))
 }
 
 // handleDeleteVolume implements DELETE /platform/1/snapshot/snapshots/{snapshot_id}
@@ -530,11 +541,19 @@ func handleGetNonexistentSnapshot(w http.ResponseWriter, r *http.Request) {
 
 // handleGetExistentSnapshot implements GET /platform/1/snapshot/snapshots/existent_snapshot_name/
 func handleGetExistentSnapshot(w http.ResponseWriter, r *http.Request) {
+	p := r.URL.Path
+	p = strings.TrimSuffix(p, "/")
+	snapName := filepath.Base(p)
+	fileName := "get_existent_snapshot_2.txt"
+	if snapName == "existent_snapshot_name_4" {
+		fileName = "get_existent_snapshot_4.txt"
+	}
+
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
 	}
-	w.Write(readFromFile("mock/snapshot/get_existent_snapshot.txt"))
+	w.Write(readFromFile(fmt.Sprintf("mock/snapshot/%s", fileName)))
 }
 
 // handleGetExistentCompatibleSnapshot implements GET /platform/1/snapshot/snapshots/existent_comp_snapshot_name/

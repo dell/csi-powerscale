@@ -1,0 +1,22 @@
+{
+"snapshots" :
+[
+{
+"created" : 1567061367,
+"expires" : null,
+"has_locks" : false,
+"id" : 4,
+"name" : "existent_snapshot_name_4",
+"path" : "ifs/data/csi-isilon/childZone/nfs_4",
+"pct_filesystem" : 8.106093574156148e-09,
+"pct_reserve" : 0.0,
+"schedule" : null,
+"shadow_bytes" : 0,
+"size" : 8192,
+"state" : "active",
+"target_id" : null,
+"target_name" : null
+}
+
+]
+}

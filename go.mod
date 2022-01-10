@@ -7,7 +7,7 @@ require (
 	github.com/cucumber/godog v0.10.0
 	github.com/dell/gocsi v1.5.0
 	github.com/dell/gofsutil v1.6.0
-	github.com/dell/goisilon v1.6.1-0.20220103111519-535fa509f500
+	github.com/dell/goisilon v1.6.1-0.20220110083433-83d13e163ea4
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.2.0
