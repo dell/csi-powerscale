@@ -11,7 +11,7 @@
 #
 # verify-csi-isilon method
 function verify-csi-isilon() {
-  verify_k8s_versions "1.20" "1.22"
+  verify_k8s_versions "1.21" "1.23"
   verify_openshift_versions "4.8" "4.9"
   verify_namespace "${NS}"
   verify_required_secrets "${RELEASE}-creds"
@@ -19,6 +19,6 @@ function verify-csi-isilon() {
   verify_alpha_snap_resources
   verify_snap_requirements
   verify_helm_3
-  verify_helm_values_version "2.0.0"
+  verify_helm_values_version "2.2.0"
   verify_authorization_proxy_server
 }
