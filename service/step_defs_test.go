@@ -337,6 +337,8 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call ControllerGetVolume with name "([^"]*)"$`, f.iCallControllerGetVolume)
 	s.Step(`^a valid ControllerGetVolumeResponse is returned$`, f.aValidControllerGetVolumeResponseIsReturned)
 	s.Step(`^I call NodeGetVolumeStats with name "([^"]*)" and path "([^"]*)"$`, f.iCallNodeGetVolumeStats)
+	s.Step(`^I call iCallNodeGetInfoWithNoFQDN`, f.iCallNodeGetInfoWithNoFQDN)
+	s.Step(`^a valid NodeGetInfoResponse is returned$`, f.aValidNodeGetInfoResponseIsReturned)
 }
 
 // GetPluginInfo
@@ -2321,5 +2323,16 @@ func (f *feature) iCallNodeGetInfowithinvalidnetworks() error {
 }
 func (f *feature) iSetRootClientEnabledTo(val string) error {
 	f.rootClientEnabled = val
+	return nil
+}
+
+func (f *feature) iCallNodeGetInfoWithNoFQDN() error {
+	req := new(csi.NodeGetInfoRequest)
+	f.service.nodeIP = "192.0.2.0"
+	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
+	if f.err != nil {
+		log.Printf("NodeGetInfo call failed: %s\n", f.err.Error())
+		return f.err
+	}
 	return nil
 }
