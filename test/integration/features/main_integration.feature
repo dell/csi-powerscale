@@ -558,6 +558,20 @@ Feature: Isilon CSI interface
     | 4               |
 
   @v1.0
+  Scenario: Create, ControllerPublish, ControllerUnpublish, delete basic volume , run with nodeID which has IP isntead of FQDN
+    Given a Isilon service
+    And a basic volume request "integration0" "8"
+    When I call CreateVolume
+    When I call ControllerPublishVolume "X_CSI_NODE_NAME_NO_FQDN"
+    Then there are no errors
+    When I call ControllerUnpublishVolume "X_CSI_NODE_NAME_NO_FQDN"
+    Then there are no errors
+    When I call DeleteVolume
+    Then there is not a directory "integration0"
+    Then there is not an export "integration0"
+
+
+  @v1.0
     Scenario: Cleanup all the files created
       Given a Isilon service
       When I call DeleteAllVolumes

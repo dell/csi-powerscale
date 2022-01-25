@@ -18,6 +18,11 @@ Feature: Isilon CSI interface
       When I call Probe
       Then a valid ProbeResponse is returned
 
+    Scenario: Identity Probe good call with session-based auth
+      Given a Isilon service with IsiAuthType as session based
+      And I call Probe
+      Then a valid ProbeResponse is returned
+
     Scenario: Identity Probe bad call with invalid OneFS REST connection
       Given a Isilon service
       When I render Isilon service unreachable
@@ -127,6 +132,11 @@ Feature: Isilon CSI interface
       Then a valid NodeGetInfoResponse is returned with volume limit "2"
       And I call remove node labels
 
+    Scenario: Call NodeGetInfo When reverse DNS is absent
+      Given a Isilon service
+      When I call iCallNodeGetInfoWithNoFQDN
+      Then a valid NodeGetInfoResponse is returned
+
     Scenario: Call NodeGetCapabilities with health monitor feature enabled
       Given a Isilon service
       When I call NodeGetCapabilities "true"
@@ -213,6 +223,12 @@ Feature: Isilon CSI interface
       Given a Isilon service
       When I call Probe
       And I call CreateVolumeFromSnapshot "2" "volume1"
+      Then a valid CreateVolumeResponse is returned
+
+    Scenario: Create volume from snapshot with different isi path good scenario
+      Given a Isilon service
+      When I call Probe
+      And I call CreateVolumeFromSnapshot "4" "volume1"
       Then a valid CreateVolumeResponse is returned
 
     Scenario Outline: Create volume from snapshot with negative or idempotent arguments

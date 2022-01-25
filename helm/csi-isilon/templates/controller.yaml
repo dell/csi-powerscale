@@ -348,6 +348,8 @@ spec:
               value: controller
             - name: X_CSI_ISI_SKIP_CERTIFICATE_VALIDATION
               value: "{{ .Values.skipCertificateValidation }}"
+            - name: X_CSI_ISI_AUTH_TYPE
+              value: "{{ .Values.isiAuthType }}"
             - name: X_CSI_VERBOSE
               value: "{{ .Values.verbose }}"
             - name: X_CSI_ISI_PORT

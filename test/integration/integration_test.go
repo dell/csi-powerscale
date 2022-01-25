@@ -55,10 +55,13 @@ func TestMain(m *testing.M) {
 	if hostFQDN == "unknown" {
 		fmt.Printf("cannot get FQDN")
 	}
+	nodeIP := os.Getenv("X_CSI_NODE_IP")
 	if os.Getenv("X_CSI_CUSTOM_TOPOLOGY_ENABLED") == "true" {
-		nodeName := host + nodeIDSeparator + hostFQDN + nodeIDSeparator + os.Getenv("X_CSI_NODE_IP")
+		nodeName := host + nodeIDSeparator + hostFQDN + nodeIDSeparator + nodeIP
 		os.Setenv("X_CSI_NODE_NAME", nodeName)
 	}
+	nodeNameWithoutFQDN := host + nodeIDSeparator + nodeIP + nodeIDSeparator + nodeIP
+	os.Setenv("X_CSI_NODE_NAME_NO_FQDN", nodeNameWithoutFQDN)
 
 	// Make the file needed for NodeStage:
 	//  /tmp/datadir    -- for file system mounts
