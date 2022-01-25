@@ -224,6 +224,7 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 	clusterName, ok := localParams[s.opts.replicationContextPrefix+"systemName"]
 	if !ok {
 		log.Error("Can't get systemName from PG params")
+		return nil, status.Errorf(codes.InvalidArgument, "Error: Can't get systemName from PG params")
 	}
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
@@ -244,6 +245,8 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 			return &csiext.DeleteStorageProtectionGroupResponse{}, nil
 		}
 		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group")
+	}	else if err != nil {
+			return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group")
 	}
 	childs, err := isiConfig.isiSvc.client.QueryVolumeChildren(ctx, strings.TrimPrefix(isiPath, isiConfig.IsiPath))
 	if err != nil {
