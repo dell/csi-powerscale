@@ -61,8 +61,10 @@ enableCustomTopology: false
 
 # fsGroupPolicy: This is defined in Driver's spec. Supports three different mode which defines volume modification and ownership change upon mount operation.
 # Allowed values:
-#   ReadWriteOnceWithFSType: supports volume ownership and permissions change only if the fsType is defined and the volume's accessModes contains            #                            ReadWriteOnce
-#   File: kubernetes may use Kubernetes may use fsGroup to change permissions and ownership of the volume to match user requested fsGroup in the pod's       #         Security Policy regardless of fstype or access mode.
+#   ReadWriteOnceWithFSType: supports volume ownership and permissions change only if the fsType is defined
+#   and the volume's accessModes contains ReadWriteOnce
+#   File: kubernetes may use Kubernetes may use fsGroup to change permissions and ownership of the volume 
+#   to match user requested fsGroup in the pod's security policy regardless of fstype or access mode.
 #   None: volumes will be mounted with no modifications.
 # Default value: ReadWriteOnceWithFSType
 fsGroupPolicy: ReadWriteOnceWithFSType
