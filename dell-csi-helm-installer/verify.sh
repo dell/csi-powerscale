@@ -147,7 +147,12 @@ function verify_fc_installation() {
 
 # verify secrets exist
 function verify_required_secrets() {
-  log step "Verifying that required secrets have been created"
+  if [[ "${@}" == *"-certs"* ]]; then
+    log step "Verifying that required secrets for certs have been created"
+  fi
+  if [[ "${@}" == *"-creds"* ]]; then
+      log step "Verifying that required secrets for creds have been created"
+  fi
 
   error=0
   for N in "${@}"; do
