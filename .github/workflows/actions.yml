@@ -24,7 +24,8 @@ jobs:
       - name: Run Go Security
         uses: securego/gosec@master
         with:
-          args: ./...
+          # added additional exclude arguments after gosec v2.9.4 came out
+          args: -exclude=G108,G301,G302,G304,G307,G402 ./...
   malware_security_scan:
     name: Malware Scanner
     runs-on: ubuntu-latest
