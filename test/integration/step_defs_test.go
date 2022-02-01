@@ -253,7 +253,8 @@ func createIsilonClient() (*isi.Client, error) {
 		"",
 		password,
 		os.Getenv(constants.EnvPath),
-		os.Getenv(constants.DefaultIsiVolumePathPermissions))
+		os.Getenv(constants.DefaultIsiVolumePathPermissions),
+		uint8(utils.ParseUintFromContext(ctx, constants.EnvIsiAuthType)))
 	if err != nil {
 		fmt.Printf("error creating isilon client: '%s'\n", err.Error())
 	}
