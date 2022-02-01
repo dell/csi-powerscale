@@ -632,7 +632,11 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 	}
 	log.Infof("Created file in target path %s", filePath+"/id")
 
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Errorf("Error closing file: %s \n", err)
+		}
+	}()
 	_, err2 := f.WriteString(createEphemeralVolResp.Volume.VolumeId)
 	if err2 != nil {
 		log.Error("Writing to id file in target path for ephemeral vol failed with error :" + err.Error())

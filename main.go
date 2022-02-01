@@ -35,7 +35,7 @@ import (
 func init() {
 	err := os.Setenv(constants.EnvGOCSIDebug, "true")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to set %s to true ", constants.EnvGOCSIDebug)
+		fmt.Fprintf(os.Stderr, "unable to set %s to true \n", constants.EnvGOCSIDebug)
 	}
 }
 
