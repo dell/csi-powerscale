@@ -117,11 +117,6 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	remoteVolume := getRemoteCSIVolume(ctx, remoteExportID, volName, accessZone, volumeSize, remoteClusterName)
 
 	// TODO: figure out what remote parameters we would need if any
-	// remoteParams := map[string]string{
-	// 	"remoteSystem": localSystem.Name,
-	// 	s.replicationContextPrefix + "managementAddress": remoteSystem.ManagementAddress,
-	// }
-	// remoteVolume.VolumeContext = remoteParams
 
 	return &csiext.CreateRemoteVolumeResponse{
 		RemoteVolume: remoteVolume,
@@ -245,8 +240,8 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 			return &csiext.DeleteStorageProtectionGroupResponse{}, nil
 		}
 		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group")
-	}	else if err != nil {
-			return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group")
+	} else if err != nil {
+		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group")
 	}
 	childs, err := isiConfig.isiSvc.client.QueryVolumeChildren(ctx, strings.TrimPrefix(isiPath, isiConfig.IsiPath))
 	if err != nil {
@@ -260,15 +255,7 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 			return nil, status.Errorf(codes.Internal, "VG is not empty")
 		}
 	}
-	//// DELETE VG, DELETE PP IF NO VOLUMES
-	//members, err := isiConfig.isiSvc.GetSubDirectoryCount(ctx, isiPath, "")
-	//if err != nil {
-	//	return nil, err
-	//}
-	//if members != 0 {
-	//	log.Error("VG has members inside")
-	//	return nil, errors.New("volume Group is not empty")
-	//}
+
 	err = isiConfig.isiSvc.DeleteVolume(ctx, isiPath, "")
 	if err != nil {
 		return nil, err
