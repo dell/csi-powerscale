@@ -83,4 +83,10 @@ const (
 
 	// EnvIsHealthMonitorEnabled specifies if health monitor is enabled.
 	EnvIsHealthMonitorEnabled = "X_CSI_HEALTH_MONITOR_ENABLED"
+
+	// EnvReplicationContextPrefix enables sidecars to read required information from volume context
+	EnvReplicationContextPrefix = "X_CSI_REPLICATION_CONTEXT_PREFIX"
+
+	// EnvReplicationPrefix is used as a prefix to find out if replication is enabled
+	EnvReplicationPrefix = "X_CSI_REPLICATION_PREFIX"
 )

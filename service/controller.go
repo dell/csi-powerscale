@@ -37,6 +37,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// RPOEnum represents valid rpo values
+type RPOEnum string
+
 // constants
 const (
 	errUnknownAccessType          = "unknown access type is not Mount"
@@ -55,6 +58,8 @@ const (
 	DeleteSnapshotMarker          = "DELETE_SNAPSHOT"
 	IgnoreDotAndDotDotSubDirs     = 2
 	ClusterNameParam              = "ClusterName"
+	// KeyReplicationEnabled represents key for replication enabled
+	KeyReplicationEnabled = "isReplicationEnabled"
 
 	// These are available when enabling --extra-create-metadata for the external-provisioner.
 	csiPersistentVolumeName           = "csi.storage.k8s.io/pv/name"
@@ -64,7 +69,55 @@ const (
 	headerPersistentVolumeName           = "x-csi-pv-name"
 	headerPersistentVolumeClaimName      = "x-csi-pv-claimname"
 	headerPersistentVolumeClaimNamespace = "x-csi-pv-namespace"
+	// KeyReplicationVGPrefix represents key for replication vg prefix
+	KeyReplicationVGPrefix = "volumeGroupPrefix"
+	// KeyReplicationRemoteSystem represents key for replication remote system
+	KeyReplicationRemoteSystem = "remoteSystem"
+	// KeyReplicationIgnoreNamespaces represents key for replication ignore namespaces
+	KeyReplicationIgnoreNamespaces = "ignoreNamespaces"
+	// KeyCSIPVCNamespace represents key for csi pvc namespace
+	KeyCSIPVCNamespace = "csi.storage.k8s.io/pvc/namespace"
+	// KeyReplicationRPO represents key for replication RPO
+	KeyReplicationRPO         = "rpo"
+	RpoFiveMinutes    RPOEnum = "Five_Minutes"
+	RpoFifteenMinutes RPOEnum = "Fifteen_Minutes"
+	RpoThirtyMinutes  RPOEnum = "Thirty_Minutes"
+	RpoOneHour        RPOEnum = "One_Hour"
+	RpoSixHours       RPOEnum = "Six_Hours"
+	RpoTwelveHours    RPOEnum = "Twelve_Hours"
+	RpoOneDay         RPOEnum = "One_Day"
 )
+
+// IsValid - checks valid RPO
+func (rpo RPOEnum) IsValid() error {
+	switch rpo {
+	case RpoFiveMinutes, RpoFifteenMinutes, RpoThirtyMinutes, RpoOneHour, RpoSixHours, RpoTwelveHours, RpoOneDay:
+		return nil
+	}
+	return errors.New("invalid rpo type")
+}
+
+// ToInt - converts to seconds
+func (rpo RPOEnum) ToInt() (int, error) {
+	switch rpo {
+	case RpoFiveMinutes:
+		return 300, nil
+	case RpoFifteenMinutes:
+		return 900, nil
+	case RpoThirtyMinutes:
+		return 1800, nil
+	case RpoOneHour:
+		return 3600, nil
+	case RpoSixHours:
+		return 21600, nil
+	case RpoTwelveHours:
+		return 43200, nil
+	case RpoOneDay:
+		return 86400, nil
+	default:
+		return -1, errors.New("invalid rpo type")
+	}
+}
 
 // validateVolSize uses the CapacityRange range params to determine what size
 // volume to create. Returned size is in bytes
@@ -108,6 +161,8 @@ func (s *service) CreateVolume(
 		snapshotTrackingDir               string
 		snapshotTrackingDirEntryForVolume string
 		clusterName                       string
+		isReplication                     bool
+		VolumeGroupDir                    string
 		snapshotSourceVolumeIsiPath       string
 	)
 
@@ -174,6 +229,16 @@ func (s *service) CreateVolume(
 	} else {
 		// use the default volumePathPermissions if not set in the storage class
 		volumePathPermissions = isiConfig.IsiVolumePathPermissions
+	}
+
+	if repl, ok := params[s.WithRP(KeyReplicationEnabled)]; ok {
+		if boolRepl, err := strconv.ParseBool(repl); err == nil {
+			isReplication = boolRepl
+		} else {
+			log.Info("Unable to parse replication flag from SC")
+		}
+	} else {
+		log.Debug("Replication flag unset")
 	}
 
 	// When custom topology is enabled it takes precedence over the current default behavior
@@ -266,9 +331,86 @@ func (s *service) CreateVolume(
 			log.Infof("Creating volume from existing volume ID: '%s'", sourceVolumeID)
 		}
 	}
+	if isReplication {
+		log.Info("Preparing volume replication")
+
+		vgPrefix, ok := params[s.WithRP(KeyReplicationVGPrefix)]
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no volume group prefix specified in storage class")
+		}
+
+		rpo, ok := params[s.WithRP(KeyReplicationRPO)]
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no RPO specified in storage class")
+		}
+
+		rpoEnum := RPOEnum(rpo)
+		if err := rpoEnum.IsValid(); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid rpo value")
+		}
+
+		rpoint, err := rpoEnum.ToInt()
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "unable to parse rpo seconds")
+		}
+
+		remoteSystemName, ok := params[s.WithRP(KeyReplicationRemoteSystem)]
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no remote system specified in storage class")
+		}
+
+		remoteIsiConfig, err := s.getIsilonConfig(ctx, &remoteSystemName)
+		if err != nil {
+			log.Error("Failed to get Isilon config with error ", err.Error())
+			return nil, status.Errorf(codes.InvalidArgument, "can't find cluster with name %s in driver config", remoteSystemName)
+		}
+		remoteSystemEndpoint := remoteIsiConfig.Endpoint
+
+		namespace := ""
+		if ignoreNS, ok := params[s.WithRP(KeyReplicationIgnoreNamespaces)]; ok && ignoreNS == "false" {
+			pvcNS, ok := params[KeyCSIPVCNamespace]
+			if ok {
+				namespace = pvcNS + "-"
+			}
+		}
+
+		vgName := vgPrefix + "-" + namespace + remoteSystemEndpoint + "-" + rpo
+		if len(vgName) > 128 {
+			vgName = vgName[:128]
+		}
+		VolumeGroupDir = vgName
+		var vg isi.Volume
+		vg, err = isiConfig.isiSvc.client.GetVolumeWithIsiPath(ctx, isiPath, "", vgName)
+		if err != nil {
+			if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode == 404 {
+				vg, err = isiConfig.isiSvc.client.CreateVolumeWithIsipath(ctx, isiPath, vgName, "0777")
+			}
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		ppName := strings.ReplaceAll(vg.Name, ".", "-")
+		_, err = isiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+		if err != nil {
+			if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode == 404 {
+				err := isiConfig.isiSvc.client.CreatePolicy(ctx, ppName, rpoint, isiPath+"/"+vgName, isiPath+"/"+vgName, remoteSystemEndpoint)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "can't create protection policy %s", err.Error())
+				}
+			} else {
+				return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
+			}
+		}
+
+		isiPath = isiPath + "/" + VolumeGroupDir
+	}
 
 	foundVol = false
 	if isROVolumeFromSnapshot {
+		if isReplication {
+			return nil, errors.New("Unable to create replication volume from snapshot")
+		}
 		path = snapshotIsiPath
 		accessZone = constants.DefaultAccessZone
 		snapshotSrc, err := isiConfig.isiSvc.GetSnapshot(ctx, sourceSnapshotID)

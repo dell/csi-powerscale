@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/dell/csi-isilon/common/constants"
 	"github.com/dell/csi-isilon/common/k8sutils"
+	csiext "github.com/dell/dell-csi-extensions/replication"
 	"log"
 	"net"
 	"net/http/httptest"
@@ -39,57 +40,64 @@ import (
 )
 
 type feature struct {
-	nGoRoutines                        int
-	server                             *httptest.Server
-	service                            *service
-	err                                error // return from the preceeding call
-	getPluginInfoResponse              *csi.GetPluginInfoResponse
-	getPluginCapabilitiesResponse      *csi.GetPluginCapabilitiesResponse
-	probeResponse                      *csi.ProbeResponse
-	createVolumeResponse               *csi.CreateVolumeResponse
-	publishVolumeResponse              *csi.ControllerPublishVolumeResponse
-	unpublishVolumeResponse            *csi.ControllerUnpublishVolumeResponse
-	nodeGetInfoResponse                *csi.NodeGetInfoResponse
-	nodeGetCapabilitiesResponse        *csi.NodeGetCapabilitiesResponse
-	deleteVolumeResponse               *csi.DeleteVolumeResponse
-	getCapacityResponse                *csi.GetCapacityResponse
-	controllerGetCapabilitiesResponse  *csi.ControllerGetCapabilitiesResponse
-	validateVolumeCapabilitiesResponse *csi.ValidateVolumeCapabilitiesResponse
-	createSnapshotResponse             *csi.CreateSnapshotResponse
-	createVolumeRequest                *csi.CreateVolumeRequest
-	publishVolumeRequest               *csi.ControllerPublishVolumeRequest
-	unpublishVolumeRequest             *csi.ControllerUnpublishVolumeRequest
-	deleteVolumeRequest                *csi.DeleteVolumeRequest
-	controllerExpandVolumeRequest      *csi.ControllerExpandVolumeRequest
-	controllerExpandVolumeResponse     *csi.ControllerExpandVolumeResponse
-	controllerGetVolumeRequest         *csi.ControllerGetVolumeRequest
-	controllerGetVolumeResponse        *csi.ControllerGetVolumeResponse
-	listVolumesRequest                 *csi.ListVolumesRequest
-	listVolumesResponse                *csi.ListVolumesResponse
-	listSnapshotsRequest               *csi.ListSnapshotsRequest
-	listSnapshotsResponse              *csi.ListSnapshotsResponse
-	listedVolumeIDs                    map[string]bool
-	listVolumesNextTokenCache          string
-	wrongCapacity, wrongStoragePool    bool
-	accessZone                         string
-	capability                         *csi.VolumeCapability
-	capabilities                       []*csi.VolumeCapability
-	nodeStageVolumeRequest             *csi.NodeStageVolumeRequest
-	nodeStageVolumeResponse            *csi.NodeStageVolumeResponse
-	nodeUnstageVolumeRequest           *csi.NodeUnstageVolumeRequest
-	nodeUnstageVolumeResponse          *csi.NodeUnstageVolumeResponse
-	nodePublishVolumeRequest           *csi.NodePublishVolumeRequest
-	nodeUnpublishVolumeRequest         *csi.NodeUnpublishVolumeRequest
-	nodeUnpublishVolumeResponse        *csi.NodeUnpublishVolumeResponse
-	nodeGetVolumeStatsRequest          *csi.NodeGetVolumeStatsRequest
-	nodeGetVolumeStatsResponse         *csi.NodeGetVolumeStatsResponse
-	deleteSnapshotRequest              *csi.DeleteSnapshotRequest
-	deleteSnapshotResponse             *csi.DeleteSnapshotResponse
-	createSnapshotRequest              *csi.CreateSnapshotRequest
-	volumeIDList                       []string
-	snapshotIDList                     []string
-	snapshotIndex                      int
-	rootClientEnabled                  string
+	nGoRoutines                          int
+	server                               *httptest.Server
+	service                              *service
+	err                                  error // return from the preceeding call
+	getPluginInfoResponse                *csi.GetPluginInfoResponse
+	getPluginCapabilitiesResponse        *csi.GetPluginCapabilitiesResponse
+	probeResponse                        *csi.ProbeResponse
+	createVolumeResponse                 *csi.CreateVolumeResponse
+	publishVolumeResponse                *csi.ControllerPublishVolumeResponse
+	unpublishVolumeResponse              *csi.ControllerUnpublishVolumeResponse
+	nodeGetInfoResponse                  *csi.NodeGetInfoResponse
+	nodeGetCapabilitiesResponse          *csi.NodeGetCapabilitiesResponse
+	deleteVolumeResponse                 *csi.DeleteVolumeResponse
+	getCapacityResponse                  *csi.GetCapacityResponse
+	controllerGetCapabilitiesResponse    *csi.ControllerGetCapabilitiesResponse
+	validateVolumeCapabilitiesResponse   *csi.ValidateVolumeCapabilitiesResponse
+	createSnapshotResponse               *csi.CreateSnapshotResponse
+	createVolumeRequest                  *csi.CreateVolumeRequest
+	createRemoteVolumeRequest            *csiext.CreateRemoteVolumeRequest
+	createRemoteVolumeResponse           *csiext.CreateRemoteVolumeResponse
+	createStorageProtectionGroupRequest  *csiext.CreateStorageProtectionGroupRequest
+	createStorageProtectionGroupResponse *csiext.CreateStorageProtectionGroupResponse
+	deleteStorageProtectionGroupRequest  *csiext.DeleteStorageProtectionGroupRequest
+	deleteStorageProtectionGroupResponse *csiext.DeleteStorageProtectionGroupResponse
+	publishVolumeRequest                 *csi.ControllerPublishVolumeRequest
+	unpublishVolumeRequest               *csi.ControllerUnpublishVolumeRequest
+	deleteVolumeRequest                  *csi.DeleteVolumeRequest
+	controllerExpandVolumeRequest        *csi.ControllerExpandVolumeRequest
+	controllerExpandVolumeResponse       *csi.ControllerExpandVolumeResponse
+	controllerGetVolumeRequest           *csi.ControllerGetVolumeRequest
+	controllerGetVolumeResponse          *csi.ControllerGetVolumeResponse
+	listVolumesRequest                   *csi.ListVolumesRequest
+	listVolumesResponse                  *csi.ListVolumesResponse
+	listSnapshotsRequest                 *csi.ListSnapshotsRequest
+	listSnapshotsResponse                *csi.ListSnapshotsResponse
+	listedVolumeIDs                      map[string]bool
+	listVolumesNextTokenCache            string
+	wrongCapacity, wrongStoragePool      bool
+	accessZone                           string
+	capability                           *csi.VolumeCapability
+	capabilities                         []*csi.VolumeCapability
+	nodeStageVolumeRequest               *csi.NodeStageVolumeRequest
+	nodeStageVolumeResponse              *csi.NodeStageVolumeResponse
+	nodeUnstageVolumeRequest             *csi.NodeUnstageVolumeRequest
+	nodeUnstageVolumeResponse            *csi.NodeUnstageVolumeResponse
+	nodePublishVolumeRequest             *csi.NodePublishVolumeRequest
+	nodeUnpublishVolumeRequest           *csi.NodeUnpublishVolumeRequest
+	nodeUnpublishVolumeResponse          *csi.NodeUnpublishVolumeResponse
+	nodeGetVolumeStatsRequest            *csi.NodeGetVolumeStatsRequest
+	nodeGetVolumeStatsResponse           *csi.NodeGetVolumeStatsResponse
+	deleteSnapshotRequest                *csi.DeleteSnapshotRequest
+	deleteSnapshotResponse               *csi.DeleteSnapshotResponse
+	createSnapshotRequest                *csi.CreateSnapshotRequest
+	volumeIDList                         []string
+	snapshotIDList                       []string
+	groupIDList                          []string
+	snapshotIndex                        int
+	rootClientEnabled                    string
 }
 
 var inducedErrors struct {
@@ -339,6 +347,14 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call NodeGetVolumeStats with name "([^"]*)" and path "([^"]*)"$`, f.iCallNodeGetVolumeStats)
 	s.Step(`^I call iCallNodeGetInfoWithNoFQDN`, f.iCallNodeGetInfoWithNoFQDN)
 	s.Step(`^a valid NodeGetInfoResponse is returned$`, f.aValidNodeGetInfoResponseIsReturned)
+	s.Step(`^I call CreateRemoteVolume`, f.iCallCreateRemoteVolume)
+	s.Step(`^a valid CreateRemoteVolumeResponse is returned$`, f.aValidCreateRemoteVolumeResponseIsReturned)
+	s.Step(`I call CreateStorageProtectionGroup`, f.iCallCreateStorageProtectionGroup)
+	s.Step(`^a valid CreateStorageProtectionGroupResponse is returned$`, f.aValidCreateStorageProtectionGroupResponseIsReturned)
+	s.Step(`I call DeleteStorageProtectionGroup`, f.iCallDeleteStorageProtectionGroup)
+	s.Step(`^a valid DeleteStorageProtectionGroupResponse is returned$`, f.aValidDeleteStorageProtectionGroupResponseIsReturned)
+	s.Step(`^I call WithParamsCreateRemoteVolume "([^"]*)" "([^"]*)"$`, f.iCallCreateRemoteVolumeWithParams)
+	s.Step(`^I call WithParamsCreateStorageProtectionGroup "([^"]*)" "([^"]*)"$`, f.iCallCreateStorageProtectionGroupWithParams)
 }
 
 // GetPluginInfo
@@ -2323,6 +2339,137 @@ func (f *feature) iCallNodeGetInfowithinvalidnetworks() error {
 }
 func (f *feature) iSetRootClientEnabledTo(val string) error {
 	f.rootClientEnabled = val
+	return nil
+}
+
+func getCreateRemoteVolumeRequest(s *service) *csiext.CreateRemoteVolumeRequest {
+	req := new(csiext.CreateRemoteVolumeRequest)
+	req.VolumeHandle = "volume1=_=_=19=_=_=System"
+	parameters := make(map[string]string)
+	parameters[constants.EnvReplicationPrefix+"/"+KeyReplicationRemoteSystem] = ""
+	parameters[s.WithRP(KeyReplicationRemoteSystem)] = "cluster1"
+	req.Parameters = parameters
+	return req
+}
+
+func (f *feature) iCallCreateRemoteVolume() error {
+	req := getCreateRemoteVolumeRequest(f.service)
+	f.createRemoteVolumeRequest = req
+	f.createRemoteVolumeResponse, f.err = f.service.CreateRemoteVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateRemoteVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createRemoteVolumeResponse != nil {
+		stepHandlersErrors.ExportNotFoundError = false
+		stepHandlersErrors.VolumeNotExistError = false
+	}
+	return nil
+}
+
+func getCreateRemoteVolumeRequestWithParams(s *service, volhand string, keyreplremsys string) *csiext.CreateRemoteVolumeRequest {
+	req := new(csiext.CreateRemoteVolumeRequest)
+	req.VolumeHandle = volhand
+	parameters := make(map[string]string)
+	parameters[s.WithRP(keyreplremsys)] = "cluster1"
+	req.Parameters = parameters
+	return req
+}
+
+func (f *feature) iCallCreateRemoteVolumeWithParams(volhand string, keyreplremsys string) error {
+	req := getCreateRemoteVolumeRequestWithParams(f.service, volhand, keyreplremsys)
+	f.createRemoteVolumeRequest = req
+	f.createRemoteVolumeResponse, f.err = f.service.CreateRemoteVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateRemoteVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createRemoteVolumeResponse != nil {
+		stepHandlersErrors.ExportNotFoundError = false
+		stepHandlersErrors.VolumeNotExistError = false
+	}
+	return nil
+}
+
+func (f *feature) aValidCreateRemoteVolumeResponseIsReturned() error {
+	if f.err != nil {
+		return f.err
+	}
+	f.volumeIDList = append(f.volumeIDList, f.createRemoteVolumeResponse.RemoteVolume.VolumeId)
+	fmt.Printf("volume '%s'\n",
+		f.createRemoteVolumeResponse.RemoteVolume.VolumeContext["Name"])
+	return nil
+}
+
+func getCreateStorageProtectionGroupRequest(s *service) *csiext.CreateStorageProtectionGroupRequest {
+	req := new(csiext.CreateStorageProtectionGroupRequest)
+	req.VolumeHandle = "volume1=_=_=19=_=_=System"
+	parameters := make(map[string]string)
+	parameters[s.WithRP(KeyReplicationRemoteSystem)] = "cluster1"
+	req.Parameters = parameters
+	return req
+}
+
+func (f *feature) iCallCreateStorageProtectionGroup() error {
+	req := getCreateStorageProtectionGroupRequest(f.service)
+	f.createStorageProtectionGroupRequest = req
+	f.createStorageProtectionGroupResponse, f.err = f.service.CreateStorageProtectionGroup(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateStorageProtectionGroup call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func getCreateStorageProtectionGroupRequestWithParams(s *service, volhand string, keyreplremsys string) *csiext.CreateStorageProtectionGroupRequest {
+	req := new(csiext.CreateStorageProtectionGroupRequest)
+	req.VolumeHandle = volhand
+	parameters := make(map[string]string)
+	parameters[keyreplremsys] = "cluster1"
+	req.Parameters = parameters
+	return req
+}
+
+func (f *feature) iCallCreateStorageProtectionGroupWithParams(volhand string, keyreplremsys string) error {
+	req := getCreateStorageProtectionGroupRequestWithParams(f.service, volhand, keyreplremsys)
+	f.createStorageProtectionGroupRequest = req
+	f.createStorageProtectionGroupResponse, f.err = f.service.CreateStorageProtectionGroup(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateStorageProtectionGroup call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func (f *feature) aValidCreateStorageProtectionGroupResponseIsReturned() error {
+	if f.err != nil {
+		return f.err
+	}
+	f.groupIDList = append(f.groupIDList, f.createStorageProtectionGroupResponse.LocalProtectionGroupId)
+	return nil
+}
+
+func deleteStorageProtectionGroupRequest(s *service) *csiext.DeleteStorageProtectionGroupRequest {
+
+	req := new(csiext.DeleteStorageProtectionGroupRequest)
+
+	req.ProtectionGroupId = "cluster1" + "::" + "/ifs/data/csi-isilon/volume1"
+	req.ProtectionGroupAttributes = map[string]string{
+		s.opts.replicationContextPrefix + "systemName": "cluster1",
+	}
+	return req
+}
+
+func (f *feature) iCallDeleteStorageProtectionGroup() error {
+	req := deleteStorageProtectionGroupRequest(f.service)
+	f.deleteStorageProtectionGroupRequest = req
+	f.deleteStorageProtectionGroupResponse, f.err = f.service.DeleteStorageProtectionGroup(context.Background(), req)
+	if f.err != nil {
+		log.Printf("DeleteStorageProtectionGroup call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func (f *feature) aValidDeleteStorageProtectionGroupResponseIsReturned() error {
+	if f.err != nil {
+		return f.err
+	}
 	return nil
 }
 

@@ -433,6 +433,15 @@ func GetIsiPathFromExportPath(exportPath string) string {
 	return fmt.Sprint(exportPath[0 : strings.LastIndex(exportPath, "/")+1])
 }
 
+// GetIsiPathFromPgID returns isiPath based on the pg id
+func GetIsiPathFromPgID(exportPath string) string {
+	s := strings.Split(exportPath, "::")
+	if len(s) != 2 {
+		return ""
+	}
+	return s[1]
+}
+
 // GetExportIDFromConflictMessage returns the export id of the export
 // which is creating or just created when there occurs a conflict
 func GetExportIDFromConflictMessage(message string) int {

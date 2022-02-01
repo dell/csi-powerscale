@@ -5,9 +5,10 @@ require (
 	github.com/akutz/gournal v0.5.0
 	github.com/container-storage-interface/spec v1.5.0
 	github.com/cucumber/godog v0.10.0
+	github.com/dell/dell-csi-extensions/replication v1.0.0
 	github.com/dell/gocsi v1.5.0
 	github.com/dell/gofsutil v1.6.0
-	github.com/dell/goisilon v1.6.1-0.20220110083433-83d13e163ea4
+	github.com/dell/goisilon v1.6.0
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.2.0
@@ -26,6 +27,7 @@ require (
 )
 
 replace (
+	github.com/dell/goisilon v1.6.0 => github.com/dell/goisilon v0.0.0-20220126122911-e1a58045d14b
 	k8s.io/api => k8s.io/api v0.20.2
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.20.2
 	k8s.io/apimachinery => k8s.io/apimachinery v0.20.2
