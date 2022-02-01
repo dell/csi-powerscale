@@ -34,6 +34,10 @@ import (
 
 func init() {
 	os.Setenv(constants.EnvGOCSIDebug, "true")
+	err := os.Setenv(constants.EnvGOCSIDebug, "true")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "unable to set %s to true ", constants.EnvGOCSIDebug)
+	}
 }
 
 // main is ignored when this package is built as a go plug-in
