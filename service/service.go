@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	"google.golang.org/grpc"
 	"io/ioutil"
 	"net"
@@ -963,6 +964,32 @@ func (s *service) GetNodeLabels() (map[string]string, error) {
 	log.Debugf("Node %s details\n", node)
 
 	return node.Labels, nil
+}
+
+func (s *service) ProbeController(ctx context.Context,
+	req *csiext.ProbeControllerRequest) (
+	*csiext.ProbeControllerResponse, error) {
+	ctx, log := GetLogger(ctx)
+
+	if !strings.EqualFold(s.mode, "node") {
+		log.Debugf("controllerProbe")
+		if err := s.probeAllClusters(ctx); err != nil {
+			log.Errorf("error in controllerProbe: %s", err.Error())
+			return nil, err
+		}
+	}
+
+	ready := new(wrappers.BoolValue)
+	ready.Value = true
+	rep := new(csiext.ProbeControllerResponse)
+	rep.Ready = ready
+	rep.Name = constants.PluginName
+	rep.VendorVersion = core.SemVer
+	rep.Manifest = Manifest
+
+	log.Debug(fmt.Sprintf("ProbeController returning: %v", rep.Ready.GetValue()))
+
+	return rep, nil
 }
 
 // WithRP appends Replication Prefix to provided string

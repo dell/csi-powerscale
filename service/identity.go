@@ -94,32 +94,6 @@ func (s *service) Probe(
 	return rep, nil
 }
 
-func (s *service) ProbeController(ctx context.Context,
-	req *csiext.ProbeControllerRequest) (
-	*csiext.ProbeControllerResponse, error) {
-	ctx, log := GetLogger(ctx)
-
-	if !strings.EqualFold(s.mode, "node") {
-		log.Debugf("controllerProbe")
-		if err := s.probeAllClusters(ctx); err != nil {
-			log.Errorf("error in controllerProbe: %s", err.Error())
-			return nil, err
-		}
-	}
-
-	ready := new(wrappers.BoolValue)
-	ready.Value = true
-	rep := new(csiext.ProbeControllerResponse)
-	rep.Ready = ready
-	rep.Name = constants.PluginName
-	rep.VendorVersion = core.SemVer
-	rep.Manifest = Manifest
-
-	log.Debug(fmt.Sprintf("ProbeController returning: %v", rep.Ready.GetValue()))
-
-	return rep, nil
-}
-
 func (s *service) GetReplicationCapabilities(ctx context.Context, req *csiext.GetReplicationCapabilityRequest) (*csiext.GetReplicationCapabilityResponse, error) {
 	var rep = new(csiext.GetReplicationCapabilityResponse)
 	if !strings.EqualFold(s.mode, "node") {
