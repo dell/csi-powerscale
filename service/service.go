@@ -19,8 +19,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/golang/protobuf/ptypes/wrappers"
-	"google.golang.org/grpc"
 	"io/ioutil"
 	"net"
 	"path/filepath"
@@ -29,6 +27,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/golang/protobuf/ptypes/wrappers"
+	"google.golang.org/grpc"
 
 	"github.com/akutz/gournal"
 	"google.golang.org/grpc/metadata"
@@ -40,7 +41,9 @@ import (
 	"github.com/dell/csi-isilon/common/constants"
 	"github.com/dell/csi-isilon/common/utils"
 	"github.com/dell/csi-isilon/core"
+	commonext "github.com/dell/dell-csi-extensions/common"
 	csiext "github.com/dell/dell-csi-extensions/replication"
+	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
 	isi "github.com/dell/goisilon"
@@ -197,7 +200,7 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 		isilonConfigFile = constants.IsilonConfigFile
 	}
 	if replicationContextPrefix, ok := csictx.LookupEnv(ctx, constants.EnvReplicationContextPrefix); ok {
-		opts.replicationContextPrefix = replicationContextPrefix
+		opts.replicationContextPrefix = replicationContextPrefix + "/"
 	}
 	if replicationPrefix, ok := csictx.LookupEnv(ctx, constants.EnvReplicationPrefix); ok {
 		opts.replicationPrefix = replicationPrefix
@@ -421,6 +424,7 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 		isiConfig.IsiVolumePathPermissions,
 		s.opts.isiAuthType,
 	)
+
 	if err != nil {
 		log.Errorf("init client failed for isilon cluster '%s': '%s'", isiConfig.ClusterName, err.Error())
 		return nil, err
@@ -428,8 +432,8 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 
 	return client, nil
 }
-func getGournalLevelFromLogrusLevel(logLevel logrus.Level) gournal.Level {
 
+func getGournalLevelFromLogrusLevel(logLevel logrus.Level) gournal.Level {
 	gournalLevel := gournal.ParseLevel(logLevel.String())
 	return gournalLevel
 }
@@ -510,6 +514,7 @@ func (s *service) BeforeServe(
 
 func (s *service) RegisterAdditionalServers(server *grpc.Server) {
 	csiext.RegisterReplicationServer(server, s)
+	vgsext.RegisterVolumeGroupSnapshotServer(server, s)
 }
 
 func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) error {
@@ -970,8 +975,8 @@ func (s *service) GetNodeLabels() (map[string]string, error) {
 }
 
 func (s *service) ProbeController(ctx context.Context,
-	req *csiext.ProbeControllerRequest) (
-	*csiext.ProbeControllerResponse, error) {
+	req *commonext.ProbeControllerRequest) (
+	*commonext.ProbeControllerResponse, error) {
 	ctx, log := GetLogger(ctx)
 
 	if !strings.EqualFold(s.mode, "node") {
@@ -984,7 +989,7 @@ func (s *service) ProbeController(ctx context.Context,
 
 	ready := new(wrappers.BoolValue)
 	ready.Value = true
-	rep := new(csiext.ProbeControllerResponse)
+	rep := new(commonext.ProbeControllerResponse)
 	rep.Ready = ready
 	rep.Name = constants.PluginName
 	rep.VendorVersion = core.SemVer

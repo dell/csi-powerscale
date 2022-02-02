@@ -5,7 +5,9 @@ require (
 	github.com/akutz/gournal v0.5.0
 	github.com/container-storage-interface/spec v1.5.0
 	github.com/cucumber/godog v0.10.0
+	github.com/dell/dell-csi-extensions/common v1.0.0
 	github.com/dell/dell-csi-extensions/replication v1.0.0
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0
 	github.com/dell/gocsi v1.5.0
 	github.com/dell/gofsutil v1.6.0
 	github.com/dell/goisilon v1.6.0
@@ -18,7 +20,7 @@ require (
 	github.com/spf13/viper v1.7.1
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
-	google.golang.org/grpc v1.38.0
+	google.golang.org/grpc v1.42.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	k8s.io/apimachinery v0.22.2
 	k8s.io/client-go v0.22.2
@@ -27,7 +29,10 @@ require (
 )
 
 replace (
-	github.com/dell/goisilon v1.6.0 => github.com/dell/goisilon v0.0.0-20220126122911-e1a58045d14b
+	github.com/dell/dell-csi-extensions/common v1.0.0 => ../dell-csi-extensions/common
+	github.com/dell/dell-csi-extensions/replication v1.0.0 => ../dell-csi-extensions/replication
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0 => ../dell-csi-extensions/volumeGroupSnapshot
+	github.com/dell/goisilon v1.6.0 => github.com/dell/goisilon v0.0.0-20220131110229-0e678b60eb17
 	k8s.io/api => k8s.io/api v0.20.2
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.20.2
 	k8s.io/apimachinery => k8s.io/apimachinery v0.20.2
