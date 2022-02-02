@@ -19,6 +19,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	"path"
 	"strconv"
 	"strings"
@@ -394,9 +395,13 @@ func (s *service) CreateVolume(
 		_, err = isiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 		if err != nil {
 			if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode == 404 {
-				err := isiConfig.isiSvc.client.CreatePolicy(ctx, ppName, rpoint, isiPath+"/"+vgName, isiPath+"/"+vgName, remoteSystemEndpoint)
+				err := isiConfig.isiSvc.client.CreatePolicy(ctx, ppName, rpoint, isiPath+"/"+vgName, isiPath+"/"+vgName, remoteSystemEndpoint, true)
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "can't create protection policy %s", err.Error())
+				}
+				err = isiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.FINISHED)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "policy job couldn't reach FINISHED %s", err.Error())
 				}
 			} else {
 				return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
@@ -1940,4 +1945,8 @@ func removeString(exportList []string, strToRemove string) []string {
 		}
 	}
 	return exportList
+}
+
+func (s *service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext.CreateVolumeGroupSnapshotRequest) (*vgsext.CreateVolumeGroupSnapshotResponse, error) {
+	panic("implement me")
 }
