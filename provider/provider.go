@@ -42,11 +42,12 @@ func New() gocsi.StoragePluginProvider {
 
 	svc := service.New()
 	return &gocsi.StoragePlugin{
-		Controller:  svc,
-		Identity:    svc,
-		Node:        svc,
-		BeforeServe: svc.BeforeServe,
-		ServerOpts:  serverOptions,
+		Controller:                svc,
+		Identity:                  svc,
+		Node:                      svc,
+		BeforeServe:               svc.BeforeServe,
+		ServerOpts:                serverOptions,
+		RegisterAdditionalServers: svc.RegisterAdditionalServers,
 
 		EnvVars: []string{
 			// Enable request validation

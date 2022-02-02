@@ -64,7 +64,6 @@ func LeaderElection(clientset *kubernetes.Clientset, lockName string, namespace 
 //GetStats - Returns the stats for the volume mounted on given volume path
 func GetStats(ctx context.Context, volumePath string) (int64, int64, int64, int64, int64, int64, error) {
 	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := gofsutil.FsInfo(ctx, volumePath)
-
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, status.Error(codes.Internal, fmt.Sprintf(
 			"failed to get volume stats: %s", err))

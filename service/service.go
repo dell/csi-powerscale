@@ -19,6 +19,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/golang/protobuf/ptypes/wrappers"
+	"google.golang.org/grpc"
 	"io/ioutil"
 	"net"
 	"path/filepath"
@@ -38,6 +40,7 @@ import (
 	"github.com/dell/csi-isilon/common/constants"
 	"github.com/dell/csi-isilon/common/utils"
 	"github.com/dell/csi-isilon/core"
+	csiext "github.com/dell/dell-csi-extensions/replication"
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
 	isi "github.com/dell/goisilon"
@@ -70,6 +73,7 @@ type Service interface {
 	csi.IdentityServer
 	csi.NodeServer
 	BeforeServe(context.Context, *gocsi.StoragePlugin, net.Listener) error
+	RegisterAdditionalServers(server *grpc.Server)
 }
 
 // Opts defines service configuration options.
@@ -88,6 +92,8 @@ type Opts struct {
 	MaxVolumesPerNode         int64
 	isiAuthType               uint8
 	IsHealthMonitorEnabled    bool
+	replicationContextPrefix  string
+	replicationPrefix         string
 }
 
 type service struct {
@@ -190,7 +196,12 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 	} else {
 		isilonConfigFile = constants.IsilonConfigFile
 	}
-
+	if replicationContextPrefix, ok := csictx.LookupEnv(ctx, constants.EnvReplicationContextPrefix); ok {
+		opts.replicationContextPrefix = replicationContextPrefix
+	}
+	if replicationPrefix, ok := csictx.LookupEnv(ctx, constants.EnvReplicationPrefix); ok {
+		opts.replicationPrefix = replicationPrefix
+	}
 	if MaxVolumesPerNode, err := utils.ParseInt64FromContext(ctx, constants.EnvMaxVolumesPerNode); err != nil {
 		log.Warnf("error while parsing env variable '%s', %s, defaulting to 0", constants.EnvMaxVolumesPerNode, err)
 		opts.MaxVolumesPerNode = 0
@@ -495,6 +506,10 @@ func (s *service) BeforeServe(
 	go s.loadIsilonConfigs(ctx, isilonConfigFile)
 
 	return s.probeOnStart(ctx)
+}
+
+func (s *service) RegisterAdditionalServers(server *grpc.Server) {
+	csiext.RegisterReplicationServer(server, s)
 }
 
 func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) error {
@@ -952,4 +967,35 @@ func (s *service) GetNodeLabels() (map[string]string, error) {
 	log.Debugf("Node %s details\n", node)
 
 	return node.Labels, nil
+}
+
+func (s *service) ProbeController(ctx context.Context,
+	req *csiext.ProbeControllerRequest) (
+	*csiext.ProbeControllerResponse, error) {
+	ctx, log := GetLogger(ctx)
+
+	if !strings.EqualFold(s.mode, "node") {
+		log.Debugf("controllerProbe")
+		if err := s.probeAllClusters(ctx); err != nil {
+			log.Errorf("error in controllerProbe: %s", err.Error())
+			return nil, err
+		}
+	}
+
+	ready := new(wrappers.BoolValue)
+	ready.Value = true
+	rep := new(csiext.ProbeControllerResponse)
+	rep.Ready = ready
+	rep.Name = constants.PluginName
+	rep.VendorVersion = core.SemVer
+	rep.Manifest = Manifest
+
+	log.Debug(fmt.Sprintf("ProbeController returning: %v", rep.Ready.GetValue()))
+
+	return rep, nil
+}
+
+// WithRP appends Replication Prefix to provided string
+func (s *service) WithRP(key string) string {
+	return s.opts.replicationPrefix + "/" + key
 }
