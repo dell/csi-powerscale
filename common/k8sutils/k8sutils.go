@@ -3,13 +3,13 @@ package k8sutils
 import (
 	"context"
 	"fmt"
+	"github.com/dell/gofsutil"
 	"github.com/kubernetes-csi/csi-lib-utils/leaderelection"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/volume/util/fs"
 	"os"
 	"time"
 )
@@ -63,7 +63,7 @@ func LeaderElection(clientset *kubernetes.Clientset, lockName string, namespace 
 
 //GetStats - Returns the stats for the volume mounted on given volume path
 func GetStats(ctx context.Context, volumePath string) (int64, int64, int64, int64, int64, int64, error) {
-	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := fs.Info(volumePath)
+	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := gofsutil.FsInfo(ctx, volumePath)
 
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, status.Error(codes.Internal, fmt.Sprintf(
