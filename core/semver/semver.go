@@ -93,7 +93,11 @@ func main() {
 			os.Exit(1)
 		}
 		w = fout
-		defer fout.Close()
+		defer func() {
+			if err := fout.Close(); err != nil {
+				fmt.Fprintf(os.Stderr, "error closing file: %s \n", err)
+			}
+		}()
 	}
 
 	gitdesc := chkErr(doExec("git", "describe", "--long", "--dirty"))

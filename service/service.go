@@ -622,6 +622,7 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 
 	var inputConfigs *IsilonClusters
 	var yamlErr error
+	var err error
 	inputConfigs, yamlErr = unmarshalYAMLContent(configBytes)
 	if yamlErr != nil {
 		log.Errorf("failed to parse isilon clusters' config details as yaml data, error: %v", yamlErr)
@@ -637,7 +638,8 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 	}
 
 	newIsiClusters := make(map[interface{}]interface{})
-	for i, config := range inputConfigs.IsilonClusters {
+	for i, clusterConfig := range inputConfigs.IsilonClusters {
+		config := clusterConfig
 		log.Debugf("parsing config details for cluster %v", config.ClusterName)
 		if config.ClusterName == "" {
 			return nil, defaultIsiClusterName, fmt.Errorf("invalid value for clusterName at index [%d]", i)
@@ -676,7 +678,10 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 
 		config.EndpointURL = fmt.Sprintf("https://%s:%s", config.Endpoint, config.EndpointPort)
 		clientCtx, _ := GetLogger(ctx)
-		config.isiSvc, _ = s.GetIsiService(clientCtx, &config, logLevel)
+		config.isiSvc, err = s.GetIsiService(clientCtx, &config, logLevel)
+		if err != nil {
+			log.Errorf("failed to get isi client, error: %v", err)
+		}
 
 		if config.IsDefault == nil {
 			defaultBoolValue := false
