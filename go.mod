@@ -29,9 +29,9 @@ require (
 )
 
 replace (
-	github.com/dell/dell-csi-extensions/common v1.0.0 => ../dell-csi-extensions/common
-	github.com/dell/dell-csi-extensions/replication v1.0.0 => ../dell-csi-extensions/replication
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0 => ../dell-csi-extensions/volumeGroupSnapshot
+	github.com/dell/dell-csi-extensions/common v1.0.0 => github.com/dell/dell-csi-extensions/common v0.0.0-20211217121714-58de430139aa
+	github.com/dell/dell-csi-extensions/replication v1.0.0 => github.com/dell/dell-csi-extensions/replication v0.0.0-20211217121714-58de430139aa
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0 => github.com/dell/dell-csi-extensions/volumeGroupSnapshot v0.0.0-20211217121714-58de430139aa
 	github.com/dell/goisilon v1.6.0 => github.com/dell/goisilon v0.0.0-20220202130111-67417549595c
 	k8s.io/api => k8s.io/api v0.20.2
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.20.2
