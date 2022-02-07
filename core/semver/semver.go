@@ -74,7 +74,7 @@ func main() {
 		format = "ver"
 	} else {
 		if fileExists(filepath.Clean(format)) {
-			buf, err := ioutil.ReadFile(format)
+			buf, err := ioutil.ReadFile(filepath.Clean(format))
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: read tpl failed: %v\n", err)
 				os.Exit(1)
@@ -87,7 +87,7 @@ func main() {
 
 	var w io.Writer = os.Stdout
 	if len(output) > 0 {
-		fout, err := os.Create(output)
+		fout, err := os.Create(filepath.Clean(output))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)

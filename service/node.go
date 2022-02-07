@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -201,7 +202,7 @@ func (s *service) NodeUnpublishVolume(
 
 	if _, err := os.Stat(lockFile); err == nil {
 		isEphemeralVolume = true
-		data, err = ioutil.ReadFile(lockFile)
+		data, err = ioutil.ReadFile(filepath.Clean(lockFile))
 		if err != nil {
 			return nil, errors.New("unable to get volume id for ephemeral volume")
 		}
@@ -621,7 +622,7 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 	}
 	log.Infof("Created dir in target path %s", filePath)
 
-	f, err := os.Create(filePath + "/id")
+	f, err := os.Create(filepath.Clean(filePath) + "/id")
 	if err != nil {
 		log.Error("Create id file in target path for ephemeral vol failed with error :" + err.Error())
 		if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
