@@ -623,6 +623,8 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 	var inputConfigs *IsilonClusters
 	var yamlErr error
 	var err error
+
+	log.Info("reading secret file to validate cluster config details")
 	inputConfigs, yamlErr = unmarshalYAMLContent(configBytes)
 	if yamlErr != nil {
 		log.Errorf("failed to parse isilon clusters' config details as yaml data, error: %v", yamlErr)
@@ -642,16 +644,16 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 		config := clusterConfig
 		log.Debugf("parsing config details for cluster %v", config.ClusterName)
 		if config.ClusterName == "" {
-			return nil, defaultIsiClusterName, fmt.Errorf("invalid value for clusterName at index [%d]", i)
+			return nil, defaultIsiClusterName, fmt.Errorf("clusterName not provided in secret at index [%d]", i)
 		}
 		if config.User == "" {
-			return nil, defaultIsiClusterName, fmt.Errorf("invalid value for username at index [%d]", i)
+			return nil, defaultIsiClusterName, fmt.Errorf("username not provided for cluster %s at index [%d]", config.ClusterName, i)
 		}
 		if config.Password == "" {
-			return nil, defaultIsiClusterName, fmt.Errorf("invalid value for password at index [%d]", i)
+			return nil, defaultIsiClusterName, fmt.Errorf("password not provided for cluster %s  at index [%d]", config.ClusterName, i)
 		}
 		if config.Endpoint == "" {
-			return nil, defaultIsiClusterName, fmt.Errorf("invalid value for endpoint at index [%d]", i)
+			return nil, defaultIsiClusterName, fmt.Errorf("endpoint not provided for cluster %s at index [%d]", config.ClusterName, i)
 		}
 
 		// Let Endpoint be generic.
@@ -661,6 +663,7 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 		}
 
 		if config.EndpointPort == "" {
+			log.Warnf("using default as EndpointPort not provided for cluster %s in secret at index [%d]", config.ClusterName, i)
 			config.EndpointPort = s.opts.Port
 		}
 
@@ -669,10 +672,12 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 		}
 
 		if config.IsiPath == "" {
+			log.Warnf("using default as IsiPath not provided for cluster %s in secret at index [%d]", config.ClusterName, i)
 			config.IsiPath = s.opts.Path
 		}
 
 		if config.IsiVolumePathPermissions == "" {
+			log.Warnf("using default as IsiVolumePathPermissions not provided for cluster %s in secret at index [%d]", config.ClusterName, i)
 			config.IsiVolumePathPermissions = s.opts.IsiVolumePathPermissions
 		}
 
@@ -680,7 +685,7 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 		clientCtx, _ := GetLogger(ctx)
 		config.isiSvc, err = s.GetIsiService(clientCtx, &config, logLevel)
 		if err != nil {
-			log.Errorf("failed to get isi client, error: %v", err)
+			log.Errorf("failed to get isi client for  cluster %s, error: %v", config.ClusterName, err)
 		}
 
 		if config.IsDefault == nil {
@@ -719,7 +724,7 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 			"IsDefault":                 *config.IsDefault,
 		}
 		// TODO: Replace logrus with log
-		logrus.WithFields(fields).Infof("new config details for cluster %s", config.ClusterName)
+		logrus.WithFields(fields).Infof("new config details set for cluster %s", config.ClusterName)
 	}
 
 	return newIsiClusters, defaultIsiClusterName, nil
