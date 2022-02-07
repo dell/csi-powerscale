@@ -24,7 +24,6 @@ jobs:
       - name: Run Go Security
         uses: securego/gosec@master
         with:
-          # added additional exclude arguments after gosec v2.9.4 came out
           args: ./...
   malware_security_scan:
     name: Malware Scanner
