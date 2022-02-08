@@ -127,6 +127,7 @@ type IsilonClusterConfig struct {
 	IsiPath                   string `yaml:"isiPath,omitempty"`
 	IsiVolumePathPermissions  string `yaml:"isiVolumePathPermissions,omitempty"`
 	IsDefault                 *bool  `yaml:"isDefault,omitempty"`
+	ReplicationCertificateID  string `yaml:"replicationCertificateID,omitempty"`
 	isiSvc                    *isiService
 }
 

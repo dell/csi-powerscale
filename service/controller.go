@@ -395,7 +395,7 @@ func (s *service) CreateVolume(
 		_, err = isiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 		if err != nil {
 			if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode == 404 {
-				err := isiConfig.isiSvc.client.CreatePolicy(ctx, ppName, rpoint, isiPath+"/"+vgName, isiPath+"/"+vgName, remoteSystemEndpoint, true)
+				err := isiConfig.isiSvc.client.CreatePolicy(ctx, ppName, rpoint, isiPath+"/"+vgName, isiPath+"/"+vgName, remoteSystemEndpoint, remoteIsiConfig.ReplicationCertificateID, true)
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "can't create protection policy %s", err.Error())
 				}

@@ -2,6 +2,8 @@ ARG GOPROXY
 
 FROM centos:8
 ARG GOPROXY
+RUN sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-Linux-* &&\
+    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
 RUN yum install -y libaio
 RUN yum install -y libuuid
 RUN yum install -y numactl

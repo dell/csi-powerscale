@@ -405,7 +405,7 @@ func failover(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIs
 	if err != nil {
 		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode == 404 {
 			err := remoteIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, localPolicy.JobDelay,
-				localPolicy.SourcePath, localPolicy.TargetPath, localIsiConfig.Endpoint, false)
+				localPolicy.SourcePath, localPolicy.TargetPath, localIsiConfig.Endpoint, localIsiConfig.ReplicationCertificateID, false)
 			if err != nil {
 				return status.Errorf(codes.Internal, "failover: can't create protection policy %s", err.Error())
 			}
@@ -541,7 +541,7 @@ func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteI
 	if err != nil {
 		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode == 404 {
 			err := localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, jobDelay,
-				sourcePath, targetPath, remoteIsiConfig.Endpoint, true)
+				sourcePath, targetPath, remoteIsiConfig.Endpoint, remoteIsiConfig.ReplicationCertificateID, true)
 			if err != nil {
 				return status.Errorf(codes.Internal, "reprotect: can't create protection policy %s", err.Error())
 			}
