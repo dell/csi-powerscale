@@ -87,7 +87,7 @@ func (s *service) Probe(
 	rep.Ready = ready
 
 	if noProbeOnStart {
-		log.Debugf("set noProbeOnStart to true and skip probe")
+		log.Debugf("noProbeOnStart is set to true, skip probe")
 		return rep, nil
 	}
 

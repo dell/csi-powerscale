@@ -351,7 +351,7 @@ func (s *service) NodeGetInfo(
 		return nil, err
 	}
 	if noProbeOnStart {
-		log.Debugf("set noProbeOnStart to true and skip probe")
+		log.Debugf("noProbeOnStart is set to true, skip probe")
 		return &csi.NodeGetInfoResponse{NodeId: nodeID}, nil
 	}
 	// If Custom Topology is enabled we do not add node labels to the worker node

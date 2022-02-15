@@ -975,6 +975,8 @@ func (s *service) ControllerPublishVolume(
 
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
+	//set noProbeOnStart to false so subsequent calls can lead to probe
+	noProbeOnStart = false
 
 	volumeContext := req.GetVolumeContext()
 	if volumeContext != nil {
@@ -1265,6 +1267,8 @@ func (s *service) ControllerUnpublishVolume(
 
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
+	//set noProbeOnStart to false so subsequent calls can lead to probe
+	noProbeOnStart = false
 
 	if req.VolumeId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "ControllerUnpublishVolumeRequest.VolumeId is empty"))
