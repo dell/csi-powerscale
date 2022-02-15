@@ -67,6 +67,8 @@ var Manifest = map[string]string{
 	"formed": core.CommitTime.Format(time.RFC1123),
 }
 
+var noProbeOnStart bool
+
 // Service is the CSI service provider.
 type Service interface {
 	csi.ControllerServer
@@ -324,16 +326,23 @@ func (s *service) probe(ctx context.Context, clusterConfig *IsilonClusterConfig)
 func (s *service) probeOnStart(ctx context.Context) error {
 
 	ctx, log := GetLogger(ctx)
-	if utils.ParseBooleanFromContext(ctx, constants.EnvNoProbeOnStart) {
-
-		log.Debug("X_CSI_ISI_NO_PROBE_ON_START is true, skip 'probeOnStart'")
-
+	if noProbeOnStart {
+		log.Debugf("noProbeOnStart is true , skip probe")
 		return nil
 	}
 
-	log.Debug("X_CSI_ISI_NO_PROBE_ON_START is false, executing 'probeOnStart'")
-
 	return s.probeAllClusters(ctx)
+}
+
+func (s *service) setNoProbeOnStart(ctx context.Context) {
+	ctx, log := GetLogger(ctx)
+	if utils.ParseBooleanFromContext(ctx, constants.EnvNoProbeOnStart) {
+		log.Debug("X_CSI_ISI_NO_PROBE_ON_START is true, set noProbeOnStart to true")
+		noProbeOnStart = true
+		return
+	}
+	log.Debug("X_CSI_ISI_NO_PROBE_ON_START is false, set noProbeOnStart to false ")
+	noProbeOnStart = false
 }
 
 func (s *service) autoProbe(ctx context.Context, isiConfig *IsilonClusterConfig) error {
@@ -481,6 +490,7 @@ func (s *service) BeforeServe(
 
 	// Update the storage array list
 	s.isiClusters = new(sync.Map)
+	s.setNoProbeOnStart(ctx)
 
 	// Update config params
 	vc := viper.New()
@@ -530,6 +540,8 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 				}
 				if event.Op&fsnotify.Create == fsnotify.Create && event.Name == parentFolder+"/..data" {
 					log.Infof("**************** Cluster config file modified. Updating cluster config details: %s****************", event.Name)
+					//set noProbeOnStart to false so subsequent calls can lead to probe
+					noProbeOnStart = false
 					err := s.syncIsilonConfigs(ctx)
 					if err != nil {
 						log.Debug("Cluster configuration array length:", s.getIsilonClusterLength())
@@ -574,6 +586,7 @@ func (s *service) syncIsilonConfigs(ctx context.Context) error {
 	defer syncMutex.Unlock()
 
 	configBytes, err := ioutil.ReadFile(filepath.Clean(isilonConfigFile))
+	log.Infof("file location of isilonConfigFile -> %s", isilonConfigFile)
 	if err != nil {
 		return fmt.Errorf("file ('%s') error: %v", isilonConfigFile, err)
 	}
@@ -683,9 +696,11 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 
 		config.EndpointURL = fmt.Sprintf("https://%s:%s", config.Endpoint, config.EndpointPort)
 		clientCtx, _ := GetLogger(ctx)
-		config.isiSvc, err = s.GetIsiService(clientCtx, &config, logLevel)
-		if err != nil {
-			log.Errorf("failed to get isi client for  cluster %s, error: %v", config.ClusterName, err)
+		if !noProbeOnStart {
+			config.isiSvc, err = s.GetIsiService(clientCtx, &config, logLevel)
+			if err != nil {
+				log.Errorf("failed to get isi client for  cluster %s, error: %v", config.ClusterName, err)
+			}
 		}
 
 		if config.IsDefault == nil {

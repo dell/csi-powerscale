@@ -19,9 +19,9 @@ package service
 import (
 	"fmt"
 	csiext "github.com/dell/dell-csi-extensions/replication"
-	"strings"
 
 	"golang.org/x/net/context"
+	"strings"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	wrappers "github.com/golang/protobuf/ptypes/wrappers"
@@ -85,6 +85,11 @@ func (s *service) Probe(
 	ready.Value = true
 	rep := new(csi.ProbeResponse)
 	rep.Ready = ready
+
+	if noProbeOnStart {
+		log.Debugf("set noProbeOnStart to true and skip probe")
+		return rep, nil
+	}
 
 	if err := s.probeAllClusters(ctx); err != nil {
 		rep.Ready.Value = false
