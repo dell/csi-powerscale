@@ -586,7 +586,6 @@ func (s *service) syncIsilonConfigs(ctx context.Context) error {
 	defer syncMutex.Unlock()
 
 	configBytes, err := ioutil.ReadFile(filepath.Clean(isilonConfigFile))
-	log.Infof("file location of isilonConfigFile -> %s", isilonConfigFile)
 	if err != nil {
 		return fmt.Errorf("file ('%s') error: %v", isilonConfigFile, err)
 	}

@@ -282,6 +282,7 @@ isiPath: /ifs/data/csi
 isiVolumePathPermissions: "0777"
 
 # noProbeOnStart: Indicates whether the controller/node should probe all the PowerScale clusters during driver initialization
+# When set to true, the driver will not set node labels, please specify label <provisionerName>.dellemc.com/<powerscalefqdnorip>:<provisionerName>
 # Allowed values:
 #   true : do not probe all PowerScale clusters during driver initialization
 #   false: probe all PowerScale clusters during driver initialization
