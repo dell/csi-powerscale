@@ -118,7 +118,11 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	}
 
 	remoteVolume := getRemoteCSIVolume(ctx, remoteExportID, volName, accessZone, volumeSize, remoteClusterName)
-
+	volumeContext := map[string]string{
+		"Path": exportPath,
+	}
+	log.Println(volumeContext)
+	remoteVolume.VolumeContext = volumeContext
 	// TODO: figure out what remote parameters we would need if any
 
 	return &csiext.CreateRemoteVolumeResponse{
@@ -276,6 +280,45 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 			log.Error("Unknown error while deleting PP")
 		}
 	}
+	//_, err = remoteIsiConfig.isiSvc.GetVolume(ctx, isiPath, "", "")
+	//if e, ok := err.(*isiApi.JSONError); ok {
+	//	if e.StatusCode == 404 {
+	//		return &csiext.DeleteStorageProtectionGroupResponse{}, nil
+	//	}
+	//	return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group")
+	//} else if err != nil {
+	//	return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group")
+	//}
+	//childs, err = isiConfig.isiSvc.client.QueryVolumeChildren(ctx, strings.TrimPrefix(isiPath, remoteIsiConfig.IsiPath))
+	//if err != nil {
+	//	return nil, status.Errorf(codes.Internal, "Error: Unable to get VG's childs")
+	//}
+	//for key := range childs {
+	//	log.Info("Child Path: ", key)
+	//	export, err := remoteIsiConfig.isiSvc.GetExportWithPathAndZone(ctx, key, "")
+	//	if err == nil {
+	//		log.Error("Contains paths: ", export.Paths)
+	//		return nil, status.Errorf(codes.Internal, "VG is not empty")
+	//	}
+	//}
+	//err = remoteIsiConfig.isiSvc.DeleteVolume(ctx, isiPath, "")
+	//if err != nil {
+	//	return nil, err
+	//}
+	//ppName = strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(isiPath, remoteIsiConfig.IsiPath), "/", ""), ".", "-")
+	//log.Info(ppName, "ppname")
+	//err = remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+	//if err != nil {
+	//	if e, ok := err.(*isiApi.JSONError); ok {
+	//		if e.StatusCode == 404 {
+	//			log.Info("No PP Found")
+	//		} else {
+	//			log.Errorf("Failed to delete PP %s.", ppName)
+	//		}
+	//	} else {
+	//		log.Error("Unknown error while deleting PP")
+	//	}
+	//}
 	log.Info("PP cleared out")
 	return &csiext.DeleteStorageProtectionGroupResponse{}, nil
 }
@@ -361,26 +404,130 @@ func (s *service) ExecuteAction(ctx context.Context, req *csiext.ExecuteActionRe
 	}
 
 	// TODO: uncomment when GetSPGStatus call will be implemented
-	// statusResp, err := s.GetStorageProtectionGroupStatus(ctx, &csiext.GetStorageProtectionGroupStatusRequest{
-	// 	ProtectionGroupId:         protectionGroupID,
-	// 	ProtectionGroupAttributes: localParams,
-	// })
-	// if err != nil {
-	// 	return nil, status.Errorf(codes.Internal, "can't get storage protection group status: %s", err.Error())
-	// }
+	statusResp, err := s.GetStorageProtectionGroupStatus(ctx, &csiext.GetStorageProtectionGroupStatusRequest{
+		ProtectionGroupId:         protectionGroupID,
+		ProtectionGroupAttributes: localParams,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "can't get storage protection group status: %s", err.Error())
+	}
 
 	resp := &csiext.ExecuteActionResponse{
 		Success: true,
 		ActionTypes: &csiext.ExecuteActionResponse_Action{
 			Action: req.GetAction(),
 		},
-		// Status: statusResp.Status,
+		Status: statusResp.Status,
 	}
 	return resp, nil
 }
 
-func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, request *csiext.GetStorageProtectionGroupStatusRequest) (*csiext.GetStorageProtectionGroupStatusResponse, error) {
-	panic("implement me")
+func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csiext.GetStorageProtectionGroupStatusRequest) (*csiext.GetStorageProtectionGroupStatusResponse, error) {
+	ctx, log, _ := GetRunIDLog(ctx)
+	localParams := req.GetProtectionGroupAttributes()
+	groupID := req.GetProtectionGroupId()
+	isiPath := utils.GetIsiPathFromPgID(groupID)
+	log.Infof("IsiPath: %s", isiPath)
+	clusterName, ok := localParams[s.opts.replicationContextPrefix+"systemName"]
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "Error: can't find `systemName` in replication group")
+	}
+
+	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
+	if err != nil {
+		log.Error("Failed to get Isilon config with error ", err.Error())
+		return nil, status.Errorf(codes.InvalidArgument, "can't find cluster with name %s in driver config: %s", clusterName, err.Error())
+	}
+
+	remoteClusterName, ok := localParams[s.opts.replicationContextPrefix+"remoteSystemName"]
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "can't find `remoteSystemName` parameter in replication group")
+	}
+
+	remoteIsiConfig, err := s.getIsilonConfig(ctx, &remoteClusterName)
+	if err != nil {
+		log.Error("Failed to get Isilon config with error ", err.Error())
+		return nil, status.Errorf(codes.InvalidArgument, "can't find cluster with name %s in driver config: %s", remoteClusterName, err.Error())
+	}
+
+	vgName, ok := localParams[s.opts.replicationContextPrefix+"VolumeGroupName"]
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "can't find `VolumeGroupName` parameter in replication group")
+	}
+
+	ppName := strings.ReplaceAll(vgName, ".", "-")
+
+	var isSync, localSusp bool
+
+	localJob, err := isiConfig.isiSvc.client.GetJobsByPolicyName(ctx, ppName)
+	if err != nil {
+		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode != 404 {
+			return nil, status.Errorf(codes.Internal, "can't find active jobs for local policy %s by name %s", ppName, err.Error())
+		}
+	} else if localJob.Action == "sync" {
+		isSync = true
+	}
+	remoteJob, err := remoteIsiConfig.isiSvc.client.GetJobsByPolicyName(ctx, ppName)
+	if err != nil {
+		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode != 404 {
+			return nil, status.Errorf(codes.Internal, "can't find active jobs for remote policy %s by name %s", ppName, err.Error())
+		}
+	} else if remoteJob.Action == "sync" {
+		isSync = true
+	}
+
+	_, err = isiConfig.isiSvc.client.GetVolumeWithIsiPath(ctx, isiPath+"/", "", "suspend")
+	if err == nil {
+		localSusp = true
+	}
+
+	s1P, err := isiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "can't find local replication policy, unexpected error %s", err.Error())
+	}
+	// obtain source policy for target cluster
+	s2TP, err := remoteIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "can't find local replication policy, unexpected error %s", err.Error())
+	}
+
+	// obtain target policy for source cluster
+	s1TP, err := isiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "can't find remote replication policy, unexpected error %s", err.Error())
+	}
+
+	// obtain target policy for target cluster
+	s2P, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "can't find remote replication policy, unexpected error %s", err.Error())
+	}
+
+	var state csiext.StorageProtectionGroupStatus_State
+	if (s1P.Enabled && !s2P.Enabled && s1TP.FailoverFailbackState == "writes_enabled" && s2TP.FailoverFailbackState == "writes_disabled") ||
+		(!s1P.Enabled && s2P.Enabled && s1TP.FailoverFailbackState == "writes_disabled" && s2TP.FailoverFailbackState == "writes_enabled") {
+		state = csiext.StorageProtectionGroupStatus_SYNCHRONIZED
+	} else if localSusp && ((s1P.Enabled || !s1P.Enabled) && !s2P.Enabled && s1TP.FailoverFailbackState == "writes_disabled" && s2TP.FailoverFailbackState == "writes_enabled") ||
+		(!s1P.Enabled && (s2P.Enabled || !s2P.Enabled) && s1TP.FailoverFailbackState == "writes_enabled" && s2TP.FailoverFailbackState == "writes_disabled") {
+		state = csiext.StorageProtectionGroupStatus_SUSPENDED
+	} else if ((s1P.Enabled || !s1P.Enabled) && !s2P.Enabled && s1TP.FailoverFailbackState == "writes_disabled" && s2TP.FailoverFailbackState == "writes_enabled") ||
+		(!s1P.Enabled && (s2P.Enabled || !s2P.Enabled) && s1TP.FailoverFailbackState == "writes_enabled" && s2TP.FailoverFailbackState == "writes_disabled") {
+		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
+	} else if isSync {
+		state = csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS
+	} else if s1TP.LastJobState == "failed" || s2TP.LastJobState == "failed" {
+		state = csiext.StorageProtectionGroupStatus_INVALID
+	} else {
+		state = csiext.StorageProtectionGroupStatus_UNKNOWN
+	}
+
+	log.Infof("The current state for group (%s) is (%s).", groupID, state.String())
+	resp := &csiext.GetStorageProtectionGroupStatusResponse{
+		Status: &csiext.StorageProtectionGroupStatus{
+			State: state,
+		},
+	}
+	return resp, err
 }
 
 func failover(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
@@ -455,6 +602,27 @@ func failover(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIs
 			return status.Errorf(codes.Internal, "failover: can't disallow writes on local site %s", err.Error())
 		}
 	}
+	err = CheckAndDeleteSuspend(ctx, localIsiConfig, remoteIsiConfig, vgName)
+	//sourcePath := localIsiConfig.IsiPath + "/" + vgName
+	//targetPath := remoteIsiConfig.IsiPath + "/" + vgName
+	//
+	//_, err = localIsiConfig.isiSvc.client.GetVolumeWithIsiPath(ctx, sourcePath, "", "suspend")
+	//if err == nil {
+	//	err = localIsiConfig.isiSvc.client.DeleteVolumeWithIsiPath(ctx, sourcePath, "suspend")
+	//	if err != nil {
+	//		return status.Errorf(codes.Internal, "failover: can't delete 'suspend' volume ")
+	//	}
+	//
+	//}
+	//
+	//_, err = remoteIsiConfig.isiSvc.client.GetVolumeWithIsiPath(ctx, targetPath, "", "suspend")
+	//if err == nil {
+	//	err = remoteIsiConfig.isiSvc.client.DeleteVolumeWithIsiPath(ctx, targetPath, "suspend")
+	//	if err != nil {
+	//		return status.Errorf(codes.Internal, "failover: can't delete 'suspend' volume ")
+	//	}
+	//
+	//}
 
 	return nil
 }
@@ -471,6 +639,27 @@ func failoverUnplanned(ctx context.Context, localIsiConfig *IsilonClusterConfig,
 	if err != nil {
 		return status.Errorf(codes.Internal, "unplanned failover: can't break association on target site %s", err.Error())
 	}
+	_ = CheckAndDeleteSuspend(ctx, localIsiConfig, remoteIsiConfig, vgName)
+	//sourcePath := localIsiConfig.IsiPath + "/" + vgName
+	//targetPath := remoteIsiConfig.IsiPath + "/" + vgName
+	//
+	//_, err = localIsiConfig.isiSvc.client.GetVolumeWithIsiPath(ctx, sourcePath, "", "suspend")
+	//if err == nil {
+	//	err = localIsiConfig.isiSvc.client.DeleteVolumeWithIsiPath(ctx, sourcePath, "suspend")
+	//	if err != nil {
+	//		return status.Errorf(codes.Internal, "unplanned failover: can't delete 'suspend' volume ")
+	//	}
+	//
+	//}
+	//
+	//_, err = remoteIsiConfig.isiSvc.client.GetVolumeWithIsiPath(ctx, targetPath, "", "suspend")
+	//if err == nil {
+	//	err = remoteIsiConfig.isiSvc.client.DeleteVolumeWithIsiPath(ctx, targetPath, "suspend")
+	//	if err != nil {
+	//		return status.Errorf(codes.Internal, "unplanned failover: can't delete 'suspend' volume ")
+	//	}
+	//
+	//}
 
 	return nil
 }
@@ -582,6 +771,7 @@ func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteI
 		}
 	}
 
+	_ = CheckAndDeleteSuspend(ctx, localIsiConfig, remoteIsiConfig, vgName)
 	return nil
 }
 
@@ -594,6 +784,8 @@ func syncAction(ctx context.Context, localIsiConfig *IsilonClusterConfig, remote
 	if err != nil {
 		return status.Errorf(codes.Internal, "sync: encountered error when trying to sync policy %s", err.Error())
 	}
+
+	err = CheckAndDeleteSuspend(ctx, localIsiConfig, remoteIsiConfig, vgName)
 
 	return nil
 }
@@ -613,6 +805,16 @@ func suspend(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsi
 	err = localIsiConfig.isiSvc.client.WaitForPolicyEnabledFieldCondition(ctx, ppName, false)
 	if err != nil {
 		return status.Errorf(codes.Internal, "suspend: policy couldn't reach disabled condition %s", err.Error())
+	}
+
+	_, err = localIsiConfig.isiSvc.client.GetVolumeWithIsiPath(ctx, localIsiConfig.IsiPath+"/"+vgName, "", "suspend")
+	if err != nil {
+		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode == 404 {
+			_, err = localIsiConfig.isiSvc.client.CreateVolumeWithIsipath(ctx, localIsiConfig.IsiPath+"/"+vgName, "suspend", "0777")
+		}
+		if err != nil {
+			return status.Errorf(codes.Internal, "suspend: can't create suspend volume in %s volume group %s", vgName, err.Error())
+		}
 	}
 
 	return nil
@@ -635,6 +837,30 @@ func resume(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiC
 		return status.Errorf(codes.Internal, "suspend: policy couldn't reach disabled condition %s", err.Error())
 	}
 
+	_ = CheckAndDeleteSuspend(ctx, localIsiConfig, remoteIsiConfig, vgName)
+
+	return nil
+}
+
+func CheckAndDeleteSuspend(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string) error {
+
+	_, err := localIsiConfig.isiSvc.client.GetVolumeWithIsiPath(ctx, localIsiConfig.IsiPath+"/"+vgName, "", "suspend")
+	if err == nil {
+		err = localIsiConfig.isiSvc.client.DeleteVolumeWithIsiPath(ctx, localIsiConfig.IsiPath+"/"+vgName, "suspend")
+		if err != nil {
+			return status.Errorf(codes.Internal, "resume: can't delete 'suspend' volume ")
+		}
+
+	}
+
+	_, err = remoteIsiConfig.isiSvc.client.GetVolumeWithIsiPath(ctx, localIsiConfig.IsiPath+"/"+vgName, "", "suspend")
+	if err == nil {
+		err = remoteIsiConfig.isiSvc.client.DeleteVolumeWithIsiPath(ctx, localIsiConfig.IsiPath+"/"+vgName, "suspend")
+		if err != nil {
+			return status.Errorf(codes.Internal, "resume: can't delete 'suspend' volume ")
+		}
+
+	}
 	return nil
 }
 

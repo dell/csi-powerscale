@@ -128,13 +128,13 @@ func (s *service) GetReplicationCapabilities(ctx context.Context, req *csiext.Ge
 					},
 				},
 			},
-			// {
-			// 	Type: &csiext.ReplicationCapability_Rpc{
-			// 		Rpc: &csiext.ReplicationCapability_RPC{
-			// 			Type: csiext.ReplicationCapability_RPC_MONITOR_PROTECTION_GROUP,
-			// 		},
-			// 	},
-			// },
+			{
+				Type: &csiext.ReplicationCapability_Rpc{
+					Rpc: &csiext.ReplicationCapability_RPC{
+						Type: csiext.ReplicationCapability_RPC_MONITOR_PROTECTION_GROUP,
+					},
+				},
+			},
 		}
 		rep.Actions = []*csiext.SupportedActions{
 			{
