@@ -18,14 +18,13 @@ package service
 import (
 	"context"
 	"fmt"
-	"path"
-	"strings"
-
 	"github.com/dell/csi-isilon/common/constants"
-
 	utils "github.com/dell/csi-isilon/common/utils"
 	isi "github.com/dell/goisilon"
 	"github.com/dell/goisilon/api"
+	"path"
+	"strings"
+	"sync"
 )
 
 type isiService struct {
@@ -464,9 +463,73 @@ func (svc *isiService) OtherClientsAlreadyAdded(ctx context.Context, exportID in
 	return clientFieldsNotEmpty && !isNodeInClientFields && !isNodeFQDNInClientFields
 }
 
-func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.Context, exportID int, accessZone, nodeID string, addClientFunc func(ctx context.Context, exportID int, accessZone, clientIP string) error) error {
+// updateClusterToNodeIDMap updates cluster to nodeID map from input clusterName, nodeID and clientToUse
+func updateClusterToNodeIDMap(ctx context.Context, clusterToNodeIDMap *sync.Map, clusterName, nodeID, clientToUse string) error {
+	log := utils.GetRunIDLogger(ctx)
+	log.Debugf("updating ClusterToNodeIDMap map for cluster '%s', for nodeID '%s' with clientToUse '%s'", clusterName, nodeID, clientToUse)
+
+	var nodeIDToClientMaps []*nodeIDToClientMap
+
+	if m, found := clusterToNodeIDMap.Load(clusterName); found {
+		log.Debugf("entry for cluster '%s' found in cluster to nodeID map", clusterName)
+		var ok bool
+		if nodeIDToClientMaps, ok = m.([]*nodeIDToClientMap); !ok {
+			return fmt.Errorf("failed to extract nodeIDToClientMap for cluster '%s'", clusterName)
+		}
+
+		for i, nodeIDMap := range nodeIDToClientMaps {
+			if client, ok := (*nodeIDMap)[nodeID]; ok {
+				// no need to update the map for this nodeID, as current client and the client to be updated are same
+				if client == clientToUse {
+					return nil
+				}
+
+				// update the for the current nodeID with the new client
+				nodeIDToClientMaps[i] = &nodeIDToClientMap{nodeID: clientToUse}
+				clusterToNodeIDMap.Store(clusterName, nodeIDToClientMaps)
+				return nil
+			}
+		}
+		// make a new entry in the map for this nodeID
+		clusterToNodeIDMap.Store(clusterName, append(nodeIDToClientMaps, &nodeIDToClientMap{nodeID: clientToUse}))
+		return nil
+	}
+
+	// make a new entry for the input cluster and nodeID in the map
+	clusterToNodeIDMap.Store(clusterName, []*nodeIDToClientMap{{nodeID: clientToUse}})
+
+	return nil
+}
+
+// getClientToUseForNodeID returns client to use for an input nodeID from the cluster to nodeID map, if present.
+// Otherwise returns an error
+func getClientToUseForNodeID(ctx context.Context, clusterToNodeIDMap *sync.Map, clusterName, nodeID string) (string, error) {
+	log := utils.GetRunIDLogger(ctx)
+
+	var nodeIDToClientMaps []*nodeIDToClientMap
+
+	if m, found := clusterToNodeIDMap.Load(clusterName); found {
+		log.Debugf("entry for cluster '%s' found in cluster to nodeID map", clusterName)
+		var ok bool
+		if nodeIDToClientMaps, ok = m.([]*nodeIDToClientMap); !ok {
+			return "", fmt.Errorf("failed to extract nodeIDToClientMap for cluster '%s'", clusterName)
+		}
+
+		for _, nodeIDMap := range nodeIDToClientMaps {
+			if client, ok := (*nodeIDMap)[nodeID]; ok {
+				log.Debugf("node id to client mapping found for nodeID '%s' client '%s'", nodeID, client)
+				return client, nil
+			}
+		}
+		return "", fmt.Errorf("node id to client map not found for nodeID '%s' in in cluster to nodeID map", nodeID)
+	}
+	return "", fmt.Errorf("entry for cluster '%s' not found in cluster to nodeID map", clusterName)
+}
+
+func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.Context, clusterName string, exportID int, accessZone, nodeID string, addClientFunc func(ctx context.Context, exportID int, accessZone, clientIP string) error) error {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
+	var clientToUse string
 
 	// try adding by client FQDN first as it is preferred over IP for its stableness.
 	// OneFS API will return error if it cannot resolve the client FQDN ,
@@ -477,21 +540,41 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 		return err
 	}
 
-	log.Debugf("AddExportClientNetworkIdentifierByID client FQDN '%s' client IP '%s'", clientFQDN, clientIP)
+	currentClient, err := getClientToUseForNodeID(ctx, clusterToNodeIDMap, clusterName, nodeID)
+	if err != nil {
+		log.Debugf(err.Error())
+		clientToUse = clientFQDN
+	} else {
+		clientToUse = currentClient
+	}
 
-	if err = addClientFunc(ctx, exportID, accessZone, clientFQDN); err == nil {
+	log.Debugf("AddExportClientNetworkIdentifierByID adding '%s' as client to export id '%d'", clientToUse, exportID)
+	if err = addClientFunc(ctx, exportID, accessZone, clientToUse); err == nil {
+		if err := updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, clientToUse); err != nil {
+			// not returning with error as export is already updated with client
+			log.Warnf("failed to update cluster to nodeID map: '%s'", err)
+		}
 
-		//adding by client FQDN is successful, no need to trying adding by IP
 		return nil
 	}
+	log.Warnf("failed to add client '%s' to export id '%d': '%v'", clientToUse, exportID, err)
 
-	log.Warnf("failed to add client FQDN '%s' to export id '%d' : '%v'", clientFQDN, exportID, err)
-
-	if err := addClientFunc(ctx, exportID, accessZone, clientIP); err != nil {
-		return fmt.Errorf("failed to add client ip '%s' to export id '%d' : '%v'", clientIP, exportID, err)
+	// try updating export with other client
+	otherClientToUse := clientFQDN
+	if clientToUse == clientFQDN {
+		otherClientToUse = clientIP
 	}
+	log.Debugf("AddExportClientNetworkIdentifierByID trying to add '%s' as client to export id '%d'", otherClientToUse, exportID)
+	if err = addClientFunc(ctx, exportID, accessZone, otherClientToUse); err == nil {
+		if err := updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, otherClientToUse); err != nil {
+			// not returning with error as export is already updated with client
+			log.Warnf("failed to update cluster to nodeID map '%s'", err)
+		}
+		return nil
+	}
+	log.Warnf("failed to add client '%s' to export id '%d': '%v'", otherClientToUse, exportID, err)
 
-	return nil
+	return fmt.Errorf("failed to add clients '%s' or '%s' to export id '%d'", clientToUse, otherClientToUse, exportID)
 }
 
 func (svc *isiService) AddExportClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string) error {

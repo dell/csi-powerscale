@@ -22,6 +22,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	fPath "path"
@@ -87,6 +88,12 @@ const (
 	RpoTwelveHours    RPOEnum = "Twelve_Hours"
 	RpoOneDay         RPOEnum = "One_Day"
 )
+
+// clusterToNodeIDMap is a map[clusterName][]*nodeIDToClientMap
+var clusterToNodeIDMap = new(sync.Map)
+
+//type nodeIDElementsMap map[string]string
+type nodeIDToClientMap map[string]string
 
 // IsValid - checks valid RPO
 func (rpo RPOEnum) IsValid() error {
@@ -531,7 +538,7 @@ func (s *service) CreateVolume(
 				if export, _ := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone); export != nil {
 					// Add dummy localhost entry for pvc security
 					if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
-						err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
+						err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
 						if err != nil {
 							log.Debugf("Error while adding dummy localhost entry to export '%d'", exportID)
 						}
@@ -553,7 +560,7 @@ func (s *service) CreateVolume(
 				if export, _ := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone); export != nil {
 					// Add dummy localhost entry for pvc security
 					if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
-						err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
+						err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
 						if err != nil {
 							log.Debugf("Error while adding dummy localhost entry to export '%d'", exportID)
 						}
@@ -1076,15 +1083,15 @@ func (s *service) ControllerPublishVolume(
 		}
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
 
-		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, nodeID, addClientFunc)
+		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, addClientFunc)
 		if err == nil && rootClientEnabled {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
-		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportReadOnlyClientByIDWithZone)
+		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportReadOnlyClientByIDWithZone)
 	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER:
@@ -1099,11 +1106,11 @@ func (s *service) ControllerPublishVolume(
 		}
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
-		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, nodeID, addClientFunc)
+		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, addClientFunc)
 		if err == nil && rootClientEnabled {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
 	default:
 		return nil, status.Errorf(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "unsupported access mode: '%s'", am.String()))
@@ -1111,7 +1118,7 @@ func (s *service) ControllerPublishVolume(
 
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID,
-			"internal error occured when attempting to add client ip '%s' to export '%d', error : '%v'", nodeID, exportID, err))
+			"internal error occurred when attempting to add client ip '%s' to export '%d', error : '%v'", nodeID, exportID, err))
 	}
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
