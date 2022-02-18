@@ -1323,7 +1323,7 @@ func (s *service) ControllerUnpublishVolume(
 	}
 
 	if err := isiConfig.isiSvc.RemoveExportClientByIDWithZone(ctx, exportID, accessZone, nodeID); err != nil {
-		if strings.Contains(err.Error(), "No such file or directory"){
+		if strings.Contains(err.Error(), "No such file or directory") {
 			err := isiConfig.isiSvc.DeleteVolume(ctx, isiConfig.IsiPath, req.VolumeId)
 			if err != nil {
 				return nil, err
