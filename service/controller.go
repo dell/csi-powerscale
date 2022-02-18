@@ -815,37 +815,37 @@ func (s *service) DeleteVolume(
 		}
 	}
 
+	// Before deleting the Volume, we would like to check if there are any
+	// NFS exports which still exist on the Volume. These exports could
+	// have been created out-of-band outside of CSI Driver.
+	path := utils.GetPathForVolume(isiPath, volName)
+	params := isiApi.OrderedValues{
+		{[]byte("path"), []byte(path)},
+		{[]byte("zone"), []byte(accessZone)},
+	}
+	exports, err := isiConfig.isiSvc.GetExportsWithParams(ctx, params)
+	if err != nil {
+		jsonError, ok := err.(*isiApi.JSONError)
+		if ok {
+			if jsonError.StatusCode != 404 {
+				return nil, err
+			}
+		}
+		return nil, err
+	}
+
+	if exports != nil && exports.Total == 1 && exports.Exports[0].ID == exportID {
+		log.Infof("controller begins to unexport id '%d', target path '%s', access zone '%s'", exportID, volName, accessZone)
+		if err := isiConfig.isiSvc.UnexportByIDWithZone(ctx, exportID, accessZone); err != nil {
+			return nil, err
+		}
+	} else if exports != nil && exports.Total > 1 {
+		return nil, fmt.Errorf("exports found for volume %s in AccessZone %s. It is not safe to delete the volume", volName, accessZone)
+	}
+
 	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", volName) {
 		log.Debugf("volume '%s' not found, skip calling delete directory.", volName)
 	} else {
-		// Before deleting the Volume, we would like to check if there are any
-		// NFS exports which still exist on the Volume. These exports could
-		// have been created out-of-band outside of CSI Driver.
-		path := utils.GetPathForVolume(isiPath, volName)
-		params := isiApi.OrderedValues{
-			{[]byte("path"), []byte(path)},
-			{[]byte("zone"), []byte(accessZone)},
-		}
-		exports, err := isiConfig.isiSvc.GetExportsWithParams(ctx, params)
-		if err != nil {
-			jsonError, ok := err.(*isiApi.JSONError)
-			if ok {
-				if jsonError.StatusCode != 404 {
-					return nil, err
-				}
-			}
-			return nil, err
-		}
-
-		if exports != nil && exports.Total == 1 && exports.Exports[0].ID == exportID {
-			log.Infof("controller begins to unexport id '%d', target path '%s', access zone '%s'", exportID, volName, accessZone)
-			if err := isiConfig.isiSvc.UnexportByIDWithZone(ctx, exportID, accessZone); err != nil {
-				return nil, err
-			}
-		} else if exports != nil && exports.Total > 1 {
-			return nil, fmt.Errorf("exports found for volume %s in AccessZone %s. It is not safe to delete the volume", volName, accessZone)
-		}
-
 		if err := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, volName); err != nil {
 			return nil, err
 		}
@@ -1324,13 +1324,14 @@ func (s *service) ControllerUnpublishVolume(
 
 	if err := isiConfig.isiSvc.RemoveExportClientByIDWithZone(ctx, exportID, accessZone, nodeID); err != nil {
 		if strings.Contains(err.Error(), "No such file or directory") {
-			err := isiConfig.isiSvc.DeleteVolume(ctx, isiConfig.IsiPath, req.VolumeId)
-			if err != nil {
-				return nil, err
+			_, delErr := s.DeleteVolume(ctx, &csi.DeleteVolumeRequest{VolumeId: req.VolumeId})
+			if delErr != nil {
+				return nil, delErr
 			}
+		} else {
+			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "error encountered when"+
+				" trying to remove client '%s' from export '%d' with access zone '%s' on cluster '%s', error %s", nodeID, exportID, accessZone, clusterName, err.Error()))
 		}
-		return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "error encountered when"+
-			" trying to remove client '%s' from export '%d' with access zone '%s' on cluster '%s'", nodeID, exportID, accessZone, clusterName))
 	}
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
