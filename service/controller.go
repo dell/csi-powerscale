@@ -1323,6 +1323,12 @@ func (s *service) ControllerUnpublishVolume(
 	}
 
 	if err := isiConfig.isiSvc.RemoveExportClientByIDWithZone(ctx, exportID, accessZone, nodeID); err != nil {
+		if strings.Contains(err.Error(), "No such file or directory"){
+			err := isiConfig.isiSvc.DeleteVolume(ctx, isiConfig.IsiPath, req.VolumeId)
+			if err != nil {
+				return nil, err
+			}
+		}
 		return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "error encountered when"+
 			" trying to remove client '%s' from export '%d' with access zone '%s' on cluster '%s'", nodeID, exportID, accessZone, clusterName))
 	}

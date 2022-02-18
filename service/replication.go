@@ -282,11 +282,13 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 			return nil, status.Errorf(codes.Internal, "VG is not empty")
 		}
 	}
+	ppName := strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(isiPath, isiConfig.IsiPath), "/", ""), ".", "-")
+	err = isiConfig.isiSvc.client.SyncPolicy(ctx, ppName)
 	err = isiConfig.isiSvc.DeleteVolume(ctx, isiPath, "")
 	if err != nil {
 		return nil, err
 	}
-	ppName := strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(isiPath, isiConfig.IsiPath), "/", ""), ".", "-")
+
 	log.Info(ppName, "ppname")
 	err = isiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
 	if err != nil {
