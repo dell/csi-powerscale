@@ -185,6 +185,8 @@ func (s *service) CreateVolume(
 
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
+	//set noProbeOnStart to false so subsequent calls can lead to probe
+	noProbeOnStart = false
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
@@ -721,6 +723,8 @@ func (s *service) DeleteVolume(
 	// TODO more checks need to be done, e.g. if access mode is VolumeCapability_AccessMode_MULTI_NODE_XXX, then other nodes might still be using this volume, thus the delete should be skipped
 	// Fetch log handler
 	ctx, log, _ := GetRunIDLog(ctx)
+	//set noProbeOnStart to false so subsequent calls can lead to probe
+	noProbeOnStart = false
 
 	// validate request
 	if err := s.ValidateDeleteVolumeRequest(ctx, req); err != nil {
@@ -978,6 +982,8 @@ func (s *service) ControllerPublishVolume(
 
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
+	//set noProbeOnStart to false so subsequent calls can lead to probe
+	noProbeOnStart = false
 
 	volumeContext := req.GetVolumeContext()
 	if volumeContext != nil {
@@ -1268,6 +1274,8 @@ func (s *service) ControllerUnpublishVolume(
 
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
+	//set noProbeOnStart to false so subsequent calls can lead to probe
+	noProbeOnStart = false
 
 	if req.VolumeId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "ControllerUnpublishVolumeRequest.VolumeId is empty"))
@@ -1299,8 +1307,8 @@ func (s *service) ControllerUnpublishVolume(
 	}
 
 	if err := isiConfig.isiSvc.RemoveExportClientByIDWithZone(ctx, exportID, accessZone, nodeID); err != nil {
-		return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "error encountered when"+
-			" trying to remove client '%s' from export '%d' with access zone '%s' on cluster '%s'", nodeID, exportID, accessZone, clusterName))
+		return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "error %s encountered when"+
+			" trying to remove client '%s' from export '%d' with access zone '%s' on cluster '%s'", err, nodeID, exportID, accessZone, clusterName))
 	}
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil

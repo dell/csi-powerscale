@@ -72,6 +72,8 @@ func (s *service) NodePublishVolume(
 
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
+	//set noProbeOnStart to false so subsequent calls can lead to probe
+	noProbeOnStart = false
 
 	volumeContext := req.GetVolumeContext()
 	if volumeContext == nil {
@@ -168,6 +170,8 @@ func (s *service) NodeUnpublishVolume(
 	ctx, log, runID := GetRunIDLog(ctx)
 
 	log.Debug("executing NodeUnpublishVolume")
+	//set noProbeOnStart to false so subsequent calls can lead to probe
+	noProbeOnStart = false
 	volID := req.GetVolumeId()
 	if volID == "" {
 		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no VolumeID found in request"))
@@ -346,7 +350,10 @@ func (s *service) NodeGetInfo(
 		log.Error("Failed to create Node ID with error", err.Error())
 		return nil, err
 	}
-
+	if noProbeOnStart {
+		log.Debugf("noProbeOnStart is set to true, skip probe")
+		return &csi.NodeGetInfoResponse{NodeId: nodeID}, nil
+	}
 	// If Custom Topology is enabled we do not add node labels to the worker node
 	if s.opts.CustomTopologyEnabled {
 		return &csi.NodeGetInfoResponse{NodeId: nodeID}, nil
