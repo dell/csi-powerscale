@@ -547,11 +547,6 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 		}
 
 	}
-	// Get last 20 reports, filter last 5 minutes
-	// Parse deleted directories from report, if we are source - delte remoteconfig.client export
-	// do not fail call even if failed to delete something
-	//Get all child source, get all child remote, calculate diff what if a lot of volumes?
-	// delete diff on remote
 
 	log.Infof("The current state for group (%s) is (%s).", groupID, state.String())
 	resp := &csiext.GetStorageProtectionGroupStatusResponse{
