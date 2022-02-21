@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/dell/csi-isilon/common/constants"
 	v11 "github.com/dell/goisilon/api/v11"
 	"strconv"
 	"strings"
@@ -520,7 +521,38 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	if s1P.Enabled {
 		source = true
 		log.Info("Current side is source")
+		localChilds, err := isiConfig.isiSvc.client.QueryVolumeChildren(ctx, isiPath)
+		if err != nil {
+			log.Error("error occured while getting local volumes ", err.Error())
+		}
+		remoteChilds, err := remoteIsiConfig.isiSvc.client.QueryVolumeChildren(ctx, isiPath)
+		if err != nil {
+			log.Error("error occured while getting remote volumes ", err.Error())
+		}
+		var deleteList []string
+		for key, val := range localChilds {
+			if _, ok := remoteChilds[key]; !ok {
+				deleteList = append(deleteList, *val.Path)
+			}
+		}
+		for _, i := range deleteList {
+			export, err := remoteIsiConfig.isiSvc.GetExportWithPathAndZone(ctx, i, constants.DefaultAccessZone)
+			if err == nil {
+				err = remoteIsiConfig.isiSvc.UnexportByIDWithZone(ctx, export.ID, constants.DefaultAccessZone)
+				if err != nil {
+					log.Error("failed to cleanup exports..")
+				}
+			}
+
+		}
+
 	}
+	// Get last 20 reports, filter last 5 minutes
+	// Parse deleted directories from report, if we are source - delte remoteconfig.client export
+	// do not fail call even if failed to delete something
+	//Get all child source, get all child remote, calculate diff what if a lot of volumes?
+	// delete diff on remote
+
 	log.Infof("The current state for group (%s) is (%s).", groupID, state.String())
 	resp := &csiext.GetStorageProtectionGroupStatusResponse{
 		Status: &csiext.StorageProtectionGroupStatus{
