@@ -521,11 +521,11 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	if s1P.Enabled {
 		source = true
 		log.Info("Current side is source")
-		localChilds, err := isiConfig.isiSvc.client.QueryVolumeChildren(ctx, isiPath)
+		localChilds, err := isiConfig.isiSvc.client.QueryVolumeChildren(ctx, vgName)
 		if err != nil {
 			log.Error("error occured while getting local volumes ", err.Error())
 		}
-		remoteChilds, err := remoteIsiConfig.isiSvc.client.QueryVolumeChildren(ctx, isiPath)
+		remoteChilds, err := remoteIsiConfig.isiSvc.client.QueryVolumeChildren(ctx, vgName)
 		if err != nil {
 			log.Error("error occured while getting remote volumes ", err.Error())
 		}
