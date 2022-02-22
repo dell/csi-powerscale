@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/dell/csi-isilon/common/constants"
 	v11 "github.com/dell/goisilon/api/v11"
+	v2 "github.com/dell/goisilon/api/v2"
 	"strconv"
 	"strings"
 	"time"
@@ -521,27 +522,50 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	if s1P.Enabled {
 		source = true
 		log.Info("Current side is source")
+<<<<<<< Updated upstream
 		localChilds, err := isiConfig.isiSvc.client.QueryVolumeChildren(ctx, vgName)
+=======
+		localExportsMap := make(map[string]v2.Export)
+		remoteExportsMap := make(map[string]v2.Export)
+		localExports, err := isiConfig.isiSvc.client.GetExports(ctx)
+>>>>>>> Stashed changes
 		if err != nil {
-			log.Error("error occured while getting local volumes ", err.Error())
+			log.Error("error occured while getting local exports ", err.Error())
 		}
+<<<<<<< Updated upstream
 		remoteChilds, err := remoteIsiConfig.isiSvc.client.QueryVolumeChildren(ctx, vgName)
-		if err != nil {
-			log.Error("error occured while getting remote volumes ", err.Error())
-		}
-		var deleteList []string
-		for key, val := range localChilds {
-			if _, ok := remoteChilds[key]; !ok {
-				deleteList = append(deleteList, *val.Path)
+=======
+		for _, i := range localExports {
+			for _, j := range *i.Paths {
+				localExportsMap[j] = *i
+
 			}
 		}
-		for _, i := range deleteList {
-			export, err := remoteIsiConfig.isiSvc.GetExportWithPathAndZone(ctx, i, constants.DefaultAccessZone)
-			if err == nil {
-				err = remoteIsiConfig.isiSvc.UnexportByIDWithZone(ctx, export.ID, constants.DefaultAccessZone)
-				if err != nil {
-					log.Error("failed to cleanup exports..")
-				}
+
+		remoteExports, err := remoteIsiConfig.isiSvc.client.GetExports(ctx)
+>>>>>>> Stashed changes
+		if err != nil {
+			log.Error("error occured while getting remote exports ", err.Error())
+		}
+		for _, i := range remoteExports {
+			for _, j := range *i.Paths {
+				remoteExportsMap[j] = *i
+			}
+		}
+
+		deleteList := make(map[int]struct{})
+		for key, val := range remoteExportsMap {
+			if _, ok := localExportsMap[key]; !ok && strings.Contains(key, vgName) {
+				deleteList[val.ID] = struct{}{}
+			}
+		}
+
+		for k := range deleteList {
+
+			err = remoteIsiConfig.isiSvc.UnexportByIDWithZone(ctx, k, constants.DefaultAccessZone)
+			log.Info("unexporting", k)
+			if err != nil {
+				log.Error("failed to cleanup exports..")
 			}
 
 		}
