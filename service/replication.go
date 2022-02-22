@@ -522,19 +522,14 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	if s1P.Enabled {
 		source = true
 		log.Info("Current side is source")
-<<<<<<< Updated upstream
-		localChilds, err := isiConfig.isiSvc.client.QueryVolumeChildren(ctx, vgName)
-=======
+
 		localExportsMap := make(map[string]v2.Export)
 		remoteExportsMap := make(map[string]v2.Export)
+
 		localExports, err := isiConfig.isiSvc.client.GetExports(ctx)
->>>>>>> Stashed changes
 		if err != nil {
 			log.Error("error occured while getting local exports ", err.Error())
 		}
-<<<<<<< Updated upstream
-		remoteChilds, err := remoteIsiConfig.isiSvc.client.QueryVolumeChildren(ctx, vgName)
-=======
 		for _, i := range localExports {
 			for _, j := range *i.Paths {
 				localExportsMap[j] = *i
@@ -543,7 +538,6 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 		}
 
 		remoteExports, err := remoteIsiConfig.isiSvc.client.GetExports(ctx)
->>>>>>> Stashed changes
 		if err != nil {
 			log.Error("error occured while getting remote exports ", err.Error())
 		}
@@ -561,15 +555,12 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 		}
 
 		for k := range deleteList {
-
 			err = remoteIsiConfig.isiSvc.UnexportByIDWithZone(ctx, k, constants.DefaultAccessZone)
 			log.Info("unexporting", k)
 			if err != nil {
 				log.Error("failed to cleanup exports..")
 			}
-
 		}
-
 	}
 
 	log.Infof("The current state for group (%s) is (%s).", groupID, state.String())
