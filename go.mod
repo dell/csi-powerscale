@@ -8,7 +8,7 @@ require (
 	github.com/dell/dell-csi-extensions/replication v1.0.0
 	github.com/dell/gocsi v1.5.0
 	github.com/dell/gofsutil v1.7.1-0.20220131144828-d54a8e0917c7
-	github.com/dell/goisilon v1.6.1-0.20220131062522-bf7e8c05654e
+	github.com/dell/goisilon v1.6.1-0.20220221094638-024f75dd0502
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.2.0

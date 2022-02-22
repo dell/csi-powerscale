@@ -115,6 +115,8 @@ github.com/dell/gofsutil v1.7.1-0.20220131144828-d54a8e0917c7 h1:+lDblTVlST1wIR7
 github.com/dell/gofsutil v1.7.1-0.20220131144828-d54a8e0917c7/go.mod h1:0tAefmK/JahHEUFLwtqFPRdr823j0c5vrrhcq+Mx4TM=
 github.com/dell/goisilon v1.6.1-0.20220131062522-bf7e8c05654e h1:ycKpkw1djI9JrpBewUVHhAMD3NtmIB6Tt383HiBt0S0=
 github.com/dell/goisilon v1.6.1-0.20220131062522-bf7e8c05654e/go.mod h1:X6Xizkcr0K4soNlM26rK/KMF95VI/StxL1GHanHm1UQ=
+github.com/dell/goisilon v1.6.1-0.20220221094638-024f75dd0502 h1:txAkas2Y7XgtdpxExX3q5PFBaz5YMn90RHgC+JIra/8=
+github.com/dell/goisilon v1.6.1-0.20220221094638-024f75dd0502/go.mod h1:ort9gaSlqh8XeyiTBhaL9ZWSymZ7u85ncjN4vckpJQA=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96/go.mod h1:Qh8CwZgvJUkLughtfhJv5dyTYa91l1fOUCrgjqmcifM=
