@@ -137,7 +137,6 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/platform/11/sync/jobs/{id}", handleGetJobs).Methods("GET")
 	isilonRouter.HandleFunc("/platform/11/sync/jobs/", handleSyncJob).Methods("POST")
 
-
 	return isilonRouter
 }
 
@@ -623,4 +622,3 @@ func handleGetJobs(w http.ResponseWriter, r *http.Request) {
 func handleSyncJob(w http.ResponseWriter, r *http.Request) {
 	w.Write(readFromFile("mock/jobs/created.json"))
 }
-
