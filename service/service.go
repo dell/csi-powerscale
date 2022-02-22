@@ -70,6 +70,8 @@ var Manifest = map[string]string{
 	"formed": core.CommitTime.Format(time.RFC1123),
 }
 
+var noProbeOnStart bool
+
 // Service is the CSI service provider.
 type Service interface {
 	csi.ControllerServer
@@ -328,16 +330,23 @@ func (s *service) probe(ctx context.Context, clusterConfig *IsilonClusterConfig)
 func (s *service) probeOnStart(ctx context.Context) error {
 
 	ctx, log := GetLogger(ctx)
-	if utils.ParseBooleanFromContext(ctx, constants.EnvNoProbeOnStart) {
-
-		log.Debug("X_CSI_ISI_NO_PROBE_ON_START is true, skip 'probeOnStart'")
-
+	if noProbeOnStart {
+		log.Debugf("noProbeOnStart is true , skip probe")
 		return nil
 	}
 
-	log.Debug("X_CSI_ISI_NO_PROBE_ON_START is false, executing 'probeOnStart'")
-
 	return s.probeAllClusters(ctx)
+}
+
+func (s *service) setNoProbeOnStart(ctx context.Context) {
+	ctx, log := GetLogger(ctx)
+	if utils.ParseBooleanFromContext(ctx, constants.EnvNoProbeOnStart) {
+		log.Debug("X_CSI_ISI_NO_PROBE_ON_START is true, set noProbeOnStart to true")
+		noProbeOnStart = true
+		return
+	}
+	log.Debug("X_CSI_ISI_NO_PROBE_ON_START is false, set noProbeOnStart to false ")
+	noProbeOnStart = false
 }
 
 func (s *service) autoProbe(ctx context.Context, isiConfig *IsilonClusterConfig) error {
@@ -486,6 +495,7 @@ func (s *service) BeforeServe(
 
 	// Update the storage array list
 	s.isiClusters = new(sync.Map)
+	s.setNoProbeOnStart(ctx)
 
 	// Update config params
 	vc := viper.New()
@@ -536,6 +546,8 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 				}
 				if event.Op&fsnotify.Create == fsnotify.Create && event.Name == parentFolder+"/..data" {
 					log.Infof("**************** Cluster config file modified. Updating cluster config details: %s****************", event.Name)
+					//set noProbeOnStart to false so subsequent calls can lead to probe
+					noProbeOnStart = false
 					err := s.syncIsilonConfigs(ctx)
 					if err != nil {
 						log.Debug("Cluster configuration array length:", s.getIsilonClusterLength())
@@ -579,7 +591,7 @@ func (s *service) syncIsilonConfigs(ctx context.Context) error {
 	syncMutex.Lock()
 	defer syncMutex.Unlock()
 
-	configBytes, err := ioutil.ReadFile(isilonConfigFile)
+	configBytes, err := ioutil.ReadFile(filepath.Clean(isilonConfigFile))
 	if err != nil {
 		return fmt.Errorf("file ('%s') error: %v", isilonConfigFile, err)
 	}
@@ -628,6 +640,9 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 
 	var inputConfigs *IsilonClusters
 	var yamlErr error
+	var err error
+
+	log.Info("reading secret file to validate cluster config details")
 	inputConfigs, yamlErr = unmarshalYAMLContent(configBytes)
 	if yamlErr != nil {
 		log.Errorf("failed to parse isilon clusters' config details as yaml data, error: %v", yamlErr)
@@ -643,19 +658,20 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 	}
 
 	newIsiClusters := make(map[interface{}]interface{})
-	for i, config := range inputConfigs.IsilonClusters {
+	for i, clusterConfig := range inputConfigs.IsilonClusters {
+		config := clusterConfig
 		log.Debugf("parsing config details for cluster %v", config.ClusterName)
 		if config.ClusterName == "" {
-			return nil, defaultIsiClusterName, fmt.Errorf("invalid value for clusterName at index [%d]", i)
+			return nil, defaultIsiClusterName, fmt.Errorf("clusterName not provided in secret at index [%d]", i)
 		}
 		if config.User == "" {
-			return nil, defaultIsiClusterName, fmt.Errorf("invalid value for username at index [%d]", i)
+			return nil, defaultIsiClusterName, fmt.Errorf("username not provided for cluster %s at index [%d]", config.ClusterName, i)
 		}
 		if config.Password == "" {
-			return nil, defaultIsiClusterName, fmt.Errorf("invalid value for password at index [%d]", i)
+			return nil, defaultIsiClusterName, fmt.Errorf("password not provided for cluster %s  at index [%d]", config.ClusterName, i)
 		}
 		if config.Endpoint == "" {
-			return nil, defaultIsiClusterName, fmt.Errorf("invalid value for endpoint at index [%d]", i)
+			return nil, defaultIsiClusterName, fmt.Errorf("endpoint not provided for cluster %s at index [%d]", config.ClusterName, i)
 		}
 
 		// Let Endpoint be generic.
@@ -665,6 +681,7 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 		}
 
 		if config.EndpointPort == "" {
+			log.Warnf("using default as EndpointPort not provided for cluster %s in secret at index [%d]", config.ClusterName, i)
 			config.EndpointPort = s.opts.Port
 		}
 
@@ -673,16 +690,23 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 		}
 
 		if config.IsiPath == "" {
+			log.Warnf("using default as IsiPath not provided for cluster %s in secret at index [%d]", config.ClusterName, i)
 			config.IsiPath = s.opts.Path
 		}
 
 		if config.IsiVolumePathPermissions == "" {
+			log.Warnf("using default as IsiVolumePathPermissions not provided for cluster %s in secret at index [%d]", config.ClusterName, i)
 			config.IsiVolumePathPermissions = s.opts.IsiVolumePathPermissions
 		}
 
 		config.EndpointURL = fmt.Sprintf("https://%s:%s", config.Endpoint, config.EndpointPort)
 		clientCtx, _ := GetLogger(ctx)
-		config.isiSvc, _ = s.GetIsiService(clientCtx, &config, logLevel)
+		if !noProbeOnStart {
+			config.isiSvc, err = s.GetIsiService(clientCtx, &config, logLevel)
+			if err != nil {
+				log.Errorf("failed to get isi client for  cluster %s, error: %v", config.ClusterName, err)
+			}
+		}
 
 		if config.IsDefault == nil {
 			defaultBoolValue := false
@@ -720,7 +744,7 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 			"IsDefault":                 *config.IsDefault,
 		}
 		// TODO: Replace logrus with log
-		logrus.WithFields(fields).Infof("new config details for cluster %s", config.ClusterName)
+		logrus.WithFields(fields).Infof("new config details set for cluster %s", config.ClusterName)
 	}
 
 	return newIsiClusters, defaultIsiClusterName, nil

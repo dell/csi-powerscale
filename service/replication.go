@@ -119,7 +119,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 				if export, _ := remoteIsiConfig.isiSvc.GetExportByIDWithZone(ctx, remoteExportID, accessZone); export != nil {
 					// Add dummy localhost entry for pvc security
 					if !remoteIsiConfig.isiSvc.IsHostAlreadyAdded(ctx, remoteExportID, accessZone, utils.DummyHostNodeID) {
-						err = remoteIsiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, remoteExportID, accessZone, utils.DummyHostNodeID, remoteIsiConfig.isiSvc.AddExportClientByIDWithZone)
+						err = remoteIsiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, remoteClusterName, remoteExportID, accessZone, utils.DummyHostNodeID, remoteIsiConfig.isiSvc.AddExportClientByIDWithZone)
 						if err != nil {
 							log.Debugf("Error while adding dummy localhost entry to export '%d'", remoteExportID)
 						}

@@ -19,11 +19,13 @@ package service
 import (
 	"errors"
 	"fmt"
-	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 
 	fPath "path"
 
@@ -88,6 +90,12 @@ const (
 	RpoTwelveHours    RPOEnum = "Twelve_Hours"
 	RpoOneDay         RPOEnum = "One_Day"
 )
+
+// clusterToNodeIDMap is a map[clusterName][]*nodeIDToClientMap
+var clusterToNodeIDMap = new(sync.Map)
+
+//type nodeIDElementsMap map[string]string
+type nodeIDToClientMap map[string]string
 
 // IsValid - checks valid RPO
 func (rpo RPOEnum) IsValid() error {
@@ -179,6 +187,8 @@ func (s *service) CreateVolume(
 
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
+	//set noProbeOnStart to false so subsequent calls can lead to probe
+	noProbeOnStart = false
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
@@ -563,7 +573,7 @@ func (s *service) CreateVolume(
 				if export, _ := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone); export != nil {
 					// Add dummy localhost entry for pvc security
 					if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
-						err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
+						err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
 						if err != nil {
 							log.Debugf("Error while adding dummy localhost entry to export '%d'", exportID)
 						}
@@ -585,7 +595,7 @@ func (s *service) CreateVolume(
 				if export, _ := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone); export != nil {
 					// Add dummy localhost entry for pvc security
 					if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
-						err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
+						err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
 						if err != nil {
 							log.Debugf("Error while adding dummy localhost entry to export '%d'", exportID)
 						}
@@ -746,6 +756,8 @@ func (s *service) DeleteVolume(
 	// TODO more checks need to be done, e.g. if access mode is VolumeCapability_AccessMode_MULTI_NODE_XXX, then other nodes might still be using this volume, thus the delete should be skipped
 	// Fetch log handler
 	ctx, log, _ := GetRunIDLog(ctx)
+	//set noProbeOnStart to false so subsequent calls can lead to probe
+	noProbeOnStart = false
 
 	// validate request
 	if err := s.ValidateDeleteVolumeRequest(ctx, req); err != nil {
@@ -1003,6 +1015,8 @@ func (s *service) ControllerPublishVolume(
 
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
+	//set noProbeOnStart to false so subsequent calls can lead to probe
+	noProbeOnStart = false
 
 	volumeContext := req.GetVolumeContext()
 	if volumeContext != nil {
@@ -1108,15 +1122,15 @@ func (s *service) ControllerPublishVolume(
 		}
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
 
-		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, nodeID, addClientFunc)
+		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, addClientFunc)
 		if err == nil && rootClientEnabled {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
-		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportReadOnlyClientByIDWithZone)
+		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportReadOnlyClientByIDWithZone)
 	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER:
@@ -1131,11 +1145,11 @@ func (s *service) ControllerPublishVolume(
 		}
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
-		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, nodeID, addClientFunc)
+		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, addClientFunc)
 		if err == nil && rootClientEnabled {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
 	default:
 		return nil, status.Errorf(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "unsupported access mode: '%s'", am.String()))
@@ -1143,7 +1157,7 @@ func (s *service) ControllerPublishVolume(
 
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID,
-			"internal error occured when attempting to add client ip '%s' to export '%d', error : '%v'", nodeID, exportID, err))
+			"internal error occurred when attempting to add client ip '%s' to export '%d', error : '%v'", nodeID, exportID, err))
 	}
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
@@ -1293,6 +1307,8 @@ func (s *service) ControllerUnpublishVolume(
 
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
+	//set noProbeOnStart to false so subsequent calls can lead to probe
+	noProbeOnStart = false
 
 	if req.VolumeId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "ControllerUnpublishVolumeRequest.VolumeId is empty"))

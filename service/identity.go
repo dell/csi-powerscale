@@ -88,6 +88,11 @@ func (s *service) Probe(
 	rep := new(csi.ProbeResponse)
 	rep.Ready = ready
 
+	if noProbeOnStart {
+		log.Debugf("noProbeOnStart is set to true, skip probe")
+		return rep, nil
+	}
+
 	if err := s.probeAllClusters(ctx); err != nil {
 		rep.Ready.Value = false
 		return rep, err
