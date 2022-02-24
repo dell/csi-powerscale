@@ -90,19 +90,18 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 		log.Info("Remote export error")
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
-	log.Info("RemExp success", remoteExport)
 
 	var remoteExportID int
 
 	// If export does not exist we need to create it
 	if remoteExport == nil {
 		// Check if quota already exists
-		log.Info("remexp nil")
+		log.Info("Remote export doesn't exist, create it")
 		var quotaID string
 		quota, err := remoteIsiConfig.isiSvc.client.GetQuotaWithPath(ctx, exportPath)
 		log.Info("Get quota", quota)
 		if quota == nil {
-			log.Info("quota nil")
+			log.Info("Remote quota doesn't exists, create it")
 			quotaID, err = remoteIsiConfig.isiSvc.CreateQuota(ctx, exportPath, volName, volumeSize, s.opts.QuotaEnabled)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "can't create volume quota %s", err.Error())
@@ -110,12 +109,9 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 		} else {
 			quotaID = quota.Id
 		}
-		log.Info("exportwithpathandzone")
 		if remoteExportID, err = remoteIsiConfig.isiSvc.ExportVolumeWithZone(ctx, isiPath, volName, accessZone, utils.GetQuotaIDWithCSITag(quotaID)); err == nil && remoteExportID != 0 {
 			// get the export and retry if not found to ensure the export has been created
-			log.Info("here")
 			for i := 0; i < MaxRetries; i++ {
-				log.Info("retry")
 				if export, _ := remoteIsiConfig.isiSvc.GetExportByIDWithZone(ctx, remoteExportID, accessZone); export != nil {
 					// Add dummy localhost entry for pvc security
 					if !remoteIsiConfig.isiSvc.IsHostAlreadyAdded(ctx, remoteExportID, accessZone, utils.DummyHostNodeID) {
@@ -269,19 +265,19 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 		if e.StatusCode == 404 {
 			return &csiext.DeleteStorageProtectionGroupResponse{}, nil
 		}
-		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group")
+		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group '%s'", isiPath)
 	} else if err != nil {
-		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group")
+		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group '%s'", isiPath)
 	}
 	childs, err := isiConfig.isiSvc.client.QueryVolumeChildren(ctx, strings.TrimPrefix(isiPath, isiConfig.IsiPath))
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Error: Unable to get VG's childs")
+		return nil, status.Errorf(codes.Internal, "Error: Unable to get VG's childs at '%s'", isiPath)
 	}
 	for key := range childs {
 		log.Info("Child Path: ", key)
 		_, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, key, "")
 		if err == nil {
-			return nil, status.Errorf(codes.Internal, "VG is not empty")
+			return nil, status.Errorf(codes.Internal, "VG '%s' is not empty", isiPath)
 		}
 	}
 	ppName := strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(isiPath, isiConfig.IsiPath), "/", ""), ".", "-")
@@ -301,7 +297,7 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 				log.Errorf("Failed to delete PP %s.", ppName)
 			}
 		} else {
-			log.Error("Unknown error while deleting PP")
+			log.Errorf("Unknown error while deleting PP %s", ppName)
 		}
 	}
 

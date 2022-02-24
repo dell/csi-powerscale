@@ -411,7 +411,7 @@ func (s *service) CreateVolume(
 				}
 				err = isiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.FINISHED)
 				if err != nil {
-					return nil, status.Errorf(codes.Internal, "policy job couldn't reach FINISHED %s", err.Error())
+					return nil, status.Errorf(codes.Internal, "policy job couldn't reach FINISHED state %s", err.Error())
 				}
 			} else {
 				return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())

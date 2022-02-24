@@ -54,6 +54,7 @@ parameters:
   # Optional: true
   # Default value: None
   replication.storage.dell.com/volumeGroupPrefix: "csi"
+
   # The name of the access zone a volume can be created in
   # Optional: true
   # Default value: default value specified in values.yaml
@@ -94,7 +95,7 @@ parameters:
   # If this parameter is not specified, then default cluster config in isilon-creds secret
   # will be considered if available.
   # Optional: true
-  ClusterName: cluster-1
+  # ClusterName: cluster-1
 
 # volumeBindingMode controls when volume binding and dynamic provisioning should occur.
 # Allowed values:
