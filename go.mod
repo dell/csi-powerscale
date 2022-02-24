@@ -10,7 +10,7 @@ require (
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0
 	github.com/dell/gocsi v1.5.0
 	github.com/dell/gofsutil v1.7.1-0.20220131144828-d54a8e0917c7
-	github.com/dell/goisilon v1.6.1-0.20220221094638-024f75dd0502
+	github.com/dell/goisilon v1.6.1-0.20220224124307-bcc52d05d6ca
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.2.0
@@ -31,7 +31,6 @@ replace (
 	github.com/dell/dell-csi-extensions/common v1.0.0 => github.com/dell/dell-csi-extensions/common v0.0.0-20211217121714-58de430139aa
 	github.com/dell/dell-csi-extensions/replication v1.0.0 => github.com/dell/dell-csi-extensions/replication v0.0.0-20211217121714-58de430139aa
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0 => github.com/dell/dell-csi-extensions/volumeGroupSnapshot v0.0.0-20211217121714-58de430139aa
-	github.com/dell/goisilon v1.6.1-0.20220221094638-024f75dd0502 => github.com/dell/goisilon v0.0.0-20220217135244-de3994c21085
 )
 
 require (
