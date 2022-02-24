@@ -36,7 +36,7 @@ Feature: Isilon CSI interface
       | induced                             | errormsg                                           |
       | "InstancesError"                    | "none"                                             |
       | "CreateQuotaError"                  | "EOF"                                              |
-      | "CreateExportError"                 | "none"                                              |
+      | "CreateExportError"                 | "EOF"                                              |
       | "GetExportInternalError"            | "EOF"                                              |
       | "none"                              | "none"                                             |
 

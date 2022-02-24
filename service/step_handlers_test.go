@@ -130,8 +130,12 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/{snapshot_id}/", handleDeleteSnapshot).Methods("DELETE")
 	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/{snapshot_id}/", handleGetSnapshotByID).Methods("GET")
 	isilonRouter.HandleFunc("/namespace/ifs/.snapshot/{snapshot_name}/data/csi-isilon/{volume_id}", handleGetSnapshotSize).Methods("GET").Queries("detail", "size", "max-depth", "-1")
-	//
-	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/{id}", handleGetVolumeWithoutMetadata).Methods("GET").Queries("query", "", "limit", "2", "max-depth", "-1", "detail", "type,container_path,size,mode,owner,group,name")
+	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/{id}/", handleGetVolumeWithoutMetadata).Methods("GET").Queries("metadata", "")
+	isilonRouter.HandleFunc("/platform/11/sync/policies/", handleGetPoliciesByName).Methods("GET")
+	isilonRouter.HandleFunc("/platform/11/sync/policies/{id}", handleGetPoliciesByName).Methods("GET")
+	isilonRouter.HandleFunc("/platform/11/sync/jobs/", handleGetJobs).Methods("GET")
+	isilonRouter.HandleFunc("/platform/11/sync/jobs/{id}", handleGetJobs).Methods("GET")
+	isilonRouter.HandleFunc("/platform/11/sync/jobs/", handleSyncJob).Methods("POST")
 
 	return isilonRouter
 }
@@ -605,4 +609,16 @@ func handleGetVolumeSize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write(readFromFile("mock/volume/get_volume_size.txt"))
+}
+
+func handleGetPoliciesByName(w http.ResponseWriter, r *http.Request) {
+	w.Write(readFromFile("mock/policy/get_policies.txt"))
+}
+
+func handleGetJobs(w http.ResponseWriter, r *http.Request) {
+	w.Write(readFromFile("mock/jobs/empty.json"))
+}
+
+func handleSyncJob(w http.ResponseWriter, r *http.Request) {
+	w.Write(readFromFile("mock/jobs/created.json"))
 }

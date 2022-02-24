@@ -18,10 +18,12 @@ package service
 
 import (
 	"fmt"
+
 	csiext "github.com/dell/dell-csi-extensions/replication"
 
-	"golang.org/x/net/context"
 	"strings"
+
+	"golang.org/x/net/context"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	wrappers "github.com/golang/protobuf/ptypes/wrappers"
@@ -117,60 +119,60 @@ func (s *service) GetReplicationCapabilities(ctx context.Context, req *csiext.Ge
 					},
 				},
 			},
-			// {
-			// 	Type: &csiext.ReplicationCapability_Rpc{
-			// 		Rpc: &csiext.ReplicationCapability_RPC{
-			// 			Type: csiext.ReplicationCapability_RPC_DELETE_PROTECTION_GROUP,
-			// 		},
-			// 	},
-			// },
-			// {
-			// 	Type: &csiext.ReplicationCapability_Rpc{
-			// 		Rpc: &csiext.ReplicationCapability_RPC{
-			// 			Type: csiext.ReplicationCapability_RPC_REPLICATION_ACTION_EXECUTION,
-			// 		},
-			// 	},
-			// },
-			// {
-			// 	Type: &csiext.ReplicationCapability_Rpc{
-			// 		Rpc: &csiext.ReplicationCapability_RPC{
-			// 			Type: csiext.ReplicationCapability_RPC_MONITOR_PROTECTION_GROUP,
-			// 		},
-			// 	},
-			// },
+			{
+				Type: &csiext.ReplicationCapability_Rpc{
+					Rpc: &csiext.ReplicationCapability_RPC{
+						Type: csiext.ReplicationCapability_RPC_DELETE_PROTECTION_GROUP,
+					},
+				},
+			},
+			{
+				Type: &csiext.ReplicationCapability_Rpc{
+					Rpc: &csiext.ReplicationCapability_RPC{
+						Type: csiext.ReplicationCapability_RPC_REPLICATION_ACTION_EXECUTION,
+					},
+				},
+			},
+			{
+				Type: &csiext.ReplicationCapability_Rpc{
+					Rpc: &csiext.ReplicationCapability_RPC{
+						Type: csiext.ReplicationCapability_RPC_MONITOR_PROTECTION_GROUP,
+					},
+				},
+			},
 		}
-		// rep.Actions = []*csiext.SupportedActions{
-		// 	{
-		// 		Actions: &csiext.SupportedActions_Type{
-		// 			Type: csiext.ActionTypes_FAILOVER_REMOTE,
-		// 		},
-		// 	},
-		// 	{
-		// 		Actions: &csiext.SupportedActions_Type{
-		// 			Type: csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL,
-		// 		},
-		// 	},
-		// 	{
-		// 		Actions: &csiext.SupportedActions_Type{
-		// 			Type: csiext.ActionTypes_REPROTECT_LOCAL,
-		// 		},
-		// 	},
-		// 	{
-		// 		Actions: &csiext.SupportedActions_Type{
-		// 			Type: csiext.ActionTypes_SUSPEND,
-		// 		},
-		// 	},
-		// 	{
-		// 		Actions: &csiext.SupportedActions_Type{
-		// 			Type: csiext.ActionTypes_RESUME,
-		// 		},
-		// 	},
-		// 	{
-		// 		Actions: &csiext.SupportedActions_Type{
-		// 			Type: csiext.ActionTypes_SYNC,
-		// 		},
-		// 	},
-		// }
+		rep.Actions = []*csiext.SupportedActions{
+			{
+				Actions: &csiext.SupportedActions_Type{
+					Type: csiext.ActionTypes_FAILOVER_REMOTE,
+				},
+			},
+			{
+				Actions: &csiext.SupportedActions_Type{
+					Type: csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL,
+				},
+			},
+			{
+				Actions: &csiext.SupportedActions_Type{
+					Type: csiext.ActionTypes_REPROTECT_LOCAL,
+				},
+			},
+			{
+				Actions: &csiext.SupportedActions_Type{
+					Type: csiext.ActionTypes_SUSPEND,
+				},
+			},
+			{
+				Actions: &csiext.SupportedActions_Type{
+					Type: csiext.ActionTypes_RESUME,
+				},
+			},
+			{
+				Actions: &csiext.SupportedActions_Type{
+					Type: csiext.ActionTypes_SYNC,
+				},
+			},
+		}
 	}
 	return rep, nil
 }

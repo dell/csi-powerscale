@@ -25,6 +25,8 @@ import (
 	"sync"
 	"time"
 
+	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
+
 	fPath "path"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -403,13 +405,44 @@ func (s *service) CreateVolume(
 		_, err = isiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 		if err != nil {
 			if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode == 404 {
-				err := isiConfig.isiSvc.client.CreatePolicy(ctx, ppName, rpoint, isiPath+"/"+vgName, isiPath+"/"+vgName, remoteSystemEndpoint)
+				err := isiConfig.isiSvc.client.CreatePolicy(ctx, ppName, rpoint, isiPath+"/"+vgName, isiPath+"/"+vgName, remoteSystemEndpoint, remoteIsiConfig.ReplicationCertificateID, true)
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "can't create protection policy %s", err.Error())
+				}
+				err = isiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.FINISHED)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "policy job couldn't reach FINISHED state %s", err.Error())
 				}
 			} else {
 				return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
 			}
+		}
+
+		_, err = remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+		if err != nil {
+			if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode == 404 {
+				err := remoteIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, rpoint, isiPath+"/"+vgName, isiPath+"/"+vgName, isiConfig.Endpoint, isiConfig.ReplicationCertificateID, true)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "can't create protection policy %s", err.Error())
+				}
+				err = remoteIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.FINISHED)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "policy job couldn't reach FINISHED state %s", err.Error())
+				}
+			}
+		}
+
+		err = isiConfig.isiSvc.client.AllowWrites(ctx, ppName)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "can't allow writes on local site %s", err.Error())
+		}
+		err = remoteIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "can't disable the policy on TGT %s", err.Error())
+		}
+		err = remoteIsiConfig.isiSvc.client.WaitForPolicyEnabledFieldCondition(ctx, ppName, false)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "policy couldn't reach disabled condition on TGT %s", err.Error())
 		}
 
 		isiPath = isiPath + "/" + VolumeGroupDir
@@ -795,37 +828,37 @@ func (s *service) DeleteVolume(
 		}
 	}
 
+	// Before deleting the Volume, we would like to check if there are any
+	// NFS exports which still exist on the Volume. These exports could
+	// have been created out-of-band outside of CSI Driver.
+	path := utils.GetPathForVolume(isiPath, volName)
+	params := isiApi.OrderedValues{
+		{[]byte("path"), []byte(path)},
+		{[]byte("zone"), []byte(accessZone)},
+	}
+	exports, err := isiConfig.isiSvc.GetExportsWithParams(ctx, params)
+	if err != nil {
+		jsonError, ok := err.(*isiApi.JSONError)
+		if ok {
+			if jsonError.StatusCode != 404 {
+				return nil, err
+			}
+		}
+		return nil, err
+	}
+
+	if exports != nil && exports.Total == 1 && exports.Exports[0].ID == exportID {
+		log.Infof("controller begins to unexport id '%d', target path '%s', access zone '%s'", exportID, volName, accessZone)
+		if err := isiConfig.isiSvc.UnexportByIDWithZone(ctx, exportID, accessZone); err != nil {
+			return nil, err
+		}
+	} else if exports != nil && exports.Total > 1 {
+		return nil, fmt.Errorf("exports found for volume %s in AccessZone %s. It is not safe to delete the volume", volName, accessZone)
+	}
+
 	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", volName) {
 		log.Debugf("volume '%s' not found, skip calling delete directory.", volName)
 	} else {
-		// Before deleting the Volume, we would like to check if there are any
-		// NFS exports which still exist on the Volume. These exports could
-		// have been created out-of-band outside of CSI Driver.
-		path := utils.GetPathForVolume(isiPath, volName)
-		params := isiApi.OrderedValues{
-			{[]byte("path"), []byte(path)},
-			{[]byte("zone"), []byte(accessZone)},
-		}
-		exports, err := isiConfig.isiSvc.GetExportsWithParams(ctx, params)
-		if err != nil {
-			jsonError, ok := err.(*isiApi.JSONError)
-			if ok {
-				if jsonError.StatusCode != 404 {
-					return nil, err
-				}
-			}
-			return nil, err
-		}
-
-		if exports != nil && exports.Total == 1 && exports.Exports[0].ID == exportID {
-			log.Infof("controller begins to unexport id '%d', target path '%s', access zone '%s'", exportID, volName, accessZone)
-			if err := isiConfig.isiSvc.UnexportByIDWithZone(ctx, exportID, accessZone); err != nil {
-				return nil, err
-			}
-		} else if exports != nil && exports.Total > 1 {
-			return nil, fmt.Errorf("exports found for volume %s in AccessZone %s. It is not safe to delete the volume", volName, accessZone)
-		}
-
 		if err := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, volName); err != nil {
 			return nil, err
 		}
@@ -1307,8 +1340,15 @@ func (s *service) ControllerUnpublishVolume(
 	}
 
 	if err := isiConfig.isiSvc.RemoveExportClientByIDWithZone(ctx, exportID, accessZone, nodeID); err != nil {
-		return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "error %s encountered when"+
-			" trying to remove client '%s' from export '%d' with access zone '%s' on cluster '%s'", err, nodeID, exportID, accessZone, clusterName))
+		if strings.Contains(err.Error(), "No such file or directory") {
+			_, delErr := s.DeleteVolume(ctx, &csi.DeleteVolumeRequest{VolumeId: req.VolumeId})
+			if delErr != nil {
+				return nil, delErr
+			}
+		} else {
+			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "error encountered when"+
+				" trying to remove client '%s' from export '%d' with access zone '%s' on cluster '%s', error %s", nodeID, exportID, accessZone, clusterName, err.Error()))
+		}
 	}
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
@@ -1955,4 +1995,8 @@ func removeString(exportList []string, strToRemove string) []string {
 		}
 	}
 	return exportList
+}
+
+func (s *service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext.CreateVolumeGroupSnapshotRequest) (*vgsext.CreateVolumeGroupSnapshotResponse, error) {
+	panic("implement me")
 }
