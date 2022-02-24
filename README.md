@@ -14,6 +14,23 @@ It supports CSI specification version 1.5.
 
 This project may be compiled as a stand-alone binary using Golang that, when run, provides a valid CSI endpoint. It also can be used as a precompiled container image.
 
+## Table of Contents
+
+* [Code of Conduct](https://github.com/dell/csm/blob/main/docs/CODE_OF_CONDUCT.md)
+* [Maintainer Guide](https://github.com/dell/csm/blob/main/docs/MAINTAINER_GUIDE.md)
+* [Committer Guide](https://github.com/dell/csm/blob/main/docs/COMMITTER_GUIDE.md)
+* [Contributing Guide](https://github.com/dell/csm/blob/main/docs/CONTRIBUTING.md)
+* [Branching Strategy](https://github.com/dell/csm/blob/main/docs/BRANCHING.md)
+* [List of Adopters](https://github.com/dell/csm/blob/main/docs/ADOPTERS.md)
+* [Maintainers](https://github.com/dell/csm/blob/main/docs/MAINTAINERS.md)
+* [Support](#support)
+* [Security](https://github.com/dell/csm/blob/main/docs/SECURITY.md)
+* [Building](#building)
+* [Runtime Dependecies](#runtime-dependencies)
+* [Driver Installation](#driver-installation)
+* [Using Driver](#using-driver)
+* [Documentation](#documentation)
+
 ## Support
 For any CSI driver issues, questions or feedback, please follow our [support process](https://github.com/dell/csm/blob/main/docs/SUPPORT.md)
 
@@ -35,7 +52,7 @@ Both the Controller and the Node portions of the driver can only be run on nodes
 ## Driver Installation
 Please consult the [Installation Guide](https://dell.github.io/csm-docs/docs/csidriver/installation)
 
-## Using driver
+## Using Driver
 Please refer to the section `Testing Drivers` in the [Documentation](https://dell.github.io/csm-docs/docs/csidriver/installation/test/) for more info.
 
 ## Documentation
