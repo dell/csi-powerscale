@@ -424,12 +424,12 @@ func (s *service) CreateVolume(
 		snapshotTrackingDirEntryForVolume = fPath.Join(snapshotTrackingDir, req.GetName())
 
 		// Check if entry for this volume is present in snapshot tracking dir
-		if isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", snapshotTrackingDirEntryForVolume) {
+		if isiConfig.isiSvc.IsVolumeExistent(ctx, snapshotSourceVolumeIsiPath, "", snapshotTrackingDirEntryForVolume) {
 			log.Debugf("the path '%s' has already existed", path)
 			foundVol = true
 		} else {
 			// Allow creation of only one active volume from a snapshot at any point in time
-			totalSubDirectories, _ := isiConfig.isiSvc.GetSubDirectoryCount(ctx, isiPath, snapshotTrackingDir)
+			totalSubDirectories, _ := isiConfig.isiSvc.GetSubDirectoryCount(ctx, snapshotSourceVolumeIsiPath, snapshotTrackingDir)
 			if totalSubDirectories > 2 {
 				return nil, fmt.Errorf("another RO volume from this snapshot is already present")
 			}
@@ -446,10 +446,10 @@ func (s *service) CreateVolume(
 
 	if !foundVol && isROVolumeFromSnapshot {
 		// Create an entry for this volume in snapshot tracking dir
-		if err = isiConfig.isiSvc.CreateVolume(ctx, isiPath, snapshotTrackingDir, volumePathPermissions); err != nil {
+		if err = isiConfig.isiSvc.CreateVolume(ctx, snapshotSourceVolumeIsiPath, snapshotTrackingDir, volumePathPermissions); err != nil {
 			return nil, err
 		}
-		if err = isiConfig.isiSvc.CreateVolume(ctx, isiPath, snapshotTrackingDirEntryForVolume, volumePathPermissions); err != nil {
+		if err = isiConfig.isiSvc.CreateVolume(ctx, snapshotSourceVolumeIsiPath, snapshotTrackingDirEntryForVolume, volumePathPermissions); err != nil {
 			return nil, err
 		}
 	}
@@ -1681,7 +1681,9 @@ func (s *service) DeleteSnapshot(
 	}
 
 	// Get snapshot path
-	snapshotIsiPath, err := isiConfig.isiSvc.GetSnapshotIsiPath(ctx, isiConfig.IsiPath, snapshotID)
+	snapshotSourceVolumeIsiPath, _ := isiConfig.isiSvc.GetSnapshotSourceVolumeIsiPath(ctx, snapshotID)
+	log.Infof("Snapshot source volume isiPath is '%s'", snapshotSourceVolumeIsiPath)
+	snapshotIsiPath, err := isiConfig.isiSvc.GetSnapshotIsiPath(ctx, snapshotSourceVolumeIsiPath, snapshotID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, err.Error()))
 	}
