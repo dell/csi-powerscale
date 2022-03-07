@@ -319,7 +319,7 @@ func (s *service) probe(ctx context.Context, clusterConfig *IsilonClusterConfig)
 		if err := s.nodeProbe(ctx, clusterConfig); err != nil {
 			return err
 		}
-	} else {
+	} else if strings.EqualFold(s.mode, "") {
 		log.Warn("Service mode not set, attempting both controller and node probe")
 		controllerErr := s.controllerProbe(ctx, clusterConfig)
 		nodeProbeErr := s.nodeProbe(ctx, clusterConfig)
@@ -328,6 +328,9 @@ func (s *service) probe(ctx context.Context, clusterConfig *IsilonClusterConfig)
 			return fmt.Errorf("probe failed")
 		}
 		return nil
+	} else {
+		return status.Error(codes.FailedPrecondition,
+			"Service mode not set")
 	}
 
 	return nil
