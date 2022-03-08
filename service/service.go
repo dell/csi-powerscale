@@ -330,7 +330,6 @@ func (s *service) probe(ctx context.Context, clusterConfig *IsilonClusterConfig)
 		if nodeProbeErr != nil {
 			return fmt.Errorf("probe failed")
 		}
-		return nil
 	} else {
 		return status.Error(codes.FailedPrecondition,
 			"Invalid mode")
