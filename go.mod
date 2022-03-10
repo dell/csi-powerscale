@@ -6,8 +6,8 @@ require (
 	github.com/container-storage-interface/spec v1.5.0
 	github.com/cucumber/godog v0.10.0
 	github.com/dell/dell-csi-extensions/common v1.0.0
-	github.com/dell/dell-csi-extensions/replication v1.0.0
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0
+	github.com/dell/dell-csi-extensions/replication v1.1.0
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.1.0
 	github.com/dell/gocsi v1.5.0
 	github.com/dell/gofsutil v1.7.1-0.20220131144828-d54a8e0917c7
 	github.com/dell/goisilon v1.6.1-0.20220224124307-bcc52d05d6ca
@@ -25,12 +25,6 @@ require (
 	k8s.io/apimachinery v0.22.2
 	k8s.io/client-go v0.22.2
 
-)
-
-replace (
-	github.com/dell/dell-csi-extensions/common v1.0.0 => github.com/dell/dell-csi-extensions/common v0.0.0-20211217121714-58de430139aa
-	github.com/dell/dell-csi-extensions/replication v1.0.0 => github.com/dell/dell-csi-extensions/replication v0.0.0-20211217121714-58de430139aa
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0 => github.com/dell/dell-csi-extensions/volumeGroupSnapshot v0.0.0-20211217121714-58de430139aa
 )
 
 require (
