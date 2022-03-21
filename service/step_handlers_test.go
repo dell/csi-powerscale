@@ -34,29 +34,59 @@ var (
 	debug bool
 
 	stepHandlersErrors struct {
-		FindVolumeIDError          bool
-		GetVolByIDError            bool
-		GetStoragePoolsError       bool
-		GetStatisticsError         bool
-		CreateSnapshotError        bool
-		RemoveVolumeError          bool
-		InstancesError             bool
-		VolInstanceError           bool
-		StatsError                 bool
-		StartingTokenInvalidError  bool
-		GetSnapshotError           bool
-		DeleteSnapshotError        bool
-		ExportNotFoundError        bool
-		VolumeNotExistError        bool
-		CreateQuotaError           bool
-		UpdateQuotaError           bool
-		CreateExportError          bool
-		GetExportInternalError     bool
-		GetExportByIDNotFoundError bool
-		UnexportError              bool
-		DeleteQuotaError           bool
-		QuotaNotFoundError         bool
-		DeleteVolumeError          bool
+		FindVolumeIDError            bool
+		GetVolByIDError              bool
+		GetStoragePoolsError         bool
+		GetStatisticsError           bool
+		CreateSnapshotError          bool
+		RemoveVolumeError            bool
+		InstancesError               bool
+		VolInstanceError             bool
+		StatsError                   bool
+		StartingTokenInvalidError    bool
+		GetSnapshotError             bool
+		DeleteSnapshotError          bool
+		ExportNotFoundError          bool
+		VolumeNotExistError          bool
+		CreateQuotaError             bool
+		UpdateQuotaError             bool
+		CreateExportError            bool
+		GetExportInternalError       bool
+		GetExportByIDNotFoundError   bool
+		UnexportError                bool
+		DeleteQuotaError             bool
+		QuotaNotFoundError           bool
+		DeleteVolumeError            bool
+		GetJobsInternalError         bool
+		GetPolicyInternalError       bool
+		GetTargetPolicyInternalError bool
+		GetTargetPolicyNotFound      bool
+		count                        int
+		counter                      int
+		reprotectCount               int
+		reprotectTPCount             int
+		failoverTPCount              int
+		failoverCount                int
+		jobCount                     int
+		getSpgCount                  int
+		getSpgTPCount                int
+		getExportCount               int
+		GetPolicyNotFoundError       bool
+		DeletePolicyError            bool
+		DeletePolicyInternalError    bool
+		DeletePolicyNotApiError      bool
+		FailedStatus                 bool
+		UnknownStatus                bool
+		UpdatePolicyError            bool
+		Reprotect                    bool
+		ReprotectTP                  bool
+		Failover                     bool
+		FailoverTP                   bool
+		GetPolicyError               bool
+		Jobs                         bool
+		GetSpgErrors                 bool
+		GetSpgTPErrors               bool
+		GetExportPolicyError         bool
 	}
 )
 
@@ -99,8 +129,6 @@ func getRouter() http.Handler {
 	// thus if the sequence is reversed, the query with "metadata" will be wrongly resolved.
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/{volume_id}", handleGetVolumeSize).Methods("GET").Queries("detail", "size", "max-depth", "-1")
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/volume1", handleGetExistentVolumeMetadata).Methods("GET").Queries("metadata", "")
-	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/volume1", handleGetVolumeWithoutMetadata).Methods("GET")
-
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/volume2", handleGetExistentVolume).Methods("GET")
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/volume1", handleCopySnapshot).Methods("PUT").
 		Headers("X-Isi-Ifs-Copy-Source", "/namespace/ifs/.snapshot/existent_snapshot_name/data/csi-isilon/nfs_1").Queries("merge", "True")
@@ -119,7 +147,6 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/{id}", handleGetVolume).Methods("GET").Queries("metadata", "")
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/{id}", handleGetVolumeWithoutMetadata).Methods("GET")
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/{id}", handleVolumeCreation).Methods("PUT")
-
 	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/", handleCreateSnapshot).Methods("POST")
 	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/create_snapshot_name/", handleGetNonexistentSnapshot).Methods("GET")
 	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/1/", handleGetNonexistentSnapshot).Methods("GET")
@@ -130,12 +157,18 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/{snapshot_id}/", handleDeleteSnapshot).Methods("DELETE")
 	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/{snapshot_id}/", handleGetSnapshotByID).Methods("GET")
 	isilonRouter.HandleFunc("/namespace/ifs/.snapshot/{snapshot_name}/data/csi-isilon/{volume_id}", handleGetSnapshotSize).Methods("GET").Queries("detail", "size", "max-depth", "-1")
-	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/{id}/", handleGetVolumeWithoutMetadata).Methods("GET").Queries("metadata", "")
 	isilonRouter.HandleFunc("/platform/11/sync/policies/", handleGetPoliciesByName).Methods("GET")
 	isilonRouter.HandleFunc("/platform/11/sync/policies/{id}", handleGetPoliciesByName).Methods("GET")
+	isilonRouter.HandleFunc("/platform/11/sync/policies/{name}", handleGetPoliciesByName).Methods("GET")
 	isilonRouter.HandleFunc("/platform/11/sync/jobs/", handleGetJobs).Methods("GET")
 	isilonRouter.HandleFunc("/platform/11/sync/jobs/{id}", handleGetJobs).Methods("GET")
 	isilonRouter.HandleFunc("/platform/11/sync/jobs/", handleSyncJob).Methods("POST")
+	isilonRouter.HandleFunc("/platform/11/sync/target/policies/", handleGetTargetPoliciesByName).Methods("GET")
+	isilonRouter.HandleFunc("/platform/11/sync/target/policies/{id}", handleGetTargetPoliciesByName).Methods("GET")
+	isilonRouter.HandleFunc("/platform/11/sync/policies/{id}", handleUpdatePolicy).Methods("PUT")
+	isilonRouter.HandleFunc("/platform/11/sync/target/policies/{id}", handleBreakAssociation).Methods("DELETE")
+	isilonRouter.HandleFunc("/platform/11/sync/policies/{id}", handleDeletePolicy).Methods("DELETE")
+	isilonRouter.HandleFunc("/platform/11/sync/target/policies/{id}", handleAllowWrites).Methods("PUT")
 
 	return isilonRouter
 }
@@ -210,6 +243,7 @@ func handleGetVolumeWithoutMetadata(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
 	}
+
 	if stepHandlersErrors.VolumeNotExistError {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(readFromFile("mock/volume/get_non_existent_volume.txt"))
@@ -421,6 +455,21 @@ func handleGetExportWithPathAndZone(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
 	}
+	if stepHandlersErrors.GetExportPolicyError {
+		defer func() {
+			stepHandlersErrors.getExportCount += 1
+		}()
+		switch stepHandlersErrors.getExportCount {
+		case 0:
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+			//w.Write(readFromFile("mock/export/get_export_557.txt"))
+		case 1:
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+
+		}
+	}
 	if stepHandlersErrors.GetExportInternalError {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -612,13 +661,190 @@ func handleGetVolumeSize(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGetPoliciesByName(w http.ResponseWriter, r *http.Request) {
-	w.Write(readFromFile("mock/policy/get_policies.txt"))
+	if stepHandlersErrors.Reprotect {
+		defer func() {
+			stepHandlersErrors.reprotectCount += 1
+		}()
+		switch stepHandlersErrors.reprotectCount {
+		case 0:
+			w.Write(readFromFile("mock/policy/get_policies.txt"))
+		case 1:
+			w.Write(readFromFile("mock/policy/get_policies.txt"))
+		case 2:
+			w.Write(readFromFile("mock/policy/get_policies.txt"))
+		}
+	}
+
+	if stepHandlersErrors.GetSpgErrors {
+		defer func() {
+			stepHandlersErrors.getSpgCount += 1
+		}()
+		if stepHandlersErrors.getSpgCount%2 == 0 {
+			w.Write(readFromFile("mock/policy/get_policies.txt"))
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+	}
+
+	if stepHandlersErrors.Failover {
+		defer func() {
+			stepHandlersErrors.failoverCount += 1
+		}()
+		switch stepHandlersErrors.failoverCount {
+		case 0:
+			w.Write(readFromFile("mock/policy/get_policies.txt"))
+		case 1:
+			w.Write(readFromFile("mock/policy/get_policies.txt"))
+		case 2:
+			writeError(w, "", http.StatusNotFound, codes.NotFound)
+		}
+	}
+	if stepHandlersErrors.UpdatePolicyError {
+		w.Write(readFromFile("mock/policy/get_policies.txt"))
+	}
+
+	if stepHandlersErrors.GetPolicyError {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if stepHandlersErrors.GetPolicyInternalError {
+		writeError(w, "", http.StatusInternalServerError, codes.Internal)
+		return
+	}
+
+	if stepHandlersErrors.GetPolicyNotFoundError {
+		writeError(w, "", http.StatusNotFound, codes.NotFound)
+	}
+
+	defer func() {
+		stepHandlersErrors.counter += 1
+	}()
+
+	if stepHandlersErrors.counter%2 == 0 {
+		w.Write(readFromFile("mock/policy/get_policies2.txt"))
+	} else {
+		w.Write(readFromFile("mock/policy/get_policies.txt"))
+	}
 }
 
 func handleGetJobs(w http.ResponseWriter, r *http.Request) {
+	if stepHandlersErrors.GetJobsInternalError {
+		writeError(w, "", http.StatusInternalServerError, codes.Internal)
+		return
+	}
+	if stepHandlersErrors.Jobs {
+		defer func() {
+			stepHandlersErrors.failoverCount += 1
+		}()
+		switch stepHandlersErrors.failoverCount {
+		case 0:
+			w.Write(readFromFile("mock/jobs/empty.json"))
+		case 1:
+			writeError(w, "", http.StatusInternalServerError, codes.Internal)
+		}
+	}
 	w.Write(readFromFile("mock/jobs/empty.json"))
 }
 
 func handleSyncJob(w http.ResponseWriter, r *http.Request) {
+	if stepHandlersErrors.GetJobsInternalError {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
 	w.Write(readFromFile("mock/jobs/created.json"))
+}
+
+func handleGetTargetPoliciesByName(w http.ResponseWriter, r *http.Request) {
+	if stepHandlersErrors.GetTargetPolicyInternalError {
+		writeError(w, "", http.StatusInternalServerError, codes.Internal)
+		return
+	}
+
+	if stepHandlersErrors.GetSpgTPErrors {
+		defer func() {
+			stepHandlersErrors.getSpgTPCount += 1
+		}()
+		if stepHandlersErrors.getSpgTPCount%2 == 0 {
+			w.Write(readFromFile("mock/policy/get_target_policies.txt"))
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+	}
+
+	if stepHandlersErrors.FailoverTP {
+		defer func() {
+			stepHandlersErrors.failoverTPCount += 1
+		}()
+		switch stepHandlersErrors.failoverTPCount {
+		case 0:
+			w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
+		case 1:
+			writeError(w, "", http.StatusInternalServerError, codes.Internal)
+			return
+		case 2:
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+	}
+	if stepHandlersErrors.FailedStatus {
+		w.Write(readFromFile("mock/policy/tp_failed.txt"))
+	}
+
+	if stepHandlersErrors.UnknownStatus {
+		w.Write(readFromFile("mock/policy/empty.txt"))
+	}
+
+	defer func() {
+		stepHandlersErrors.count += 1
+	}()
+	if stepHandlersErrors.count%2 == 0 {
+		w.Write(readFromFile("mock/policy/get_target_policies.txt"))
+	} else {
+		w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
+	}
+}
+
+func handleUpdatePolicy(w http.ResponseWriter, r *http.Request) {
+	if stepHandlersErrors.UpdatePolicyError {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Write(readFromFile("mock/policy/get_policies2.txt"))
+}
+
+func handleBreakAssociation(w http.ResponseWriter, r *http.Request) {
+	if stepHandlersErrors.DeletePolicyError {
+		writeError(w, "", http.StatusNotFound, codes.Internal)
+		//return
+	}
+	w.WriteHeader(http.StatusNoContent)
+	// response body is empty
+	w.Write([]byte(""))
+}
+
+func handleAllowWrites(w http.ResponseWriter, r *http.Request) {
+	w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
+}
+
+func handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
+	if stepHandlersErrors.DeletePolicyError {
+		writeError(w, "", http.StatusNotFound, codes.Internal)
+		return
+	}
+
+	if stepHandlersErrors.DeletePolicyInternalError {
+		writeError(w, "", http.StatusInternalServerError, codes.Internal)
+		return
+	}
+	if stepHandlersErrors.DeletePolicyNotApiError {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+	// response body is empty
+	w.Write([]byte(""))
 }
