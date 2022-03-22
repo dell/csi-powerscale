@@ -74,7 +74,7 @@ var (
 		GetPolicyNotFoundError       bool
 		DeletePolicyError            bool
 		DeletePolicyInternalError    bool
-		DeletePolicyNotApiError      bool
+		DeletePolicyNotAPIError      bool
 		FailedStatus                 bool
 		UnknownStatus                bool
 		UpdatePolicyError            bool
@@ -457,7 +457,7 @@ func handleGetExportWithPathAndZone(w http.ResponseWriter, r *http.Request) {
 	}
 	if stepHandlersErrors.GetExportPolicyError {
 		defer func() {
-			stepHandlersErrors.getExportCount += 1
+			stepHandlersErrors.getExportCount++
 		}()
 		switch stepHandlersErrors.getExportCount {
 		case 0:
@@ -663,7 +663,7 @@ func handleGetVolumeSize(w http.ResponseWriter, r *http.Request) {
 func handleGetPoliciesByName(w http.ResponseWriter, r *http.Request) {
 	if stepHandlersErrors.Reprotect {
 		defer func() {
-			stepHandlersErrors.reprotectCount += 1
+			stepHandlersErrors.reprotectCount++
 		}()
 		switch stepHandlersErrors.reprotectCount {
 		case 0:
@@ -677,7 +677,7 @@ func handleGetPoliciesByName(w http.ResponseWriter, r *http.Request) {
 
 	if stepHandlersErrors.GetSpgErrors {
 		defer func() {
-			stepHandlersErrors.getSpgCount += 1
+			stepHandlersErrors.getSpgCount++
 		}()
 		if stepHandlersErrors.getSpgCount%2 == 0 {
 			w.Write(readFromFile("mock/policy/get_policies.txt"))
@@ -690,7 +690,7 @@ func handleGetPoliciesByName(w http.ResponseWriter, r *http.Request) {
 
 	if stepHandlersErrors.Failover {
 		defer func() {
-			stepHandlersErrors.failoverCount += 1
+			stepHandlersErrors.failoverCount++
 		}()
 		switch stepHandlersErrors.failoverCount {
 		case 0:
@@ -719,7 +719,7 @@ func handleGetPoliciesByName(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer func() {
-		stepHandlersErrors.counter += 1
+		stepHandlersErrors.counter++
 	}()
 
 	if stepHandlersErrors.counter%2 == 0 {
@@ -736,7 +736,7 @@ func handleGetJobs(w http.ResponseWriter, r *http.Request) {
 	}
 	if stepHandlersErrors.Jobs {
 		defer func() {
-			stepHandlersErrors.failoverCount += 1
+			stepHandlersErrors.failoverCount++
 		}()
 		switch stepHandlersErrors.failoverCount {
 		case 0:
@@ -764,7 +764,7 @@ func handleGetTargetPoliciesByName(w http.ResponseWriter, r *http.Request) {
 
 	if stepHandlersErrors.GetSpgTPErrors {
 		defer func() {
-			stepHandlersErrors.getSpgTPCount += 1
+			stepHandlersErrors.getSpgTPCount++
 		}()
 		if stepHandlersErrors.getSpgTPCount%2 == 0 {
 			w.Write(readFromFile("mock/policy/get_target_policies.txt"))
@@ -777,7 +777,7 @@ func handleGetTargetPoliciesByName(w http.ResponseWriter, r *http.Request) {
 
 	if stepHandlersErrors.FailoverTP {
 		defer func() {
-			stepHandlersErrors.failoverTPCount += 1
+			stepHandlersErrors.failoverTPCount++
 		}()
 		switch stepHandlersErrors.failoverTPCount {
 		case 0:
@@ -799,7 +799,7 @@ func handleGetTargetPoliciesByName(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer func() {
-		stepHandlersErrors.count += 1
+		stepHandlersErrors.count++
 	}()
 	if stepHandlersErrors.count%2 == 0 {
 		w.Write(readFromFile("mock/policy/get_target_policies.txt"))
@@ -840,7 +840,7 @@ func handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, "", http.StatusInternalServerError, codes.Internal)
 		return
 	}
-	if stepHandlersErrors.DeletePolicyNotApiError {
+	if stepHandlersErrors.DeletePolicyNotAPIError {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

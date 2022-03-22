@@ -796,8 +796,8 @@ func (f *feature) iInduceError(errtype string) error {
 		stepHandlersErrors.DeletePolicyError = true
 	case "DeletePolicyInternalError":
 		stepHandlersErrors.DeletePolicyInternalError = true
-	case "DeletePolicyNotApiError":
-		stepHandlersErrors.DeletePolicyNotApiError = true
+	case "DeletePolicyNotAPIError":
+		stepHandlersErrors.DeletePolicyNotAPIError = true
 	case "FailedStatus":
 		stepHandlersErrors.FailedStatus = true
 	case "UnknownStatus":
@@ -1030,7 +1030,7 @@ func clearErrors() {
 	stepHandlersErrors.getExportCount = 0
 	stepHandlersErrors.DeletePolicyError = false
 	stepHandlersErrors.DeletePolicyInternalError = false
-	stepHandlersErrors.DeletePolicyNotApiError = false
+	stepHandlersErrors.DeletePolicyNotAPIError = false
 	stepHandlersErrors.FailedStatus = false
 	stepHandlersErrors.UnknownStatus = false
 	stepHandlersErrors.UpdatePolicyError = false
