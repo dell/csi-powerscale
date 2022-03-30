@@ -34,6 +34,16 @@ rules:
     resourceNames: [ "privileged" ]
     resources: [ "securitycontextconstraints" ]
     verbs: [ "use" ]
+  {{- if hasKey .Values "podmon" }}
+  {{- if eq .Values.podmon.enabled true }}
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "update", "delete"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "watch", "list", "delete", "update", "create"]
+  {{ end }}
+  {{ end }}
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -80,6 +90,53 @@ spec:
       hostNetwork: true
       dnsPolicy: {{ .Values.node.dnsPolicy }}
       containers:
+      {{- if hasKey .Values "podmon" }}
+      {{- if eq .Values.podmon.enabled true }}
+        - name: podmon
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+          image: {{ required "Must provide the podmon container image." .Values.podmon.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          args:
+            {{- toYaml .Values.podmon.node.args | nindent 12 }}
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: X_CSI_PRIVATE_MOUNT_DIR
+              value: "{{ .Values.kubeletConfigDir }}/plugins/csi-isilon/disks"
+            - name: MY_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: kubelet-pods
+              mountPath: {{ .Values.kubeletConfigDir }}/pods
+              mountPropagation: "Bidirectional"
+            - name: driver-path
+              mountPath: {{ .Values.kubeletConfigDir }}/plugins/csi-isilon
+              mountPropagation: "Bidirectional"
+            - name: usr-bin
+              mountPath: /usr-bin
+            - name: var-run
+              mountPath: /var/run
+            - name: csi-isilon-config-params
+              mountPath: /csi-isilon-config-params
+      {{- end }}
+      {{- end }}
         - name: driver
           command: ["/csi-isilon"]
           args:
@@ -247,5 +304,21 @@ spec:
         - name: proxy-server-root-certificate
           secret:
             secretName: proxy-server-root-certificate
+        {{ end }}
+        {{ end }}
+        {{- if hasKey .Values "podmon" }}
+        {{- if eq .Values.podmon.enabled true }}
+        - name: usr-bin
+          hostPath:
+            path: /usr/bin
+            type: Directory
+        - name: kubelet-pods
+          hostPath:
+            path: /var/lib/kubelet/pods
+            type: Directory
+        - name: var-run
+          hostPath:
+            path: /var/run
+            type: Directory
         {{ end }}
         {{ end }}
