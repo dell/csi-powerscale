@@ -18,9 +18,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"github.com/dell/csi-isilon/common/constants"
-	"github.com/dell/csi-isilon/common/k8sutils"
-	csiext "github.com/dell/dell-csi-extensions/replication"
 	"log"
 	"net"
 	"net/http/httptest"
@@ -29,14 +26,19 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/dell/csi-isilon/common/constants"
+	"github.com/dell/csi-isilon/common/k8sutils"
+	csiext "github.com/dell/dell-csi-extensions/replication"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"os/exec"
+
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
 	"github.com/dell/gocsi"
 	"github.com/dell/gofsutil"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"os/exec"
 )
 
 type feature struct {
@@ -93,6 +95,8 @@ type feature struct {
 	deleteSnapshotRequest                *csi.DeleteSnapshotRequest
 	deleteSnapshotResponse               *csi.DeleteSnapshotResponse
 	createSnapshotRequest                *csi.CreateSnapshotRequest
+	getReplicationCapabilityRequest      *csiext.GetReplicationCapabilityRequest
+	getReplicationCapabilityResponse     *csiext.GetReplicationCapabilityResponse
 	volumeIDList                         []string
 	snapshotIDList                       []string
 	groupIDList                          []string
@@ -355,6 +359,8 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a valid DeleteStorageProtectionGroupResponse is returned$`, f.aValidDeleteStorageProtectionGroupResponseIsReturned)
 	s.Step(`^I call WithParamsCreateRemoteVolume "([^"]*)" "([^"]*)"$`, f.iCallCreateRemoteVolumeWithParams)
 	s.Step(`^I call WithParamsCreateStorageProtectionGroup "([^"]*)" "([^"]*)"$`, f.iCallCreateStorageProtectionGroupWithParams)
+	s.Step(`^I call GetReplicationCapabilities`, f.iCallGetReplicationCapabilities)
+	s.Step(`^a valid GetReplicationCapabilitiesResponse is returned$`, f.aValidGetReplicationCapabilitiesResponseIsReturned)
 }
 
 // GetPluginInfo
@@ -2482,4 +2488,69 @@ func (f *feature) iCallNodeGetInfoWithNoFQDN() error {
 		return f.err
 	}
 	return nil
+}
+
+func (f *feature) iCallGetReplicationCapabilities() error {
+	req := new(csiext.GetReplicationCapabilityRequest)
+	f.getReplicationCapabilityResponse, f.err = f.service.GetReplicationCapabilities(context.Background(), req)
+	if f.err != nil {
+		log.Printf("GetReplicationCapabilities call failed: %s\n", f.err.Error())
+		return f.err
+	}
+	return nil
+}
+
+func (f *feature) aValidGetReplicationCapabilitiesResponseIsReturned() error {
+	rep := f.getReplicationCapabilityResponse
+	if rep != nil {
+		if rep.Capabilities == nil {
+			return errors.New("no capabilities returned in GetReplicationCapabilitiesResponse")
+		}
+		count := 0
+		for _, cap := range rep.Capabilities {
+			rpcType := cap.GetRpc().Type
+			switch rpcType {
+			case csiext.ReplicationCapability_RPC_CREATE_REMOTE_VOLUME:
+				count = count + 1
+			case csiext.ReplicationCapability_RPC_CREATE_PROTECTION_GROUP:
+				count = count + 1
+			case csiext.ReplicationCapability_RPC_DELETE_PROTECTION_GROUP:
+				count = count + 1
+			case csiext.ReplicationCapability_RPC_REPLICATION_ACTION_EXECUTION:
+				count = count + 1
+			case csiext.ReplicationCapability_RPC_MONITOR_PROTECTION_GROUP:
+				count = count + 1
+			default:
+				return fmt.Errorf("received unexpected capability: %v", rpcType)
+			}
+		}
+
+		if rep.Actions == nil {
+			return errors.New("no actions returned in GetReplicationCapabilitiesResponse")
+		}
+		for _, action := range rep.Actions {
+			actType := action.GetType()
+			switch actType {
+			case csiext.ActionTypes_FAILOVER_REMOTE:
+				count = count + 1
+			case csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL:
+				count = count + 1
+			case csiext.ActionTypes_REPROTECT_LOCAL:
+				count = count + 1
+			case csiext.ActionTypes_SUSPEND:
+				count = count + 1
+			case csiext.ActionTypes_RESUME:
+				count = count + 1
+			case csiext.ActionTypes_SYNC:
+				count = count + 1
+			default:
+				return fmt.Errorf("received unexpected actiontype: %v", actType)
+
+			}
+		}
+
+	}
+
+	return nil
+
 }
