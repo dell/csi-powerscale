@@ -320,6 +320,7 @@ podmon:
   #  args:
   #    - "--csisock=unix:/var/run/csi/csi.sock"
   #    - "--labelvalue=csi-isilon"
+  #    - "--driverPath=csi-isilon.dellemc.com"
   #    - "--mode=controller"
   #    - "--skipArrayConnectionValidation=false"
   #    - "--driver-config-params=/csi-isilon-config-params/driver-config-params.yaml"
@@ -327,6 +328,7 @@ podmon:
   #  args:
   #    - "--csisock=unix:/var/lib/kubelet/plugins/csi-isilon/csi_sock"
   #    - "--labelvalue=csi-isilon"
+  #    - "--driverPath=csi-isilon.dellemc.com"
   #    - "--mode=node"
   #    - "--leaderelection=false"
   #    - "--driver-config-params=/csi-isilon-config-params/driver-config-params.yaml"
