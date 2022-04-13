@@ -371,3 +371,7 @@ Feature: Isilon CSI interface
     And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1" and path ""
     Then the error contains "no Volume Path found in request"
 
+  Scenario: Identity GetReplicationCapabilities call
+    Given a Isilon service
+    When I call GetReplicationCapabilities
+    Then a valid GetReplicationCapabilitiesResponse is returned
