@@ -42,6 +42,7 @@ import (
 	"github.com/dell/csi-isilon/common/utils"
 	"github.com/dell/csi-isilon/core"
 	commonext "github.com/dell/dell-csi-extensions/common"
+	podmon "github.com/dell/dell-csi-extensions/podmon"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	"github.com/dell/gocsi"
@@ -534,9 +535,13 @@ func (s *service) BeforeServe(
 	return s.probeOnStart(ctx)
 }
 
+// RegisterAdditionalServers registers any additional grpc services that use the CSI socket.
 func (s *service) RegisterAdditionalServers(server *grpc.Server) {
+	_, log := GetLogger(context.Background())
+	log.Info("Registering additional GRPC servers")
 	csiext.RegisterReplicationServer(server, s)
 	vgsext.RegisterVolumeGroupSnapshotServer(server, s)
+	podmon.RegisterPodmonServer(server, s)
 }
 
 func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) error {
@@ -629,7 +634,7 @@ func (s *service) syncIsilonConfigs(ctx context.Context) error {
 
 		s.defaultIsiClusterName = defaultClusterName
 		if s.defaultIsiClusterName == "" {
-			log.Warnf("no default cluster name/config available")
+			log.Errorf("no default cluster name/config available")
 		}
 	} else {
 		return errors.New("isilon cluster details are not provided in isilon-creds secret")
