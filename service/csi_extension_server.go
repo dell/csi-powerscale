@@ -47,7 +47,15 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 	ctx, log = setClusterContext(ctx, clusterName)
 	log.Debugf("Cluster Name: %v", clusterName)
 
-	rep.Connected = true
+	// Go through each of the systemIDs
+	for systemID := range systemIDs {
+		// First - check if the array is visible from the node
+		var checkError error
+		checkError = s.checkIfNodeIsConnected(ctx, systemID, req.GetNodeId(), rep)
+		if checkError != nil {
+			return rep, checkError
+		}
+	}
 
 	clients, err := isiConfig.isiSvc.IsIOinProgress(ctx)
 
@@ -85,4 +93,39 @@ func (s *service) getArrayIdsFromVolumes(ctx context.Context, systemIDs map[stri
 		}
 	}
 	return foundAtLeastOne
+}
+
+// checkIfNodeIsConnected looks at the 'nodeId' to determine if there is connectivity to the 'arrayId' array.
+//The 'rep' object will be filled with the results of the check.
+func (s *service) checkIfNodeIsConnected(ctx context.Context, arrayID string, nodeID string, rep *podmon.ValidateVolumeHostConnectivityResponse) error {
+	ctx, log, _ := GetRunIDLog(ctx)
+	log.Infof("Checking if array %s is connected to node %s", arrayID, nodeID)
+	var message string
+	rep.Connected = false
+
+	_, _, nodeIP, err := utils.ParseNodeID(ctx, nodeID)
+	if err != nil {
+		log.Errorf("failed to parse node ID '%s'", nodeID)
+		return fmt.Errorf("failed to parse node ID")
+	}
+
+	//form url to call array on node
+	url := "http://" + nodeIP + apiPort + arrayStatus + "/" + arrayID
+	connected, err := s.queryArrayStatus(ctx, url)
+	if err != nil {
+		message = fmt.Sprintf("connectivity unknown for array %s to node %s due to %s", arrayID, nodeID, err)
+		log.Error(message)
+		rep.Messages = append(rep.Messages, message)
+		log.Errorf(err.Error())
+	}
+
+	if connected {
+		rep.Connected = true
+		message = fmt.Sprintf("array %s is connected to node %s", arrayID, nodeID)
+	} else {
+		message = fmt.Sprintf("array %s is not connected to node %s", arrayID, nodeID)
+	}
+	log.Info(message)
+	rep.Messages = append(rep.Messages, message)
+	return nil
 }
