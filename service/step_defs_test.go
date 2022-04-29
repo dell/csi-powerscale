@@ -35,6 +35,7 @@ import (
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
+	podmon "github.com/dell/dell-csi-extensions/podmon"
 	"github.com/dell/gocsi"
 	"github.com/dell/gofsutil"
 	"golang.org/x/net/context"
@@ -97,6 +98,7 @@ type feature struct {
 	createSnapshotRequest                *csi.CreateSnapshotRequest
 	getReplicationCapabilityRequest      *csiext.GetReplicationCapabilityRequest
 	getReplicationCapabilityResponse     *csiext.GetReplicationCapabilityResponse
+	validateVolumeHostConnectivityResp   *podmon.ValidateVolumeHostConnectivityResponse
 	volumeIDList                         []string
 	snapshotIDList                       []string
 	groupIDList                          []string
@@ -361,6 +363,8 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call WithParamsCreateStorageProtectionGroup "([^"]*)" "([^"]*)"$`, f.iCallCreateStorageProtectionGroupWithParams)
 	s.Step(`^I call GetReplicationCapabilities`, f.iCallGetReplicationCapabilities)
 	s.Step(`^a valid GetReplicationCapabilitiesResponse is returned$`, f.aValidGetReplicationCapabilitiesResponseIsReturned)
+	s.Step(`^I call ValidateConnectivity$`, f.iCallValidateVolumeHostConnectivity)
+	s.Step(`^the ValidateConnectivity response message contains "([^"]*)"$`, f.theValidateConnectivityResponseMessageContains)
 }
 
 // GetPluginInfo
@@ -769,6 +773,12 @@ func (f *feature) iInduceError(errtype string) error {
 		stepHandlersErrors.QuotaNotFoundError = true
 	case "DeleteVolumeError":
 		stepHandlersErrors.DeleteVolumeError = true
+	case "no-nodeId":
+		stepHandlersErrors.PodmonVolumeStatisticsError = true
+		stepHandlersErrors.PodmonNoNodeIDError = true
+	case "no-volume-no-nodeId":
+		stepHandlersErrors.PodmonVolumeStatisticsError = true
+		stepHandlersErrors.PodmonNoVolumeNoNodeIDError = true
 	case "none":
 
 	default:
@@ -2552,5 +2562,83 @@ func (f *feature) aValidGetReplicationCapabilitiesResponseIsReturned() error {
 	}
 
 	return nil
+}
 
+func (f *feature) iCallValidateVolumeHostConnectivity() error {
+
+	header := metadata.New(map[string]string{"csi.requestid": "1"})
+	ctx := metadata.NewIncomingContext(context.Background(), header)
+
+	csiNodeID := f.service.nodeID
+	log.Printf("Node id is: %v", csiNodeID)
+
+	volIDs := make([]string, 0)
+
+	if stepHandlersErrors.PodmonNoVolumeNoNodeIDError == true {
+		csiNodeID = ""
+	} else if stepHandlersErrors.PodmonNoNodeIDError == true {
+		csiNodeID = ""
+		volid := f.createVolumeResponse.GetVolume().VolumeId
+		volIDs = volIDs[:0]
+		volIDs = append(volIDs, volid)
+	} else if stepHandlersErrors.PodmonControllerProbeError == true {
+		f.service.mode = "controller"
+	} else if stepHandlersErrors.PodmonNodeProbeError == true {
+		f.service.mode = "node"
+	} else if stepHandlersErrors.PodmonVolumeError == true {
+		volid := "9999"
+		volIDs = append(volIDs, volid)
+	} else {
+		volid := f.createVolumeResponse.GetVolume().VolumeId
+		volIDs = volIDs[:0]
+		volIDs = append(volIDs, volid)
+	}
+
+	req := &podmon.ValidateVolumeHostConnectivityRequest{
+		NodeId:    csiNodeID,
+		VolumeIds: volIDs,
+	}
+
+	connect, err := f.service.ValidateVolumeHostConnectivity(ctx, req)
+	if err != nil {
+		f.err = errors.New(err.Error())
+		return nil
+	}
+	f.validateVolumeHostConnectivityResp = connect
+	if len(connect.Messages) > 0 {
+		for i, msg := range connect.Messages {
+			fmt.Printf("messages %d: %s\n", i, msg)
+			if stepHandlersErrors.PodmonVolumeStatisticsError == true ||
+				stepHandlersErrors.PodmonVolumeError == true {
+				if strings.Contains(msg, "volume") {
+					fmt.Printf("found %d: %s\n", i, msg)
+					f.err = errors.New(connect.Messages[i])
+					return nil
+				}
+			}
+		}
+		fmt.Printf("DEBUG connect Messages %s\n", connect.Messages[0])
+		if stepHandlersErrors.PodmonVolumeStatisticsError == true {
+			f.err = errors.New(connect.Messages[0])
+			return nil
+		}
+	}
+
+	if connect.IosInProgress {
+		return nil
+	}
+	err = fmt.Errorf("Unexpected error IO to volume: %t", connect.IosInProgress)
+	return nil
+}
+
+func (f *feature) theValidateConnectivityResponseMessageContains(expected string) error {
+	resp := f.validateVolumeHostConnectivityResp
+	if resp != nil {
+		for _, m := range resp.Messages {
+			if strings.Contains(m, expected) {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("Expected %s message in ValidateVolumeHostConnectivityResp but it wasn't there", expected)
 }
