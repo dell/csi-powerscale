@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/dell/csi-isilon/common/constants"
 	"github.com/dell/csi-isilon/common/utils"
-	csictx "github.com/dell/gocsi/context"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"net/http"
@@ -34,15 +33,15 @@ type ArrayConnectivityStatus struct {
 }
 
 func (s *service) setAPIPort(ctx context.Context) {
-	if port, ok := csictx.LookupEnv(ctx, constants.EnvPodmonAPIPORT); ok {
-		log.Debugf("set podmon API port to %s", apiPort)
-		apiPort = ":" + port
-	} else {
+	port := utils.ParseUintFromContext(ctx, constants.EnvPodmonAPIPORT)
+	if port == 0 {
 		// If the port number cannot be fetched, set it to default
 		apiPort = ":" + constants.DefaultPodmonAPIPortNumber
 		log.Debugf("set podmon API port to default %s", apiPort)
+		return
 	}
-	fmt.Printf("set podmon API port to %s", apiPort)
+	apiPort = fmt.Sprintf(":%d", port)
+	log.Debugf("set podmon API port to %s", apiPort)
 }
 
 func (s *service) setPollingFrequency(ctx context.Context) int64 {
@@ -72,18 +71,18 @@ func MarshalSyncMapToJSON(m *sync.Map) ([]byte, error) {
 func (s *service) startAPIService(ctx context.Context) {
 	isPodmonEnabled := utils.ParseBooleanFromContext(ctx, constants.EnvPodmonEnabled)
 	if !isPodmonEnabled {
-		log.Infof("podmon not enabled")
-		//TODO: Check if podmon is enabled
-		//return
+		log.Info("podmon not enabled")
+		return
 	}
 
 	pollingFrequencyInSeconds = s.setPollingFrequency(ctx)
+	s.setAPIPort(ctx)
 
 	//start methods based on mode
 	if strings.EqualFold(s.mode, constants.ModeController) {
+		log.Info("controller mode, don't need to start apiRouter")
 		return
 	}
-	s.setAPIPort(ctx)
 	s.startNodeToArrayConnectivityCheck(ctx)
 	s.apiRouter(ctx)
 }

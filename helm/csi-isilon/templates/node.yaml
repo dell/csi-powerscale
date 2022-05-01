@@ -129,12 +129,6 @@ spec:
             - name: driver-path
               mountPath: {{ .Values.kubeletConfigDir }}/plugins/csi-isilon
               mountPropagation: "Bidirectional"
-            - name: volumedevices-path
-              mountPath: {{ .Values.kubeletConfigDir }}/plugins/kubernetes.io/csi/volumeDevices
-              mountPropagation: "Bidirectional"
-            - name: dev
-              mountPath: /dev
-              mountPropagation: "Bidirectional"
             - name: usr-bin
               mountPath: /usr-bin
             - name: var-run
@@ -197,6 +191,12 @@ spec:
               value: "{{ .Values.maxIsilonVolumesPerNode }}"
             - name: X_CSI_HEALTH_MONITOR_ENABLED
               value: "{{ .Values.node.healthMonitor.enabled }}"
+            - name: X_CSI_PODMON_ENABLED
+              value: "{{ .Values.podmon.enabled }}"
+            - name: X_CSI_PODMON_API_PORT
+              value: "{{ .Values.podmonAPIPort }}"
+            - name: X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE
+              value: "{{ .Values.podmon.controller.arrayConnectivityPollRate }}"
           volumeMounts:
             - name: driver-path
               mountPath: {{ .Values.kubeletConfigDir }}/plugins/csi-isilon

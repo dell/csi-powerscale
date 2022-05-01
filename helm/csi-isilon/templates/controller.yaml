@@ -413,6 +413,12 @@ spec:
               value: "{{ .Values.isiVolumePathPermissions }}"
             - name: X_CSI_ISI_NO_PROBE_ON_START
               value: "{{ .Values.noProbeOnStart }}"
+            - name: X_CSI_PODMON_ENABLED
+              value: "{{ .Values.podmon.enabled }}"
+            - name: X_CSI_PODMON_API_PORT
+              value: "{{ .Values.podmonAPIPort }}"
+            - name: X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE
+              value: "{{ .Values.podmon.controller.arrayConnectivityPollRate }}"
             {{- if hasKey .Values.controller "replication" }}
             {{- if eq .Values.controller.replication.enabled true}}
             - name: X_CSI_REPLICATION_CONTEXT_PREFIX

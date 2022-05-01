@@ -69,6 +69,12 @@ enableCustomTopology: false
 # Default value: ReadWriteOnceWithFSType
 fsGroupPolicy: ReadWriteOnceWithFSType
 
+# podmonAPIPort: Defines the port to be used within the kubernetes cluster
+# Allowed values:
+#   Any valid and free port.
+# Default value: 8083
+podmonAPIPort: 8081
+
 # controller: configure controller pod specific parameters
 controller:
   # controllerCount: defines the number of csi-powerscale controller pods to deploy to
@@ -320,6 +326,7 @@ podmon:
   #  args:
   #    - "--csisock=unix:/var/run/csi/csi.sock"
   #    - "--labelvalue=csi-isilon"
+  #    - "--arrayConnectivityPollRate=120"
   #    - "--driverPath=csi-isilon.dellemc.com"
   #    - "--mode=controller"
   #    - "--skipArrayConnectionValidation=false"
