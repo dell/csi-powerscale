@@ -59,15 +59,16 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 
 	clients, err := isiConfig.isiSvc.IsIOinProgress(ctx)
 
-	for _, c := range clients.ClientsList {
-		if c.Protocol == "nfs3" || c.Protocol == "nfs4" {
-			_, _, clientIP, _ := utils.ParseNodeID(ctx, req.GetNodeId())
-			if clientIP == c.RemoteAddr {
-				rep.IosInProgress = true
+	if clients != nil {
+		for _, c := range clients.ClientsList {
+			if c.Protocol == "nfs3" || c.Protocol == "nfs4" {
+				_, _, clientIP, _ := utils.ParseNodeID(ctx, req.GetNodeId())
+				if clientIP == c.RemoteAddr {
+					rep.IosInProgress = true
+				}
 			}
 		}
 	}
-
 	log.Infof("ValidateVolumeHostConnectivity reply %+v", rep)
 	return rep, nil
 }
