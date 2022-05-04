@@ -162,7 +162,6 @@ func connectivityStatus(w http.ResponseWriter, r *http.Request) {
 		return true
 	})
 	log.Infof("ConnectivityStatus called, status is %v \n", tmpMap)
-	w.Write(jsonResponse)
 	_, err = w.Write(jsonResponse)
 	if err != nil {
 		log.Errorf("unable to write response %s", err)
