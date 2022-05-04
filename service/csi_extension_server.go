@@ -57,7 +57,7 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 		}
 	}
 
-	clients, err := isiConfig.isiSvc.IsIOinProgress(ctx)
+	clients, err := isiConfig.isiSvc.IsIOInProgress(ctx)
 
 	if clients != nil {
 		for _, c := range clients.ClientsList {

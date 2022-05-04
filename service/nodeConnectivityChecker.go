@@ -21,6 +21,8 @@ const (
 
 // pollingFrequency in seconds
 var pollingFrequencyInSeconds int64
+
+// port for API calls
 var apiPort string
 
 // probeStatus map[string]ArrayConnectivityStatus
@@ -32,7 +34,7 @@ type ArrayConnectivityStatus struct {
 	LastAttempt int64 `json:"lastAttempt"` // last timestamp attempted to check connectivity
 }
 
-func (s *service) setAPIPort(ctx context.Context) {
+func setAPIPort(ctx context.Context) {
 	port := utils.ParseUintFromContext(ctx, constants.EnvPodmonAPIPORT)
 	if port == 0 {
 		// If the port number cannot be fetched, set it to default
@@ -44,16 +46,15 @@ func (s *service) setAPIPort(ctx context.Context) {
 	log.Debugf("set podmon API port to %s", apiPort)
 }
 
-func (s *service) setPollingFrequency(ctx context.Context) int64 {
+//reads the pollingFrequency from Env, sets default if not found
+func setPollingFrequency(ctx context.Context) int64 {
 	pollRate, err := utils.ParseInt64FromContext(ctx, constants.EnvPodmonArrayConnectivityPollRate)
 	if err != nil {
-		log.Debugf("set default pollingFrequency %d seconds", constants.DefaultPodmonPollRate)
+		log.Debugf("use default pollingFrequency %d seconds, err %s", constants.DefaultPodmonPollRate, err)
 		return constants.DefaultPodmonPollRate
 	}
-	log.Debugf("set pollingFrequency as %d seconds", pollRate)
-	//TODO:: fetch poll rate from env
-	return constants.DefaultPodmonPollRate
-	//return pollRate
+	log.Debugf("use pollingFrequency as %d seconds", pollRate)
+	return pollRate
 }
 
 // MarshalSyncMapToJSON marshal the sync Map to Json
@@ -75,8 +76,8 @@ func (s *service) startAPIService(ctx context.Context) {
 		return
 	}
 
-	pollingFrequencyInSeconds = s.setPollingFrequency(ctx)
-	s.setAPIPort(ctx)
+	pollingFrequencyInSeconds = setPollingFrequency(ctx)
+	setAPIPort(ctx)
 
 	//start methods based on mode
 	if strings.EqualFold(s.mode, constants.ModeController) {
@@ -165,7 +166,6 @@ func (s *service) startNodeToArrayConnectivityCheck(ctx context.Context) error {
 	log.Info("startNodeToArrayConnectivityCheck called")
 	probeStatus = new(sync.Map)
 	var status ArrayConnectivityStatus
-	//ctx, log := GetLogger(ctx)
 	isilonClusters := s.getIsilonClusters()
 	for _, cluster := range isilonClusters {
 		go func(cluster *IsilonClusterConfig) {
@@ -191,7 +191,7 @@ func (s *service) startNodeToArrayConnectivityCheck(ctx context.Context) error {
 				probeStatus.Store(cluster.ClusterName, status)
 				st, ok := probeStatus.Load(cluster.ClusterName)
 				log.Infof("cluster %s , reading probeStatus is %+v, %v", cluster.ClusterName, st, ok)
-				time.Sleep(time.Second * time.Duration(pollingFrequencyInSeconds))
+				time.Sleep(time.Second * time.Duration(pollingFrequencyInSeconds/2))
 			}
 		}(cluster)
 	}

@@ -73,7 +73,7 @@ fsGroupPolicy: ReadWriteOnceWithFSType
 # Allowed values:
 #   Any valid and free port.
 # Default value: 8083
-podmonAPIPort: 8081
+podmonAPIPort: 8083
 
 # controller: configure controller pod specific parameters
 controller:
@@ -326,7 +326,7 @@ podmon:
   #  args:
   #    - "--csisock=unix:/var/run/csi/csi.sock"
   #    - "--labelvalue=csi-isilon"
-  #    - "--arrayConnectivityPollRate=120"
+  #    - "--arrayConnectivityPollRate=60"
   #    - "--driverPath=csi-isilon.dellemc.com"
   #    - "--mode=controller"
   #    - "--skipArrayConnectionValidation=false"
@@ -335,6 +335,7 @@ podmon:
   #  args:
   #    - "--csisock=unix:/var/lib/kubelet/plugins/csi-isilon/csi_sock"
   #    - "--labelvalue=csi-isilon"
+  #    - "--arrayConnectivityPollRate=60"
   #    - "--driverPath=csi-isilon.dellemc.com"
   #    - "--mode=node"
   #    - "--leaderelection=false"

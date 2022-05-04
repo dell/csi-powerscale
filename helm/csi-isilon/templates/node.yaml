@@ -202,8 +202,12 @@ spec:
             - name: X_CSI_PODMON_API_PORT
               value: "{{ .Values.podmonAPIPort }}"
             {{- if eq .Values.podmon.enabled true }}
+              {{- range $key, $value := .Values.podmon.node.args }}
+                {{- if contains "--arrayConnectivityPollRate" $value }}
             - name: X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE
-              value: "{{ .Values.podmon.controller.arrayConnectivityPollRate }}"
+              value: "{{ (split "=" $value)._1 }}"
+                {{ end }}
+              {{ end }}
             {{ end }}
           volumeMounts:
             - name: driver-path

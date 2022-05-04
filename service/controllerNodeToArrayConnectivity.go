@@ -58,7 +58,7 @@ func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error
 	log.Infof("API Response as struct %+v\n", statusResponse)
 	//responseObject has last success and alst attempt timestamp in Unix format
 	timeDiff := statusResponse.LastAttempt - statusResponse.LastSuccess
-	tolerance := 2 * pollingFrequencyInSeconds
+	tolerance := setPollingFrequency(ctx)
 	log.Debugf("timeDiff %v, tolerance %v", timeDiff, tolerance)
 	if timeDiff < tolerance {
 		return true, nil
