@@ -98,7 +98,10 @@ func (s *service) apiRouter(ctx context.Context) {
 	router.HandleFunc(arrayStatus, connectivityStatus).Methods("GET")
 	router.HandleFunc(arrayStatus+"/"+"{arrayId}", getArrayConnectivityStatus).Methods("GET")
 	//start http server to serve requests
-	http.ListenAndServe(apiPort, router)
+	err := http.ListenAndServe(apiPort, router)
+	if err != nil {
+		log.Errorf("unable to start http server to serve status requests due to %s", err)
+	}
 }
 
 // GetArrayConnectivityStatus lists status of the requested array
@@ -125,7 +128,10 @@ func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 	log.Infof("sending response %s for array %s \n", status, arrayID)
 	//update response
 	w.WriteHeader(http.StatusOK)
-	w.Write(jsonResponse)
+	_, err = w.Write(jsonResponse)
+	if err != nil {
+		log.Errorf("unable to write response %s", err)
+	}
 }
 
 // NodeHealth states if node is up
@@ -157,13 +163,17 @@ func connectivityStatus(w http.ResponseWriter, r *http.Request) {
 	})
 	log.Infof("ConnectivityStatus called, status is %v \n", tmpMap)
 	w.Write(jsonResponse)
+	_, err = w.Write(jsonResponse)
+	if err != nil {
+		log.Errorf("unable to write response %s", err)
+	}
 
 }
 
 //startNodeToArrayConnectivityCheck runs probe to test connectivity from node to array
 //updates probeStatus map[array]ArrayConnectivityStatus
-func (s *service) startNodeToArrayConnectivityCheck(ctx context.Context) error {
-	log.Info("startNodeToArrayConnectivityCheck called")
+func (s *service) startNodeToArrayConnectivityCheck(ctx context.Context) {
+	log.Debug("startNodeToArrayConnectivityCheck called")
 	probeStatus = new(sync.Map)
 	var status ArrayConnectivityStatus
 	isilonClusters := s.getIsilonClusters()
@@ -195,5 +205,5 @@ func (s *service) startNodeToArrayConnectivityCheck(ctx context.Context) error {
 			}
 		}(cluster)
 	}
-	return nil
+	log.Infof("startNodeToArrayConnectivityCheck is running probes at pollingFrequency %d ", pollingFrequencyInSeconds/2)
 }
