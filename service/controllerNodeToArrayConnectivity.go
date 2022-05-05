@@ -24,22 +24,12 @@ func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error
 	}
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
-	log.Infof("request is %+v", req)
+	log.Debugf("Making %s url request %+v", url, req)
 
-	client := &http.Client{
-		Transport: nil,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-		Jar:     nil,
-		Timeout: 0,
-	}
+	client := &http.Client{}
 	resp, err := client.Do(req)
-	log.Infof("response is %+v", resp)
+	log.Debugf("Received response %+v for url %s", resp, url)
 	if err != nil {
-		if resp != nil && resp.StatusCode == 302 {
-			log.Errorf("got redirect %+v", resp.Header.Get("Location"))
-		}
 		log.Errorf("failed to call API %s due to %s ", url, err.Error())
 		return false, err
 	}
@@ -55,11 +45,11 @@ func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error
 		log.Errorf("unable to unmarshal and determine connectivity due to %s ", err)
 		return false, err
 	}
-	log.Infof("API Response as struct %+v\n", statusResponse)
-	//responseObject has last success and alst attempt timestamp in Unix format
+	log.Infof("API Response received is %+v\n", statusResponse)
+	//responseObject has last success and last attempt timestamp in Unix format
 	timeDiff := statusResponse.LastAttempt - statusResponse.LastSuccess
 	tolerance := setPollingFrequency(ctx)
-	log.Debugf("timeDiff %v, tolerance %v", timeDiff, tolerance)
+	log.Debugf("last connectivity was  %d sec back, tolerance is %d sec", timeDiff, tolerance)
 	if timeDiff < tolerance {
 		return true, nil
 	}

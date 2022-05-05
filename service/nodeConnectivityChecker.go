@@ -187,7 +187,7 @@ func (s *service) startNodeToArrayConnectivityCheck(ctx context.Context) {
 						log.Errorf("failed to extract ArrayConnectivityStatus for cluster '%s'", cluster.ClusterName)
 					}
 				}
-				log.Infof("status is %+v", status)
+				log.Debugf("cluster %s , status is %+v", cluster.ClusterName, status)
 				err := s.nodeProbe(ctx, cluster)
 				if err == nil {
 					log.Debugf("Probe successful for %s", cluster.ClusterName)
@@ -196,10 +196,8 @@ func (s *service) startNodeToArrayConnectivityCheck(ctx context.Context) {
 					log.Debugf("Probe failed for isilon cluster '%s' error:'%s'", cluster.ClusterName, err)
 				}
 				status.LastAttempt = time.Now().Unix()
-				log.Infof("cluster %s , storing status %+v", cluster.ClusterName, status)
+				log.Debugf("cluster %s , storing status %+v", cluster.ClusterName, status)
 				probeStatus.Store(cluster.ClusterName, status)
-				st, ok := probeStatus.Load(cluster.ClusterName)
-				log.Infof("cluster %s , reading probeStatus is %+v, %v", cluster.ClusterName, st, ok)
 				time.Sleep(time.Second * time.Duration(pollingFrequencyInSeconds/2))
 			}
 		}(cluster)
