@@ -20,6 +20,7 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 		return rep, nil
 	}
 
+	//create the map of all the clusters with clustername as key
 	systemIDs := make(map[string]bool)
 	systemID := req.GetArrayId()
 	if systemID == "" {
@@ -34,19 +35,6 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 		return nil, fmt.Errorf("The NodeID is a required field")
 	}
 
-	clusterName := s.defaultIsiClusterName
-
-	//Get cluster config
-	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
-	if err != nil {
-		log.Error("Failed to get Isilon config with error ", err.Error())
-		return nil, err
-	}
-
-	//set cluster context
-	ctx, log = setClusterContext(ctx, clusterName)
-	log.Debugf("Cluster Name: %v", clusterName)
-
 	// Go through each of the systemIDs
 	for systemID := range systemIDs {
 		// First - check if the array is visible from the node
@@ -55,16 +43,23 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 		if checkError != nil {
 			return rep, checkError
 		}
-	}
 
-	clients, err := isiConfig.isiSvc.IsIOInProgress(ctx)
+		//Get cluster config
+		isiConfig, err := s.getIsilonConfig(ctx, &systemID)
+		if err != nil {
+			log.Error("Failed to get Isilon config with error ", err.Error())
+			return nil, err
+		}
 
-	if clients != nil {
-		for _, c := range clients.ClientsList {
-			if c.Protocol == "nfs3" || c.Protocol == "nfs4" {
-				_, _, clientIP, _ := utils.ParseNodeID(ctx, req.GetNodeId())
-				if clientIP == c.RemoteAddr {
-					rep.IosInProgress = true
+		// check if any IO is inProgress for the current systemID/array
+		clients, err := isiConfig.isiSvc.IsIOInProgress(ctx)
+		if clients != nil {
+			for _, c := range clients.ClientsList {
+				if c.Protocol == "nfs3" || c.Protocol == "nfs4" {
+					_, _, clientIP, _ := utils.ParseNodeID(ctx, req.GetNodeId())
+					if clientIP == c.RemoteAddr {
+						rep.IosInProgress = true
+					}
 				}
 			}
 		}
