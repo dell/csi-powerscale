@@ -6,7 +6,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
+	"time"
 )
+
+//timeout for making http requests
+const timeout = time.Second * 5
 
 //queryStatus make API call to the specified url to retrieve connection status
 func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error) {
@@ -15,9 +19,11 @@ func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error
 			log.Println("panic occurred in queryStatus:", err)
 		}
 	}()
-	log.Infof("Calling API %s", url)
+	log.Infof("Calling API %s with timeout %v", url, timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		log.Errorf("failed to create request for API %s due to %s ", url, err.Error())
 		return false, err
@@ -49,6 +55,14 @@ func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error
 	//responseObject has last success and last attempt timestamp in Unix format
 	timeDiff := statusResponse.LastAttempt - statusResponse.LastSuccess
 	tolerance := setPollingFrequency(ctx)
+	currTime := time.Now().Unix()
+	//checking if the status response is stale and connectivity test is still running
+	//since nodeProbe is run at frequency tolerance/2, ideally below check should never be true
+	if (currTime - statusResponse.LastAttempt) > tolerance*2 {
+		log.Errorf("seems like connectivity test is not being run, current time is %d and last run was at %d", currTime, statusResponse.LastAttempt)
+		//considering connectivity is broken
+		return false, nil
+	}
 	log.Debugf("last connectivity was  %d sec back, tolerance is %d sec", timeDiff, tolerance)
 	if timeDiff < tolerance {
 		return true, nil
