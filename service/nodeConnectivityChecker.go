@@ -49,8 +49,8 @@ func setAPIPort(ctx context.Context) {
 //reads the pollingFrequency from Env, sets default if not found
 func setPollingFrequency(ctx context.Context) int64 {
 	pollRate, err := utils.ParseInt64FromContext(ctx, constants.EnvPodmonArrayConnectivityPollRate)
-	if err != nil {
-		log.Debugf("use default pollingFrequency %d seconds, err %s", constants.DefaultPodmonPollRate, err)
+	if err != nil || pollRate == 0 {
+		log.Debugf("use default pollingFrequency %d seconds, err %v", constants.DefaultPodmonPollRate, err)
 		return constants.DefaultPodmonPollRate
 	}
 	log.Debugf("use pollingFrequency as %d seconds", pollRate)
