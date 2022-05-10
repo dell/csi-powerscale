@@ -186,10 +186,9 @@ func (s *service) testConnectivityAndUpdateStatus(ctx context.Context, cluster *
 		go s.testConnectivityAndUpdateStatus(ctx, cluster, timeout)
 	}()
 	var status ArrayConnectivityStatus
-	//add timeout to context
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
 	for {
+		//add timeout to context
+		timeOutCtx, cancel := context.WithTimeout(ctx, timeout)
 		log.Debugf("Running probe for cluster %s at time %v \n", cluster.ClusterName, time.Now())
 		if existingStatus, ok := probeStatus.Load(cluster.ClusterName); !ok {
 			log.Debugf("%s not in probeStatus ", cluster.ClusterName)
@@ -200,7 +199,7 @@ func (s *service) testConnectivityAndUpdateStatus(ctx context.Context, cluster *
 		}
 		log.Debugf("cluster %s , status is %+v", cluster.ClusterName, status)
 		//run nodeProbe to test connectivity
-		err := s.nodeProbe(ctx, cluster)
+		err := s.nodeProbe(timeOutCtx, cluster)
 		if err == nil {
 			log.Debugf("Probe successful for %s", cluster.ClusterName)
 			status.LastSuccess = time.Now().Unix()
@@ -210,6 +209,7 @@ func (s *service) testConnectivityAndUpdateStatus(ctx context.Context, cluster *
 		status.LastAttempt = time.Now().Unix()
 		log.Debugf("cluster %s , storing status %+v", cluster.ClusterName, status)
 		probeStatus.Store(cluster.ClusterName, status)
+		cancel()
 		//sleep for half the pollingFrequency and run check again
 		time.Sleep(time.Second * time.Duration(pollingFrequencyInSeconds/2))
 	}
