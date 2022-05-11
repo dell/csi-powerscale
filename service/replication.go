@@ -673,7 +673,7 @@ func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteI
 		return status.Errorf(codes.Internal, "can't find remote replication policy, unexpected error %s", err.Error())
 	}
 	if s1TP.FailoverFailbackState == "writes_disabled" {
-		return status.Errorf(codes.Internal, "unable to perform reprotect with writes disabled, perform reprotect on another side")
+		return status.Errorf(codes.InvalidArgument, "unable to perform reprotect with writes disabled, perform reprotect on another side")
 	}
 
 	remotePolicy, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
