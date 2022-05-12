@@ -20,10 +20,10 @@ func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error
 		}
 	}()
 	log.Infof("Calling API %s with timeout %v", url, timeout)
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	timeOutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(timeOutCtx, "GET", url, nil)
 	if err != nil {
 		log.Errorf("failed to create request for API %s due to %s ", url, err.Error())
 		return false, err

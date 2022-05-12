@@ -32,7 +32,7 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 	}
 
 	if req.GetNodeId() == "" {
-		return nil, fmt.Errorf("The NodeID is a required field")
+		return nil, fmt.Errorf("the NodeID is a required field")
 	}
 
 	// Go through each of the systemIDs
@@ -53,6 +53,7 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 
 		// check if any IO is inProgress for the current systemID/array
 		clients, err := isiConfig.isiSvc.IsIOInProgress(ctx)
+		log.Debugf("fetched clients %+v", clients)
 		if clients != nil {
 			for _, c := range clients.ClientsList {
 				if c.Protocol == "nfs3" || c.Protocol == "nfs4" {
