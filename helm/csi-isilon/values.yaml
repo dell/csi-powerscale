@@ -334,6 +334,6 @@ podmon:
   #    - "--driver-config-params=/csi-isilon-config-params/driver-config-params.yaml"
 
 # Set the below parameter for setting the path size limit
-# Deafult value None
+# Deafult value: 128
 # Examples: 128, 256 (Depends on the driver type and allowed value for path size limit)
-maxPathLen:
+maxPathLen: 128
