@@ -75,6 +75,11 @@ fsGroupPolicy: ReadWriteOnceWithFSType
 # Default value: 8083
 podmonAPIPort: 8083
 
+# maxPathLen: this parameter is used for setting the maximum Path length for the given volume.
+# Default value: 128
+# Examples: 128, 256
+maxPathLen: 128
+
 # controller: configure controller pod specific parameters
 controller:
   # controllerCount: defines the number of csi-powerscale controller pods to deploy to
@@ -340,8 +345,3 @@ podmon:
   #    - "--mode=node"
   #    - "--leaderelection=false"
   #    - "--driver-config-params=/csi-isilon-config-params/driver-config-params.yaml"
-
-# maxPathLen: this parameter is used for setting the maximum Path length for the given volume.
-# Default value: 128
-# Examples: 128, 256
-maxPathLen: 128
