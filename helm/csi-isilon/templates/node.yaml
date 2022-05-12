@@ -197,6 +197,8 @@ spec:
               value: "{{ .Values.maxIsilonVolumesPerNode }}"
             - name: X_CSI_HEALTH_MONITOR_ENABLED
               value: "{{ .Values.node.healthMonitor.enabled }}"
+            - name: X_CSI_MAX_PATH_LIMIT
+              value: "{{ .Values.maxPathLen }}"
           volumeMounts:
             - name: driver-path
               mountPath: {{ .Values.kubeletConfigDir }}/plugins/csi-isilon
