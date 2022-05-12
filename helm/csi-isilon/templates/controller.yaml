@@ -447,6 +447,8 @@ spec:
               value: /certs
             - name: X_CSI_ISI_CONFIG_PATH
               value: /isilon-configs/config
+            - name: X_CSI_MAX_PATH_LIMIT
+              value: "{{ .Values.maxPathLen }}"
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi

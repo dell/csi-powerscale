@@ -209,6 +209,8 @@ spec:
                 {{ end }}
               {{ end }}
             {{ end }}
+            - name: X_CSI_MAX_PATH_LIMIT
+              value: "{{ .Values.maxPathLen }}"
           volumeMounts:
             - name: driver-path
               mountPath: {{ .Values.kubeletConfigDir }}/plugins/csi-isilon
