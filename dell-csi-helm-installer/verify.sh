@@ -224,7 +224,7 @@ function verify_openshift_versions() {
   log arrow
   log smart_step "Verifying minimum OpenShift version" "small"
   error=0
-  if [[ ${V} < ${MIN} ]]; then
+  if (( ${V%%.*} < ${MIN%%.*} || ( ${V%%.*} == ${MIN%%.*} && ${V##*.} < ${MIN##*.} ) )) ; then
     error=1
     found_error "OpenShift version ${V} is too old. Minimum required version is: ${MIN}"
   fi
@@ -234,7 +234,7 @@ function verify_openshift_versions() {
   log arrow
   log smart_step "Verifying maximum OpenShift version" "small"
   error=0
-  if [[ ${V} > ${MAX} ]]; then
+  if (( ${V%%.*} > ${MAX%%.*} || ( ${V%%.*} == ${MAX%%.*} && ${V##*.} > ${MAX##*.} ) )) ; then
     error=1
     found_warning "OpenShift version ${V} is newer than the version that has been tested. Latest tested version is: ${MAX}"
   fi
