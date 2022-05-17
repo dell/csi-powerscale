@@ -34,29 +34,35 @@ var (
 	debug bool
 
 	stepHandlersErrors struct {
-		FindVolumeIDError          bool
-		GetVolByIDError            bool
-		GetStoragePoolsError       bool
-		GetStatisticsError         bool
-		CreateSnapshotError        bool
-		RemoveVolumeError          bool
-		InstancesError             bool
-		VolInstanceError           bool
-		StatsError                 bool
-		StartingTokenInvalidError  bool
-		GetSnapshotError           bool
-		DeleteSnapshotError        bool
-		ExportNotFoundError        bool
-		VolumeNotExistError        bool
-		CreateQuotaError           bool
-		UpdateQuotaError           bool
-		CreateExportError          bool
-		GetExportInternalError     bool
-		GetExportByIDNotFoundError bool
-		UnexportError              bool
-		DeleteQuotaError           bool
-		QuotaNotFoundError         bool
-		DeleteVolumeError          bool
+		FindVolumeIDError           bool
+		GetVolByIDError             bool
+		GetStoragePoolsError        bool
+		GetStatisticsError          bool
+		CreateSnapshotError         bool
+		RemoveVolumeError           bool
+		InstancesError              bool
+		VolInstanceError            bool
+		StatsError                  bool
+		StartingTokenInvalidError   bool
+		GetSnapshotError            bool
+		DeleteSnapshotError         bool
+		ExportNotFoundError         bool
+		VolumeNotExistError         bool
+		CreateQuotaError            bool
+		UpdateQuotaError            bool
+		CreateExportError           bool
+		GetExportInternalError      bool
+		GetExportByIDNotFoundError  bool
+		UnexportError               bool
+		DeleteQuotaError            bool
+		QuotaNotFoundError          bool
+		DeleteVolumeError           bool
+		PodmonControllerProbeError  bool
+		PodmonNodeProbeError        bool
+		PodmonVolumeError           bool
+		PodmonVolumeStatisticsError bool
+		PodmonNoNodeIDError         bool
+		PodmonNoVolumeNoNodeIDError bool
 	}
 )
 
@@ -94,6 +100,7 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetExportsWithResume).Methods("GET").Queries("resume", "")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetExports).Methods("GET")
 	isilonRouter.HandleFunc("/platform/3/statistics/current", handleStatistics)
+	isilonRouter.HandleFunc("/platform/3/statistics/summary/client", handleIOInProgress).Methods("GET")
 	isilonRouter.HandleFunc("/platform/3/cluster/config/", handleGetClusterConfig)
 	// Do NOT change the sequence of the following lines, the first is the subset of the second,
 	// thus if the sequence is reversed, the query with "metadata" will be wrongly resolved.
@@ -392,6 +399,15 @@ func handleModifyExport(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 	// response body is empty
 	w.Write([]byte(""))
+}
+
+func handleIOInProgress(w http.ResponseWriter, r *http.Request) {
+	if testControllerHasNoConnection || testNodeHasNoConnection {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(readFromFile("mock/statistics/IO_not_inprogress.txt"))
 }
 
 // handleStatistics implements GET /platform/3/statistics

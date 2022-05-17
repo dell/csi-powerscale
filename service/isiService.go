@@ -400,6 +400,19 @@ func (svc *isiService) GetStatistics(ctx context.Context, keys []string) (isi.St
 	return stat, nil
 }
 
+func (svc *isiService) IsIOInProgress(ctx context.Context) (isi.Clients, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
+	var clients isi.Clients
+	var err error
+	if clients, err = svc.client.IsIOInProgress(ctx); err != nil {
+		log.Errorf("failed to get array Clients '%s'", err)
+		return nil, err
+	}
+	return clients, nil
+}
+
 func (svc *isiService) IsVolumeExistent(ctx context.Context, isiPath, volID, name string) bool {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)

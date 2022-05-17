@@ -1,0 +1,52 @@
+{
+    "client": [
+        {
+            "class": "other",
+            "in": 7.800000190734863,
+            "in_avg": 39.0,
+            "in_max": 39,
+            "in_min": 39,
+            "local_addr": "*",
+            "local_name": "UNKNOWN",
+            "node": 1,
+            "num_operations": 1,
+            "operation_rate": 0.2000000029802322,
+            "out": 0.0,
+            "out_avg": 0.0,
+            "out_max": 0,
+            "out_min": 0,
+            "protocol": "siq",
+            "remote_addr": "*",
+            "remote_name": "UNKNOWN",
+            "time": 1651131929,
+            "time_avg": 7.0,
+            "time_max": 7,
+            "time_min": 7,
+            "user": {}
+        },
+        {
+            "class": "other",
+            "in": 0.0,
+            "in_avg": 0.0,
+            "in_max": 0,
+            "in_min": 0,
+            "local_addr": "*",
+            "local_name": "UNKNOWN",
+            "node": 2,
+            "num_operations": 1,
+            "operation_rate": 0.2000000029802322,
+            "out": 7.800000190734863,
+            "out_avg": 39.0,
+            "out_max": 39,
+            "out_min": 39,
+            "protocol": "siq",
+            "remote_addr": "*",
+            "remote_name": "UNKNOWN",
+            "time": 1651131929,
+            "time_avg": 68.0,
+            "time_max": 68,
+            "time_min": 68,
+            "user": {}
+        }
+    ]
+}
