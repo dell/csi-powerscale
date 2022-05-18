@@ -13,13 +13,12 @@ Feature: Isilon CSI interface
     And I call ValidateConnectivity
     Then the error contains "none"
 
-
   Scenario: Call ValidateConnectivity with no Node
     Given a Isilon service
     When I call CreateVolume "volume1"
     And I induce error "no-nodeId"
     And I call ValidateConnectivity
-    Then the error contains "The NodeID is a required field"
+    Then the error contains "the NodeID is a required field"
 
 
   Scenario: Call ValidateConnectivity with no Volume no Node
