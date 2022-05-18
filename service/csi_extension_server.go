@@ -44,22 +44,25 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 			return rep, checkError
 		}
 
-		//Get cluster config
-		isiConfig, err := s.getIsilonConfig(ctx, &systemID)
-		if err != nil {
-			log.Error("Failed to get Isilon config with error ", err.Error())
-			return nil, err
-		}
+		//Check for IOinProgress only when volumes IDs are present in the request as the field is required only in the latter case also to reduce number of calls to the API making it efficient
+		if len(req.GetVolumeIds()) > 0 {
+			//Get cluster config
+			isiConfig, err := s.getIsilonConfig(ctx, &systemID)
+			if err != nil {
+				log.Error("Failed to get Isilon config with error ", err.Error())
+				return nil, err
+			}
 
-		// check if any IO is inProgress for the current systemID/array
-		clients, err := isiConfig.isiSvc.IsIOInProgress(ctx)
-		log.Debugf("fetched clients %+v", clients)
-		if clients != nil {
-			for _, c := range clients.ClientsList {
-				if c.Protocol == "nfs3" || c.Protocol == "nfs4" {
-					_, _, clientIP, _ := utils.ParseNodeID(ctx, req.GetNodeId())
-					if clientIP == c.RemoteAddr {
-						rep.IosInProgress = true
+			// check if any IO is inProgress for the current systemID/array
+			clients, err := isiConfig.isiSvc.IsIOInProgress(ctx)
+			log.Debugf("fetched clients %+v", clients)
+			if clients != nil {
+				for _, c := range clients.ClientsList {
+					if c.Protocol == "nfs3" || c.Protocol == "nfs4" {
+						_, _, clientIP, _ := utils.ParseNodeID(ctx, req.GetNodeId())
+						if clientIP == c.RemoteAddr {
+							rep.IosInProgress = true
+						}
 					}
 				}
 			}
