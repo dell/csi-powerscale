@@ -22,3 +22,5 @@ images:
 
   # "images.externalhealthmonitorcontroller" defines the container images used for the csi external health monitor controller
   # container.
+  externalhealthmonitorcontroller: k8s.gcr.io/sig-storage/csi-external-health-monitor-controller:v0.5.0
+
