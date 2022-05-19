@@ -2569,7 +2569,11 @@ func (f *feature) iCallValidateVolumeHostConnectivity() error {
 	header := metadata.New(map[string]string{"csi.requestid": "1"})
 	ctx := metadata.NewIncomingContext(context.Background(), header)
 
-	csiNodeID := f.service.nodeID
+	csiNodeID, err := f.service.getPowerScaleNodeID(ctx)
+	if err != nil {
+		f.err = errors.New(err.Error())
+		return nil
+	}
 	log.Printf("Node id is: %v", csiNodeID)
 
 	volIDs := make([]string, 0)
