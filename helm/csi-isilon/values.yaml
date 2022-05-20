@@ -326,7 +326,7 @@ authorization:
 # Enable this feature only after contact support for additional information
 podmon:
   enabled: false
-  image: dellemc/podmon:v1.1.0
+  image: dellemc/podmon:v1.2.0
   #controller:
   #  args:
   #    - "--csisock=unix:/var/run/csi/csi.sock"
@@ -336,6 +336,7 @@ podmon:
   #    - "--mode=controller"
   #    - "--skipArrayConnectionValidation=false"
   #    - "--driver-config-params=/csi-isilon-config-params/driver-config-params.yaml"
+  #    - "--driverPodLabelValue=dell-storage"
   #node:
   #  args:
   #    - "--csisock=unix:/var/lib/kubelet/plugins/csi-isilon/csi_sock"
@@ -345,3 +346,4 @@ podmon:
   #    - "--mode=node"
   #    - "--leaderelection=false"
   #    - "--driver-config-params=/csi-isilon-config-params/driver-config-params.yaml"
+  #    - "--driverPodLabelValue=dell-storage"
