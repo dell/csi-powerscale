@@ -34,65 +34,68 @@ var (
 	debug bool
 
 	stepHandlersErrors struct {
-		FindVolumeIDError            bool
-		GetVolByIDError              bool
-		GetStoragePoolsError         bool
-		GetStatisticsError           bool
-		CreateSnapshotError          bool
-		RemoveVolumeError            bool
-		InstancesError               bool
-		VolInstanceError             bool
-		StatsError                   bool
-		StartingTokenInvalidError    bool
-		GetSnapshotError             bool
-		DeleteSnapshotError          bool
-		ExportNotFoundError          bool
-		VolumeNotExistError          bool
-		CreateQuotaError             bool
-		UpdateQuotaError             bool
-		CreateExportError            bool
-		GetExportInternalError       bool
-		GetExportByIDNotFoundError   bool
-		UnexportError                bool
-		DeleteQuotaError             bool
-		QuotaNotFoundError           bool
-		DeleteVolumeError            bool
-		GetJobsInternalError         bool
-		GetPolicyInternalError       bool
-		GetTargetPolicyInternalError bool
-		GetTargetPolicyNotFound      bool
-		count                        int
-		counter                      int
-		reprotectCount               int
-		reprotectTPCount             int
-		failoverTPCount              int
-		failoverCount                int
-		jobCount                     int
-		getSpgCount                  int
-		getSpgTPCount                int
-		getExportCount               int
-		GetPolicyNotFoundError       bool
-		DeletePolicyError            bool
-		DeletePolicyInternalError    bool
-		DeletePolicyNotAPIError      bool
-		FailedStatus                 bool
-		UnknownStatus                bool
-		UpdatePolicyError            bool
-		Reprotect                    bool
-		ReprotectTP                  bool
-		Failover                     bool
-		FailoverTP                   bool
-		GetPolicyError               bool
-		Jobs                         bool
-		GetSpgErrors                 bool
-		GetSpgTPErrors               bool
-		GetExportPolicyError         bool
-		PodmonControllerProbeError   bool
-		PodmonNodeProbeError         bool
-		PodmonVolumeError            bool
-		PodmonVolumeStatisticsError  bool
-		PodmonNoNodeIDError          bool
-		PodmonNoVolumeNoNodeIDError  bool
+		FindVolumeIDError             bool
+		GetVolByIDError               bool
+		GetStoragePoolsError          bool
+		GetStatisticsError            bool
+		CreateSnapshotError           bool
+		RemoveVolumeError             bool
+		InstancesError                bool
+		VolInstanceError              bool
+		StatsError                    bool
+		StartingTokenInvalidError     bool
+		GetSnapshotError              bool
+		DeleteSnapshotError           bool
+		ExportNotFoundError           bool
+		VolumeNotExistError           bool
+		CreateQuotaError              bool
+		UpdateQuotaError              bool
+		CreateExportError             bool
+		GetExportInternalError        bool
+		GetExportByIDNotFoundError    bool
+		UnexportError                 bool
+		DeleteQuotaError              bool
+		QuotaNotFoundError            bool
+		DeleteVolumeError             bool
+		GetJobsInternalError          bool
+		GetPolicyInternalError        bool
+		GetTargetPolicyInternalError  bool
+		GetTargetPolicyNotFound       bool
+		count                         int
+		counter                       int
+		reprotectCount                int
+		reprotectTPCount              int
+		failoverTPCount               int
+		failoverCount                 int
+		jobCount                      int
+		getPolicyTPCount              int
+		getPolicyInternalErrorTPCount int
+		getPolicyNotFoundTPCount      int
+		getSpgCount                   int
+		getSpgTPCount                 int
+		getExportCount                int
+		GetPolicyNotFoundError        bool
+		DeletePolicyError             bool
+		DeletePolicyInternalError     bool
+		DeletePolicyNotAPIError       bool
+		FailedStatus                  bool
+		UnknownStatus                 bool
+		UpdatePolicyError             bool
+		Reprotect                     bool
+		ReprotectTP                   bool
+		Failover                      bool
+		FailoverTP                    bool
+		GetPolicyError                bool
+		Jobs                          bool
+		GetSpgErrors                  bool
+		GetSpgTPErrors                bool
+		GetExportPolicyError          bool
+		PodmonControllerProbeError    bool
+		PodmonNodeProbeError          bool
+		PodmonVolumeError             bool
+		PodmonVolumeStatisticsError   bool
+		PodmonNoNodeIDError           bool
+		PodmonNoVolumeNoNodeIDError   bool
 	}
 )
 
@@ -479,7 +482,7 @@ func handleGetExportWithPathAndZone(w http.ResponseWriter, r *http.Request) {
 		case 0:
 			w.WriteHeader(http.StatusInternalServerError)
 			return
-			//w.Write(readFromFile("mock/export/get_export_557.txt"))
+			// w.Write(readFromFile("mock/export/get_export_557.txt"))
 		case 1:
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -643,7 +646,7 @@ func handleCopySnapshot(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
 	}
-	//w.Write(readFromFile("mock/create_snapshot.txt"))
+	// w.Write(readFromFile("mock/create_snapshot.txt"))
 }
 
 // handleCopyVolume implements PUT /namespace/ifs/data/csi-isilon/volume1?merge=True
@@ -653,7 +656,7 @@ func handleCopyVolume(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
 	}
-	//w.Write(readFromFile("mock/create_snapshot.txt"))
+	// w.Write(readFromFile("mock/create_snapshot.txt"))
 }
 
 // handleGetSnapshotSize implements GET /namespace/ifs/.snapshot/{snapshot_name}/data/csi-isilon/{volume_id}?detail=size&max-depth=-1
@@ -682,11 +685,11 @@ func handleGetPoliciesByName(w http.ResponseWriter, r *http.Request) {
 			stepHandlersErrors.reprotectCount++
 		}()
 		switch stepHandlersErrors.reprotectCount {
-		case 0:
-			w.Write(readFromFile("mock/policy/get_policies.txt"))
 		case 1:
 			w.Write(readFromFile("mock/policy/get_policies.txt"))
 		case 2:
+			w.Write(readFromFile("mock/policy/get_policies.txt"))
+		case 3:
 			w.Write(readFromFile("mock/policy/get_policies.txt"))
 		}
 	}
@@ -778,6 +781,87 @@ func handleGetTargetPoliciesByName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if stepHandlersErrors.ReprotectTP {
+		defer func() {
+			stepHandlersErrors.reprotectTPCount++
+		}()
+		switch stepHandlersErrors.reprotectTPCount {
+		case 0:
+			w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
+		case 1:
+			w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
+		case 2:
+			w.Write(readFromFile("mock/policy/get_target_policies.txt"))
+		default:
+			w.Write(readFromFile("mock/policy/get_target_policies.txt"))
+		}
+	}
+
+	if stepHandlersErrors.Reprotect {
+		defer func() {
+			stepHandlersErrors.reprotectCount++
+		}()
+
+		switch stepHandlersErrors.reprotectCount {
+		case 0:
+			w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
+		case 4:
+			w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
+		case 5:
+			w.Write(readFromFile("mock/policy/get_target_policies.txt"))
+		default:
+			w.Write(readFromFile("mock/policy/get_target_policies.txt"))
+		}
+	}
+
+	if stepHandlersErrors.GetPolicyError {
+		defer func() {
+			stepHandlersErrors.getPolicyTPCount++
+		}()
+		switch stepHandlersErrors.getPolicyTPCount {
+		case 0:
+			w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
+		case 1:
+			w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
+		case 2:
+			w.Write(readFromFile("mock/policy/get_target_policies.txt"))
+		default:
+			w.Write(readFromFile("mock/policy/get_target_policies.txt"))
+		}
+	}
+
+	if stepHandlersErrors.GetPolicyInternalError {
+		defer func() {
+			stepHandlersErrors.getPolicyInternalErrorTPCount++
+		}()
+		switch stepHandlersErrors.getPolicyInternalErrorTPCount {
+		case 0:
+			w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
+		case 1:
+			w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
+		case 2:
+			w.Write(readFromFile("mock/policy/get_target_policies.txt"))
+		default:
+			w.Write(readFromFile("mock/policy/get_target_policies.txt"))
+		}
+	}
+
+	if stepHandlersErrors.GetPolicyNotFoundError {
+		defer func() {
+			stepHandlersErrors.getPolicyNotFoundTPCount++
+		}()
+		switch stepHandlersErrors.getPolicyNotFoundTPCount {
+		case 0:
+			w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
+		case 1:
+			w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
+		case 2:
+			w.Write(readFromFile("mock/policy/get_target_policies.txt"))
+		default:
+			w.Write(readFromFile("mock/policy/get_target_policies.txt"))
+		}
+	}
+
 	if stepHandlersErrors.GetSpgTPErrors {
 		defer func() {
 			stepHandlersErrors.getSpgTPCount++
@@ -835,7 +919,7 @@ func handleUpdatePolicy(w http.ResponseWriter, r *http.Request) {
 func handleBreakAssociation(w http.ResponseWriter, r *http.Request) {
 	if stepHandlersErrors.DeletePolicyError {
 		writeError(w, "", http.StatusNotFound, codes.Internal)
-		//return
+		// return
 	}
 	w.WriteHeader(http.StatusNoContent)
 	// response body is empty

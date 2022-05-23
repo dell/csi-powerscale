@@ -100,72 +100,14 @@ type feature struct {
 	getStorageProtectionGroupStatusRequest  *csiext.GetStorageProtectionGroupStatusRequest
 	executeActionRequest                    *csiext.ExecuteActionRequest
 	executeActionResponse                   *csiext.ExecuteActionResponse
+	getReplicationCapabilityRequest         *csiext.GetReplicationCapabilityRequest
+	getReplicationCapabilityResponse        *csiext.GetReplicationCapabilityResponse
+	validateVolumeHostConnectivityResp      *podmon.ValidateVolumeHostConnectivityResponse
 	volumeIDList                            []string
 	snapshotIDList                          []string
 	groupIDList                             []string
 	snapshotIndex                           int
 	rootClientEnabled                       string
-	nGoRoutines                          int
-	server                               *httptest.Server
-	service                              *service
-	err                                  error // return from the preceeding call
-	getPluginInfoResponse                *csi.GetPluginInfoResponse
-	getPluginCapabilitiesResponse        *csi.GetPluginCapabilitiesResponse
-	probeResponse                        *csi.ProbeResponse
-	createVolumeResponse                 *csi.CreateVolumeResponse
-	publishVolumeResponse                *csi.ControllerPublishVolumeResponse
-	unpublishVolumeResponse              *csi.ControllerUnpublishVolumeResponse
-	nodeGetInfoResponse                  *csi.NodeGetInfoResponse
-	nodeGetCapabilitiesResponse          *csi.NodeGetCapabilitiesResponse
-	deleteVolumeResponse                 *csi.DeleteVolumeResponse
-	getCapacityResponse                  *csi.GetCapacityResponse
-	controllerGetCapabilitiesResponse    *csi.ControllerGetCapabilitiesResponse
-	validateVolumeCapabilitiesResponse   *csi.ValidateVolumeCapabilitiesResponse
-	createSnapshotResponse               *csi.CreateSnapshotResponse
-	createVolumeRequest                  *csi.CreateVolumeRequest
-	createRemoteVolumeRequest            *csiext.CreateRemoteVolumeRequest
-	createRemoteVolumeResponse           *csiext.CreateRemoteVolumeResponse
-	createStorageProtectionGroupRequest  *csiext.CreateStorageProtectionGroupRequest
-	createStorageProtectionGroupResponse *csiext.CreateStorageProtectionGroupResponse
-	deleteStorageProtectionGroupRequest  *csiext.DeleteStorageProtectionGroupRequest
-	deleteStorageProtectionGroupResponse *csiext.DeleteStorageProtectionGroupResponse
-	publishVolumeRequest                 *csi.ControllerPublishVolumeRequest
-	unpublishVolumeRequest               *csi.ControllerUnpublishVolumeRequest
-	deleteVolumeRequest                  *csi.DeleteVolumeRequest
-	controllerExpandVolumeRequest        *csi.ControllerExpandVolumeRequest
-	controllerExpandVolumeResponse       *csi.ControllerExpandVolumeResponse
-	controllerGetVolumeRequest           *csi.ControllerGetVolumeRequest
-	controllerGetVolumeResponse          *csi.ControllerGetVolumeResponse
-	listVolumesRequest                   *csi.ListVolumesRequest
-	listVolumesResponse                  *csi.ListVolumesResponse
-	listSnapshotsRequest                 *csi.ListSnapshotsRequest
-	listSnapshotsResponse                *csi.ListSnapshotsResponse
-	listedVolumeIDs                      map[string]bool
-	listVolumesNextTokenCache            string
-	wrongCapacity, wrongStoragePool      bool
-	accessZone                           string
-	capability                           *csi.VolumeCapability
-	capabilities                         []*csi.VolumeCapability
-	nodeStageVolumeRequest               *csi.NodeStageVolumeRequest
-	nodeStageVolumeResponse              *csi.NodeStageVolumeResponse
-	nodeUnstageVolumeRequest             *csi.NodeUnstageVolumeRequest
-	nodeUnstageVolumeResponse            *csi.NodeUnstageVolumeResponse
-	nodePublishVolumeRequest             *csi.NodePublishVolumeRequest
-	nodeUnpublishVolumeRequest           *csi.NodeUnpublishVolumeRequest
-	nodeUnpublishVolumeResponse          *csi.NodeUnpublishVolumeResponse
-	nodeGetVolumeStatsRequest            *csi.NodeGetVolumeStatsRequest
-	nodeGetVolumeStatsResponse           *csi.NodeGetVolumeStatsResponse
-	deleteSnapshotRequest                *csi.DeleteSnapshotRequest
-	deleteSnapshotResponse               *csi.DeleteSnapshotResponse
-	createSnapshotRequest                *csi.CreateSnapshotRequest
-	getReplicationCapabilityRequest      *csiext.GetReplicationCapabilityRequest
-	getReplicationCapabilityResponse     *csiext.GetReplicationCapabilityResponse
-	validateVolumeHostConnectivityResp   *podmon.ValidateVolumeHostConnectivityResponse
-	volumeIDList                         []string
-	snapshotIDList                       []string
-	groupIDList                          []string
-	snapshotIndex                        int
-	rootClientEnabled                    string
 }
 
 var inducedErrors struct {
@@ -1102,6 +1044,9 @@ func clearErrors() {
 	stepHandlersErrors.getSpgCount = 0
 	stepHandlersErrors.getSpgTPCount = 0
 	stepHandlersErrors.getExportCount = 0
+	stepHandlersErrors.getPolicyTPCount = 0
+	stepHandlersErrors.getPolicyInternalErrorTPCount = 0
+	stepHandlersErrors.getPolicyNotFoundTPCount = 0
 	stepHandlersErrors.DeletePolicyError = false
 	stepHandlersErrors.DeletePolicyInternalError = false
 	stepHandlersErrors.DeletePolicyNotAPIError = false
@@ -2684,7 +2629,6 @@ func (f *feature) iCallGetReplicationCapabilities() error {
 	return nil
 }
 
-
 func getStorageProtectionGroupStatusRequestWithParams(s *service, id, localSystemName, remoteSystemName, vgname, clustername1, clustername2 string) *csiext.GetStorageProtectionGroupStatusRequest {
 	req := new(csiext.GetStorageProtectionGroupStatusRequest)
 	req.ProtectionGroupId = id
@@ -2975,6 +2919,8 @@ func (f *feature) iCallCreateStorageProtectionGroupBad() error {
 		log.Printf("CreateStorageProtectionGroup call failed: %s\n", f.err.Error())
 	}
 	return nil
+}
+
 func (f *feature) aValidGetReplicationCapabilitiesResponseIsReturned() error {
 	rep := f.getReplicationCapabilityResponse
 	if rep != nil {
