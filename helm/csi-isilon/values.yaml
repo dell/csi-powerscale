@@ -2,7 +2,7 @@
 ########################
 # version: version of this values file
 # Note: Do not change this value
-version: "2.2.0"
+version: "2.3.0"
 
 # CSI driver log level
 # Allowed values: "error", "warn"/"warning", "info", "debug"
@@ -68,6 +68,17 @@ enableCustomTopology: false
 #   None: volumes will be mounted with no modifications.
 # Default value: ReadWriteOnceWithFSType
 fsGroupPolicy: ReadWriteOnceWithFSType
+
+# podmonAPIPort: Defines the port to be used within the kubernetes cluster
+# Allowed values:
+#   Any valid and free port.
+# Default value: 8083
+podmonAPIPort: 8083
+
+# maxPathLen: this parameter is used for setting the maximum Path length for the given volume.
+# Default value: 128
+# Examples: 128, 256
+maxPathLen: 128
 
 # controller: configure controller pod specific parameters
 controller:
@@ -311,3 +322,28 @@ authorization:
   #   "false" - TLS certificate will be verified 
   # Default value: "true" 
   skipCertificateValidation: true
+
+# Enable this feature only after contact support for additional information
+podmon:
+  enabled: false
+  image: dellemc/podmon:v1.2.0
+  #controller:
+  #  args:
+  #    - "--csisock=unix:/var/run/csi/csi.sock"
+  #    - "--labelvalue=csi-isilon"
+  #    - "--arrayConnectivityPollRate=60"
+  #    - "--driverPath=csi-isilon.dellemc.com"
+  #    - "--mode=controller"
+  #    - "--skipArrayConnectionValidation=false"
+  #    - "--driver-config-params=/csi-isilon-config-params/driver-config-params.yaml"
+  #    - "--driverPodLabelValue=dell-storage"
+  #node:
+  #  args:
+  #    - "--csisock=unix:/var/lib/kubelet/plugins/csi-isilon/csi_sock"
+  #    - "--labelvalue=csi-isilon"
+  #    - "--arrayConnectivityPollRate=60"
+  #    - "--driverPath=csi-isilon.dellemc.com"
+  #    - "--mode=node"
+  #    - "--leaderelection=false"
+  #    - "--driver-config-params=/csi-isilon-config-params/driver-config-params.yaml"
+  #    - "--driverPodLabelValue=dell-storage"

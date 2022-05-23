@@ -14,7 +14,13 @@ rules:
     verbs: ["list", "watch", "create", "update", "patch"]
   - apiGroups: [""]
     resources: ["nodes"]
+  {{- if hasKey .Values "podmon" }}
+  {{- if eq .Values.podmon.enabled true }}
+    verbs: ["get", "list", "watch", "patch"]
+  {{- else }}
     verbs: ["get", "list", "watch"]
+  {{- end }}
+  {{- end }}
   - apiGroups: [""]
     resources: ["persistentvolumes"]
     verbs: ["get", "list", "watch", "create", "delete", "update"]
@@ -23,13 +29,25 @@ rules:
     verbs: ["get", "list", "watch", "update"]
   - apiGroups: [""]
     resources: ["pods"]
+  {{- if hasKey .Values "podmon" }}
+  {{- if eq .Values.podmon.enabled true }}
+    verbs: ["get", "list", "watch", "update", "delete"]
+  {{- else }}
     verbs: ["get", "list", "watch"]
+  {{- end }}
+  {{- end }}
   - apiGroups: ["storage.k8s.io"]
     resources: ["storageclasses"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
+  {{- if hasKey .Values "podmon" }}
+  {{- if eq .Values.podmon.enabled true }}
+    verbs: ["get", "list", "watch", "update", "patch", "delete"]
+  {{- else }}
     verbs: ["get", "list", "watch", "update", "patch"]
+  {{- end }}
+  {{- end }}
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments/status"]
     verbs: ["patch"]
@@ -148,6 +166,33 @@ spec:
       {{- toYaml .Values.controller.tolerations | nindent 8 }}
       {{ end }}
       containers:
+        {{- if hasKey .Values "podmon" }}
+        {{- if eq .Values.podmon.enabled true }}
+        - name: podmon
+          image: {{ required "Must provide the podmon container image." .Values.podmon.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          args:
+            {{- toYaml .Values.podmon.controller.args | nindent 12 }}
+          env:
+            - name: MY_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
+            - name: csi-isilon-config-params
+              mountPath: /csi-isilon-config-params
+        {{- end }}
+        {{- end }}
         {{- if hasKey .Values.controller "replication" }}
         {{- if eq .Values.controller.replication.enabled true}}
         - name: dell-csi-replicator
@@ -368,6 +413,18 @@ spec:
               value: "{{ .Values.isiVolumePathPermissions }}"
             - name: X_CSI_ISI_NO_PROBE_ON_START
               value: "{{ .Values.noProbeOnStart }}"
+            - name: X_CSI_PODMON_ENABLED
+              value: "{{ .Values.podmon.enabled }}"
+            - name: X_CSI_PODMON_API_PORT
+              value: "{{ .Values.podmonAPIPort }}"
+            {{- if eq .Values.podmon.enabled true }}
+              {{- range $key, $value := .Values.podmon.controller.args }}
+                {{- if contains "--arrayConnectivityPollRate" $value }}
+            - name: X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE
+              value: "{{ (split "=" $value)._1 }}"
+                {{ end }}
+              {{ end }}
+            {{ end }}
             {{- if hasKey .Values.controller "replication" }}
             {{- if eq .Values.controller.replication.enabled true}}
             - name: X_CSI_REPLICATION_CONTEXT_PREFIX
@@ -390,6 +447,8 @@ spec:
               value: /certs
             - name: X_CSI_ISI_CONFIG_PATH
               value: /isilon-configs/config
+            - name: X_CSI_MAX_PATH_LIMIT
+              value: "{{ .Values.maxPathLen }}"
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi

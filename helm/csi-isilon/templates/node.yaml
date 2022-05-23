@@ -34,6 +34,16 @@ rules:
     resourceNames: [ "privileged" ]
     resources: [ "securitycontextconstraints" ]
     verbs: [ "use" ]
+  {{- if hasKey .Values "podmon" }}
+  {{- if eq .Values.podmon.enabled true }}
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "update", "delete"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "watch", "list", "delete", "update", "create"]
+  {{ end }}
+  {{ end }}
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -67,6 +77,9 @@ spec:
     metadata:
       labels:
         app: {{ .Release.Name }}-node
+{{- if .Values.podmon.enabled }}
+        driver.dellemc.com: dell-storage
+{{- end }}
     spec:
       serviceAccount: {{ .Release.Name }}-node
       {{ if .Values.node.nodeSelector }}
@@ -80,6 +93,58 @@ spec:
       hostNetwork: true
       dnsPolicy: {{ .Values.node.dnsPolicy }}
       containers:
+      {{- if hasKey .Values "podmon" }}
+      {{- if eq .Values.podmon.enabled true }}
+        - name: podmon
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+          image: {{ required "Must provide the podmon container image." .Values.podmon.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          args:
+            {{- toYaml .Values.podmon.node.args | nindent 12 }}
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: X_CSI_PRIVATE_MOUNT_DIR
+              value: "{{ .Values.kubeletConfigDir }}/plugins/csi-isilon/disks"
+            - name: MY_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: kubelet-pods
+              mountPath: {{ .Values.kubeletConfigDir }}/pods
+              mountPropagation: "Bidirectional"
+            - name: driver-path
+              mountPath: {{ .Values.kubeletConfigDir }}/plugins/csi-isilon
+              mountPropagation: "Bidirectional"
+            - name: volumedevices-path
+              mountPath: {{ .Values.kubeletConfigDir }}/plugins/kubernetes.io/csi/volumeDevices
+              mountPropagation: "Bidirectional"
+            - name: dev
+              mountPath: /dev
+            - name: usr-bin
+              mountPath: /usr-bin
+            - name: var-run
+              mountPath: /var/run
+            - name: csi-isilon-config-params
+              mountPath: /csi-isilon-config-params
+      {{- end }}
+      {{- end }}
         - name: driver
           command: ["/csi-isilon"]
           args:
@@ -134,6 +199,20 @@ spec:
               value: "{{ .Values.maxIsilonVolumesPerNode }}"
             - name: X_CSI_HEALTH_MONITOR_ENABLED
               value: "{{ .Values.node.healthMonitor.enabled }}"
+            - name: X_CSI_PODMON_ENABLED
+              value: "{{ .Values.podmon.enabled }}"
+            - name: X_CSI_PODMON_API_PORT
+              value: "{{ .Values.podmonAPIPort }}"
+            {{- if eq .Values.podmon.enabled true }}
+              {{- range $key, $value := .Values.podmon.node.args }}
+                {{- if contains "--arrayConnectivityPollRate" $value }}
+            - name: X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE
+              value: "{{ (split "=" $value)._1 }}"
+                {{ end }}
+              {{ end }}
+            {{ end }}
+            - name: X_CSI_MAX_PATH_LIMIT
+              value: "{{ .Values.maxPathLen }}"
           volumeMounts:
             - name: driver-path
               mountPath: {{ .Values.kubeletConfigDir }}/plugins/csi-isilon
@@ -247,5 +326,21 @@ spec:
         - name: proxy-server-root-certificate
           secret:
             secretName: proxy-server-root-certificate
+        {{ end }}
+        {{ end }}
+        {{- if hasKey .Values "podmon" }}
+        {{- if eq .Values.podmon.enabled true }}
+        - name: usr-bin
+          hostPath:
+            path: /usr/bin
+            type: Directory
+        - name: kubelet-pods
+          hostPath:
+            path: /var/lib/kubelet/pods
+            type: Directory
+        - name: var-run
+          hostPath:
+            path: /var/run
+            type: Directory
         {{ end }}
         {{ end }}

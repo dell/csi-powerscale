@@ -67,4 +67,10 @@ const (
 
 	//ParamCSILogLevel csi driver log level
 	ParamCSILogLevel = "CSI_LOG_LEVEL"
+
+	//DefaultPodmonAPIPortNumber is the port number in default to expose internal health APIs
+	DefaultPodmonAPIPortNumber = "8083"
+
+	//DefaultPodmonPollRate is the default polling frequency to check for array connectivity
+	DefaultPodmonPollRate = 60
 )

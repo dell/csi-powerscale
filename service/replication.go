@@ -280,8 +280,19 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 			return nil, status.Errorf(codes.Internal, "VG '%s' is not empty", isiPath)
 		}
 	}
+
 	ppName := strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(isiPath, isiConfig.IsiPath), "/", ""), ".", "-")
 	err = isiConfig.isiSvc.client.SyncPolicy(ctx, ppName)
+
+	log.Info("Breaking association on SRC site")
+	err = isiConfig.isiSvc.client.BreakAssociation(ctx, ppName)
+	e, ok := err.(*isiApi.JSONError)
+	if err != nil {
+		if (ok && e.StatusCode != 404) || !strings.Contains(err.Error(), "not found") {
+			return nil, status.Errorf(codes.Internal, "can't break association on source site %s", err.Error())
+		}
+	}
+
 	err = isiConfig.isiSvc.DeleteVolume(ctx, isiPath, "")
 	if err != nil {
 		return nil, err
@@ -666,6 +677,15 @@ func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteI
 	// this assumes we run reprotect_local action hence we use localIsiConfig
 
 	ppName := strings.ReplaceAll(vgName, ".", "-")
+	// if local allowed writes -- do not do failover
+
+	s1TP, err := localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "can't find remote replication policy, unexpected error %s", err.Error())
+	}
+	if s1TP.FailoverFailbackState == "writes_disabled" {
+		return status.Errorf(codes.InvalidArgument, "unable to perform reprotect with writes disabled, perform reprotect on another side")
+	}
 
 	remotePolicy, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 	if err != nil {

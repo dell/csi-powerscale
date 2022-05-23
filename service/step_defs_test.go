@@ -18,9 +18,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"github.com/dell/csi-isilon/common/constants"
-	"github.com/dell/csi-isilon/common/k8sutils"
-	csiext "github.com/dell/dell-csi-extensions/replication"
 	"log"
 	"net"
 	"net/http/httptest"
@@ -29,14 +26,20 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/dell/csi-isilon/common/constants"
+	"github.com/dell/csi-isilon/common/k8sutils"
+	csiext "github.com/dell/dell-csi-extensions/replication"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"os/exec"
+
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
+	podmon "github.com/dell/dell-csi-extensions/podmon"
 	"github.com/dell/gocsi"
 	"github.com/dell/gofsutil"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"os/exec"
 )
 
 type feature struct {
@@ -102,6 +105,67 @@ type feature struct {
 	groupIDList                             []string
 	snapshotIndex                           int
 	rootClientEnabled                       string
+	nGoRoutines                          int
+	server                               *httptest.Server
+	service                              *service
+	err                                  error // return from the preceeding call
+	getPluginInfoResponse                *csi.GetPluginInfoResponse
+	getPluginCapabilitiesResponse        *csi.GetPluginCapabilitiesResponse
+	probeResponse                        *csi.ProbeResponse
+	createVolumeResponse                 *csi.CreateVolumeResponse
+	publishVolumeResponse                *csi.ControllerPublishVolumeResponse
+	unpublishVolumeResponse              *csi.ControllerUnpublishVolumeResponse
+	nodeGetInfoResponse                  *csi.NodeGetInfoResponse
+	nodeGetCapabilitiesResponse          *csi.NodeGetCapabilitiesResponse
+	deleteVolumeResponse                 *csi.DeleteVolumeResponse
+	getCapacityResponse                  *csi.GetCapacityResponse
+	controllerGetCapabilitiesResponse    *csi.ControllerGetCapabilitiesResponse
+	validateVolumeCapabilitiesResponse   *csi.ValidateVolumeCapabilitiesResponse
+	createSnapshotResponse               *csi.CreateSnapshotResponse
+	createVolumeRequest                  *csi.CreateVolumeRequest
+	createRemoteVolumeRequest            *csiext.CreateRemoteVolumeRequest
+	createRemoteVolumeResponse           *csiext.CreateRemoteVolumeResponse
+	createStorageProtectionGroupRequest  *csiext.CreateStorageProtectionGroupRequest
+	createStorageProtectionGroupResponse *csiext.CreateStorageProtectionGroupResponse
+	deleteStorageProtectionGroupRequest  *csiext.DeleteStorageProtectionGroupRequest
+	deleteStorageProtectionGroupResponse *csiext.DeleteStorageProtectionGroupResponse
+	publishVolumeRequest                 *csi.ControllerPublishVolumeRequest
+	unpublishVolumeRequest               *csi.ControllerUnpublishVolumeRequest
+	deleteVolumeRequest                  *csi.DeleteVolumeRequest
+	controllerExpandVolumeRequest        *csi.ControllerExpandVolumeRequest
+	controllerExpandVolumeResponse       *csi.ControllerExpandVolumeResponse
+	controllerGetVolumeRequest           *csi.ControllerGetVolumeRequest
+	controllerGetVolumeResponse          *csi.ControllerGetVolumeResponse
+	listVolumesRequest                   *csi.ListVolumesRequest
+	listVolumesResponse                  *csi.ListVolumesResponse
+	listSnapshotsRequest                 *csi.ListSnapshotsRequest
+	listSnapshotsResponse                *csi.ListSnapshotsResponse
+	listedVolumeIDs                      map[string]bool
+	listVolumesNextTokenCache            string
+	wrongCapacity, wrongStoragePool      bool
+	accessZone                           string
+	capability                           *csi.VolumeCapability
+	capabilities                         []*csi.VolumeCapability
+	nodeStageVolumeRequest               *csi.NodeStageVolumeRequest
+	nodeStageVolumeResponse              *csi.NodeStageVolumeResponse
+	nodeUnstageVolumeRequest             *csi.NodeUnstageVolumeRequest
+	nodeUnstageVolumeResponse            *csi.NodeUnstageVolumeResponse
+	nodePublishVolumeRequest             *csi.NodePublishVolumeRequest
+	nodeUnpublishVolumeRequest           *csi.NodeUnpublishVolumeRequest
+	nodeUnpublishVolumeResponse          *csi.NodeUnpublishVolumeResponse
+	nodeGetVolumeStatsRequest            *csi.NodeGetVolumeStatsRequest
+	nodeGetVolumeStatsResponse           *csi.NodeGetVolumeStatsResponse
+	deleteSnapshotRequest                *csi.DeleteSnapshotRequest
+	deleteSnapshotResponse               *csi.DeleteSnapshotResponse
+	createSnapshotRequest                *csi.CreateSnapshotRequest
+	getReplicationCapabilityRequest      *csiext.GetReplicationCapabilityRequest
+	getReplicationCapabilityResponse     *csiext.GetReplicationCapabilityResponse
+	validateVolumeHostConnectivityResp   *podmon.ValidateVolumeHostConnectivityResponse
+	volumeIDList                         []string
+	snapshotIDList                       []string
+	groupIDList                          []string
+	snapshotIndex                        int
+	rootClientEnabled                    string
 }
 
 var inducedErrors struct {
@@ -374,6 +438,10 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call BadCreateRemoteVolume`, f.iCallCreateRemoteVolumeBad)
 	s.Step(`^I call BadCreateStorageProtectionGroup`, f.iCallCreateStorageProtectionGroupBad)
 	//s.Step(`I call ExecuteActionWithParams "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)"$`, f.iCallExecuteActionWithParams)
+	s.Step(`^I call GetReplicationCapabilities`, f.iCallGetReplicationCapabilities)
+	s.Step(`^a valid GetReplicationCapabilitiesResponse is returned$`, f.aValidGetReplicationCapabilitiesResponseIsReturned)
+	s.Step(`^I call ValidateConnectivity$`, f.iCallValidateVolumeHostConnectivity)
+	s.Step(`^the ValidateConnectivity response message contains "([^"]*)"$`, f.theValidateConnectivityResponseMessageContains)
 }
 
 // GetPluginInfo
@@ -822,6 +890,12 @@ func (f *feature) iInduceError(errtype string) error {
 		stepHandlersErrors.GetSpgTPErrors = true
 	case "GetExportPolicyError":
 		stepHandlersErrors.GetExportPolicyError = true
+	case "no-nodeId":
+		stepHandlersErrors.PodmonVolumeStatisticsError = true
+		stepHandlersErrors.PodmonNoNodeIDError = true
+	case "no-volume-no-nodeId":
+		stepHandlersErrors.PodmonVolumeStatisticsError = true
+		stepHandlersErrors.PodmonNoVolumeNoNodeIDError = true
 	case "none":
 
 	default:
@@ -2600,6 +2674,17 @@ func (f *feature) aValidGetStorageProtectionGroupStatusResponseIsReturned() erro
 	return nil
 }
 
+func (f *feature) iCallGetReplicationCapabilities() error {
+	req := new(csiext.GetReplicationCapabilityRequest)
+	f.getReplicationCapabilityResponse, f.err = f.service.GetReplicationCapabilities(context.Background(), req)
+	if f.err != nil {
+		log.Printf("GetReplicationCapabilities call failed: %s\n", f.err.Error())
+		return f.err
+	}
+	return nil
+}
+
+
 func getStorageProtectionGroupStatusRequestWithParams(s *service, id, localSystemName, remoteSystemName, vgname, clustername1, clustername2 string) *csiext.GetStorageProtectionGroupStatusRequest {
 	req := new(csiext.GetStorageProtectionGroupStatusRequest)
 	req.ProtectionGroupId = id
@@ -2890,4 +2975,139 @@ func (f *feature) iCallCreateStorageProtectionGroupBad() error {
 		log.Printf("CreateStorageProtectionGroup call failed: %s\n", f.err.Error())
 	}
 	return nil
+func (f *feature) aValidGetReplicationCapabilitiesResponseIsReturned() error {
+	rep := f.getReplicationCapabilityResponse
+	if rep != nil {
+		if rep.Capabilities == nil {
+			return errors.New("no capabilities returned in GetReplicationCapabilitiesResponse")
+		}
+		count := 0
+		for _, cap := range rep.Capabilities {
+			rpcType := cap.GetRpc().Type
+			switch rpcType {
+			case csiext.ReplicationCapability_RPC_CREATE_REMOTE_VOLUME:
+				count = count + 1
+			case csiext.ReplicationCapability_RPC_CREATE_PROTECTION_GROUP:
+				count = count + 1
+			case csiext.ReplicationCapability_RPC_DELETE_PROTECTION_GROUP:
+				count = count + 1
+			case csiext.ReplicationCapability_RPC_REPLICATION_ACTION_EXECUTION:
+				count = count + 1
+			case csiext.ReplicationCapability_RPC_MONITOR_PROTECTION_GROUP:
+				count = count + 1
+			default:
+				return fmt.Errorf("received unexpected capability: %v", rpcType)
+			}
+		}
+
+		if rep.Actions == nil {
+			return errors.New("no actions returned in GetReplicationCapabilitiesResponse")
+		}
+		for _, action := range rep.Actions {
+			actType := action.GetType()
+			switch actType {
+			case csiext.ActionTypes_FAILOVER_REMOTE:
+				count = count + 1
+			case csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL:
+				count = count + 1
+			case csiext.ActionTypes_REPROTECT_LOCAL:
+				count = count + 1
+			case csiext.ActionTypes_SUSPEND:
+				count = count + 1
+			case csiext.ActionTypes_RESUME:
+				count = count + 1
+			case csiext.ActionTypes_SYNC:
+				count = count + 1
+			default:
+				return fmt.Errorf("received unexpected actiontype: %v", actType)
+
+			}
+		}
+
+	}
+
+	return nil
+}
+
+func (f *feature) iCallValidateVolumeHostConnectivity() error {
+
+	header := metadata.New(map[string]string{"csi.requestid": "1"})
+	ctx := metadata.NewIncomingContext(context.Background(), header)
+
+	csiNodeID, err := f.service.getPowerScaleNodeID(ctx)
+	if err != nil {
+		f.err = errors.New(err.Error())
+		return nil
+	}
+	log.Printf("Node id is: %v", csiNodeID)
+
+	volIDs := make([]string, 0)
+
+	if stepHandlersErrors.PodmonNoVolumeNoNodeIDError == true {
+		csiNodeID = ""
+	} else if stepHandlersErrors.PodmonNoNodeIDError == true {
+		csiNodeID = ""
+		volid := f.createVolumeResponse.GetVolume().VolumeId
+		volIDs = volIDs[:0]
+		volIDs = append(volIDs, volid)
+	} else if stepHandlersErrors.PodmonControllerProbeError == true {
+		f.service.mode = "controller"
+	} else if stepHandlersErrors.PodmonNodeProbeError == true {
+		f.service.mode = "node"
+	} else if stepHandlersErrors.PodmonVolumeError == true {
+		volid := "9999"
+		volIDs = append(volIDs, volid)
+	} else {
+		volid := f.createVolumeResponse.GetVolume().VolumeId
+		volIDs = volIDs[:0]
+		volIDs = append(volIDs, volid)
+	}
+
+	req := &podmon.ValidateVolumeHostConnectivityRequest{
+		NodeId:    csiNodeID,
+		VolumeIds: volIDs,
+	}
+
+	connect, err := f.service.ValidateVolumeHostConnectivity(ctx, req)
+	if err != nil {
+		f.err = errors.New(err.Error())
+		return nil
+	}
+	f.validateVolumeHostConnectivityResp = connect
+	if len(connect.Messages) > 0 {
+		for i, msg := range connect.Messages {
+			fmt.Printf("messages %d: %s\n", i, msg)
+			if stepHandlersErrors.PodmonVolumeStatisticsError == true ||
+				stepHandlersErrors.PodmonVolumeError == true {
+				if strings.Contains(msg, "volume") {
+					fmt.Printf("found %d: %s\n", i, msg)
+					f.err = errors.New(connect.Messages[i])
+					return nil
+				}
+			}
+		}
+		fmt.Printf("DEBUG connect Messages %s\n", connect.Messages[0])
+		if stepHandlersErrors.PodmonVolumeStatisticsError == true {
+			f.err = errors.New(connect.Messages[0])
+			return nil
+		}
+	}
+
+	if connect.IosInProgress {
+		return nil
+	}
+	err = fmt.Errorf("Unexpected error IO to volume: %t", connect.IosInProgress)
+	return nil
+}
+
+func (f *feature) theValidateConnectivityResponseMessageContains(expected string) error {
+	resp := f.validateVolumeHostConnectivityResp
+	if resp != nil {
+		for _, m := range resp.Messages {
+			if strings.Contains(m, expected) {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("Expected %s message in ValidateVolumeHostConnectivityResp but it wasn't there", expected)
 }
