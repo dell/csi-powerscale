@@ -43,67 +43,71 @@ import (
 )
 
 type feature struct {
-	nGoRoutines                          int
-	server                               *httptest.Server
-	service                              *service
-	err                                  error // return from the preceeding call
-	getPluginInfoResponse                *csi.GetPluginInfoResponse
-	getPluginCapabilitiesResponse        *csi.GetPluginCapabilitiesResponse
-	probeResponse                        *csi.ProbeResponse
-	createVolumeResponse                 *csi.CreateVolumeResponse
-	publishVolumeResponse                *csi.ControllerPublishVolumeResponse
-	unpublishVolumeResponse              *csi.ControllerUnpublishVolumeResponse
-	nodeGetInfoResponse                  *csi.NodeGetInfoResponse
-	nodeGetCapabilitiesResponse          *csi.NodeGetCapabilitiesResponse
-	deleteVolumeResponse                 *csi.DeleteVolumeResponse
-	getCapacityResponse                  *csi.GetCapacityResponse
-	controllerGetCapabilitiesResponse    *csi.ControllerGetCapabilitiesResponse
-	validateVolumeCapabilitiesResponse   *csi.ValidateVolumeCapabilitiesResponse
-	createSnapshotResponse               *csi.CreateSnapshotResponse
-	createVolumeRequest                  *csi.CreateVolumeRequest
-	createRemoteVolumeRequest            *csiext.CreateRemoteVolumeRequest
-	createRemoteVolumeResponse           *csiext.CreateRemoteVolumeResponse
-	createStorageProtectionGroupRequest  *csiext.CreateStorageProtectionGroupRequest
-	createStorageProtectionGroupResponse *csiext.CreateStorageProtectionGroupResponse
-	deleteStorageProtectionGroupRequest  *csiext.DeleteStorageProtectionGroupRequest
-	deleteStorageProtectionGroupResponse *csiext.DeleteStorageProtectionGroupResponse
-	publishVolumeRequest                 *csi.ControllerPublishVolumeRequest
-	unpublishVolumeRequest               *csi.ControllerUnpublishVolumeRequest
-	deleteVolumeRequest                  *csi.DeleteVolumeRequest
-	controllerExpandVolumeRequest        *csi.ControllerExpandVolumeRequest
-	controllerExpandVolumeResponse       *csi.ControllerExpandVolumeResponse
-	controllerGetVolumeRequest           *csi.ControllerGetVolumeRequest
-	controllerGetVolumeResponse          *csi.ControllerGetVolumeResponse
-	listVolumesRequest                   *csi.ListVolumesRequest
-	listVolumesResponse                  *csi.ListVolumesResponse
-	listSnapshotsRequest                 *csi.ListSnapshotsRequest
-	listSnapshotsResponse                *csi.ListSnapshotsResponse
-	listedVolumeIDs                      map[string]bool
-	listVolumesNextTokenCache            string
-	wrongCapacity, wrongStoragePool      bool
-	accessZone                           string
-	capability                           *csi.VolumeCapability
-	capabilities                         []*csi.VolumeCapability
-	nodeStageVolumeRequest               *csi.NodeStageVolumeRequest
-	nodeStageVolumeResponse              *csi.NodeStageVolumeResponse
-	nodeUnstageVolumeRequest             *csi.NodeUnstageVolumeRequest
-	nodeUnstageVolumeResponse            *csi.NodeUnstageVolumeResponse
-	nodePublishVolumeRequest             *csi.NodePublishVolumeRequest
-	nodeUnpublishVolumeRequest           *csi.NodeUnpublishVolumeRequest
-	nodeUnpublishVolumeResponse          *csi.NodeUnpublishVolumeResponse
-	nodeGetVolumeStatsRequest            *csi.NodeGetVolumeStatsRequest
-	nodeGetVolumeStatsResponse           *csi.NodeGetVolumeStatsResponse
-	deleteSnapshotRequest                *csi.DeleteSnapshotRequest
-	deleteSnapshotResponse               *csi.DeleteSnapshotResponse
-	createSnapshotRequest                *csi.CreateSnapshotRequest
-	getReplicationCapabilityRequest      *csiext.GetReplicationCapabilityRequest
-	getReplicationCapabilityResponse     *csiext.GetReplicationCapabilityResponse
-	validateVolumeHostConnectivityResp   *podmon.ValidateVolumeHostConnectivityResponse
-	volumeIDList                         []string
-	snapshotIDList                       []string
-	groupIDList                          []string
-	snapshotIndex                        int
-	rootClientEnabled                    string
+	nGoRoutines                             int
+	server                                  *httptest.Server
+	service                                 *service
+	err                                     error // return from the preceeding call
+	getPluginInfoResponse                   *csi.GetPluginInfoResponse
+	getPluginCapabilitiesResponse           *csi.GetPluginCapabilitiesResponse
+	probeResponse                           *csi.ProbeResponse
+	createVolumeResponse                    *csi.CreateVolumeResponse
+	publishVolumeResponse                   *csi.ControllerPublishVolumeResponse
+	unpublishVolumeResponse                 *csi.ControllerUnpublishVolumeResponse
+	nodeGetInfoResponse                     *csi.NodeGetInfoResponse
+	nodeGetCapabilitiesResponse             *csi.NodeGetCapabilitiesResponse
+	deleteVolumeResponse                    *csi.DeleteVolumeResponse
+	getCapacityResponse                     *csi.GetCapacityResponse
+	controllerGetCapabilitiesResponse       *csi.ControllerGetCapabilitiesResponse
+	validateVolumeCapabilitiesResponse      *csi.ValidateVolumeCapabilitiesResponse
+	createSnapshotResponse                  *csi.CreateSnapshotResponse
+	createVolumeRequest                     *csi.CreateVolumeRequest
+	createRemoteVolumeRequest               *csiext.CreateRemoteVolumeRequest
+	createRemoteVolumeResponse              *csiext.CreateRemoteVolumeResponse
+	createStorageProtectionGroupRequest     *csiext.CreateStorageProtectionGroupRequest
+	createStorageProtectionGroupResponse    *csiext.CreateStorageProtectionGroupResponse
+	deleteStorageProtectionGroupRequest     *csiext.DeleteStorageProtectionGroupRequest
+	deleteStorageProtectionGroupResponse    *csiext.DeleteStorageProtectionGroupResponse
+	publishVolumeRequest                    *csi.ControllerPublishVolumeRequest
+	unpublishVolumeRequest                  *csi.ControllerUnpublishVolumeRequest
+	deleteVolumeRequest                     *csi.DeleteVolumeRequest
+	controllerExpandVolumeRequest           *csi.ControllerExpandVolumeRequest
+	controllerExpandVolumeResponse          *csi.ControllerExpandVolumeResponse
+	controllerGetVolumeRequest              *csi.ControllerGetVolumeRequest
+	controllerGetVolumeResponse             *csi.ControllerGetVolumeResponse
+	listVolumesRequest                      *csi.ListVolumesRequest
+	listVolumesResponse                     *csi.ListVolumesResponse
+	listSnapshotsRequest                    *csi.ListSnapshotsRequest
+	listSnapshotsResponse                   *csi.ListSnapshotsResponse
+	listedVolumeIDs                         map[string]bool
+	listVolumesNextTokenCache               string
+	wrongCapacity, wrongStoragePool         bool
+	accessZone                              string
+	capability                              *csi.VolumeCapability
+	capabilities                            []*csi.VolumeCapability
+	nodeStageVolumeRequest                  *csi.NodeStageVolumeRequest
+	nodeStageVolumeResponse                 *csi.NodeStageVolumeResponse
+	nodeUnstageVolumeRequest                *csi.NodeUnstageVolumeRequest
+	nodeUnstageVolumeResponse               *csi.NodeUnstageVolumeResponse
+	nodePublishVolumeRequest                *csi.NodePublishVolumeRequest
+	nodeUnpublishVolumeRequest              *csi.NodeUnpublishVolumeRequest
+	nodeUnpublishVolumeResponse             *csi.NodeUnpublishVolumeResponse
+	nodeGetVolumeStatsRequest               *csi.NodeGetVolumeStatsRequest
+	nodeGetVolumeStatsResponse              *csi.NodeGetVolumeStatsResponse
+	deleteSnapshotRequest                   *csi.DeleteSnapshotRequest
+	deleteSnapshotResponse                  *csi.DeleteSnapshotResponse
+	createSnapshotRequest                   *csi.CreateSnapshotRequest
+	getStorageProtectionGroupStatusResponse *csiext.GetStorageProtectionGroupStatusResponse
+	getStorageProtectionGroupStatusRequest  *csiext.GetStorageProtectionGroupStatusRequest
+	executeActionRequest                    *csiext.ExecuteActionRequest
+	executeActionResponse                   *csiext.ExecuteActionResponse
+	getReplicationCapabilityRequest         *csiext.GetReplicationCapabilityRequest
+	getReplicationCapabilityResponse        *csiext.GetReplicationCapabilityResponse
+	validateVolumeHostConnectivityResp      *podmon.ValidateVolumeHostConnectivityResponse
+	volumeIDList                            []string
+	snapshotIDList                          []string
+	groupIDList                             []string
+	snapshotIndex                           int
+	rootClientEnabled                       string
 }
 
 var inducedErrors struct {
@@ -357,10 +361,25 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a valid CreateRemoteVolumeResponse is returned$`, f.aValidCreateRemoteVolumeResponseIsReturned)
 	s.Step(`I call CreateStorageProtectionGroup`, f.iCallCreateStorageProtectionGroup)
 	s.Step(`^a valid CreateStorageProtectionGroupResponse is returned$`, f.aValidCreateStorageProtectionGroupResponseIsReturned)
-	s.Step(`I call DeleteStorageProtectionGroup`, f.iCallDeleteStorageProtectionGroup)
+	s.Step(`^I call StorageProtectionGroupDelete "([^"]*)" and "([^"]*)" and "([^"]*)"$`, f.iCallStorageProtectionGroupDelete)
 	s.Step(`^a valid DeleteStorageProtectionGroupResponse is returned$`, f.aValidDeleteStorageProtectionGroupResponseIsReturned)
+	//s.Step(`^I call DeleteStorageProtectionGroupWithParams"$`, f.iCallWithParamsDeleteStorageProtectionGroup)
 	s.Step(`^I call WithParamsCreateRemoteVolume "([^"]*)" "([^"]*)"$`, f.iCallCreateRemoteVolumeWithParams)
 	s.Step(`^I call WithParamsCreateStorageProtectionGroup "([^"]*)" "([^"]*)"$`, f.iCallCreateStorageProtectionGroupWithParams)
+	s.Step(`I call GetStorageProtectionGroupStatus`, f.iCallGetStorageProtectionGroupStatus)
+	s.Step(`^a valid GetStorageProtectionGroupStatusResponse is returned$`, f.aValidGetStorageProtectionGroupStatusResponseIsReturned)
+	s.Step(`^I call WithParamsGetStorageProtectionGroupStatus "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)"$`, f.iCallGetStorageProtectionGroupStatusWithParams)
+	s.Step(`I call ExecuteAction to "([^"]*)" to "([^"]*)" to "([^"]*)" to "([^"]*)" to "([^"]*)" to "([^"]*)"$`, f.iCallExecuteAction)
+	s.Step(`^a valid ExecuteActionResponse is returned$`, f.aValidExecuteActionResponseIsReturned)
+	s.Step(`I call SuspendExecuteAction`, f.iCallExecuteActionSuspend)
+	s.Step(`I call ReprotectExecuteAction`, f.iCallExecuteActionReprotect)
+	s.Step(`I call SyncExecuteAction`, f.iCallExecuteActionSync)
+	s.Step(`^a valid ExecuteActionResponse is returned$`, f.aValidExecuteActionResponseIsReturned)
+	s.Step(`I call FailoverExecuteAction`, f.iCallExecuteActionSyncFailover)
+	s.Step(`I call FailoverUnplannedExecuteAction`, f.iCallExecuteActionSyncFailoverUnplanned)
+	s.Step(`^I call BadCreateRemoteVolume`, f.iCallCreateRemoteVolumeBad)
+	s.Step(`^I call BadCreateStorageProtectionGroup`, f.iCallCreateStorageProtectionGroupBad)
+	//s.Step(`I call ExecuteActionWithParams "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)"$`, f.iCallExecuteActionWithParams)
 	s.Step(`^I call GetReplicationCapabilities`, f.iCallGetReplicationCapabilities)
 	s.Step(`^a valid GetReplicationCapabilitiesResponse is returned$`, f.aValidGetReplicationCapabilitiesResponseIsReturned)
 	s.Step(`^I call ValidateConnectivity$`, f.iCallValidateVolumeHostConnectivity)
@@ -773,6 +792,46 @@ func (f *feature) iInduceError(errtype string) error {
 		stepHandlersErrors.QuotaNotFoundError = true
 	case "DeleteVolumeError":
 		stepHandlersErrors.DeleteVolumeError = true
+	case "GetPolicyInternalError":
+		stepHandlersErrors.GetPolicyInternalError = true
+	case "GetJobsInternalError":
+		stepHandlersErrors.GetJobsInternalError = true
+	case "GetTargetPolicyInternalError":
+		stepHandlersErrors.GetTargetPolicyInternalError = true
+	case "GetTargetPolicyNotFound":
+		stepHandlersErrors.GetTargetPolicyNotFound = true
+	case "GetPolicyNotFoundError":
+		stepHandlersErrors.GetPolicyNotFoundError = true
+	case "DeletePolicyError":
+		stepHandlersErrors.DeletePolicyError = true
+	case "DeletePolicyInternalError":
+		stepHandlersErrors.DeletePolicyInternalError = true
+	case "DeletePolicyNotAPIError":
+		stepHandlersErrors.DeletePolicyNotAPIError = true
+	case "FailedStatus":
+		stepHandlersErrors.FailedStatus = true
+	case "UnknownStatus":
+		stepHandlersErrors.UnknownStatus = true
+	case "UpdatePolicyError":
+		stepHandlersErrors.UpdatePolicyError = true
+	case "Reprotect":
+		stepHandlersErrors.Reprotect = true
+	case "ReprotectTP":
+		stepHandlersErrors.ReprotectTP = true
+	case "GetPolicyError":
+		stepHandlersErrors.GetPolicyError = true
+	case "Failover":
+		stepHandlersErrors.Failover = true
+	case "FailoverTP":
+		stepHandlersErrors.FailoverTP = true
+	case "Jobs":
+		stepHandlersErrors.Jobs = true
+	case "GetSpgErrors":
+		stepHandlersErrors.GetSpgErrors = true
+	case "GetSpgTPErrors":
+		stepHandlersErrors.GetSpgTPErrors = true
+	case "GetExportPolicyError":
+		stepHandlersErrors.GetExportPolicyError = true
 	case "no-nodeId":
 		stepHandlersErrors.PodmonVolumeStatisticsError = true
 		stepHandlersErrors.PodmonNoNodeIDError = true
@@ -970,6 +1029,39 @@ func clearErrors() {
 	stepHandlersErrors.DeleteVolumeError = false
 	inducedErrors.noIsiService = false
 	inducedErrors.autoProbeNotEnabled = false
+	stepHandlersErrors.GetJobsInternalError = false
+	stepHandlersErrors.GetPolicyInternalError = false
+	stepHandlersErrors.GetTargetPolicyInternalError = false
+	stepHandlersErrors.GetTargetPolicyNotFound = false
+	stepHandlersErrors.GetPolicyNotFoundError = false
+	stepHandlersErrors.count = 0
+	stepHandlersErrors.counter = 0
+	stepHandlersErrors.reprotectCount = 0
+	stepHandlersErrors.reprotectTPCount = 0
+	stepHandlersErrors.failoverTPCount = 0
+	stepHandlersErrors.failoverCount = 0
+	stepHandlersErrors.jobCount = 0
+	stepHandlersErrors.getSpgCount = 0
+	stepHandlersErrors.getSpgTPCount = 0
+	stepHandlersErrors.getExportCount = 0
+	stepHandlersErrors.getPolicyTPCount = 0
+	stepHandlersErrors.getPolicyInternalErrorTPCount = 0
+	stepHandlersErrors.getPolicyNotFoundTPCount = 0
+	stepHandlersErrors.DeletePolicyError = false
+	stepHandlersErrors.DeletePolicyInternalError = false
+	stepHandlersErrors.DeletePolicyNotAPIError = false
+	stepHandlersErrors.FailedStatus = false
+	stepHandlersErrors.UnknownStatus = false
+	stepHandlersErrors.UpdatePolicyError = false
+	stepHandlersErrors.Reprotect = false
+	stepHandlersErrors.ReprotectTP = false
+	stepHandlersErrors.Failover = false
+	stepHandlersErrors.FailoverTP = false
+	stepHandlersErrors.Jobs = false
+	stepHandlersErrors.GetPolicyError = false
+	stepHandlersErrors.GetSpgErrors = false
+	stepHandlersErrors.GetSpgTPErrors = false
+	stepHandlersErrors.GetExportPolicyError = false
 }
 
 func getTypicalCapacityRequest(valid bool) *csi.GetCapacityRequest {
@@ -2457,23 +2549,23 @@ func (f *feature) aValidCreateStorageProtectionGroupResponseIsReturned() error {
 	if f.err != nil {
 		return f.err
 	}
-	f.groupIDList = append(f.groupIDList, f.createStorageProtectionGroupResponse.LocalProtectionGroupId)
 	return nil
 }
 
-func deleteStorageProtectionGroupRequest(s *service) *csiext.DeleteStorageProtectionGroupRequest {
+func deleteStorageProtectionGroupRequest(s *service, volume, systemName, clustername string) *csiext.DeleteStorageProtectionGroupRequest {
 
 	req := new(csiext.DeleteStorageProtectionGroupRequest)
 
-	req.ProtectionGroupId = "cluster1" + "::" + "/ifs/data/csi-isilon/volume1"
+	//req.ProtectionGroupId = "cluster1" + "::" + "/ifs/data/csi-isilon" + volume
+	req.ProtectionGroupId = volume
 	req.ProtectionGroupAttributes = map[string]string{
-		s.opts.replicationContextPrefix + "systemName": "cluster1",
+		s.opts.replicationContextPrefix + systemName: clustername,
 	}
 	return req
 }
 
-func (f *feature) iCallDeleteStorageProtectionGroup() error {
-	req := deleteStorageProtectionGroupRequest(f.service)
+func (f *feature) iCallStorageProtectionGroupDelete(volume, systemName, clustername string) error {
+	req := deleteStorageProtectionGroupRequest(f.service, volume, systemName, clustername)
 	f.deleteStorageProtectionGroupRequest = req
 	f.deleteStorageProtectionGroupResponse, f.err = f.service.DeleteStorageProtectionGroup(context.Background(), req)
 	if f.err != nil {
@@ -2499,6 +2591,33 @@ func (f *feature) iCallNodeGetInfoWithNoFQDN() error {
 	}
 	return nil
 }
+func getStorageProtectionGroupStatusRequest(s *service) *csiext.GetStorageProtectionGroupStatusRequest {
+	req := new(csiext.GetStorageProtectionGroupStatusRequest)
+	req.ProtectionGroupId = ""
+	req.ProtectionGroupAttributes = map[string]string{
+		s.opts.replicationContextPrefix + "systemName":       "cluster1",
+		s.opts.replicationContextPrefix + "remoteSystemName": "cluster1",
+		s.opts.replicationContextPrefix + "VolumeGroupName":  "csi-prov-test-19743d82-192-168-111-25-Five_Minutes",
+	}
+	return req
+}
+
+func (f *feature) iCallGetStorageProtectionGroupStatus() error {
+	req := getStorageProtectionGroupStatusRequest(f.service)
+	f.getStorageProtectionGroupStatusRequest = req
+	f.getStorageProtectionGroupStatusResponse, f.err = f.service.GetStorageProtectionGroupStatus(context.Background(), req)
+	if f.err != nil {
+		log.Printf("GetStorageProtectionGroupStatus call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func (f *feature) aValidGetStorageProtectionGroupStatusResponseIsReturned() error {
+	if f.err != nil {
+		return f.err
+	}
+	return nil
+}
 
 func (f *feature) iCallGetReplicationCapabilities() error {
 	req := new(csiext.GetReplicationCapabilityRequest)
@@ -2506,6 +2625,298 @@ func (f *feature) iCallGetReplicationCapabilities() error {
 	if f.err != nil {
 		log.Printf("GetReplicationCapabilities call failed: %s\n", f.err.Error())
 		return f.err
+	}
+	return nil
+}
+
+func getStorageProtectionGroupStatusRequestWithParams(s *service, id, localSystemName, remoteSystemName, vgname, clustername1, clustername2 string) *csiext.GetStorageProtectionGroupStatusRequest {
+	req := new(csiext.GetStorageProtectionGroupStatusRequest)
+	req.ProtectionGroupId = id
+	req.ProtectionGroupAttributes = map[string]string{
+		s.opts.replicationContextPrefix + localSystemName:  clustername1,
+		s.opts.replicationContextPrefix + remoteSystemName: clustername2,
+		s.opts.replicationContextPrefix + vgname:           "csi-prov-test-19743d82-192-168-111-25-Five_Minutes",
+	}
+	return req
+}
+
+func (f *feature) iCallGetStorageProtectionGroupStatusWithParams(id, localSystemName, remoteSystemName, vgname, clustername1, clustername2 string) error {
+	req := getStorageProtectionGroupStatusRequestWithParams(f.service, id, localSystemName, remoteSystemName, vgname, clustername1, clustername2)
+	f.getStorageProtectionGroupStatusRequest = req
+	f.getStorageProtectionGroupStatusResponse, f.err = f.service.GetStorageProtectionGroupStatus(context.Background(), req)
+	if f.err != nil {
+		log.Printf("GetStorageProtectionGroupStatus call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func executeActionRequest(s *service, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname string) *csiext.ExecuteActionRequest {
+	action := &csiext.Action{
+		ActionTypes: csiext.ActionTypes_RESUME,
+	}
+	params := map[string]string{
+		s.opts.replicationContextPrefix + systemName:       clusterNameOne,
+		s.opts.replicationContextPrefix + remoteSystemName: clusterNameTwo,
+		s.opts.replicationContextPrefix + vgname:           ppname,
+	}
+	req := &csiext.ExecuteActionRequest{
+		ActionId:                        "",
+		ProtectionGroupId:               "",
+		ActionTypes:                     &csiext.ExecuteActionRequest_Action{Action: action},
+		ProtectionGroupAttributes:       params,
+		RemoteProtectionGroupId:         "",
+		RemoteProtectionGroupAttributes: nil,
+	}
+
+	return req
+}
+
+func (f *feature) iCallExecuteAction(systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname string) error {
+	req := executeActionRequest(f.service, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname)
+	f.executeActionRequest = req
+	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
+	if f.err != nil {
+		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func (f *feature) aValidExecuteActionResponseIsReturned() error {
+	if f.err != nil {
+		return f.err
+	}
+	return nil
+}
+
+func executeActionRequestSuspend(s *service) *csiext.ExecuteActionRequest {
+	action := &csiext.Action{
+		ActionTypes: csiext.ActionTypes_SUSPEND,
+	}
+	params := map[string]string{
+		s.opts.replicationContextPrefix + "systemName":       "cluster1",
+		s.opts.replicationContextPrefix + "remoteSystemName": "cluster1",
+		s.opts.replicationContextPrefix + "VolumeGroupName":  "csi-prov-test-19743d82-192-168-111-25-Five_Minutes",
+	}
+	req := &csiext.ExecuteActionRequest{
+		ActionId:                        "",
+		ProtectionGroupId:               "",
+		ActionTypes:                     &csiext.ExecuteActionRequest_Action{Action: action},
+		ProtectionGroupAttributes:       params,
+		RemoteProtectionGroupId:         "",
+		RemoteProtectionGroupAttributes: nil,
+	}
+
+	return req
+}
+
+func (f *feature) iCallExecuteActionSuspend() error {
+	req := executeActionRequestSuspend(f.service)
+	f.executeActionRequest = req
+	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
+	if f.err != nil {
+		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func executeActionRequestReprotect(s *service) *csiext.ExecuteActionRequest {
+	action := &csiext.Action{
+		ActionTypes: csiext.ActionTypes_REPROTECT_LOCAL,
+	}
+	params := map[string]string{
+		s.opts.replicationContextPrefix + "systemName":       "cluster1",
+		s.opts.replicationContextPrefix + "remoteSystemName": "cluster1",
+		s.opts.replicationContextPrefix + "VolumeGroupName":  "csi-prov-test-19743d82-192-168-111-25-Five_Minutes",
+	}
+	req := &csiext.ExecuteActionRequest{
+		ActionId:                        "",
+		ProtectionGroupId:               "",
+		ActionTypes:                     &csiext.ExecuteActionRequest_Action{Action: action},
+		ProtectionGroupAttributes:       params,
+		RemoteProtectionGroupId:         "",
+		RemoteProtectionGroupAttributes: nil,
+	}
+
+	return req
+}
+
+func (f *feature) iCallExecuteActionReprotect() error {
+	req := executeActionRequestReprotect(f.service)
+	f.executeActionRequest = req
+	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
+	if f.err != nil {
+		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func executeActionRequestSync(s *service) *csiext.ExecuteActionRequest {
+	action := &csiext.Action{
+		ActionTypes: csiext.ActionTypes_SYNC,
+	}
+	params := map[string]string{
+		s.opts.replicationContextPrefix + "systemName":       "cluster1",
+		s.opts.replicationContextPrefix + "remoteSystemName": "cluster1",
+		s.opts.replicationContextPrefix + "VolumeGroupName":  "csi-prov-test-19743d82-192-168-111-25-Five_Minutes",
+	}
+	req := &csiext.ExecuteActionRequest{
+		ActionId:                        "",
+		ProtectionGroupId:               "",
+		ActionTypes:                     &csiext.ExecuteActionRequest_Action{Action: action},
+		ProtectionGroupAttributes:       params,
+		RemoteProtectionGroupId:         "",
+		RemoteProtectionGroupAttributes: nil,
+	}
+
+	return req
+}
+
+func (f *feature) iCallExecuteActionSync() error {
+	req := executeActionRequestSync(f.service)
+	f.executeActionRequest = req
+	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
+	if f.err != nil {
+		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func executeActionRequestFailover(s *service) *csiext.ExecuteActionRequest {
+	action := &csiext.Action{
+		ActionTypes: csiext.ActionTypes_FAILOVER_REMOTE,
+	}
+	params := map[string]string{
+		s.opts.replicationContextPrefix + "systemName":       "cluster1",
+		s.opts.replicationContextPrefix + "remoteSystemName": "cluster1",
+		s.opts.replicationContextPrefix + "VolumeGroupName":  "csi-prov-test-19743d82-192-168-111-25-Five_Minutes",
+	}
+	req := &csiext.ExecuteActionRequest{
+		ActionId:                        "",
+		ProtectionGroupId:               "",
+		ActionTypes:                     &csiext.ExecuteActionRequest_Action{Action: action},
+		ProtectionGroupAttributes:       params,
+		RemoteProtectionGroupId:         "",
+		RemoteProtectionGroupAttributes: nil,
+	}
+
+	return req
+}
+
+func (f *feature) iCallExecuteActionSyncFailoverUnplanned() error {
+	req := executeActionRequestFailoverUnplanned(f.service)
+	f.executeActionRequest = req
+	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
+	if f.err != nil {
+		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func executeActionRequestFailoverUnplanned(s *service) *csiext.ExecuteActionRequest {
+	action := &csiext.Action{
+		ActionTypes: csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL,
+	}
+	params := map[string]string{
+		s.opts.replicationContextPrefix + "systemName":       "cluster1",
+		s.opts.replicationContextPrefix + "remoteSystemName": "cluster1",
+		s.opts.replicationContextPrefix + "VolumeGroupName":  "csi-prov-test-19743d82-192-168-111-25-Five_Minutes",
+	}
+	req := &csiext.ExecuteActionRequest{
+		ActionId:                        "",
+		ProtectionGroupId:               "",
+		ActionTypes:                     &csiext.ExecuteActionRequest_Action{Action: action},
+		ProtectionGroupAttributes:       params,
+		RemoteProtectionGroupId:         "",
+		RemoteProtectionGroupAttributes: nil,
+	}
+
+	return req
+}
+
+func (f *feature) iCallExecuteActionSyncFailover() error {
+	req := executeActionRequestFailover(f.service)
+	f.executeActionRequest = req
+	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
+	if f.err != nil {
+		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func executeActionRequestWithParams(s *service, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname string) *csiext.ExecuteActionRequest {
+	action := &csiext.Action{
+		ActionTypes: csiext.ActionTypes_RESUME,
+	}
+	params := map[string]string{
+		//s.opts.replicationContextPrefix + systemName: clusterNameOne,
+		//s.opts.replicationContextPrefix + remoteSystemName: clusterNameTwo,
+		//s.opts.replicationContextPrefix + vgname:  ppname,
+
+	}
+	req := &csiext.ExecuteActionRequest{
+		ActionId:                        "",
+		ProtectionGroupId:               "",
+		ActionTypes:                     &csiext.ExecuteActionRequest_Action{Action: action},
+		ProtectionGroupAttributes:       params,
+		RemoteProtectionGroupId:         "",
+		RemoteProtectionGroupAttributes: nil,
+	}
+
+	return req
+}
+
+func (f *feature) iCallExecuteActionWithParams(s *service, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname string) error {
+	req := executeActionRequestWithParams(f.service, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname)
+	f.executeActionRequest = req
+	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
+	if f.err != nil {
+		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func getCreateRemoteVolumeRequestBad(s *service) *csiext.CreateRemoteVolumeRequest {
+	req := new(csiext.CreateRemoteVolumeRequest)
+	req.VolumeHandle = "volume1=_=_=19=_=_=System"
+	parameters := make(map[string]string)
+	parameters[constants.EnvReplicationPrefix+"/"+KeyReplicationRemoteSystem] = ""
+	parameters[s.WithRP(KeyReplicationRemoteSystem)] = "cluster1"
+	parameters[s.WithRP(KeyReplicationRemoteSystem)] = "cluster2"
+	req.Parameters = parameters
+	return req
+}
+
+func (f *feature) iCallCreateRemoteVolumeBad() error {
+	req := getCreateRemoteVolumeRequestBad(f.service)
+	f.createRemoteVolumeRequest = req
+	f.createRemoteVolumeResponse, f.err = f.service.CreateRemoteVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateRemoteVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createRemoteVolumeResponse != nil {
+		stepHandlersErrors.ExportNotFoundError = false
+		stepHandlersErrors.VolumeNotExistError = false
+	}
+	return nil
+}
+
+func getCreateStorageProtectionGroupRequestBad(s *service) *csiext.CreateStorageProtectionGroupRequest {
+	req := new(csiext.CreateStorageProtectionGroupRequest)
+	req.VolumeHandle = "volume1=_=_=19=_=_=System"
+	parameters := make(map[string]string)
+	parameters[constants.EnvReplicationPrefix+"/"+KeyReplicationRemoteSystem] = ""
+	parameters[s.WithRP(KeyReplicationRemoteSystem)] = "cluster1"
+	parameters[s.WithRP(KeyReplicationRemoteSystem)] = "cluster2"
+	req.Parameters = parameters
+	return req
+}
+
+func (f *feature) iCallCreateStorageProtectionGroupBad() error {
+	req := getCreateStorageProtectionGroupRequestBad(f.service)
+	f.createStorageProtectionGroupRequest = req
+	f.createStorageProtectionGroupResponse, f.err = f.service.CreateStorageProtectionGroup(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateStorageProtectionGroup call failed: %s\n", f.err.Error())
 	}
 	return nil
 }

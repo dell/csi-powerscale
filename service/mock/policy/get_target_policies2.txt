@@ -1,0 +1,19 @@
+
+{
+"policies" :
+[
+
+{
+"failover_failback_state" : "writes_enabled",
+"id" : "9c9b581c60b4314b21e339796ea66ac7",
+"last_job_state" : "finished",
+"last_source_coordinator_ip" : "192.168.111.20",
+"last_update_from_source" : 1644930873,
+"legacy_policy" : false,
+"name" : "csi-prov-test-19743d82-192-168-111-25-Five_Minutes",
+"source_cluster_guid" : "0050568876308e650b62651a8b25f5982d90",
+"source_host" : "max",
+"target_path" : "/ifs/data/csi/csi-prov-test-19743d82-192-168-111-25-Five_Minutes"
+    }
+    ]
+    }

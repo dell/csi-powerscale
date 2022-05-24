@@ -1,0 +1,8 @@
+{
+  "policies": [
+    {
+      "enabled": true,
+      "name": "vgname",
+    }
+  ]
+}
