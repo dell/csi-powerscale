@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -14,6 +13,7 @@ const timeout = time.Second * 5
 
 //queryStatus make API call to the specified url to retrieve connection status
 func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error) {
+	ctx, log, _ := GetRunIDLog(ctx)
 	defer func() {
 		if err := recover(); err != nil {
 			log.Println("panic occurred in queryStatus:", err)
@@ -64,7 +64,8 @@ func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error
 		return false, nil
 	}
 	log.Debugf("last connectivity was  %d sec back, tolerance is %d sec", timeDiff, tolerance)
-	if timeDiff < tolerance {
+	//give 2s leeway for tolerance check
+	if timeDiff <= tolerance+2 {
 		return true, nil
 	}
 	return false, nil
