@@ -204,12 +204,6 @@ Feature: Isilon CSI interface
       | induced             | errormsg                              |
       | "UpdatePolicyError" | "suspend: can't disable local policy" |
 
-  Scenario: Execute action reprotect
-    Given a Isilon service
-    And I enable quota
-    When I call ReprotectExecuteAction
-    Then a valid ExecuteActionResponse is returned
-
   Scenario: Execute action sync
     Given a Isilon service
     And I enable quota
@@ -269,9 +263,10 @@ Feature: Isilon CSI interface
       | induced                        | errormsg                                                    |
       | "GetPolicyInternalError"       | "reprotect: can't get policy"                               |
       | "GetPolicyNotFoundError"       | "reprotect: can't create protection policy EOF"             |
-      | "GetTargetPolicyInternalError" | "reprotect: couldn't get target policy"                     |
+      | "GetTargetPolicyInternalError" | "reprotect: can't find remote replication policy"           |
       | "GetPolicyError"               | "reprotect: can't ensure protection policy exists "         |
       | "Reprotect"                    | "reprotect: policy couldn't reach enabled condition on TGT" |
+      | "ReprotectTP"                  | "none" |
 
   Scenario Outline: Execute action
     Given a Isilon service
