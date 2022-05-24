@@ -121,8 +121,8 @@ github.com/dell/gocsi v1.5.2-0.20220523053849-2bf3d53bf42f h1:cPR/93yvvyyYjUbIoV
 github.com/dell/gocsi v1.5.2-0.20220523053849-2bf3d53bf42f/go.mod h1:cGd8QtRfAWgyyZcf59VMADoXLfGNkJuhUqSdyW/XNQ0=
 github.com/dell/gofsutil v1.8.0 h1:YqsTQF3n6GAlCLVjxLkD6GmHG4mKX2SLpD64mpsAdY8=
 github.com/dell/gofsutil v1.8.0/go.mod h1:oWLiV7FmBurEie3An11SNqQ1ReyOiqjSZaXDRhm7tMc=
-github.com/dell/goisilon v1.7.1-0.20220518061426-9b49506e1dd2 h1:avn+UuJ3hgEh61Z8G+SjcpmKwPgVUXlNDaSjoapUXR0=
-github.com/dell/goisilon v1.7.1-0.20220518061426-9b49506e1dd2/go.mod h1:ort9gaSlqh8XeyiTBhaL9ZWSymZ7u85ncjN4vckpJQA=
+github.com/dell/goisilon v1.7.1-0.20220523151745-c7279cad3de8 h1:tWtY0AxB+w8tnaoeQyKq893WFEb0hgGQ4rZBfcsZs54=
+github.com/dell/goisilon v1.7.1-0.20220523151745-c7279cad3de8/go.mod h1:KQFKwihNKd/SDQt68tHPZTd34NBRCf3tPtG5knrqCfY=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96/go.mod h1:Qh8CwZgvJUkLughtfhJv5dyTYa91l1fOUCrgjqmcifM=
