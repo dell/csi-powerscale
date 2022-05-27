@@ -189,7 +189,7 @@ controller:
   #   operator: "Exists"
   #   effect: "NoSchedule"
   # Uncomment if nodes you wish to use have the node-role.kubernetes.io/control-plane taint
-  tolerations:
+  # tolerations:
   # - key: "node-role.kubernetes.io/control-plane"
   #   operator: "Exists"
   #   effect: "NoSchedule"
@@ -227,7 +227,7 @@ node:
   #   operator: "Exists"
   #   effect: "NoSchedule"
   # Uncomment if nodes you wish to use have the node-role.kubernetes.io/control-plane taint
-  tolerations:
+  # tolerations:
   # - key: "node-role.kubernetes.io/control-plane"
   #   operator: "Exists"
   #   effect: "NoSchedule"
