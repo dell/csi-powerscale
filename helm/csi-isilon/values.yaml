@@ -176,17 +176,28 @@ controller:
   # Allowed values: map of key-value pairs
   # Default value: None
   # Examples:
-  #   node-role.kubernetes.io/control-plane: ""
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/master taint
+  #  node-role.kubernetes.io/master
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/control-plane taint
+  #  node-role.kubernetes.io/control-plane
   nodeSelector:
-  #  node-role.kubernetes.io/control-plane: ""
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/master taint
+  #  node-role.kubernetes.io/master
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/control-plane taint
+  #  node-role.kubernetes.io/control-plane
 
   # tolerations: Define tolerations for the controller deployment, if required.
   # Default value: None
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/master taint
   tolerations:
-  #  - key: "node-role.kubernetes.io/control-plane"
-  #    operator: "Equal"
-  #    value: "true"
-  #    effect: "NoSchedule"
+  # - key: "node-role.kubernetes.io/master"
+  #   operator: "Exists"
+  #   effect: "NoSchedule"
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/control-plane taint
+  tolerations:
+  # - key: "node-role.kubernetes.io/control-plane"
+  #   operator: "Exists"
+  #   effect: "NoSchedule"
 
 # node: configure node pod specific parameters
 node:
@@ -199,20 +210,24 @@ node:
   # Examples:
   #   node-role.kubernetes.io/control-plane: ""
   nodeSelector:
-  #  node-role.kubernetes.io/control-plane: ""
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/master taint
+  #  node-role.kubernetes.io/master
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/control-plane taint
+  #  node-role.kubernetes.io/control-plane
 
   # tolerations: Define tolerations for the node daemonset, if required.
   # Default value: None
   tolerations:
-  #  - key: "node.kubernetes.io/memory-pressure"
-  #    operator: "Exists"
-  #    effect: "NoExecute"
-  #  - key: "node.kubernetes.io/disk-pressure"
-  #    operator: "Exists"
-  #    effect: "NoExecute"
-  #  - key: "node.kubernetes.io/network-unavailable"
-  #    operator: "Exists"
-  #    effect: "NoExecute"
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/master taint
+  tolerations:
+  # - key: "node-role.kubernetes.io/master"
+  #   operator: "Exists"
+  #   effect: "NoSchedule"
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/control-plane taint
+  tolerations:
+  # - key: "node-role.kubernetes.io/control-plane"
+  #   operator: "Exists"
+  #   effect: "NoSchedule"
 
   # dnsPolicy: Determines the DNS Policy of the Node service.
   # Allowed values:
