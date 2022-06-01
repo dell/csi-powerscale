@@ -234,10 +234,10 @@ node:
 
   # Uncomment if CSM for Resiliency and CSI Driver pods monitor are enabled
   #tolerations:
-  # - key: "offline.vxflexos.storage.dell.com"
+  #  - key: "offline.vxflexos.storage.dell.com"
   #    operator: "Exists"
   #    effect: "NoSchedule"
-  # - key: "vxflexos.podmon.storage.dell.com"
+  #  - key: "vxflexos.podmon.storage.dell.com"
   #    operator: "Exists"
   #    effect: "NoSchedule"
   #  - key: "offline.unity.storage.dell.com"
