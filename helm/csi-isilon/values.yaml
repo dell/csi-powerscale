@@ -232,6 +232,27 @@ node:
   #   operator: "Exists"
   #   effect: "NoSchedule"
 
+  # Uncomment if CSM for Resiliency and CSI Driver pods monitor are enabled
+  #tolerations:
+  #  - key: "offline.vxflexos.storage.dell.com"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+  #  - key: "vxflexos.podmon.storage.dell.com"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+  #  - key: "offline.unity.storage.dell.com"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+  #  - key: "unity.podmon.storage.dell.com"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+  #  - key: "offline.isilon.storage.dell.com"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+  #  - key: "isilon.podmon.storage.dell.com"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+
   # dnsPolicy: Determines the DNS Policy of the Node service.
   # Allowed values:
   #   Default: The Pod inherits the name resolution configuration from the node that the pods run on.
