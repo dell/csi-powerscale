@@ -85,6 +85,11 @@ build_image_manifest() {
     fi
   done
 
+  # Forming this only for drivers supporting standalone helm charts
+  if [ ! -z ${DRIVERREPO} ]; then 
+   echo "${DRIVERREPO}/${DRIVERNAME}\:${DRIVERVERSIONVALUESYAML}"
+   echo "${DRIVERREPO}/${DRIVERNAME}:${DRIVERVERSIONVALUESYAML}" >> "${IMAGEMANIFEST}.tmp"
+  fi
   # sort and uniqify the list
   cat "${IMAGEMANIFEST}.tmp" | sort | uniq > "${IMAGEMANIFEST}"
   rm "${IMAGEMANIFEST}.tmp"
@@ -158,6 +163,10 @@ fixup_files() {
       echo "   changing: $line -> ${NEWNAME}"
       find "${ROOTDIR}" -type f -not -path "${SCRIPTDIR}/*" -exec sed -i "s|$line|$NEWNAME|g" {} \;
   done < "${IMAGEMANIFEST}"
+
+  # Replacing values file with local registry
+  sed -i "s|driverRepository:.*|driverRepository: ${REGISTRY}|" ${VALUESFILE}
+  sed -i 's/\/$//' ${VALUESFILE}
 }
 
 # compress the whole bundle
@@ -222,12 +231,15 @@ set_mode
 if [ "${MODE}" == "helm" ]; then
   INSTALLERDIR="${REPODIR}/dell-csi-helm-installer"
   CHARTFILE=$(find "${HELMDIR}" -maxdepth 2 -type f -name Chart.yaml)
+  VALUESFILE=$(find "${HELMDIR}" -maxdepth 2 -type f -name values.yaml)
 
   # some output files
   DRIVERNAME=$(grep -oh "^name:\s.*" "${CHARTFILE}" | awk '{print $2}')
   DRIVERNAME=${DRIVERNAME:-"dell-csi-driver"}
-  DRIVERVERSION=$(grep -oh "^version:\s.*" "${CHARTFILE}" | awk '{print $2}')
+  DRIVERVERSION=$(grep -oh "^version:\s.*" "${CHARTFILE}" | awk '{print $2}' | sed -e 's/^"//' -e 's/"$//')
   DRIVERVERSION=${DRIVERVERSION:-unknown}
+  DRIVERVERSIONVALUESYAML=$(grep -oh "^version:\s.*" "${VALUESFILE}" | awk '{print $2}' | sed -e 's/^"//' -e 's/"$//')
+  DRIVERREPO=$(grep -oh "driverRepository:\s.*" "${VALUESFILE}" | awk '{print $2}')
   DISTBASE="${REPODIR}"
   DRIVERDIR="${DRIVERNAME}-bundle-${DRIVERVERSION}"
   DISTDIR="${DISTBASE}/${DRIVERDIR}"
