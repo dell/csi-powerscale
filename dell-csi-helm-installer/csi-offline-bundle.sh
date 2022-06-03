@@ -163,6 +163,10 @@ fixup_files() {
       echo "   changing: $line -> ${NEWNAME}"
       find "${ROOTDIR}" -type f -not -path "${SCRIPTDIR}/*" -exec sed -i "s|$line|$NEWNAME|g" {} \;
   done < "${IMAGEMANIFEST}"
+
+  # Replacing values file with local registry
+  sed -i "s|driverRepository:.*|driverRepository: ${REGISTRY}|" ${VALUESFILE}
+  sed -i 's/\/$//' ${VALUESFILE}
 }
 
 # compress the whole bundle
