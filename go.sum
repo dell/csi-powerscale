@@ -109,8 +109,8 @@ github.com/cucumber/messages-go/v10 v10.0.3/go.mod h1:9jMZ2Y8ZxjLY6TG2+x344nt5rX
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dell/dell-csi-extensions/common v1.0.1-0.20220526070836-43b4ac597bf3 h1:qvMebvZGaON6NQllzrtxGBLrW1AhEpywMq7xMacTORg=
-github.com/dell/dell-csi-extensions/common v1.0.1-0.20220526070836-43b4ac597bf3/go.mod h1:x68COjv2yqphSmGWZDPV9WcBENA9+e8v21aGFO5i3PQ=
+github.com/dell/dell-csi-extensions/common v1.1.0 h1:BFWoXdAennOs+fFiYqsGo02AU27YEYT4jT7YKjWghnw=
+github.com/dell/dell-csi-extensions/common v1.1.0/go.mod h1:x68COjv2yqphSmGWZDPV9WcBENA9+e8v21aGFO5i3PQ=
 github.com/dell/dell-csi-extensions/podmon v1.1.1 h1:AIFHmVscJInpADaJyXMuvpHZKAhLpQhD+7dFHjHKdjI=
 github.com/dell/dell-csi-extensions/podmon v1.1.1/go.mod h1:J4VNEmXV6sz40QviNF1B+Ov+KNQmzFtJw0YNUpq6ncs=
 github.com/dell/dell-csi-extensions/replication v1.2.1 h1:dx67k7BBN/aZKgPdOgO04PNFTciChnNwIx+Cnwlgq0s=
