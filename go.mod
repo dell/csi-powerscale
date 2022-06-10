@@ -5,7 +5,7 @@ require (
 	github.com/akutz/gournal v0.5.0
 	github.com/container-storage-interface/spec v1.5.0
 	github.com/cucumber/godog v0.10.0
-	github.com/dell/dell-csi-extensions/common v1.0.1-0.20220526070836-43b4ac597bf3
+	github.com/dell/dell-csi-extensions/common v1.1.0
 	github.com/dell/dell-csi-extensions/podmon v1.1.1
 	github.com/dell/dell-csi-extensions/replication v1.2.1
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.1
