@@ -5,13 +5,13 @@ require (
 	github.com/akutz/gournal v0.5.0
 	github.com/container-storage-interface/spec v1.5.0
 	github.com/cucumber/godog v0.10.0
-	github.com/dell/dell-csi-extensions/common v1.0.0
-	github.com/dell/dell-csi-extensions/podmon v0.1.0
-	github.com/dell/dell-csi-extensions/replication v1.1.0
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.1.0
-	github.com/dell/gocsi v1.5.2-0.20220525142554-48ff29a07e1e
-	github.com/dell/gofsutil v1.8.0
-	github.com/dell/goisilon v1.7.1-0.20220523151745-c7279cad3de8
+	github.com/dell/dell-csi-extensions/common v1.1.0
+	github.com/dell/dell-csi-extensions/podmon v1.1.1
+	github.com/dell/dell-csi-extensions/replication v1.2.1
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.1
+	github.com/dell/gocsi v1.6.0
+	github.com/dell/gofsutil v1.9.0
+	github.com/dell/goisilon v1.8.0
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.2.0
@@ -66,7 +66,7 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.17.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
-	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e // indirect
+	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
