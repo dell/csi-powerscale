@@ -1,6 +1,5 @@
 # default target
 all: help
-GO_FLAGS ?= -buildvcs=false
 
 # include an overrides file, which sets up default values and allows user overrides
 include overrides.mk
@@ -39,7 +38,7 @@ format:
 
 # Build the driver locally
 build: dependencies check
-	GOOS=linux CGO_ENABLED=0 go build -buildvcs=false
+	GOOS=linux CGO_ENABLED=0 GO_FLAGS ?= -buildvcs=false go build
 
 # Generates the docker container (but does not push)
 podman-build:
