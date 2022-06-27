@@ -1,5 +1,6 @@
 # default target
 all: help
+GO_FLAGS ?= -buildvcs=false
 
 # include an overrides file, which sets up default values and allows user overrides
 include overrides.mk
