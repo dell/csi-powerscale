@@ -68,5 +68,5 @@ version:
 	make -f docker.mk version
 
 gosec:
-	gosec -quiet -log gosec.log -out=gosecresults.csv -fmt=csv -tags=-buildvcs=false ./...
+	gosec -quiet -log gosec.log -out=gosecresults.csv -fmt=csv ./...
 
