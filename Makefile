@@ -38,7 +38,7 @@ format:
 
 # Build the driver locally
 build: dependencies check
-	GOOS=linux CGO_ENABLED=0 GO_FLAGS ?= -buildvcs=false go build $(GO_FLAGS)
+	GOOS=linux CGO_ENABLED=0 go build
 
 # Generates the docker container (but does not push)
 podman-build:
@@ -68,5 +68,5 @@ version:
 	make -f docker.mk version
 
 gosec:
-	gosec -quiet -log gosec.log -out=gosecresults.csv -fmt=csv ./...
+	gosec -quiet -log gosec.log -out=gosecresults.csv -fmt=csv -tags=-buildvcs=false ./...
 
