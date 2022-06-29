@@ -16,16 +16,19 @@ import (
 var singletonLog *logrus.Logger
 var once sync.Once
 
+// LogConst represents string in context.WithValue
+type LogConst string
+
 // Constants used for logging
 const (
 	// Default log format will output [INFO]: 2006-01-02T15:04:05Z07:00 - Log message
-	defaultLogFormat       = "time=\"%time%\" level=%lvl% %clusterName% %runid% msg=\"%msg%\""
-	defaultTimestampFormat = time.RFC3339
-	ClusterName            = "clusterName"
-	PowerScaleLogger       = "powerscalelog"
-	LogFields              = "fields"
-	RequestID              = "requestid"
-	RunID                  = "runid"
+	defaultLogFormat                = "time=\"%time%\" level=%lvl% %clusterName% %runid% msg=\"%msg%\""
+	defaultTimestampFormat          = time.RFC3339
+	ClusterName                     = "clusterName"
+	PowerScaleLogger       LogConst = "powerscalelog"
+	LogFields              LogConst = "fields"
+	RequestID                       = "requestid"
+	RunID                           = "runid"
 )
 
 // Formatter implements logrus.Formatter interface.
