@@ -13,3 +13,28 @@ Feature: Isilon CSI interface
       When I induce error "GetExportInternalError"
       And I call get export related functions in isiService
       Then the error contains "EOF"
+
+    Scenario: GetSnapshotNameFromIsiPath with params
+    Given a Isilon service
+    And I call GetSnapshotNameFromIsiPath with <isipath>
+    Then the error contains <errormsg>
+    Examples:
+      | isipath                                  | errormsg                                                              |
+      | ""                                       | "invalid snapshot isilon path"                                        |
+      | "/ifs/.snapshot"                         | "invalid snapshot isilon path"                                        |
+      | "/ifs/.snapshot/data/csiislon"           | "none"                                                                |
+
+    Scenario: GetSnapshotIsiPathComponents
+    Given a Isilon service
+    And I call GetSnapshotIsiPathComponents
+    Then the error contains "none"
+
+    Scenario: GetSubDirectoryCount
+    Given a Isilon service
+    And I call GetSubDirectoryCount
+    Then the error contains "none"
+
+    Scenario: DeleteSnapshot case
+    Given a Isilon service
+    And I call DeleteSnapshotIsiService
+    Then the error contains "none"

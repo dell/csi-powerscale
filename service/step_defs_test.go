@@ -18,7 +18,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"github.com/dell/csi-isilon/common/utils"
 	"log"
 	"net"
 	"net/http/httptest"
@@ -27,6 +26,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dell/csi-isilon/common/utils"
 
 	"github.com/dell/csi-isilon/common/constants"
 	"github.com/dell/csi-isilon/common/k8sutils"
@@ -396,6 +397,10 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call DynamicLogChange "([^"]*)"$`, f.iCallDynamicLogChange)
 	s.Step(`^a valid DynamicLogChange occurs "([^"]*)" "([^"]*)"$`, f.aValidDynamicLogChangeOccurs)
 	s.Step(`^I set noProbeOnStart to "([^"]*)"$`, f.iSetNoProbeOnStart)
+	s.Step(`^I call GetSnapshotNameFromIsiPath with "([^"]*)"$`, f.iCallGetSnapshotNameFromIsiPathWith)
+	s.Step(`^I call GetSnapshotIsiPathComponents`, f.iCallGetSnapshotIsiPathComponents)
+	s.Step(`^I call GetSubDirectoryCount`, f.iCallGetSubDirectoryCount)
+	s.Step(`^I call DeleteSnapshot`, f.iCallDeleteSnapshotIsiService)
 }
 
 // GetPluginInfo
@@ -3107,5 +3112,38 @@ func (f *feature) aValidDynamicLogChangeOccurs(file, expectedLevel string) error
 
 func (f *feature) iSetNoProbeOnStart(value string) error {
 	os.Setenv(constants.EnvNoProbeOnStart, value)
+	return nil
+}
+
+func (f *feature) iCallGetSnapshotNameFromIsiPathWith(isiPath string) error {
+	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
+	ctx, _, _ := GetRunIDLog(context.Background())
+	_, f.err = clusterConfig.isiSvc.GetSnapshotNameFromIsiPath(ctx, isiPath)
+	if f.err != nil {
+		log.Printf("inside iCallGetSnapshotNameFromIsiPath error %s\n", f.err.Error())
+	}
+	return nil
+}
+func (f *feature) iCallGetSnapshotIsiPathComponents() error {
+	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
+	_, _, _ = clusterConfig.isiSvc.GetSnapshotIsiPathComponents("/ifs/.snapshot/data/csiislon")
+	_ = clusterConfig.isiSvc.GetSnapshotTrackingDirName("data")
+	return nil
+}
+
+func (f *feature) iCallGetSubDirectoryCount() error {
+	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
+	ctx, _, _ := GetRunIDLog(context.Background())
+	_, _ = clusterConfig.isiSvc.GetSubDirectoryCount(ctx, "/ifs/data/csi-isilon", "csi-isilon")
+	return nil
+}
+
+func (f *feature) iCallDeleteSnapshotIsiService() error {
+	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
+	ctx, _, _ := GetRunIDLog(context.Background())
+	f.err = clusterConfig.isiSvc.DeleteSnapshot(ctx, 64, "")
+	if f.err != nil {
+		log.Printf("inside iCallDeleteSnapshotIsiService error %s\n", f.err.Error())
+	}
 	return nil
 }

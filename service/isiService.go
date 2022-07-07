@@ -18,13 +18,14 @@ package service
 import (
 	"context"
 	"fmt"
+	"path"
+	"strings"
+	"sync"
+
 	"github.com/dell/csi-isilon/common/constants"
 	utils "github.com/dell/csi-isilon/common/utils"
 	isi "github.com/dell/goisilon"
 	"github.com/dell/goisilon/api"
-	"path"
-	"strings"
-	"sync"
 )
 
 type isiService struct {
@@ -667,7 +668,7 @@ func (svc *isiService) GetExportsWithLimit(ctx context.Context, limit string) (i
 	return exports.Exports, exports.Resume, nil
 }
 
-func (svc *isiService) GetExportsWithResume(ctx context.Context, resume string) (isi.ExportList, string, error) {
+/* func (svc *isiService) GetExportsWithResume(ctx context.Context, resume string) (isi.ExportList, string, error) {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
@@ -680,7 +681,7 @@ func (svc *isiService) GetExportsWithResume(ctx context.Context, resume string) 
 	}
 	return exports.Exports, exports.Resume, nil
 }
-
+*/
 func (svc *isiService) DeleteSnapshot(ctx context.Context, id int64, name string) error {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
