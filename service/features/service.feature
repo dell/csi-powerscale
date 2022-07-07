@@ -277,6 +277,7 @@ Feature: Isilon CSI interface
       | "blah"      | "unknown"      | "none"                  | "none"                               | "probe of all isilon clusters failed" |
       | "blah"      | "controller"   | "noIsiService"          | "none"                               | "none"                                |
       | "blah"      | "node"         | "noIsiService"          | "none"                               | "none"                                |
+      | "blah"      | ""             | "none"                  | "none"                               | "none" |
 
     Scenario Outline: Calling logStatistics different times
       Given a Isilon service
@@ -287,8 +288,15 @@ Feature: Isilon CSI interface
       | times    | errormsg     |
       | 100      | "none"       |
 
+    Scenario: Calling functions with noProbeOnStart set to true
+      Given a Isilon service
+      When I set noProbeOnStart to "true"
+      When I call BeforeServe
+      Then the error contains "none"
+
     Scenario: Calling BeforeServe
       Given a Isilon service
+      When I set noProbeOnStart to "false"
       When I call BeforeServe
       Then the error contains "probe of all isilon clusters failed"
       
@@ -345,33 +353,53 @@ Feature: Isilon CSI interface
       And I call NodeGetInfo
       Then a valid NodeGetInfoResponse is returned
 
-   Scenario: ControllerGetVolume good scenario
-    Given a Isilon service
-    When I call Probe
-    And I call ControllerGetVolume with name "volume2=_=_=43=_=_=System=_=_=cluster1"
-    Then a valid ControllerGetVolumeResponse is returned
+    Scenario: ControllerGetVolume good scenario
+      Given a Isilon service
+      When I call Probe
+      And I call ControllerGetVolume with name "volume2=_=_=43=_=_=System=_=_=cluster1"
+      Then a valid ControllerGetVolumeResponse is returned
 
-  Scenario: ControllerGetVolume volume does not exist scenario
-    Given a Isilon service
-    When I call Probe
-    And I induce error "VolumeNotExistError"
-    And I call ControllerGetVolume with name ""
-    Then the error contains "no VolumeID found in request"
-
-  Scenario: NodeGetVolumeStats volume does not exist scenario
-    Given a Isilon service
-    When I call Probe
-    And I induce error "VolumeNotExistError"
-    And I call NodeGetVolumeStats with name "" and path ""
-    Then the error contains "no VolumeID found in request"
-
-  Scenario: NodeGetVolumeStats volume does not exist scenario
-    Given a Isilon service
-    When I call Probe
-    And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1" and path ""
-    Then the error contains "no Volume Path found in request"
-
-  Scenario: Identity GetReplicationCapabilities call
-    Given a Isilon service
-    When I call GetReplicationCapabilities
-    Then a valid GetReplicationCapabilitiesResponse is returned
+    Scenario: ControllerGetVolume volume does not exist scenario
+      Given a Isilon service
+      When I call Probe
+      And I induce error "VolumeNotExistError"
+      And I call ControllerGetVolume with name ""
+      Then the error contains "no VolumeID found in request"
+  
+    Scenario: NodeGetVolumeStats volume does not exist scenario
+      Given a Isilon service
+      When I call Probe
+      And I induce error "VolumeNotExistError"
+      And I call NodeGetVolumeStats with name "" and path ""
+      Then the error contains "no VolumeID found in request"
+  
+    Scenario: NodeGetVolumeStats volume does not exist scenario
+      Given a Isilon service
+      When I call Probe
+      And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1" and path ""
+      Then the error contains "no Volume Path found in request"
+  
+    Scenario: Identity GetReplicationCapabilities call
+      Given a Isilon service
+      When I call GetReplicationCapabilities
+      Then a valid GetReplicationCapabilitiesResponse is returned
+  
+    Scenario: Call Isilon Service with custom topology
+      Given a Isilon service with custom topology "blah" "controller"
+      When I call Probe
+      Then the error contains "probe of all isilon clusters failed"
+  
+    Scenario: Call ProbeController
+      Given a Isilon service
+      When I call Probe
+      And I call ProbeController
+      Then the error contains "none"
+  
+    Scenario Outline: Dynamic log config change
+      Given a Isilon service
+      When I call DynamicLogChange <file>
+      Then a valid DynamicLogChange occurs <file> <level>
+      Examples:
+        | file                  | level   |
+        | "logLevelInfo.yaml"   | "info" |
+        | "logConfigError.yaml" | "debug" |

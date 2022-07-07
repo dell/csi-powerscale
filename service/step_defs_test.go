@@ -18,6 +18,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"github.com/dell/csi-isilon/common/utils"
 	"log"
 	"net"
 	"net/http/httptest"
@@ -25,16 +26,19 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dell/csi-isilon/common/constants"
 	"github.com/dell/csi-isilon/common/k8sutils"
 	csiext "github.com/dell/dell-csi-extensions/replication"
+	"google.golang.org/grpc"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"os/exec"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
+	commonext "github.com/dell/dell-csi-extensions/common"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 	"github.com/dell/gocsi"
 	"github.com/dell/gofsutil"
@@ -103,6 +107,8 @@ type feature struct {
 	getReplicationCapabilityRequest         *csiext.GetReplicationCapabilityRequest
 	getReplicationCapabilityResponse        *csiext.GetReplicationCapabilityResponse
 	validateVolumeHostConnectivityResp      *podmon.ValidateVolumeHostConnectivityResponse
+	ProbeControllerRequest                  *commonext.ProbeControllerRequest
+	ProbeControllerResponse                 *commonext.ProbeControllerResponse
 	volumeIDList                            []string
 	snapshotIDList                          []string
 	groupIDList                             []string
@@ -247,6 +253,8 @@ func (f *feature) getService() *service {
 
 	svc.opts = opts
 	svc.mode = "controller"
+	server := grpc.NewServer()
+	svc.RegisterAdditionalServers(server)
 	f.service = svc
 	f.service.nodeID, _ = os.Hostname()
 	f.service.nodeIP = "127.0.0.1"
@@ -384,6 +392,10 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a valid GetReplicationCapabilitiesResponse is returned$`, f.aValidGetReplicationCapabilitiesResponseIsReturned)
 	s.Step(`^I call ValidateConnectivity$`, f.iCallValidateVolumeHostConnectivity)
 	s.Step(`^the ValidateConnectivity response message contains "([^"]*)"$`, f.theValidateConnectivityResponseMessageContains)
+	s.Step(`^I call ProbeController$`, f.iCallProbeController)
+	s.Step(`^I call DynamicLogChange "([^"]*)"$`, f.iCallDynamicLogChange)
+	s.Step(`^a valid DynamicLogChange occurs "([^"]*)" "([^"]*)"$`, f.aValidDynamicLogChangeOccurs)
+	s.Step(`^I set noProbeOnStart to "([^"]*)"$`, f.iSetNoProbeOnStart)
 }
 
 // GetPluginInfo
@@ -3056,4 +3068,44 @@ func (f *feature) theValidateConnectivityResponseMessageContains(expected string
 		}
 	}
 	return fmt.Errorf("Expected %s message in ValidateVolumeHostConnectivityResp but it wasn't there", expected)
+}
+
+func (f *feature) iCallProbeController() error {
+	header := metadata.New(map[string]string{"csi.requestid": "1"})
+	ctx := metadata.NewIncomingContext(context.Background(), header)
+	req := &commonext.ProbeControllerRequest{}
+	connect, err := f.service.ProbeController(ctx, req)
+	if err != nil {
+		f.err = errors.New(err.Error())
+		return nil
+	}
+	fmt.Printf("response is %v", connect)
+	return nil
+}
+
+func (f *feature) iCallDynamicLogChange(file string) error {
+	log.Printf("level before change: %s", utils.GetCurrentLogLevel())
+	DriverConfigParamsFile = "mock/loglevel/" + file
+	log.Printf("wait for config change %s", DriverConfigParamsFile)
+	f.iCallBeforeServe()
+	time.Sleep(10 * time.Second)
+	return nil
+}
+
+func (f *feature) aValidDynamicLogChangeOccurs(file, expectedLevel string) error {
+	log.Printf("level after change: %s", utils.GetCurrentLogLevel())
+	if utils.GetCurrentLogLevel().String() != expectedLevel {
+		err := fmt.Errorf("level was expected to be %s, but was %s instead", expectedLevel, utils.GetCurrentLogLevel().String())
+		return err
+	}
+	log.Printf("Reverting log changes made")
+	DriverConfigParamsFile = "mock/loglevel/logConfig.yaml"
+	f.iCallBeforeServe()
+	time.Sleep(10 * time.Second)
+	return nil
+}
+
+func (f *feature) iSetNoProbeOnStart(value string) error {
+	os.Setenv(constants.EnvNoProbeOnStart, value)
+	return nil
 }
