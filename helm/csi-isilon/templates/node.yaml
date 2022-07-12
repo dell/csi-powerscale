@@ -258,7 +258,7 @@ spec:
           env:
             - name: PROXY_HOST
               value: "{{ .Values.authorization.proxyHost }}"
-            - name: INSECURE
+            - name: SKIP_CERTIFICATE_VALIDATION
               value: "{{ .Values.authorization.skipCertificateValidation }}"
             - name: PLUGIN_IDENTIFIER
               value: powerscale
