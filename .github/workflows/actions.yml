@@ -16,15 +16,15 @@ jobs:
         with:
           directories: ./...
   go_security_scan:
-    name: Go security
+    name: Run gosec
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
         uses: actions/checkout@v2
-      - name: Run Go Security
-        uses: securego/gosec@master
+      - name: Run gosec to check for security vulnerabilities
+        uses: dell/common-github-actions/gosec-runner@main
         with:
-          args: ./...
+          directories: "./..."
   malware_security_scan:
     name: Malware Scanner
     runs-on: ubuntu-latest
