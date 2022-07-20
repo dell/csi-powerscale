@@ -125,12 +125,14 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleExportUpdate).Methods("PUT")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/{export_id}", handleModifyExport).Methods("PUT")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/{export_id}", handleUnexportPath).Methods("DELETE").Queries("zone", "System")
+	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/47", handleGetSnapshotExportByID).Methods("GET")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/{id}", handleGetExportByID).Methods("GET")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleCreateExport).Methods("POST")
 	// Do NOT change the sequence of the following four lines, the first three are subsets of the fourth
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetExportWithPathAndZone).Methods("GET").Queries("path", "/ifs/data/csi-isilon/volume1", "zone", "System")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetExportsWithLimit).Methods("GET").Queries("limit", "")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetExportsWithResume).Methods("GET").Queries("resume", "")
+	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetSnapshotExportWithPathAndZone).Methods("GET").Queries("path", "/ifs/.snapshot/existent_snapshot_name/data/yian/nfs_1", "zone", "System")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetExports).Methods("GET")
 	isilonRouter.HandleFunc("/platform/3/statistics/current", handleStatistics)
 	isilonRouter.HandleFunc("/platform/3/statistics/summary/client", handleIOInProgress).Methods("GET")
@@ -152,7 +154,7 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/platform/1/quota/quotas/", handleCreateQuota).Methods("POST")
 	isilonRouter.HandleFunc("/platform/1/quota/quotas/{quota_id}", handleDeleteQuotaByID).Methods("DELETE")
 	isilonRouter.HandleFunc("/platform/1/quota/quotas/{quota_id}", handleUpdateQuotaByID).Methods("PUT")
-
+	isilonRouter.HandleFunc("/namespace/ifs/.csi-k8s-12345678-tracking-dir/snapVol3", handleDeleteVolume).Methods("DELETE").Queries("recursive", "true")
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/{volume_id}", handleDeleteVolume).Methods("DELETE").Queries("recursive", "true")
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/{id}", handleGetVolume).Methods("GET").Queries("metadata", "")
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/{id}", handleGetVolumeWithoutMetadata).Methods("GET")
@@ -179,7 +181,12 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/platform/11/sync/target/policies/{id}", handleBreakAssociation).Methods("DELETE")
 	isilonRouter.HandleFunc("/platform/11/sync/policies/{id}", handleDeletePolicy).Methods("DELETE")
 	isilonRouter.HandleFunc("/platform/11/sync/target/policies/{id}", handleAllowWrites).Methods("PUT")
-
+	isilonRouter.HandleFunc("/namespace/ifs/data/yian/.csi-existent_snapshot_name-tracking-dir/snapVol1", handleGetExistentSnapshotVolume).Methods("GET")
+	isilonRouter.HandleFunc("/namespace/ifs/data/yian/.csi-existent_snapshot_name-tracking-dir", handleCreateVolumeFromSnapshot).Methods("PUT")
+	isilonRouter.HandleFunc("/namespace/ifs/data/yian/.csi-existent_snapshot_name-tracking-dir/snapVol2", handleCreateVolumeFromSnapshot).Methods("PUT")
+	isilonRouter.HandleFunc("/namespace/ifs/.csi-k8s-12345678-tracking-dir", handleGetExistentVolumeFromSnapshotMetadata).Methods("GET").Queries("metadata", "")
+	isilonRouter.HandleFunc("/namespace/ifs/.csi-k8s-12345678-tracking-dir", handleGetExistentVolumeFromSnapshot).Methods("GET")
+	isilonRouter.HandleFunc("/namespace/ifs/.csi-k8s-12345678-tracking-dir/snapVol3", handleGetExistentVolumeFromSnapshot).Methods("GET")
 	return isilonRouter
 }
 
@@ -947,4 +954,72 @@ func handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 	// response body is empty
 	w.Write([]byte(""))
+}
+
+// handleGetExistentSnapshotVolume implements GET /namespace/ifs/data/csi-isilon/childZone/.csi-existent_snapshot_name_4-tracking-dir/volume1
+func handleGetExistentSnapshotVolume(w http.ResponseWriter, r *http.Request) {
+	// response body is true
+	//w.Write([]byte("true"))
+	return
+}
+
+// handleCreateVolumeFromSnapshot implements PUT /namespace/ifs/data/csi-isilon/childZone/.csi-existent_snapshot_name_4-tracking-dir
+func handleCreateVolumeFromSnapshot(w http.ResponseWriter, r *http.Request) {
+	if testControllerHasNoConnection {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+}
+
+// handleGetSnapshotExportWithPathAndZone GET /platform/2/protocols/nfs/exports/?path=/ifs/.snapshot/existent_snapshot_name_4/data/csi-isilon/childZone/nfs_4&zone=System
+func handleGetSnapshotExportWithPathAndZone(w http.ResponseWriter, r *http.Request) {
+	if testControllerHasNoConnection {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+	if stepHandlersErrors.GetExportInternalError {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Write(readFromFile("mock/export/get_exports_snapVol2.txt"))
+}
+
+// handleGetSnapshotExportByID implements GET /platform/2/protocols/nfs/exports/47
+func handleGetSnapshotExportByID(w http.ResponseWriter, r *http.Request) {
+	if testControllerHasNoConnection {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+	if stepHandlersErrors.GetExportInternalError {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if stepHandlersErrors.GetExportByIDNotFoundError {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(readFromFile("mock/export/export_not_found_by_id.txt"))
+		return
+	}
+	w.Write(readFromFile("mock/export/get_export_snapVol3.txt"))
+}
+
+
+// handleGetExistentVolumeFromSnapshot implements GET namespace/ifs/.csi-k8s-12345678-tracking-dir
+func handleGetExistentVolumeFromSnapshot(w http.ResponseWriter, r *http.Request) {
+	if testControllerHasNoConnection {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+
+// handleGetExistentVolumeFromSnapshotMetadata implements GET /namespace/ifs/.csi-k8s-12345678-tracking-dir?metadata
+func handleGetExistentVolumeFromSnapshotMetadata(w http.ResponseWriter, r *http.Request) {
+	if testControllerHasNoConnection {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+	
+	w.Write([]byte("{\"attrs\":[{\"name\":\"att1\",\"value\":\"val1\"},{\"name\":\"att2\",\"value\":\"val2\"}]}"))
 }
