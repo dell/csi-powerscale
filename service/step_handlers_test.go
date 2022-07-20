@@ -1002,7 +1002,6 @@ func handleGetSnapshotExportByID(w http.ResponseWriter, r *http.Request) {
 	w.Write(readFromFile("mock/export/get_export_snapVol3.txt"))
 }
 
-
 // handleGetExistentVolumeFromSnapshot implements GET namespace/ifs/.csi-k8s-12345678-tracking-dir
 func handleGetExistentVolumeFromSnapshot(w http.ResponseWriter, r *http.Request) {
 	if testControllerHasNoConnection {
@@ -1013,13 +1012,12 @@ func handleGetExistentVolumeFromSnapshot(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 }
 
-
 // handleGetExistentVolumeFromSnapshotMetadata implements GET /namespace/ifs/.csi-k8s-12345678-tracking-dir?metadata
 func handleGetExistentVolumeFromSnapshotMetadata(w http.ResponseWriter, r *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
 	}
-	
+
 	w.Write([]byte("{\"attrs\":[{\"name\":\"att1\",\"value\":\"val1\"},{\"name\":\"att2\",\"value\":\"val2\"}]}"))
 }

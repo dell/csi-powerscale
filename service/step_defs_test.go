@@ -2271,7 +2271,7 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	opts.Verbose = 1
 	opts.CustomTopologyEnabled = true
 	pwd, _ := os.Getwd()
-	pwd = "--"+pwd+"--"
+	pwd = "--" + pwd + "--"
 	opts.KubeConfigPath = "mock/k8s/admin.conf"
 	newConfig := IsilonClusterConfig{}
 	newConfig.ClusterName = clusterName1
@@ -3196,7 +3196,6 @@ func (f *feature) aValidCreateVolumeRespIsReturned() error {
 	return nil
 }
 
-
 func getTypicalCreateROVolumeFromSnapshotRequest() *csi.CreateVolumeRequest {
 	req := new(csi.CreateVolumeRequest)
 	req.Name = "volume1"
@@ -3229,7 +3228,6 @@ func getTypicalCreateROVolumeFromSnapshotRequest() *csi.CreateVolumeRequest {
 	return req
 }
 
-
 func (f *feature) iCallCreateROVolumeFromSnapshot(name string) error {
 	req := getTypicalCreateROVolumeFromSnapshotRequest()
 	if f.rootClientEnabled != "" {
@@ -3244,7 +3242,7 @@ func (f *feature) iCallCreateROVolumeFromSnapshot(name string) error {
 	if f.createVolumeResponse != nil {
 		log.Printf("volume name '%s' created\n", name)
 	}
-/*	if f.createVolumeResponse != nil {
+	/*	if f.createVolumeResponse != nil {
 		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
 		stepHandlersErrors.ExportNotFoundError = false
 		stepHandlersErrors.VolumeNotExistError = false
