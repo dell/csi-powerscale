@@ -3189,7 +3189,6 @@ func getCreatevolumeReplicationEnabled(s *service) *csi.CreateVolumeRequest {
 
 func (f *feature) aValidCreateVolumeRespIsReturned() error {
 	if f.err != nil {
-		//return f.err
 		stepHandlersErrors.ExportNotFoundError = false
 		stepHandlersErrors.VolumeNotExistError = false
 	}
@@ -3217,14 +3216,6 @@ func getTypicalCreateROVolumeFromSnapshotRequest() *csi.CreateVolumeRequest {
 	parameters[IsiPathParam] = "/ifs/data/csi-isilon"
 	req.Parameters = parameters
 	req.VolumeCapabilities = capabilities
-	/*req := new(csi.CreateVolumeRequest)
-	volumeContentSource := &csi.VolumeContentSource{
-		Type: &csi.VolumeContentSource_Snapshot{
-			Snapshot: &csi.VolumeContentSource_SnapshotSource{
-				SnapshotId: "4",
-			},
-		},
-	}*/
 	return req
 }
 
@@ -3242,11 +3233,6 @@ func (f *feature) iCallCreateROVolumeFromSnapshot(name string) error {
 	if f.createVolumeResponse != nil {
 		log.Printf("volume name '%s' created\n", name)
 	}
-	/*	if f.createVolumeResponse != nil {
-		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
-		stepHandlersErrors.ExportNotFoundError = false
-		stepHandlersErrors.VolumeNotExistError = false
-	}*/
 	return nil
 }
 
