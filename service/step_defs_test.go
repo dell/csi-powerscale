@@ -420,7 +420,6 @@ func (f *feature) iCallGetPluginInfo() error {
 	return nil
 }
 
-//shefali
 func (f *feature) iCallStartAPIService() error {
 	ctx, cancel := context2.WithTimeout(context.Background(), time.Duration(time.Second*2))
 	defer cancel()
