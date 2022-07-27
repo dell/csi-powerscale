@@ -16,6 +16,7 @@ package service
  limitations under the License.
 */
 import (
+	context2 "context"
 	"errors"
 	"fmt"
 	"log"
@@ -401,6 +402,12 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call GetSnapshotIsiPathComponents`, f.iCallGetSnapshotIsiPathComponents)
 	s.Step(`^I call GetSubDirectoryCount`, f.iCallGetSubDirectoryCount)
 	s.Step(`^I call DeleteSnapshot`, f.iCallDeleteSnapshotIsiService)
+	s.Step(`^I set mode to "([^"]*)"$`, f.iSetModeTo)
+	s.Step(`^I call startAPIService`, f.iCallStartAPIService)
+	s.Step(`^I set podmon enable to "([^"]*)"$`, f.iSetPodmonEnable)
+	s.Step(`^I set API port to "([^"]*)"$`, f.iSetAPIPort)
+	s.Step(`^I set polling freq to "([^"]*)"$`, f.iSetPollingFeqTo)
+
 }
 
 // GetPluginInfo
@@ -411,6 +418,31 @@ func (f *feature) iCallGetPluginInfo() error {
 		return f.err
 	}
 	return nil
+}
+//shefali
+func (f *feature) iCallStartAPIService() error {
+	ctx, cancel :=context2.WithTimeout(context.Background(), time.Duration(time.Second*2))
+	defer cancel()
+	f.service.startAPIService(ctx)
+	return nil
+}
+
+func (f *feature) iSetPodmonEnable(value string) error {
+    os.Setenv(constants.EnvPodmonEnabled, value)
+     return nil
+}
+func (f *feature) iSetModeTo(value string) error {
+    os.Setenv(gocsi.EnvVarMode, value)
+     return nil
+}
+func (f *feature) iSetAPIPort(value string) error {
+    os.Setenv(constants.EnvPodmonAPIPORT, value)
+     return nil
+}
+
+func (f *feature) iSetPollingFeqTo(value string)  error {
+    os.Setenv(constants.EnvPodmonArrayConnectivityPollRate, value)
+     return nil
 }
 
 func (f *feature) aValidGetPlugInfoResponseIsReturned() error {
