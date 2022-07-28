@@ -218,7 +218,19 @@ Feature: Isilon CSI interface
     | "NodeUnpublishNoTargetPath"             | "Target Path is required"                                                 |
     | "TargetNotCreatedForNodeUnpublish"      | "none"                                                                    |
     | "GOFSMockUnmountError"                  | "error unmounting target"                                                 |
-    
+
+@v1.0.0
+  Scenario: Ephemeral NodePublish test cases
+    Given a Isilon service
+    And I call EphemeralNodePublishVolume
+    Then the error contains "none"
+
+@v1.0.0
+  Scenario: Ephemeral NodeUnpublish test cases
+  Given a Isilon service
+  And I call EphemeralNodeUnpublishVolume
+  Then the error contains "exports found for volume"
+
   #This test is failing and when it is working it is not doing its job correctly
   @todo
   Scenario: Ephemeral NodePublish NodeUnpublish test cases
