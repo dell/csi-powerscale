@@ -288,7 +288,6 @@ func (s *service) CreateVolume(
 	// check volume content source in the request
 	isROVolumeFromSnapshot = false
 	if contentSource = req.GetVolumeContentSource(); contentSource != nil {
-
 		// Fetch source snapshot ID  or volume ID from content source
 		if snapshot := contentSource.GetSnapshot(); snapshot != nil {
 			normalizedSnapshotID := snapshot.GetSnapshotId()
@@ -1130,7 +1129,13 @@ func (s *service) ControllerPublishVolume(
 			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
-		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportReadOnlyClientByIDWithZone)
+		//since read-only has higher privileges than root-clients, add to root-clients in exports on powerscale if root client enabled is set to true
+		if rootClientEnabled && isROVolumeFromSnapshot {
+			log.Info("ROVolumeFromSnapshot & rootClientEnabled is set to true, add to root clients")
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportRootClientByIDWithZone)
+		} else {
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, isiConfig.isiSvc.AddExportReadOnlyClientByIDWithZone)
+		}
 	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER:

@@ -418,12 +418,39 @@ Feature: Isilon CSI interface
         | "43"      | "snapVol1"  |
         | "44"      | "snapVol2"  |
 
-  Scenario: Call DeleteVolume From Snapshot
-    Given a Isilon service
-    When I call DeleteVolume "snapVol3=_=_=47=_=_=System=_=_=cluster1"
-    Then a valid DeleteVolumeResponse is returned
+    Scenario: Call DeleteVolume From Snapshot
+      Given a Isilon service
+      When I call DeleteVolume "snapVol3=_=_=47=_=_=System=_=_=cluster1"
+      Then a valid DeleteVolumeResponse is returned
 
-  Scenario: Call DeleteSnapshot
-    Given a Isilon service
-    When I call DeleteSnapshot "48"
-    Then the error contains "failed to unexport volume directory '0' in access zone '' : 'EOF'"
+    Scenario: Call DeleteSnapshot
+      Given a Isilon service
+      When I call DeleteSnapshot "48"
+      Then the error contains "failed to unexport volume directory '0' in access zone '' : 'EOF'"
+
+    Scenario Outline: podmon enable change
+      Given a Isilon service
+      And I set podmon enable to <value>
+      And I call BeforeServe
+      When I call startAPIService
+      Then the error contains "probe of all isilon clusters failed"
+      Examples:
+        | value |
+        | "true" |
+        | "false" |
+
+    Scenario Outline: startAPIService with different polling feq and API port
+      Given a Isilon service
+      And I set mode to <mode>
+      And I call BeforeServe
+      And I set podmon enable to <value>
+      And I set API port to <port>
+      And I set polling freq to <freq>
+      And I call startAPIService
+      Then the error contains "probe of all isilon clusters failed"
+      Examples:
+       | mode | value | port   | freq |
+       |"controller"  | "false" |"8097" | "70"  |
+       | "controller" | "true" | "7089" | "90" |
+       | "controller" | "true" | "0" | "0" |
+

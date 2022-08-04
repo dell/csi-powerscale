@@ -19,6 +19,6 @@ function verify-csi-isilon() {
   verify_alpha_snap_resources
   verify_snap_requirements
   verify_helm_3
-  verify_helm_values_version "2.3.0"
+  verify_helm_values_version "2.4.0"
   verify_authorization_proxy_server
 }
