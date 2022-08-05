@@ -369,16 +369,39 @@ Feature: Isilon CSI interface
     Scenario: NodeGetVolumeStats volume does not exist scenario
       Given a Isilon service
       When I call Probe
-      And I induce error "VolumeNotExistError"
-      And I call NodeGetVolumeStats with name "" and path ""
+      And I call NodeGetVolumeStats with name ""
       Then the error contains "no VolumeID found in request"
-  
+
+    Scenario: NodeGetVolumeStats volume path not found scenario
+      Given a Isilon service
+      When I call Probe
+      And I induce error "volumePathNotFound"
+      And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1"
+      Then the error contains "no Volume Path found in request"
+
     Scenario: NodeGetVolumeStats volume does not exist scenario
       Given a Isilon service
       When I call Probe
-      And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1" and path ""
-      Then the error contains "no Volume Path found in request"
-  
+      And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1"
+      Then a NodeGetVolumeResponse is returned
+      
+    Scenario: NodeGetVolumeStats volume does not exist at path scenario
+      Given a Isilon service
+      When I call Probe
+      And I call NodeGetVolumeStats with name "volume3=_=_=43=_=_=System=_=_=cluster1"
+      Then a NodeGetVolumeResponse is returned
+
+    Scenario: NodeGetVolumeStats correct scenario
+      Given a Isilon service
+      When I call Probe
+      And I call ControllerPublishVolume with name "volume2=_=_=43=_=_=System" and access type "multiple-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
+      And a capability with voltype "mount" access "single-writer"
+      And get Node Publish Volume Request with Volume Name "volume2=_=_=43=_=_=System=_=_=cluster1"
+      When I call Probe
+      And I call NodePublishVolume
+      And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1"
+      Then a NodeGetVolumeResponse is returned
+ 
     Scenario: Identity GetReplicationCapabilities call
       Given a Isilon service
       When I call GetReplicationCapabilities
