@@ -1199,6 +1199,7 @@ func (f *feature) iCallNodeGetInfo() error {
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
 	if f.err != nil {
 		log.Printf("NodeGetInfo call failed: %s\n", f.err.Error())
+		return f.err
 	}
 	return nil
 }
