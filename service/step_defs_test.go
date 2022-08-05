@@ -31,12 +31,8 @@ import (
 	"github.com/dell/csi-isilon/common/utils"
 
 	"github.com/dell/csi-isilon/common/constants"
-	"github.com/dell/csi-isilon/common/k8sutils"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"google.golang.org/grpc"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"os/exec"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
@@ -1198,6 +1194,7 @@ func (f *feature) aValidGetCapacityResponseIsReturned() error {
 }
 
 func (f *feature) iCallNodeGetInfo() error {
+	MockK8sApi()
 	req := new(csi.NodeGetInfoRequest)
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
 	if f.err != nil {
@@ -1212,6 +1209,7 @@ func (f *feature) iCallSetAttributeMaxVolumesPerNode(volumeLimit int64) error {
 }
 
 func (f *feature) iCallNodeGetInfoWithInvalidVolumeLimit(volumeLimit int64) error {
+	MockK8sApi()
 	req := new(csi.NodeGetInfoRequest)
 	f.service.opts.MaxVolumesPerNode = volumeLimit
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
@@ -2237,30 +2235,9 @@ func (f *feature) aIsilonServiceWithParamsForCustomTopologyNoLabel(user, mode st
 }
 
 func removeNodeLabels(host string) (result bool) {
-	k8sclientset, err := k8sutils.CreateKubeClientSet("mock/k8s/admin.conf")
-	if err != nil {
-		log.Printf("init client failed for custom topology: '%s'", err.Error())
-		return false
-	}
-
-	// access the API to fetch node object
-	node, _ := k8sclientset.CoreV1().Nodes().Get(context.TODO(), host, v1.GetOptions{})
-	log.Printf("Node %s details\n", node)
-
-	// Iterate node labels and check if required label is available and if found remove it
-	for lkey, lval := range node.Labels {
-		log.Printf("Label is: %s:%s\n", lkey, lval)
-		if (strings.HasPrefix(lkey, constants.PluginName+"/") && lval == constants.PluginName) ||
-			(strings.HasPrefix(lkey, "max-isilon-volumes-per-node")) {
-			log.Printf("label %s:%s available on node", lkey, lval)
-			cmd := exec.Command("/bin/bash", "-c", "kubectl label nodes "+host+" "+lkey+"-")
-			err := cmd.Run()
-			if err != nil {
-				log.Printf("Error encountered while removing label from node %s: %s", host, err)
-				return false
-			}
-		}
-	}
+	mockStr := fmt.Sprintf("mocked call to remove labels on %s ", host)
+	deleteK8sValuesFile()
+	fmt.Printf(mockStr)
 	return true
 }
 
@@ -2268,6 +2245,7 @@ func applyNodeLabel(host, label string) (result bool) {
 	//don't need to run actual kubernetes commands for UTs
 	//expect kubernetes commands to work
 	mockStr := fmt.Sprintf("mocked call apply lable %s to %s", label, host)
+	writeK8sValueToFile(k8sLabel, label)
 	fmt.Printf(mockStr)
 
 	return true
@@ -2485,6 +2463,7 @@ func (f *feature) iCallSetAllowedNetworkswithmultiplenetworks(envIP1 string, env
 }
 
 func (f *feature) iCallNodeGetInfowithinvalidnetworks() error {
+	MockK8sApi()
 	req := new(csi.NodeGetInfoRequest)
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
 	if f.err != nil {

@@ -28,6 +28,7 @@ import (
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
+	"sync"
 )
 
 var (
@@ -103,6 +104,7 @@ var (
 var isilonRouter http.Handler
 var testControllerHasNoConnection bool
 var testNodeHasNoConnection bool
+var once sync.Once
 
 // getFileHandler returns an http.Handler that
 func getHandler() http.Handler {
@@ -1020,4 +1022,34 @@ func handleGetExistentVolumeFromSnapshotMetadata(w http.ResponseWriter, r *http.
 	}
 
 	w.Write([]byte("{\"attrs\":[{\"name\":\"att1\",\"value\":\"val1\"},{\"name\":\"att2\",\"value\":\"val2\"}]}"))
+}
+
+func MockK8sApi() {
+	fmt.Println("mocking k8s api begun")
+	once.Do(func() {
+		fmt.Println("create mock server only once")
+		http.HandleFunc("/api/v1/nodes/", noderesponse)
+		go func() {
+			fmt.Println("started mock server")
+			http.ListenAndServe(":36443", nil)
+		}()
+	})
+	fmt.Println("mocking k8s api done")
+}
+
+
+func noderesponse(w http.ResponseWriter, req *http.Request) {
+
+	log.Printf("request in noderesponse -> %+v",req)
+	param1 := req.URL.Query().Get("nodeId")
+	fakeNode := GetFakeNode()
+	fn, err := json.Marshal(fakeNode)
+	if err != nil {
+		fmt.Printf("Error fake node: %s", err)
+	}
+	log.Printf("wrote fn for %v", param1)
+	log.Printf("labels sent were %+v", fakeNode.GetLabels())
+	w.Header().Add("Content-Type", "application/json")
+	w.Header().Add("Content-Type", "v=v1")
+	w.Write(fn)
 }
