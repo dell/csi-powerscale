@@ -2652,7 +2652,7 @@ func (f *feature) iCallGetReplicationCapabilities() error {
 	f.getReplicationCapabilityResponse, f.err = f.service.GetReplicationCapabilities(context.Background(), req)
 	if f.err != nil {
 		log.Printf("GetReplicationCapabilities call failed: %s\n", f.err.Error())
-		return nil
+		return f.err
 	}
 	return nil
 }
