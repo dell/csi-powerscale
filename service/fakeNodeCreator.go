@@ -14,21 +14,24 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-
-const K8sValueFile  = "k8sValues.csv"
+const K8sValueFile = "k8sValues.csv"
 const k8sLabel = "label"
 
-func writeK8sValueToFile(inputType, value string){
+func writeK8sValueToFile(inputType, value string) {
 	deleteK8sValuesFile()
 	log.Printf("writing k8s values input=%s, value=%s", inputType, value)
 	pwd, err := os.Getwd()
 	log.Printf("cwd is path is %s", pwd)
 	file, err := os.Create(K8sValueFile)
 	if err != nil {
-		log.Printf("Unable to create file to write kubernetes values - %s",err)
+		log.Printf("Unable to create file to write kubernetes values - %s", err)
 	}
-	defer file.Close()
-	valuesCsvStr := fmt.Sprintf("%s,%s",inputType,value)
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("Error closing file: %s\n", err)
+		}
+	}()
+	valuesCsvStr := fmt.Sprintf("%s,%s", inputType, value)
 	log.Printf("values str is %s", valuesCsvStr)
 	_, err = file.WriteString(valuesCsvStr)
 	if err != nil {
@@ -58,7 +61,7 @@ func deleteK8sValuesFile() bool {
 	return true
 }
 
-func readAppliedLabels() (string, string ){
+func readAppliedLabels() (string, string) {
 	var label string
 	var value string
 	abspath, err := filepath.Abs(K8sValueFile)
@@ -75,16 +78,16 @@ func readAppliedLabels() (string, string ){
 	}
 	valueStr := string(content)
 	log.Infof("content read is %s", valueStr)
-	values := strings.Split(valueStr,",")
+	values := strings.Split(valueStr, ",")
 	if len(values) > 0 {
-		labelnValues := strings.Split(values[1],"=")
+		labelnValues := strings.Split(values[1], "=")
 		if len(labelnValues) > 1 {
 			label = labelnValues[0]
 			value = labelnValues[1]
 		}
 	}
 	log.Printf("sent label values %s - %s ", label, value)
-	return label,value
+	return label, value
 }
 
 func GetFakeNode() *v1.Node {
@@ -104,9 +107,9 @@ func GetFakeNode() *v1.Node {
 	label, value := readAppliedLabels()
 	if label != "" {
 		fmt.Printf("wrote %s=%s\n", label, value)
-		labelStr := fmt.Sprintf("%s",label)
-		val := ""+value+""
-		labelMap[labelStr]= val
+		labelStr := fmt.Sprintf("%s", label)
+		val := "" + value + ""
+		labelMap[labelStr] = val
 	}
 	labelMap["csi-isilon.dellemc.com/127.0.0.1"] = "csi-isilon.dellemc.com"
 

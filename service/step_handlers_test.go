@@ -1037,10 +1037,9 @@ func MockK8sApi() {
 	fmt.Println("mocking k8s api done")
 }
 
-
 func noderesponse(w http.ResponseWriter, req *http.Request) {
 
-	log.Printf("request in noderesponse -> %+v",req)
+	log.Printf("request in noderesponse -> %+v", req)
 	param1 := req.URL.Query().Get("nodeId")
 	fakeNode := GetFakeNode()
 	fn, err := json.Marshal(fakeNode)
