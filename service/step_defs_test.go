@@ -128,6 +128,7 @@ var inducedErrors struct {
 	useAccessTypeMount   bool
 	noIsiService         bool
 	autoProbeNotEnabled  bool
+	volumePathNotFound   bool
 }
 
 const (
@@ -328,6 +329,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call NodePublishVolume$`, f.iCallNodePublishVolume)
 	s.Step(`^I call EphemeralNodePublishVolume$`, f.iCallEphemeralNodePublishVolume)
 	s.Step(`^get Node Publish Volume Request$`, f.getNodePublishVolumeRequest)
+	s.Step(`^get Node Publish Volume Request with Volume Name "([^"]*)"$`, f.getNodePublishVolumeRequestwithVolumeName)
 	s.Step(`^I change the target path$`, f.iChangeTheTargetPath)
 	s.Step(`^I mark request read only$`, f.iMarkRequestReadOnly)
 	s.Step(`^I call NodeStageVolume with name "([^"]*)" and access type "([^"]*)"$`, f.iCallNodeStageVolume)
@@ -362,7 +364,8 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I set RootClientEnabled to "([^"]*)"$`, f.iSetRootClientEnabledTo)
 	s.Step(`^I call ControllerGetVolume with name "([^"]*)"$`, f.iCallControllerGetVolume)
 	s.Step(`^a valid ControllerGetVolumeResponse is returned$`, f.aValidControllerGetVolumeResponseIsReturned)
-	s.Step(`^I call NodeGetVolumeStats with name "([^"]*)" and path "([^"]*)"$`, f.iCallNodeGetVolumeStats)
+	s.Step(`^I call NodeGetVolumeStats with name "([^"]*)"$`, f.iCallNodeGetVolumeStats)
+	s.Step(`^a NodeGetVolumeResponse is returned$`, f.aNodeGetVolumeResponseIsReturned)
 	s.Step(`^I call iCallNodeGetInfoWithNoFQDN`, f.iCallNodeGetInfoWithNoFQDN)
 	s.Step(`^a valid NodeGetInfoResponse is returned$`, f.aValidNodeGetInfoResponseIsReturned)
 	s.Step(`^I call CreateRemoteVolume`, f.iCallCreateRemoteVolume)
@@ -888,6 +891,8 @@ func (f *feature) iInduceError(errtype string) error {
 	case "no-volume-no-nodeId":
 		stepHandlersErrors.PodmonVolumeStatisticsError = true
 		stepHandlersErrors.PodmonNoVolumeNoNodeIDError = true
+	case "volumePathNotFound":
+		inducedErrors.volumePathNotFound = true
 	case "none":
 
 	default:
@@ -1079,6 +1084,7 @@ func clearErrors() {
 	stepHandlersErrors.DeleteVolumeError = false
 	inducedErrors.noIsiService = false
 	inducedErrors.autoProbeNotEnabled = false
+	inducedErrors.volumePathNotFound = false
 	stepHandlersErrors.GetJobsInternalError = false
 	stepHandlersErrors.GetPolicyInternalError = false
 	stepHandlersErrors.GetTargetPolicyInternalError = false
@@ -1637,6 +1643,27 @@ func (f *feature) getNodePublishVolumeRequest() error {
 	return nil
 }
 
+func (f *feature) getNodePublishVolumeRequestwithVolumeName(volName string) error {
+	req := new(csi.NodePublishVolumeRequest)
+	req.VolumeId, _, _, _, _ = utils.ParseNormalizedVolumeID(context.Background(), volName)
+
+	req.Readonly = false
+	req.VolumeCapability = f.capability
+	mount := f.capability.GetMount()
+	if mount != nil {
+		req.TargetPath = datadir
+	}
+	attributes := map[string]string{
+		"Name":       req.VolumeId,
+		"AccessZone": "",
+		"Path":       f.service.opts.Path + "/" + req.VolumeId,
+	}
+	req.VolumeContext = attributes
+
+	f.nodePublishVolumeRequest = req
+	return nil
+}
+
 func (f *feature) getNodeUnpublishVolumeRequest() error {
 	req := new(csi.NodeUnpublishVolumeRequest)
 	req.VolumeId = Volume1
@@ -1732,7 +1759,7 @@ func (f *feature) aValidControllerGetVolumeResponseIsReturned() error {
 	return nil
 }
 
-func (f *feature) iCallNodeGetVolumeStats(volID string, path string) error {
+func (f *feature) iCallNodeGetVolumeStats(volID string) error {
 
 	header := metadata.New(map[string]string{"csi.requestid": "1"})
 	ctx := metadata.NewIncomingContext(context.Background(), header)
@@ -1740,15 +1767,44 @@ func (f *feature) iCallNodeGetVolumeStats(volID string, path string) error {
 	req := new(csi.NodeGetVolumeStatsRequest)
 	req.VolumeId = volID
 
+	if inducedErrors.volumePathNotFound == true {
+		req.VolumePath = ""
+	} else {
+		req.VolumePath = datadir
+	}
+
 	f.nodeGetVolumeStatsRequest = req
 	fmt.Printf("Calling NodeGetVolumeStats")
+
+	//assume no errors induced, so response should be okay, these values will change below if errors were induced
+	abnormal := false
+	message := ""
+
 	f.nodeGetVolumeStatsResponse, f.err = f.service.NodeGetVolumeStats(ctx, req)
 	if f.err != nil {
 		log.Printf("Node GetVolumeStats call failed: %s\n", f.err.Error())
 	}
-	f.nodeGetVolumeStatsRequest = nil
+	if f.nodeGetVolumeStatsResponse != nil {
+		//check message and abnormal state returned in NodeGetVolumeStatsResponse.VolumeCondition
+		if f.nodeGetVolumeStatsResponse.VolumeCondition.Abnormal == abnormal && strings.Contains(f.nodeGetVolumeStatsResponse.VolumeCondition.Message, message) {
+			fmt.Printf("NodeGetVolumeStats Response VolumeCondition check passed\n")
+		} else {
+			fmt.Printf("Expected nodeGetVolumeStatsResponse.Abnormal to be %v, and message to contain: %s, but instead, abnormal was: %v and message was: %s", abnormal, message, f.nodeGetVolumeStatsResponse.VolumeCondition.Abnormal, f.nodeGetVolumeStatsResponse.VolumeCondition.Message)
+		}
+	}
+
 	return nil
 }
+
+func (f *feature) aNodeGetVolumeResponseIsReturned() error {
+	if f.err != nil {
+		return f.err
+	}
+	fmt.Printf("The volume condition is %v\n", f.nodeGetVolumeStatsResponse)
+
+	return nil
+}
+
 func (f *feature) iCallControllerUnPublishVolume(volID string, accessMode string, nodeID string) error {
 	req := f.getControllerUnPublishVolumeRequest(accessMode, nodeID)
 	f.unpublishVolumeRequest = req
