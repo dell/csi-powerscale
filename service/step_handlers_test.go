@@ -1024,7 +1024,7 @@ func handleGetExistentVolumeFromSnapshotMetadata(w http.ResponseWriter, r *http.
 	w.Write([]byte("{\"attrs\":[{\"name\":\"att1\",\"value\":\"val1\"},{\"name\":\"att2\",\"value\":\"val2\"}]}"))
 }
 
-func MockK8sApi() {
+func MockK8sAPI() {
 	fmt.Println("mocking k8s api begun")
 	once.Do(func() {
 		fmt.Println("create mock server only once")

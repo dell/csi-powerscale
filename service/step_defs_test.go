@@ -1200,7 +1200,7 @@ func (f *feature) aValidGetCapacityResponseIsReturned() error {
 }
 
 func (f *feature) iCallNodeGetInfo() error {
-	MockK8sApi()
+	MockK8sAPI()
 	req := new(csi.NodeGetInfoRequest)
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
 	if f.err != nil {
@@ -1216,7 +1216,7 @@ func (f *feature) iCallSetAttributeMaxVolumesPerNode(volumeLimit int64) error {
 }
 
 func (f *feature) iCallNodeGetInfoWithInvalidVolumeLimit(volumeLimit int64) error {
-	MockK8sApi()
+	MockK8sAPI()
 	req := new(csi.NodeGetInfoRequest)
 	f.service.opts.MaxVolumesPerNode = volumeLimit
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
@@ -2520,7 +2520,7 @@ func (f *feature) iCallSetAllowedNetworkswithmultiplenetworks(envIP1 string, env
 }
 
 func (f *feature) iCallNodeGetInfowithinvalidnetworks() error {
-	MockK8sApi()
+	MockK8sAPI()
 	req := new(csi.NodeGetInfoRequest)
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
 	if f.err != nil {

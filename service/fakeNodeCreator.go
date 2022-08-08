@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
+//K8sValueFile values file that stories k8s node labels applied
 const K8sValueFile = "k8sValues.csv"
 const k8sLabel = "label"
 
@@ -90,6 +91,7 @@ func readAppliedLabels() (string, string) {
 	return label, value
 }
 
+//GetFakeNode returns a fake node with labels including current hostname
 func GetFakeNode() *v1.Node {
 	client := fake.NewSimpleClientset()
 	hostname, err := os.Hostname()
