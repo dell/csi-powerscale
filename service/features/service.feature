@@ -427,6 +427,30 @@ Feature: Isilon CSI interface
         | "logLevelInfo.yaml"   | "info" |
         | "logConfigError.yaml" | "debug" |
 
+    Scenario: Create Volume with Replication Enabled
+      Given a Isilon service
+      When I call CreateVolumeRequest
+      Then the error contains "json: cannot unmarshal number into Go value of type api.JSONError"
+
+    Scenario Outline: Create RO Volume from snapshot
+      Given a Isilon service
+      When I call CreateVolumeFromSnapshotMultiReader <exportID> <snapVolName>
+      Then a valid CreateVolumeResponse is returned
+      Examples:
+        | exportID  | snapVolName |
+        | "43"      | "snapVol1"  |
+        | "44"      | "snapVol2"  |
+
+    Scenario: Call DeleteVolume From Snapshot
+      Given a Isilon service
+      When I call DeleteVolume "snapVol3=_=_=47=_=_=System=_=_=cluster1"
+      Then a valid DeleteVolumeResponse is returned
+
+    Scenario: Call DeleteSnapshot
+      Given a Isilon service
+      When I call DeleteSnapshot "48"
+      Then the error contains "failed to unexport volume directory '0' in access zone '' : 'EOF'"
+
     Scenario Outline: podmon enable change
       Given a Isilon service
       And I set podmon enable to <value>
