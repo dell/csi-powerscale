@@ -19,6 +19,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/dell/csi-isilon/service/mock/k8s"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
@@ -1041,7 +1042,7 @@ func noderesponse(w http.ResponseWriter, req *http.Request) {
 
 	log.Printf("request in noderesponse -> %+v", req)
 	param1 := req.URL.Query().Get("nodeId")
-	fakeNode := GetFakeNode()
+	fakeNode := k8s.GetFakeNode()
 	fn, err := json.Marshal(fakeNode)
 	if err != nil {
 		fmt.Printf("Error fake node: %s", err)

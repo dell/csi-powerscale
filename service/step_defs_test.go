@@ -19,6 +19,7 @@ import (
 	context2 "context"
 	"errors"
 	"fmt"
+	"github.com/dell/csi-isilon/service/mock/k8s"
 	"log"
 	"net"
 	"net/http/httptest"
@@ -2293,7 +2294,7 @@ func (f *feature) aIsilonServiceWithParamsForCustomTopologyNoLabel(user, mode st
 
 func removeNodeLabels(host string) (result bool) {
 	mockStr := fmt.Sprintf("mocked call to remove labels on %s ", host)
-	deleteK8sValuesFile()
+	k8s.DeleteK8sValuesFile()
 	fmt.Printf(mockStr)
 	return true
 }
@@ -2302,7 +2303,7 @@ func applyNodeLabel(host, label string) (result bool) {
 	//don't need to run actual kubernetes commands for UTs
 	//expect kubernetes commands to work
 	mockStr := fmt.Sprintf("mocked call apply lable %s to %s", label, host)
-	writeK8sValueToFile(k8sLabel, label)
+	k8s.WriteK8sValueToFile(k8s.K8sLabel, label)
 	fmt.Printf(mockStr)
 
 	return true

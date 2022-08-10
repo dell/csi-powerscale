@@ -1,4 +1,4 @@
-package service
+package k8s
 
 import (
 	"context"
@@ -16,10 +16,13 @@ import (
 
 //K8sValueFile values file that stories k8s node labels applied
 const K8sValueFile = "k8sValues.csv"
-const k8sLabel = "label"
 
-func writeK8sValueToFile(inputType, value string) {
-	deleteK8sValuesFile()
+//K8sLabel defines the field label to be used
+const K8sLabel = "label"
+
+//WriteK8sValueToFile writes the values to a file to used in fakeNode
+func WriteK8sValueToFile(inputType, value string) {
+	DeleteK8sValuesFile()
 	log.Printf("writing k8s values input=%s, value=%s", inputType, value)
 	pwd, err := os.Getwd()
 	log.Printf("cwd is path is %s", pwd)
@@ -45,7 +48,8 @@ func writeK8sValueToFile(inputType, value string) {
 	fmt.Printf("wrote the values to file - %s \n", absPath)
 }
 
-func deleteK8sValuesFile() bool {
+//DeleteK8sValuesFile deletes the values in the file used in fakeNode
+func DeleteK8sValuesFile() bool {
 	abspath, err := filepath.Abs(K8sValueFile)
 	if err != nil {
 		log.Errorf("unable get abs path of file for deletion - %s", err)
