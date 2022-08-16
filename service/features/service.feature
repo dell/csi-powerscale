@@ -477,3 +477,10 @@ Feature: Isilon CSI interface
        | "controller" | "true" | "7089" | "90" |
        | "controller" | "true" | "0" | "0" |
 
+  Scenario: Create RO volume from snapshot With RootClient Enabled
+    Given a Isilon service
+    And I set RootClientEnabled to "true"
+    And I call CreateVolumeFromSnapshotMultiReader "43" "snapVol1"
+    And I call ControllerPublishVolume on Snapshot with name "snapVol1=_=_=43=_=_=System" and access type "multiple-reader" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
+    Then a valid ControllerPublishVolumeResponse is returned
+    Then a valid CreateVolumeResponse is returned

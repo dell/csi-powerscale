@@ -412,6 +412,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I set podmon enable to "([^"]*)"$`, f.iSetPodmonEnable)
 	s.Step(`^I set API port to "([^"]*)"$`, f.iSetAPIPort)
 	s.Step(`^I set polling freq to "([^"]*)"$`, f.iSetPollingFeqTo)
+	s.Step(`^I call ControllerPublishVolume on Snapshot with name "([^"]*)" and access type "([^"]*)" to "([^"]*)"$`, f.iCallControllerPublishVolumeOnSnapshot)
 
 }
 
@@ -3342,4 +3343,69 @@ func (f *feature) aValidDeleteSnapshotResponseIsReturned() error {
 		return f.err
 	}
 	return nil
+}
+
+func (f *feature) iCallControllerPublishVolumeOnSnapshot(volID string, accessMode string, nodeID string) error {
+	log.Printf("iCallControllerPublishVolume called with %s and %s", accessMode, nodeID)
+	header := metadata.New(map[string]string{"csi.requestid": "1"})
+	ctx := metadata.NewIncomingContext(context.Background(), header)
+	req := f.publishVolumeRequest
+	if f.publishVolumeRequest == nil {
+		req = f.getControllerPublishVolumeRequestOnSnapshot(accessMode, nodeID)
+		f.publishVolumeRequest = req
+	}
+
+	// a customized volume ID can be specified to overwrite the default one
+	if volID != "" {
+		req.VolumeId = volID
+	}
+
+	log.Printf("Calling controllerPublishVolume with request %v", req)
+	f.publishVolumeResponse, f.err = f.service.ControllerPublishVolume(ctx, req)
+	if f.err != nil {
+		log.Printf("PublishVolume call failed: %s\n", f.err.Error())
+	}
+	f.publishVolumeRequest = nil
+	return nil
+}
+
+func (f *feature) getControllerPublishVolumeRequestOnSnapshot(accessType, nodeID string) *csi.ControllerPublishVolumeRequest {
+	capability := new(csi.VolumeCapability)
+
+	mountVolume := new(csi.VolumeCapability_MountVolume)
+	mountVolume.MountFlags = make([]string, 0)
+	mount := new(csi.VolumeCapability_Mount)
+	mount.Mount = mountVolume
+	capability.AccessType = mount
+
+	if !inducedErrors.omitAccessMode {
+		capability.AccessMode = getAccessMode(accessType)
+	}
+	fmt.Printf("capability.AccessType %v\n", capability.AccessType)
+	fmt.Printf("capability.AccessMode %v\n", capability.AccessMode)
+	req := new(csi.ControllerPublishVolumeRequest)
+	if !inducedErrors.noVolumeID {
+		if inducedErrors.invalidVolumeID || f.createVolumeResponse == nil {
+			req.VolumeId = "000-000"
+		} else {
+			req.VolumeId = "volume1=_=_=19=_=_=System"
+		}
+	}
+	if !inducedErrors.noNodeID {
+		req.NodeId = nodeID
+	}
+	req.Readonly = false
+	if !inducedErrors.omitVolumeCapability {
+		req.VolumeCapability = capability
+	}
+	// add in the context
+	attributes := map[string]string{}
+	attributes[AccessZoneParam] = f.accessZone
+	if f.rootClientEnabled != "" {
+		attributes[RootClientEnabledParam] = f.rootClientEnabled
+	}
+	attributes[ExportPathParam] = "/ifs/.snapshot/snapshot-54820ad0-b127-412b-8286-20d5275d2161"
+	//ExportPathParam
+	req.VolumeContext = attributes
+	return req
 }
