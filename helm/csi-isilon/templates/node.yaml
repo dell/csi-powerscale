@@ -93,6 +93,18 @@ spec:
       hostNetwork: true
       dnsPolicy: {{ .Values.node.dnsPolicy }}
       containers:
+        {{- $encModes := list false }}
+        {{- if eq .Values.encryption.enabled true }}
+        {{- $encModes = list false true }}
+        {{- end }}
+{{- range $encrypted := $encModes }}
+{{- with $ }}
+        {{- $driverSock := "csi_sock" }}
+        {{- $csiSidecarSuffix := "" }}
+        {{- if $encrypted }}
+        {{- $driverSock = "csi_sec_sock" }}
+        {{- $csiSidecarSuffix = "-sec" }}
+        {{- end }}
       {{- if hasKey .Values "podmon" }}
       {{- if eq .Values.podmon.enabled true }}
         - name: podmon
@@ -145,6 +157,7 @@ spec:
               mountPath: /csi-isilon-config-params
       {{- end }}
       {{- end }}
+        {{- if not $encrypted }}
         - name: driver
           command: ["/csi-isilon"]
           args:
@@ -158,7 +171,7 @@ spec:
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           env:
             - name: CSI_ENDPOINT
-              value: "{{ .Values.kubeletConfigDir }}/plugins/csi-isilon/csi_sock"
+              value: "{{ .Values.kubeletConfigDir }}/plugins/csi-isilon/{{ $driverSock }}"
             - name: X_CSI_MODE
               value: node
             - name: X_CSI_ISI_SKIP_CERTIFICATE_VALIDATION
@@ -216,8 +229,14 @@ spec:
           volumeMounts:
             - name: driver-path
               mountPath: {{ .Values.kubeletConfigDir }}/plugins/csi-isilon
+            {{- if eq .Values.encryption.enabled true }}
+            - name: staging-dir
+              mountPath: {{ .Values.kubeletConfigDir }}/plugins/kubernetes.io/csi
+              mountPropagation: Bidirectional
+            {{- else }}
             - name: volumedevices-path
               mountPath: {{ .Values.kubeletConfigDir }}/plugins/kubernetes.io/csi/volumeDevices
+            {{- end }}
             - name: pods-path
               mountPath: {{ .Values.kubeletConfigDir }}/pods
               mountPropagation: "Bidirectional"
@@ -230,16 +249,15 @@ spec:
               mountPath: /isilon-configs
             - name: csi-isilon-config-params
               mountPath: /csi-isilon-config-params
-        - name: registrar
+        {{- end }}
+        - name: registrar{{ $csiSidecarSuffix }}
           image: {{ required "Must provide the CSI node registrar container image." .Values.images.registrar }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--v=5"
-            - "--csi-address=$(ADDRESS)"
-            - --kubelet-registration-path={{ .Values.kubeletConfigDir }}/plugins/csi-isilon/csi_sock
+            - "--csi-address=/csi/{{ $driverSock }}"
+            - --kubelet-registration-path={{ .Values.kubeletConfigDir }}/plugins/csi-isilon/{{ $driverSock }}
           env:
-            - name: ADDRESS
-              value: /csi/csi_sock
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
@@ -250,6 +268,7 @@ spec:
               mountPath: /registration
             - name: driver-path
               mountPath: /csi
+        {{- if not $encrypted }}
         {{- if hasKey .Values "authorization" }}
         {{- if eq .Values.authorization.enabled true }}
         - name: karavi-authorization-proxy
@@ -281,6 +300,64 @@ spec:
               mountPath: /etc/karavi-authorization
         {{ end }}
         {{ end }}
+        {{- end }}
+        {{- if $encrypted }}
+        - name: driver-sec
+          image: {{ .Values.encryption.image }}
+          imagePullPolicy: {{ default .Values.imagePullPolicy .Values.encryption.imagePullPolicy }}
+          securityContext:
+            privileged: true
+            allowPrivilegeEscalation: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+          args:
+            - --name={{ .Values.encryption.pluginName }}
+            - --nodeId=$(NODE_ID)
+            - "--endpoint=unix://var/run/csi/csi_sec_sock"
+            - "--targetEndpoint=unix://var/run/csi/csi_sock"
+            - --targetType=Isilon
+            - --vaultClientConfig=/etc/dea/vault/client.json
+            - --logLevel={{ .Values.encryption.logLevel }}
+            - --licenseName=/etc/dea/license/license
+            {{- if .Values.encryption.livenessPort }}
+            - --livenessPort={{ .Values.encryption.livenessPort }}
+            {{- end}}
+            {{- range index .Values.encryption.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
+          env:
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: vault-config
+              mountPath: /etc/dea/vault
+            - name: driver-path
+              mountPath: /var/run/csi
+            - name: pods-path
+              mountPath: {{ .Values.kubeletConfigDir }}/pods
+              mountPropagation: Bidirectional
+            - name: staging-dir
+              mountPath: {{ .Values.kubeletConfigDir }}/plugins/kubernetes.io/csi
+              mountPropagation: Bidirectional
+            - name: hostroot
+              mountPath: /hostroot
+            - name: license-config
+              mountPath: /etc/dea/license
+          {{- if .Values.encryption.livenessPort }}
+          livenessProbe:
+            httpGet:
+              path: /liveprobe
+              port: {{ .Values.encryption.livenessPort }}
+              initialDelaySeconds: 1500
+              periodSeconds: 1000
+              timeoutSeconds: 3
+              failureThreshold: 100
+          {{- end }}
+        {{- end }}
+{{- end }}
+{{- end }}
       volumes:
         - name: registration-dir
           hostPath:
@@ -344,3 +421,25 @@ spec:
             type: Directory
         {{ end }}
         {{ end }}
+        {{- if eq .Values.encryption.enabled true }}
+        - name: vault-config
+          projected:
+            sources:
+            - secret:
+                name: vault-cert
+            - secret:
+                name: vault-auth
+            - configMap:
+                name: vault-client-conf
+        - name: staging-dir
+          hostPath:
+            path: {{ .Values.kubeletConfigDir }}/plugins/kubernetes.io/csi
+            type: DirectoryOrCreate
+        - name: hostroot
+          hostPath:
+            path: /root
+            type: Directory
+        - name: license-config
+          secret:
+            secretName: encryption-license
+        {{- end }}
