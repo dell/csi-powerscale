@@ -48,6 +48,11 @@ parameters:
   # Optional: true
   #ClusterName: <cluster_name>
 
+  # Sets the filesystem type which will be used to format the new volume
+  # Optional: true
+  # Default value: None
+  csi.storage.k8s.io/fstype: "nfs"
+
 # volumeBindingMode controls when volume binding and dynamic provisioning should occur.
 # Allowed values:
 #   Immediate: indicates that volume binding and dynamic provisioning occurs once the
