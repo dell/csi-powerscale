@@ -412,7 +412,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I set podmon enable to "([^"]*)"$`, f.iSetPodmonEnable)
 	s.Step(`^I set API port to "([^"]*)"$`, f.iSetAPIPort)
 	s.Step(`^I set polling freq to "([^"]*)"$`, f.iSetPollingFeqTo)
-	s.Step(`^I call ControllerPublishVolume on Snapshot with name "([^"]*)" and access type "([^"]*)" to "([^"]*)"$`, f.iCallControllerPublishVolumeOnSnapshot)
+	s.Step(`^I call ControllerPublishVolume on Snapshot with name "([^"]*)" and access type "([^"]*)" to "([^"]*)" and path "([^"]*)"$`, f.iCallControllerPublishVolumeOnSnapshot)
 
 }
 
@@ -3345,13 +3345,13 @@ func (f *feature) aValidDeleteSnapshotResponseIsReturned() error {
 	return nil
 }
 
-func (f *feature) iCallControllerPublishVolumeOnSnapshot(volID string, accessMode string, nodeID string) error {
+func (f *feature) iCallControllerPublishVolumeOnSnapshot(volID, accessMode, nodeID, path string) error {
 	log.Printf("iCallControllerPublishVolume called with %s and %s", accessMode, nodeID)
 	header := metadata.New(map[string]string{"csi.requestid": "1"})
 	ctx := metadata.NewIncomingContext(context.Background(), header)
 	req := f.publishVolumeRequest
 	if f.publishVolumeRequest == nil {
-		req = f.getControllerPublishVolumeRequestOnSnapshot(accessMode, nodeID)
+		req = f.getControllerPublishVolumeRequestOnSnapshot(accessMode, nodeID, path)
 		f.publishVolumeRequest = req
 	}
 
@@ -3369,7 +3369,7 @@ func (f *feature) iCallControllerPublishVolumeOnSnapshot(volID string, accessMod
 	return nil
 }
 
-func (f *feature) getControllerPublishVolumeRequestOnSnapshot(accessType, nodeID string) *csi.ControllerPublishVolumeRequest {
+func (f *feature) getControllerPublishVolumeRequestOnSnapshot(accessType, nodeID, path string) *csi.ControllerPublishVolumeRequest {
 	capability := new(csi.VolumeCapability)
 
 	mountVolume := new(csi.VolumeCapability_MountVolume)
@@ -3404,7 +3404,7 @@ func (f *feature) getControllerPublishVolumeRequestOnSnapshot(accessType, nodeID
 	if f.rootClientEnabled != "" {
 		attributes[RootClientEnabledParam] = f.rootClientEnabled
 	}
-	attributes[ExportPathParam] = "/ifs/.snapshot/snapshot-54820ad0-b127-412b-8286-20d5275d2161"
+	attributes[ExportPathParam] = path
 	//ExportPathParam
 	req.VolumeContext = attributes
 	return req
