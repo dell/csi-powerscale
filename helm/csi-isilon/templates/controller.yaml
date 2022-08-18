@@ -178,6 +178,7 @@ spec:
         {{- $driverSock = "csi-sec.sock" }}
         {{- $csiSidecarSuffix = "-sec" }}
         {{- end }}
+        {{- $driverSockPath := printf "/var/run/csi/%s" $driverSock }}
         {{- if not $encrypted }}
         {{- if hasKey .Values "podmon" }}
         {{- if eq .Values.podmon.enabled true }}
@@ -212,7 +213,7 @@ spec:
           image: {{ required "Must provide the Dell CSI Replicator image." .Values.controller.replication.image}}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
-            - "--csi-address=/var/run/csi/{{ $driverSock }}"
+            - "--csi-address={{ $driverSockPath }}"
             - "--leader-election=true"
             - "--worker-threads=2"
             - "--retry-interval-start=1s"
@@ -239,7 +240,7 @@ spec:
           image: {{ required "Must provide the CSI resizer container image." .Values.images.resizer }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
-            - "--csi-address=/var/run/csi/{{ $driverSock }}"
+            - "--csi-address={{ $driverSockPath }}"
             - "--leader-election"
             - "--timeout=120s"
             - "--v=5"
@@ -263,7 +264,7 @@ spec:
           image: {{ required "Must provide the CSI attacher container image." .Values.images.attacher }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
-            - "--csi-address=/var/run/csi/{{ $driverSock }}"
+            - "--csi-address={{ $driverSockPath }}"
             - "--v=5"
             - "--leader-election"
             - "--timeout=180s"
@@ -288,7 +289,7 @@ spec:
           image: {{ required "Must provide the CSI external-health-monitor-controller container image." .Values.images.externalhealthmonitorcontroller }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
-            - "--csi-address=/var/run/csi/{{ $driverSock }}"
+            - "--csi-address={{ $driverSockPath }}"
             - "--v=5"
             - "--leader-election"
             - "--enable-node-watcher=true"
@@ -316,7 +317,7 @@ spec:
           image: {{ required "Must provide the CSI provisioner container image." .Values.images.provisioner }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
-            - "--csi-address=/var/run/csi/{{ $driverSock }}"
+            - "--csi-address={{ $driverSockPath }}"
             - "--volume-name-prefix={{ required "Must provide a value to prefix to driver created volume names" .Values.controller.volumeNamePrefix }}"
             - "--volume-name-uuid-length=10"
             - "--worker-threads=5"
@@ -346,7 +347,7 @@ spec:
           image: {{ required "Must provide the CSI snapshotter container image." .Values.images.snapshotter }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
-            - "--csi-address=/var/run/csi/{{ $driverSock }}"
+            - "--csi-address={{ $driverSockPath }}"
             - "--timeout=120s"
             - "--v=5"
             - "--snapshot-name-prefix={{ required "Must privided a Snapshot Name Prefix" .Values.controller.snapshot.snapNamePrefix }}"
@@ -388,7 +389,7 @@ spec:
             - "--driver-config-params=/csi-isilon-config-params/driver-config-params.yaml"
           env:
             - name: CSI_ENDPOINT
-              value: "/var/run/csi/{{ $driverSock }}"
+              value: "{{ $driverSockPath }}"
             - name: X_CSI_MODE
               value: controller
             - name: X_CSI_ISI_SKIP_CERTIFICATE_VALIDATION
