@@ -166,6 +166,20 @@ spec:
       {{- toYaml .Values.controller.tolerations | nindent 8 }}
       {{ end }}
       containers:
+        {{- $encModes := list false }}
+        {{- if eq .Values.encryption.enabled true }}
+        {{- $encModes = list false true }}
+        {{- end }}
+{{- range $encrypted := $encModes }}
+{{- with $ }}
+        {{- $driverSock := "csi.sock" }}
+        {{- $csiSidecarSuffix := "" }}
+        {{- if $encrypted }}
+        {{- $driverSock = "csi-sec.sock" }}
+        {{- $csiSidecarSuffix = "-sec" }}
+        {{- end }}
+        {{- $driverSockPath := printf "/var/run/csi/%s" $driverSock }}
+        {{- if not $encrypted }}
         {{- if hasKey .Values "podmon" }}
         {{- if eq .Values.podmon.enabled true }}
         - name: podmon
@@ -199,7 +213,7 @@ spec:
           image: {{ required "Must provide the Dell CSI Replicator image." .Values.controller.replication.image}}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
-            - "--csi-address=$(ADDRESS)"
+            - "--csi-address={{ $driverSockPath }}"
             - "--leader-election=true"
             - "--worker-threads=2"
             - "--retry-interval-start=1s"
@@ -208,8 +222,6 @@ spec:
             - "--context-prefix={{ .Values.controller.replication.replicationContextPrefix}}"
             - "--prefix={{ .Values.controller.replication.replicationPrefix}}"
           env:
-            - name: ADDRESS
-              value: /var/run/csi/csi.sock
             - name: X_CSI_REPLICATION_CONFIG_DIR
               value: /csi-isilon-config-params
             - name: X_CSI_REPLICATION_CONFIG_FILE_NAME
@@ -221,13 +233,14 @@ spec:
               mountPath: /csi-isilon-config-params
         {{- end }}
         {{- end }}
+        {{- end }}
         {{- if hasKey .Values.controller "resizer" }}
         {{- if eq .Values.controller.resizer.enabled true }}
-        - name: resizer
+        - name: resizer{{ $csiSidecarSuffix }}
           image: {{ required "Must provide the CSI resizer container image." .Values.images.resizer }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
-            - "--csi-address=$(ADDRESS)"
+            - "--csi-address={{ $driverSockPath }}"
             - "--leader-election"
             - "--timeout=120s"
             - "--v=5"
@@ -242,19 +255,16 @@ spec:
             - "--leader-election-retry-period={{ .Values.controller.leaderElection.leaderElectionRetryPeriod }}"
             {{end}}
             {{end}}
-          env:
-            - name: ADDRESS
-              value: /var/run/csi/csi.sock
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
         {{ end }}
         {{ end }}
-        - name: attacher
+        - name: attacher{{ $csiSidecarSuffix }}
           image: {{ required "Must provide the CSI attacher container image." .Values.images.attacher }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
-            - "--csi-address=$(ADDRESS)"
+            - "--csi-address={{ $driverSockPath }}"
             - "--v=5"
             - "--leader-election"
             - "--timeout=180s"
@@ -269,19 +279,17 @@ spec:
             - "--leader-election-retry-period={{ .Values.controller.leaderElection.leaderElectionRetryPeriod }}"
             {{end}}
             {{end}}
-          env:
-            - name: ADDRESS
-              value: /var/run/csi/csi.sock
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
+        {{- if not $encrypted }}
         {{- if hasKey .Values.controller "healthMonitor" }}
         {{- if eq .Values.controller.healthMonitor.enabled true }}
         - name: external-health-monitor-controller
           image: {{ required "Must provide the CSI external-health-monitor-controller container image." .Values.images.externalhealthmonitorcontroller }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
-            - "--csi-address=$(ADDRESS)"
+            - "--csi-address={{ $driverSockPath }}"
             - "--v=5"
             - "--leader-election"
             - "--enable-node-watcher=true"
@@ -299,19 +307,17 @@ spec:
             - "--leader-election-retry-period={{ .Values.controller.leaderElection.leaderElectionRetryPeriod }}"
             {{end}}
             {{end}}
-          env:
-            - name: ADDRESS
-              value: /var/run/csi/csi.sock
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
         {{end}}
         {{end}}
-        - name: provisioner
+        {{- end }}
+        - name: provisioner{{ $csiSidecarSuffix }}
           image: {{ required "Must provide the CSI provisioner container image." .Values.images.provisioner }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
-            - "--csi-address=$(ADDRESS)"
+            - "--csi-address={{ $driverSockPath }}"
             - "--volume-name-prefix={{ required "Must provide a value to prefix to driver created volume names" .Values.controller.volumeNamePrefix }}"
             - "--volume-name-uuid-length=10"
             - "--worker-threads=5"
@@ -331,20 +337,17 @@ spec:
             - "--leader-election-retry-period={{ .Values.controller.leaderElection.leaderElectionRetryPeriod }}"
             {{end}}
             {{end}}
-          env:
-            - name: ADDRESS
-              value: /var/run/csi/csi.sock
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
         {{- if hasKey .Values.controller "snapshot" }}
         {{- if eq .Values.controller.snapshot.enabled true }}
-        - name: snapshotter
+        - name: snapshotter{{ $csiSidecarSuffix }}
           #image: quay.io/k8scsi/csi-snapshotter:v1.0.0
           image: {{ required "Must provide the CSI snapshotter container image." .Values.images.snapshotter }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
-            - "--csi-address=$(ADDRESS)"
+            - "--csi-address={{ $driverSockPath }}"
             - "--timeout=120s"
             - "--v=5"
             - "--snapshot-name-prefix={{ required "Must privided a Snapshot Name Prefix" .Values.controller.snapshot.snapNamePrefix }}"
@@ -360,14 +363,12 @@ spec:
             - "--leader-election-retry-period={{ .Values.controller.leaderElection.leaderElectionRetryPeriod }}"
             {{end}}
             {{end}}
-          env:
-            - name: ADDRESS
-              value: /var/run/csi/csi.sock
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
         {{end}}
         {{end}}
+        {{- if not $encrypted }}
         - name: driver
           image: {{ required "Must provide the Isilon driver container image." .Values.images.driver }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
@@ -388,7 +389,7 @@ spec:
             - "--driver-config-params=/csi-isilon-config-params/driver-config-params.yaml"
           env:
             - name: CSI_ENDPOINT
-              value: /var/run/csi/csi.sock
+              value: "{{ $driverSockPath }}"
             - name: X_CSI_MODE
               value: controller
             - name: X_CSI_ISI_SKIP_CERTIFICATE_VALIDATION
@@ -459,6 +460,8 @@ spec:
               mountPath: /isilon-configs
             - name: csi-isilon-config-params
               mountPath: /csi-isilon-config-params
+        {{- end }}
+        {{- if not $encrypted }}
         {{- if hasKey .Values "authorization" }}
         {{- if eq .Values.authorization.enabled true }}
         - name: karavi-authorization-proxy
@@ -490,6 +493,33 @@ spec:
               mountPath: /etc/karavi-authorization
         {{ end }}
         {{ end }}
+        {{- end }}
+        {{- if $encrypted }}
+        - name: driver-sec
+          image: {{ .Values.encryption.image }}
+          imagePullPolicy: {{ default .Values.imagePullPolicy .Values.encryption.imagePullPolicy }}
+          args:
+            - --name={{ .Values.encryption.pluginName }}
+            - --nodeId=$(NODE_ID)
+            - "--endpoint=unix://var/run/csi/csi-sec.sock"
+            - "--targetEndpoint=unix://var/run/csi/csi.sock"
+            - --targetType=Isilon
+            - --controller
+            - --logLevel={{ .Values.encryption.logLevel }}
+            {{- range index .Values.encryption.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
+          env:
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
+        {{- end }}
+{{- end }}
+{{- end }}
       volumes:
         - name: socket-dir
           emptyDir:
