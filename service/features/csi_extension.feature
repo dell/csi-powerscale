@@ -27,3 +27,8 @@ Feature: Isilon CSI interface
     And I call ValidateConnectivity
     Then the error contains "ValidateVolumeHostConnectivity is implemented"
 
+  Scenario: Call Validate Url Status
+    Given a Isilon service
+    And I call QueryArrayStatus "55555"
+    Then the error contains "none"
+

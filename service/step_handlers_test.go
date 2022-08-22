@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+        "time"
 
 	isiapi "github.com/dell/goisilon/api"
 	"github.com/gorilla/mux"
@@ -1053,3 +1054,41 @@ func noderesponse(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Content-Type", "v=v1")
 	w.Write(fn)
 }
+
+func MockClusterStatus() {
+	log.Printf("apiPort %s" ,apiPort)
+	/*if apiPort != ":55555" {
+		return
+	}*/
+	log.Printf("Nitesh mocking cluster start")
+	fmt.Println("mocking cluster status api begun")
+	once.Do(func() {
+		fmt.Println("create mock server only once")
+        time.Sleep(10)
+		http.HandleFunc("/array-status/cluster1", apiResponse)
+		go func() {
+			fmt.Println("started mock server")
+			log.Printf("Nitesh started mock server")
+			http.ListenAndServe(":55555", nil)
+		}()
+	})
+	fmt.Println("mocking cluster done")
+}
+
+
+func apiResponse(w http.ResponseWriter, req *http.Request) {
+
+	log.Printf("Nitesh request in apiResponse -> %+v", req)
+	var statusResponse ArrayConnectivityStatus
+	statusResponse.LastAttempt = time.Now().Unix()
+	statusResponse.LastSuccess = time.Now().Unix()
+	fn, err := json.Marshal(statusResponse)
+	if err != nil {
+		fmt.Printf("Error statusResponse: %s", err)
+	}
+	w.Header().Add("Content-Type", "application/json")
+	w.Write(fn)
+	w.WriteHeader(http.StatusOK)
+
+}
+
