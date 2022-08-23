@@ -24,7 +24,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
-        "time"
+	"time"
 
 	isiapi "github.com/dell/goisilon/api"
 	"github.com/gorilla/mux"
@@ -1031,7 +1031,7 @@ func MockK8sAPI() {
 	once.Do(func() {
 		fmt.Println("create mock server only once")
 		http.HandleFunc("/api/v1/nodes/", noderesponse)
-                time.Sleep(15)
+		time.Sleep(15)
 
 		//http://127.0.0.1:36443/array-status/cluster1
 		http.HandleFunc("/array-status/cluster1/", apiResponse)
@@ -1073,4 +1073,3 @@ func apiResponse(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 }
-

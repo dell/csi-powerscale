@@ -413,7 +413,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I set API port to "([^"]*)"$`, f.iSetAPIPort)
 	s.Step(`^I set polling freq to "([^"]*)"$`, f.iSetPollingFeqTo)
 	s.Step(`^I call ControllerPublishVolume on Snapshot with name "([^"]*)" and access type "([^"]*)" to "([^"]*)" and path "([^"]*)"$`, f.iCallControllerPublishVolumeOnSnapshot)
-        s.Step(`^I call QueryArrayStatus "([^"]*)"$`, f.iCallQueryArrayStatus)
+	s.Step(`^I call QueryArrayStatus "([^"]*)"$`, f.iCallQueryArrayStatus)
 
 }
 
@@ -3414,11 +3414,11 @@ func (f *feature) getControllerPublishVolumeRequestOnSnapshot(accessType, nodeID
 func (f *feature) iCallQueryArrayStatus(apiPort string) error {
 
 	// Calling http mock server
-        MockK8sAPI()
+	MockK8sAPI()
 	ctx := context2.Background()
 	url := "http://" + "127.0.0.1:" + apiPort + arrayStatus + "/" + "cluster1"
 	_, err := f.service.queryArrayStatus(ctx, url)
-	if err != nil{
+	if err != nil {
 		log.Printf("queryArrayStatus failed: %s", err)
 	}
 	return nil
