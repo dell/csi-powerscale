@@ -896,6 +896,8 @@ func (f *feature) iInduceError(errtype string) error {
 		stepHandlersErrors.PodmonNoVolumeNoNodeIDError = true
 	case "volumePathNotFound":
 		inducedErrors.volumePathNotFound = true
+	case "ModifyLastAttempt":
+		stepHandlersErrors.ModifyLastAttempt = true
 	case "none":
 
 	default:
@@ -1121,6 +1123,7 @@ func clearErrors() {
 	stepHandlersErrors.GetSpgErrors = false
 	stepHandlersErrors.GetSpgTPErrors = false
 	stepHandlersErrors.GetExportPolicyError = false
+	stepHandlersErrors.ModifyLastAttempt = false
 }
 
 func getTypicalCapacityRequest(valid bool) *csi.GetCapacityRequest {
