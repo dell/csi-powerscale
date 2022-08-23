@@ -1031,6 +1031,8 @@ func MockK8sAPI() {
 	once.Do(func() {
 		fmt.Println("create mock server only once")
 		http.HandleFunc("/api/v1/nodes/", noderesponse)
+                time.Sleep(15)
+
 		//http://127.0.0.1:36443/array-status/cluster1
 		http.HandleFunc("/array-status/cluster1/", apiResponse)
 		go func() {
@@ -1057,32 +1059,8 @@ func noderesponse(w http.ResponseWriter, req *http.Request) {
 	w.Write(fn)
 }
 
-func MockClusterStatus() {
-	log.Printf("apiPort %s" ,apiPort)
-	/*if apiPort != ":55555" {
-		return
-	}*/
-	log.Printf("Nitesh mocking cluster start")
-	fmt.Println("mocking cluster status api begun")
-	MockK8sAPI()
-	/*once.Do(func() {
-		fmt.Println("create mock server only once")
-        time.Sleep(10)
-		http.HandleFunc("/array-status/cluster1", apiResponse)
-		go func() {
-			fmt.Println("started mock server")
-			log.Printf("Nitesh started mock server")
-			http.ListenAndServe(":55555", nil)
-		}()
-	})
-*/
-	fmt.Println("mocking cluster done")
-}
-
-
 func apiResponse(w http.ResponseWriter, req *http.Request) {
 
-	log.Printf("Nitesh request in apiResponse -> %+v", req)
 	var statusResponse ArrayConnectivityStatus
 	statusResponse.LastAttempt = time.Now().Unix()
 	statusResponse.LastSuccess = time.Now().Unix()

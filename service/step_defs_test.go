@@ -3413,15 +3413,13 @@ func (f *feature) getControllerPublishVolumeRequestOnSnapshot(accessType, nodeID
 
 func (f *feature) iCallQueryArrayStatus(apiPort string) error {
 
-	log.Printf("Nitesh calling MockClusterStatus")
-	MockK8sAPI()
-	MockClusterStatus()
-	log.Printf("Nitesh calling iCallQueryArrayStatus")
+	// Calling http mock server
+        MockK8sAPI()
 	ctx := context2.Background()
 	url := "http://" + "127.0.0.1:" + apiPort + arrayStatus + "/" + "cluster1"
 	_, err := f.service.queryArrayStatus(ctx, url)
 	if err != nil{
-		log.Printf("Nitesh getting error with iCallQueryArrayStatus ")
+		log.Printf("queryArrayStatus failed: %s", err)
 	}
 	return nil
 }
