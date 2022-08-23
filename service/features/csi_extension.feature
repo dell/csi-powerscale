@@ -29,6 +29,6 @@ Feature: Isilon CSI interface
 
   Scenario: Call Validate Url Status
     Given a Isilon service
-    And I call QueryArrayStatus "55555"
+    And I call QueryArrayStatus "36443"
     Then the error contains "none"
 

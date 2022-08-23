@@ -1031,6 +1031,8 @@ func MockK8sAPI() {
 	once.Do(func() {
 		fmt.Println("create mock server only once")
 		http.HandleFunc("/api/v1/nodes/", noderesponse)
+		//http://127.0.0.1:36443/array-status/cluster1
+		http.HandleFunc("/array-status/cluster1/", apiResponse)
 		go func() {
 			fmt.Println("started mock server")
 			http.ListenAndServe(":36443", nil)
@@ -1062,7 +1064,8 @@ func MockClusterStatus() {
 	}*/
 	log.Printf("Nitesh mocking cluster start")
 	fmt.Println("mocking cluster status api begun")
-	once.Do(func() {
+	MockK8sAPI()
+	/*once.Do(func() {
 		fmt.Println("create mock server only once")
         time.Sleep(10)
 		http.HandleFunc("/array-status/cluster1", apiResponse)
@@ -1072,6 +1075,7 @@ func MockClusterStatus() {
 			http.ListenAndServe(":55555", nil)
 		}()
 	})
+*/
 	fmt.Println("mocking cluster done")
 }
 

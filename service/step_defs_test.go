@@ -3414,6 +3414,7 @@ func (f *feature) getControllerPublishVolumeRequestOnSnapshot(accessType, nodeID
 func (f *feature) iCallQueryArrayStatus(apiPort string) error {
 
 	log.Printf("Nitesh calling MockClusterStatus")
+	MockK8sAPI()
 	MockClusterStatus()
 	log.Printf("Nitesh calling iCallQueryArrayStatus")
 	ctx := context2.Background()
