@@ -387,8 +387,6 @@ podmon:
 
 encryption:
   # enable: Enable/disable volume encryption feature
-  # Encryption cannot be enabled in tandem with resizer or authorization.
-  # Enable this feature only after contacting support for additional information.
   enabled: false
 
   # pluginName: The name of the provisioner to use when encryption is enabled.
