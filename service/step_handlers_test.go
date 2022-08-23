@@ -99,6 +99,7 @@ var (
 		PodmonVolumeStatisticsError   bool
 		PodmonNoNodeIDError           bool
 		PodmonNoVolumeNoNodeIDError   bool
+		ModifyLastAttempt             bool
 	}
 )
 
@@ -1062,7 +1063,15 @@ func noderesponse(w http.ResponseWriter, req *http.Request) {
 func apiResponse(w http.ResponseWriter, req *http.Request) {
 
 	var statusResponse ArrayConnectivityStatus
-	statusResponse.LastAttempt = time.Now().Unix()
+	// Validating LastAttempt flag
+	if stepHandlersErrors.ModifyLastAttempt {
+		currentTime := time.Now()
+		currentTime = currentTime.Add(-time.Minute * 5)
+		// Reducing LastAttempt time by 5 mins
+		statusResponse.LastAttempt = currentTime.Unix()
+	} else {
+		statusResponse.LastAttempt = time.Now().Unix()
+	}
 	statusResponse.LastSuccess = time.Now().Unix()
 	fn, err := json.Marshal(statusResponse)
 	if err != nil {
