@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	isiapi "github.com/dell/goisilon/api"
 	"github.com/gorilla/mux"
@@ -1030,6 +1031,10 @@ func MockK8sAPI() {
 	once.Do(func() {
 		fmt.Println("create mock server only once")
 		http.HandleFunc("/api/v1/nodes/", noderesponse)
+		time.Sleep(15)
+
+		//http://127.0.0.1:36443/array-status/cluster1
+		http.HandleFunc("/array-status/cluster1/", apiResponse)
 		go func() {
 			fmt.Println("started mock server")
 			http.ListenAndServe(":36443", nil)
@@ -1052,4 +1057,19 @@ func noderesponse(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 	w.Header().Add("Content-Type", "v=v1")
 	w.Write(fn)
+}
+
+func apiResponse(w http.ResponseWriter, req *http.Request) {
+
+	var statusResponse ArrayConnectivityStatus
+	statusResponse.LastAttempt = time.Now().Unix()
+	statusResponse.LastSuccess = time.Now().Unix()
+	fn, err := json.Marshal(statusResponse)
+	if err != nil {
+		fmt.Printf("Error statusResponse: %s", err)
+	}
+	w.Header().Add("Content-Type", "application/json")
+	w.Write(fn)
+	w.WriteHeader(http.StatusOK)
+
 }
