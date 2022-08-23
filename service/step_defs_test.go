@@ -1743,12 +1743,23 @@ func (f *feature) iCallControllerGetVolume(volID string) error {
 	req := new(csi.ControllerGetVolumeRequest)
 	req.VolumeId = volID
 
+	abnormal := false
+	message := ""
 	f.controllerGetVolumeRequest = req
 	fmt.Printf("Calling controllerGetVolume")
 	f.controllerGetVolumeResponse, f.err = f.service.ControllerGetVolume(ctx, req)
 	if f.err != nil {
 		log.Printf("Controller GetVolume call failed: %s\n", f.err.Error())
 	}
+	if f.controllerGetVolumeResponse != nil {
+		//check message and abnormal state returned in NodeGetVolumeStatsResponse.VolumeCondition
+		if f.controllerGetVolumeResponse.Status.VolumeCondition.Abnormal == abnormal && strings.Contains(f.controllerGetVolumeResponse.Status.VolumeCondition.Message, message) {
+			fmt.Printf("controllerGetVolumeResponse Response VolumeCondition check passed\n")
+		} else {
+			fmt.Printf("Expected controllerGetVolumeResponse.Abnormal to be %v, and message to contain: %s, but instead, abnormal was: %v and message was: %s", abnormal, message, f.controllerGetVolumeResponse.Status.VolumeCondition.Abnormal, f.controllerGetVolumeResponse.Status.VolumeCondition.Message)
+		}
+	}
+
 	f.controllerGetVolumeRequest = nil
 	return nil
 }
@@ -2495,7 +2506,9 @@ func (f *feature) iCallGetExportRelatedFunctionsInIsiService() error {
 
 func (f *feature) iCallUnimplementedFunctions() error {
 	_, f.err = f.service.ListSnapshots(context.Background(), new(csi.ListSnapshotsRequest))
-	_, f.err = f.service.ControllerExpandVolume(context.Background(), new(csi.ControllerExpandVolumeRequest))
+	_, f.err = f.service.NodeUnstageVolume(context.Background(), new(csi.NodeUnstageVolumeRequest))
+	_, f.err = f.service.NodeStageVolume(context.Background(), new(csi.NodeStageVolumeRequest))
+	_, f.err = f.service.ListVolumes(context.Background(), new(csi.ListVolumesRequest))
 	_, f.err = f.service.NodeExpandVolume(context.Background(), new(csi.NodeExpandVolumeRequest))
 	return nil
 }

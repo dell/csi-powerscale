@@ -32,6 +32,7 @@ Feature: Isilon CSI interface
       | ""                                       | "KeyReplicationRemoteSystem" | "volume ID is required"                                               |
       | "volume1=_=_=19=_=_=System"              | ""                           | "replication enabled but no remote system specified in storage class" |
       | "volume1=_=_=43=_=_=System=_=_=cluster2" | "KeyReplicationRemoteSystem" | "failed to get cluster config details for clusterName: 'cluster2'"    |
+      | "volume1=_=_=43"                         | "KeyReplicationRemoteSystem" | "cannot be split into tokens"                                         |
 
 
   Scenario Outline: Create remote volume with induced errors and quota enabled
@@ -43,14 +44,15 @@ Feature: Isilon CSI interface
     Then the error contains <errormsg>
 
     Examples:
-      | induced                  | errormsg               |
-      | "InstancesError"         | "none"                 |
-      | "CreateQuotaError"       | "EOF"                  |
-      | "CreateExportError"      | "EOF"                  |
-      | "GetExportInternalError" | "EOF"                  |
-      | "none"                   | "none"                 |
-      | "GetPolicyInternalError" | "failed to sync data " |
-      | "GetExportPolicyError"   | "NotFound"             |
+      | induced                  | errormsg                     |
+      | "InstancesError"         | "none"                       |
+      | "CreateQuotaError"       | "EOF"                        |
+      | "CreateExportError"      | "EOF"                        |
+      | "GetExportInternalError" | "EOF"                        |
+      | "none"                   | "none"                       |
+      | "GetPolicyInternalError" | "failed to sync data "       |
+      | "GetExportPolicyError"   | "NotFound"                   |
+      | "autoProbeFailed"        | "auto probe is not enabled"  |
 
   Scenario Outline: Create remote volume with different volume and export status and induce server errors
     Given a Isilon service
@@ -99,6 +101,7 @@ Feature: Isilon CSI interface
       | induced                      | errormsg                           |
       | "GetExportByIDNotFoundError" | "Export id 9999999 does not exist" |
       | "GetExportInternalError"     | "EOF"                              |
+      | "autoProbeFailed"            | "auto probe is not enabled"        |
 
   Scenario Outline: Create storage protection group with parameters
     Given a Isilon service
@@ -111,6 +114,7 @@ Feature: Isilon CSI interface
       | ""                                       | "remoteSystem" | "volume ID is required"                                               |
       | "volume1=_=_=19=_=_=System"              | ""             | "replication enabled but no remote system specified in storage class" |
       | "volume1=_=_=43=_=_=System=_=_=cluster2" | "remoteSystem" | "failed to get cluster config details for clusterName: 'cluster2'"    |
+      | "volume1=_=_=43"                         | "remoteSystem" | "cannot be split into tokens"                                         |
 
   @deleteStorageProtectionGroup
     @v1.0.0
@@ -201,9 +205,10 @@ Feature: Isilon CSI interface
     Then the error contains <errormsg>
 
     Examples:
-      | induced             | errormsg                              |
-      | "UpdatePolicyError" | "suspend: can't disable local policy" |
-
+      | induced                  | errormsg                              |
+      | "UpdatePolicyError"      | "suspend: can't disable local policy" |
+      | "autoProbeFailed"        | "auto probe is not enabled" |
+    
   Scenario: Execute action sync
     Given a Isilon service
     And I enable quota
