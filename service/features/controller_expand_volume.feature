@@ -55,3 +55,13 @@ Feature: Isilon CSI interface
      | induced                             | errormsg                                           |
      | "UpdateQuotaError"                  | "failed to update quota"                           |
 
+   Scenario: Calling functions with autoProbe failed
+      Given a Isilon service
+      And I induce error "autoProbeFailed"
+      When I call ControllerExpandVolume "volume1=_=_=557=_=_=System" "108589934592"
+      Then the error contains "auto probe is not enabled"
+
+   Scenario: Calling functions with invalid volume id
+      Given a Isilon service
+      When I call ControllerExpandVolume "volume1=_=_=557" "108589934592"
+      Then the error contains "volume ID @@ cannot be split into tokens"
