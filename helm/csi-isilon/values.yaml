@@ -392,13 +392,13 @@ encryption:
   # pluginName: The name of the provisioner to use for encrypted volumes.
   pluginName: "sec-isilon.dellemc.com"
 
-  # image: Encryption agent image name.
+  # image: Encryption driver image name.
   image: "dellemc/csm-encryption:v0.1.0"
 
   # imagePullPolicy: If specified, overrides the chart global imagePullPolicy.
   imagePullPolicy:
 
-  # logLevel: Log level of the encryption agent.
+  # logLevel: Log level of the encryption driver.
   # Allowed values: "error", "warning", "info", "debug", "trace".
   logLevel: "error"
   
@@ -407,7 +407,7 @@ encryption:
   # Example: 8080
   livenessPort:
 
-  # extraArgs: Extra command line parameters to pass to the encryption agent.
+  # extraArgs: Extra command line parameters to pass to the encryption driver.
   # Allowed values:
   # --sharedStorage - may be required by some applications to work properly.
   # When set, performance is reduced and hard links cannot be created.
