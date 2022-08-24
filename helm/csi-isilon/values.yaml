@@ -386,10 +386,10 @@ podmon:
   #    - "--driverPodLabelValue=dell-storage"
 
 encryption:
-  # enable: Enable/disable volume encryption feature
+  # enabled: Enable/disable volume encryption feature.
   enabled: false
 
-  # pluginName: The name of the provisioner to use when encryption is enabled.
+  # pluginName: The name of the provisioner to use for encrypted volumes.
   pluginName: "sec-isilon.dellemc.com"
 
   # image: Encryption agent image name.
@@ -399,7 +399,7 @@ encryption:
   imagePullPolicy:
 
   # logLevel: Log level of the encryption agent.
-  # Allowed values: "error", "warning", "info", "debug", "trace"
+  # Allowed values: "error", "warning", "info", "debug", "trace".
   logLevel: "error"
   
   # livenessPort: HTTP liveness probe port number. 
