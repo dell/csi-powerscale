@@ -550,3 +550,15 @@ Feature: Isilon CSI interface
     And I induce error "GetExportInternalError"
     And I call ControllerGetVolume with name "volume2=_=_=43=_=_=System=_=_=cluster1"
     Then the error contains "none"
+
+  Scenario: Create RO volume from snapshot with NodePublishVolume
+    Given a Isilon service
+    When I call Probe
+    And I call CreateVolumeFromSnapshotMultiReader "43" "snapVol1"
+    And I call ControllerPublishVolume on Snapshot with name "snapVol1=_=_=43=_=_=System" and access type "multiple-reader" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1" and path "/ifs/.snapshot/snapshot-snappath"
+    And a capability with voltype "mount" access "multiple-reader"
+    And get Node Publish Volume Request with Volume Name "volume2=_=_=43=_=_=System=_=_=cluster1" and path "/ifs/.snapshot/snapshot-snappath"
+    And I call NodePublishVolume
+    And get Node Unpublish Volume Request for RO Snapshot "volume2=_=_=43=_=_=System=_=_=cluster1" and path "/ifs/.snapshot/snapshot-snappath"
+    And I call NodeUnpublishVolume
+    Then a valid CreateVolumeResponse is returned
