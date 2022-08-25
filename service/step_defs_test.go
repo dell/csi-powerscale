@@ -331,6 +331,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call EphemeralNodePublishVolume$`, f.iCallEphemeralNodePublishVolume)
 	s.Step(`^get Node Publish Volume Request$`, f.getNodePublishVolumeRequest)
 	s.Step(`^get Node Publish Volume Request with Volume Name "([^"]*)"$`, f.getNodePublishVolumeRequestwithVolumeName)
+	s.Step(`^get Node Publish Volume Request with Volume Name "([^"]*)" and path "([^"]*)"$`, f.getNodePublishVolumeRequestwithVolumeNameandPath)
 	s.Step(`^I change the target path$`, f.iChangeTheTargetPath)
 	s.Step(`^I mark request read only$`, f.iMarkRequestReadOnly)
 	s.Step(`^I call NodeStageVolume with name "([^"]*)" and access type "([^"]*)"$`, f.iCallNodeStageVolume)
@@ -414,7 +415,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I set polling freq to "([^"]*)"$`, f.iSetPollingFeqTo)
 	s.Step(`^I call ControllerPublishVolume on Snapshot with name "([^"]*)" and access type "([^"]*)" to "([^"]*)" and path "([^"]*)"$`, f.iCallControllerPublishVolumeOnSnapshot)
 	s.Step(`^I call QueryArrayStatus "([^"]*)"$`, f.iCallQueryArrayStatus)
-
+	s.Step(`^get Node Unpublish Volume Request for RO Snapshot "([^"]*)" and path "([^"]*)"$`, f.getNodeUnpublishVolumeRequestForROSnapshot)
 }
 
 // GetPluginInfo
@@ -1649,6 +1650,26 @@ func (f *feature) getNodePublishVolumeRequest() error {
 	return nil
 }
 
+func (f *feature) getNodePublishVolumeRequestwithVolumeNameandPath(volName string, path string) error {
+	req := new(csi.NodePublishVolumeRequest)
+	req.VolumeId = volName
+	req.Readonly = true
+	req.VolumeCapability = f.capability
+	mount := f.capability.GetMount()
+	if mount != nil {
+		req.TargetPath = datadir
+	}
+	attributes := map[string]string{
+		"Name":       req.VolumeId,
+		"AccessZone": "",
+		"Path":       path,
+	}
+	req.VolumeContext = attributes
+
+	f.nodePublishVolumeRequest = req
+	return nil
+}
+
 func (f *feature) getNodePublishVolumeRequestwithVolumeName(volName string) error {
 	req := new(csi.NodePublishVolumeRequest)
 	req.VolumeId, _, _, _, _ = utils.ParseNormalizedVolumeID(context.Background(), volName)
@@ -1674,6 +1695,16 @@ func (f *feature) getNodeUnpublishVolumeRequest() error {
 	req := new(csi.NodeUnpublishVolumeRequest)
 	req.VolumeId = Volume1
 	req.TargetPath = datadir
+
+	f.nodeUnpublishVolumeRequest = req
+	return nil
+}
+
+func (f *feature) getNodeUnpublishVolumeRequestForROSnapshot(volName string, path string) error {
+	req := new(csi.NodeUnpublishVolumeRequest)
+	req.VolumeId = volName
+	req.TargetPath = path
+
 	f.nodeUnpublishVolumeRequest = req
 	return nil
 }
