@@ -98,7 +98,13 @@ func (s *service) apiRouter(ctx context.Context) {
 	router.HandleFunc(arrayStatus, connectivityStatus).Methods("GET")
 	router.HandleFunc(arrayStatus+"/"+"{arrayId}", getArrayConnectivityStatus).Methods("GET")
 	//start http server to serve requests
-	err := http.ListenAndServe(apiPort, router)
+	server := &http.Server{
+		Addr:         apiPort,
+		Handler:      router,
+		ReadTimeout:  timeout,
+		WriteTimeout: timeout,
+	}
+	err := server.ListenAndServe()
 	if err != nil {
 		log.Errorf("unable to start http server to serve status requests due to %s", err)
 	}
