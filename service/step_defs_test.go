@@ -16,8 +16,10 @@ package service
  limitations under the License.
 */
 import (
+	context2 "context"
 	"errors"
 	"fmt"
+	"github.com/dell/csi-isilon/service/mock/k8s"
 	"log"
 	"net"
 	"net/http/httptest"
@@ -30,12 +32,8 @@ import (
 	"github.com/dell/csi-isilon/common/utils"
 
 	"github.com/dell/csi-isilon/common/constants"
-	"github.com/dell/csi-isilon/common/k8sutils"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"google.golang.org/grpc"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"os/exec"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
@@ -115,6 +113,8 @@ type feature struct {
 	groupIDList                             []string
 	snapshotIndex                           int
 	rootClientEnabled                       string
+	createVolumeRequestTest                 *csi.CreateVolumeRequest
+	createVolumeResponseTest                *csi.CreateVolumeResponse
 }
 
 var inducedErrors struct {
@@ -129,6 +129,7 @@ var inducedErrors struct {
 	useAccessTypeMount   bool
 	noIsiService         bool
 	autoProbeNotEnabled  bool
+	volumePathNotFound   bool
 }
 
 const (
@@ -222,7 +223,7 @@ func (f *feature) getService() *service {
 	opts.SkipCertificateValidation = true
 	opts.isiAuthType = 0
 	opts.Verbose = 1
-	opts.KubeConfigPath = "/etc/kubernetes/admin.conf"
+	opts.KubeConfigPath = "mock/k8s/admin.conf"
 
 	newConfig := IsilonClusterConfig{}
 	newConfig.ClusterName = clusterName1
@@ -329,6 +330,8 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call NodePublishVolume$`, f.iCallNodePublishVolume)
 	s.Step(`^I call EphemeralNodePublishVolume$`, f.iCallEphemeralNodePublishVolume)
 	s.Step(`^get Node Publish Volume Request$`, f.getNodePublishVolumeRequest)
+	s.Step(`^get Node Publish Volume Request with Volume Name "([^"]*)"$`, f.getNodePublishVolumeRequestwithVolumeName)
+	s.Step(`^get Node Publish Volume Request with Volume Name "([^"]*)" and path "([^"]*)"$`, f.getNodePublishVolumeRequestwithVolumeNameandPath)
 	s.Step(`^I change the target path$`, f.iChangeTheTargetPath)
 	s.Step(`^I mark request read only$`, f.iMarkRequestReadOnly)
 	s.Step(`^I call NodeStageVolume with name "([^"]*)" and access type "([^"]*)"$`, f.iCallNodeStageVolume)
@@ -363,7 +366,8 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I set RootClientEnabled to "([^"]*)"$`, f.iSetRootClientEnabledTo)
 	s.Step(`^I call ControllerGetVolume with name "([^"]*)"$`, f.iCallControllerGetVolume)
 	s.Step(`^a valid ControllerGetVolumeResponse is returned$`, f.aValidControllerGetVolumeResponseIsReturned)
-	s.Step(`^I call NodeGetVolumeStats with name "([^"]*)" and path "([^"]*)"$`, f.iCallNodeGetVolumeStats)
+	s.Step(`^I call NodeGetVolumeStats with name "([^"]*)"$`, f.iCallNodeGetVolumeStats)
+	s.Step(`^a NodeGetVolumeResponse is returned$`, f.aNodeGetVolumeResponseIsReturned)
 	s.Step(`^I call iCallNodeGetInfoWithNoFQDN`, f.iCallNodeGetInfoWithNoFQDN)
 	s.Step(`^a valid NodeGetInfoResponse is returned$`, f.aValidNodeGetInfoResponseIsReturned)
 	s.Step(`^I call CreateRemoteVolume`, f.iCallCreateRemoteVolume)
@@ -401,6 +405,17 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call GetSnapshotIsiPathComponents`, f.iCallGetSnapshotIsiPathComponents)
 	s.Step(`^I call GetSubDirectoryCount`, f.iCallGetSubDirectoryCount)
 	s.Step(`^I call DeleteSnapshot`, f.iCallDeleteSnapshotIsiService)
+	s.Step(`^I call CreateVolumeRequest$`, f.iCallCreateVolumeReplicationEnabled)
+	s.Step(`^I call CreateVolumeFromSnapshotMultiReader "([^"]*)" "([^"]*)"$`, f.iCallCreateVolumeFromSnapshotMultiReader)
+	s.Step(`^a valid DeleteSnapshotResponse is returned$`, f.aValidDeleteSnapshotResponseIsReturned)
+	s.Step(`^I set mode to "([^"]*)"$`, f.iSetModeTo)
+	s.Step(`^I call startAPIService`, f.iCallStartAPIService)
+	s.Step(`^I set podmon enable to "([^"]*)"$`, f.iSetPodmonEnable)
+	s.Step(`^I set API port to "([^"]*)"$`, f.iSetAPIPort)
+	s.Step(`^I set polling freq to "([^"]*)"$`, f.iSetPollingFeqTo)
+	s.Step(`^I call ControllerPublishVolume on Snapshot with name "([^"]*)" and access type "([^"]*)" to "([^"]*)" and path "([^"]*)"$`, f.iCallControllerPublishVolumeOnSnapshot)
+	s.Step(`^I call QueryArrayStatus "([^"]*)"$`, f.iCallQueryArrayStatus)
+	s.Step(`^get Node Unpublish Volume Request for RO Snapshot "([^"]*)" and path "([^"]*)"$`, f.getNodeUnpublishVolumeRequestForROSnapshot)
 }
 
 // GetPluginInfo
@@ -410,6 +425,31 @@ func (f *feature) iCallGetPluginInfo() error {
 	if f.err != nil {
 		return f.err
 	}
+	return nil
+}
+
+func (f *feature) iCallStartAPIService() error {
+	ctx, cancel := context2.WithTimeout(context.Background(), time.Duration(time.Second*2))
+	defer cancel()
+	f.service.startAPIService(ctx)
+	return nil
+}
+
+func (f *feature) iSetPodmonEnable(value string) error {
+	os.Setenv(constants.EnvPodmonEnabled, value)
+	return nil
+}
+func (f *feature) iSetModeTo(value string) error {
+	os.Setenv(gocsi.EnvVarMode, value)
+	return nil
+}
+func (f *feature) iSetAPIPort(value string) error {
+	os.Setenv(constants.EnvPodmonAPIPORT, value)
+	return nil
+}
+
+func (f *feature) iSetPollingFeqTo(value string) error {
+	os.Setenv(constants.EnvPodmonArrayConnectivityPollRate, value)
 	return nil
 }
 
@@ -855,6 +895,10 @@ func (f *feature) iInduceError(errtype string) error {
 	case "no-volume-no-nodeId":
 		stepHandlersErrors.PodmonVolumeStatisticsError = true
 		stepHandlersErrors.PodmonNoVolumeNoNodeIDError = true
+	case "volumePathNotFound":
+		inducedErrors.volumePathNotFound = true
+	case "ModifyLastAttempt":
+		stepHandlersErrors.ModifyLastAttempt = true
 	case "none":
 
 	default:
@@ -1046,6 +1090,7 @@ func clearErrors() {
 	stepHandlersErrors.DeleteVolumeError = false
 	inducedErrors.noIsiService = false
 	inducedErrors.autoProbeNotEnabled = false
+	inducedErrors.volumePathNotFound = false
 	stepHandlersErrors.GetJobsInternalError = false
 	stepHandlersErrors.GetPolicyInternalError = false
 	stepHandlersErrors.GetTargetPolicyInternalError = false
@@ -1079,6 +1124,7 @@ func clearErrors() {
 	stepHandlersErrors.GetSpgErrors = false
 	stepHandlersErrors.GetSpgTPErrors = false
 	stepHandlersErrors.GetExportPolicyError = false
+	stepHandlersErrors.ModifyLastAttempt = false
 }
 
 func getTypicalCapacityRequest(valid bool) *csi.GetCapacityRequest {
@@ -1161,6 +1207,7 @@ func (f *feature) aValidGetCapacityResponseIsReturned() error {
 }
 
 func (f *feature) iCallNodeGetInfo() error {
+	MockK8sAPI()
 	req := new(csi.NodeGetInfoRequest)
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
 	if f.err != nil {
@@ -1176,12 +1223,12 @@ func (f *feature) iCallSetAttributeMaxVolumesPerNode(volumeLimit int64) error {
 }
 
 func (f *feature) iCallNodeGetInfoWithInvalidVolumeLimit(volumeLimit int64) error {
+	MockK8sAPI()
 	req := new(csi.NodeGetInfoRequest)
 	f.service.opts.MaxVolumesPerNode = volumeLimit
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
 	if f.err != nil {
 		log.Printf("NodeGetInfo call failed: %s\n", f.err.Error())
-		return nil
 	}
 	return nil
 }
@@ -1603,10 +1650,61 @@ func (f *feature) getNodePublishVolumeRequest() error {
 	return nil
 }
 
+func (f *feature) getNodePublishVolumeRequestwithVolumeNameandPath(volName string, path string) error {
+	req := new(csi.NodePublishVolumeRequest)
+	req.VolumeId = volName
+	req.Readonly = true
+	req.VolumeCapability = f.capability
+	mount := f.capability.GetMount()
+	if mount != nil {
+		req.TargetPath = datadir
+	}
+	attributes := map[string]string{
+		"Name":       req.VolumeId,
+		"AccessZone": "",
+		"Path":       path,
+	}
+	req.VolumeContext = attributes
+
+	f.nodePublishVolumeRequest = req
+	return nil
+}
+
+func (f *feature) getNodePublishVolumeRequestwithVolumeName(volName string) error {
+	req := new(csi.NodePublishVolumeRequest)
+	req.VolumeId, _, _, _, _ = utils.ParseNormalizedVolumeID(context.Background(), volName)
+
+	req.Readonly = false
+	req.VolumeCapability = f.capability
+	mount := f.capability.GetMount()
+	if mount != nil {
+		req.TargetPath = datadir
+	}
+	attributes := map[string]string{
+		"Name":       req.VolumeId,
+		"AccessZone": "",
+		"Path":       f.service.opts.Path + "/" + req.VolumeId,
+	}
+	req.VolumeContext = attributes
+
+	f.nodePublishVolumeRequest = req
+	return nil
+}
+
 func (f *feature) getNodeUnpublishVolumeRequest() error {
 	req := new(csi.NodeUnpublishVolumeRequest)
 	req.VolumeId = Volume1
 	req.TargetPath = datadir
+
+	f.nodeUnpublishVolumeRequest = req
+	return nil
+}
+
+func (f *feature) getNodeUnpublishVolumeRequestForROSnapshot(volName string, path string) error {
+	req := new(csi.NodeUnpublishVolumeRequest)
+	req.VolumeId = volName
+	req.TargetPath = path
+
 	f.nodeUnpublishVolumeRequest = req
 	return nil
 }
@@ -1679,12 +1777,23 @@ func (f *feature) iCallControllerGetVolume(volID string) error {
 	req := new(csi.ControllerGetVolumeRequest)
 	req.VolumeId = volID
 
+	abnormal := false
+	message := ""
 	f.controllerGetVolumeRequest = req
 	fmt.Printf("Calling controllerGetVolume")
 	f.controllerGetVolumeResponse, f.err = f.service.ControllerGetVolume(ctx, req)
 	if f.err != nil {
 		log.Printf("Controller GetVolume call failed: %s\n", f.err.Error())
 	}
+	if f.controllerGetVolumeResponse != nil {
+		//check message and abnormal state returned in NodeGetVolumeStatsResponse.VolumeCondition
+		if f.controllerGetVolumeResponse.Status.VolumeCondition.Abnormal == abnormal && strings.Contains(f.controllerGetVolumeResponse.Status.VolumeCondition.Message, message) {
+			fmt.Printf("controllerGetVolumeResponse Response VolumeCondition check passed\n")
+		} else {
+			fmt.Printf("Expected controllerGetVolumeResponse.Abnormal to be %v, and message to contain: %s, but instead, abnormal was: %v and message was: %s", abnormal, message, f.controllerGetVolumeResponse.Status.VolumeCondition.Abnormal, f.controllerGetVolumeResponse.Status.VolumeCondition.Message)
+		}
+	}
+
 	f.controllerGetVolumeRequest = nil
 	return nil
 }
@@ -1698,7 +1807,7 @@ func (f *feature) aValidControllerGetVolumeResponseIsReturned() error {
 	return nil
 }
 
-func (f *feature) iCallNodeGetVolumeStats(volID string, path string) error {
+func (f *feature) iCallNodeGetVolumeStats(volID string) error {
 
 	header := metadata.New(map[string]string{"csi.requestid": "1"})
 	ctx := metadata.NewIncomingContext(context.Background(), header)
@@ -1706,15 +1815,44 @@ func (f *feature) iCallNodeGetVolumeStats(volID string, path string) error {
 	req := new(csi.NodeGetVolumeStatsRequest)
 	req.VolumeId = volID
 
+	if inducedErrors.volumePathNotFound == true {
+		req.VolumePath = ""
+	} else {
+		req.VolumePath = datadir
+	}
+
 	f.nodeGetVolumeStatsRequest = req
 	fmt.Printf("Calling NodeGetVolumeStats")
+
+	//assume no errors induced, so response should be okay, these values will change below if errors were induced
+	abnormal := false
+	message := ""
+
 	f.nodeGetVolumeStatsResponse, f.err = f.service.NodeGetVolumeStats(ctx, req)
 	if f.err != nil {
 		log.Printf("Node GetVolumeStats call failed: %s\n", f.err.Error())
 	}
-	f.nodeGetVolumeStatsRequest = nil
+	if f.nodeGetVolumeStatsResponse != nil {
+		//check message and abnormal state returned in NodeGetVolumeStatsResponse.VolumeCondition
+		if f.nodeGetVolumeStatsResponse.VolumeCondition.Abnormal == abnormal && strings.Contains(f.nodeGetVolumeStatsResponse.VolumeCondition.Message, message) {
+			fmt.Printf("NodeGetVolumeStats Response VolumeCondition check passed\n")
+		} else {
+			fmt.Printf("Expected nodeGetVolumeStatsResponse.Abnormal to be %v, and message to contain: %s, but instead, abnormal was: %v and message was: %s", abnormal, message, f.nodeGetVolumeStatsResponse.VolumeCondition.Abnormal, f.nodeGetVolumeStatsResponse.VolumeCondition.Message)
+		}
+	}
+
 	return nil
 }
+
+func (f *feature) aNodeGetVolumeResponseIsReturned() error {
+	if f.err != nil {
+		return f.err
+	}
+	fmt.Printf("The volume condition is %v\n", f.nodeGetVolumeStatsResponse)
+
+	return nil
+}
+
 func (f *feature) iCallControllerUnPublishVolume(volID string, accessMode string, nodeID string) error {
 	req := f.getControllerUnPublishVolumeRequest(accessMode, nodeID)
 	f.unpublishVolumeRequest = req
@@ -2125,7 +2263,6 @@ func (f *feature) aIsilonServiceWithParamsForCustomTopology(user, mode string) e
 	updatedClusterConfig, _ := f.service.isiClusters.Load(clusterName1)
 	updatedClusterConfig.(*IsilonClusterConfig).isiSvc = isiSvc
 	f.service.isiClusters.Store(clusterName1, updatedClusterConfig)
-
 	f.checkGoRoutines("end aIsilonService")
 	f.service.logServiceStats()
 	if inducedErrors.noIsiService || inducedErrors.autoProbeNotEnabled {
@@ -2203,40 +2340,19 @@ func (f *feature) aIsilonServiceWithParamsForCustomTopologyNoLabel(user, mode st
 }
 
 func removeNodeLabels(host string) (result bool) {
-	k8sclientset, err := k8sutils.CreateKubeClientSet("/etc/kubernetes/admin.conf")
-	if err != nil {
-		log.Printf("init client failed for custom topology: '%s'", err.Error())
-		return false
-	}
-
-	// access the API to fetch node object
-	node, _ := k8sclientset.CoreV1().Nodes().Get(context.TODO(), host, v1.GetOptions{})
-	log.Printf("Node %s details\n", node)
-
-	// Iterate node labels and check if required label is available and if found remove it
-	for lkey, lval := range node.Labels {
-		log.Printf("Label is: %s:%s\n", lkey, lval)
-		if (strings.HasPrefix(lkey, constants.PluginName+"/") && lval == constants.PluginName) ||
-			(strings.HasPrefix(lkey, "max-isilon-volumes-per-node")) {
-			log.Printf("label %s:%s available on node", lkey, lval)
-			cmd := exec.Command("/bin/bash", "-c", "kubectl label nodes "+host+" "+lkey+"-")
-			err := cmd.Run()
-			if err != nil {
-				log.Printf("Error encountered while removing label from node %s: %s", host, err)
-				return false
-			}
-		}
-	}
+	mockStr := fmt.Sprintf("mocked call to remove labels on %s ", host)
+	k8s.DeleteK8sValuesFile()
+	fmt.Printf(mockStr)
 	return true
 }
 
 func applyNodeLabel(host, label string) (result bool) {
-	cmd := exec.Command("kubectl", "label", "nodes", host, label)
-	err := cmd.Run()
-	if err != nil {
-		log.Printf("Applying label on node %s failed", host)
-		return false
-	}
+	//don't need to run actual kubernetes commands for UTs
+	//expect kubernetes commands to work
+	mockStr := fmt.Sprintf("mocked call apply lable %s to %s", label, host)
+	k8s.WriteK8sValueToFile(k8s.K8sLabel, label)
+	fmt.Printf(mockStr)
+
 	return true
 }
 
@@ -2268,8 +2384,9 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	opts.isiAuthType = 0
 	opts.Verbose = 1
 	opts.CustomTopologyEnabled = true
-	opts.KubeConfigPath = "/etc/kubernetes/admin.conf"
-
+	pwd, _ := os.Getwd()
+	pwd = "--" + pwd + "--"
+	opts.KubeConfigPath = "mock/k8s/admin.conf"
 	newConfig := IsilonClusterConfig{}
 	newConfig.ClusterName = clusterName1
 	newConfig.Endpoint = "127.0.0.1"
@@ -2281,7 +2398,6 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
 	boolTrue := true
 	newConfig.IsDefault = &boolTrue
-
 	host, _ := os.Hostname()
 	result := removeNodeLabels(host)
 	if !result {
@@ -2301,7 +2417,6 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	} else {
 		opts.AutoProbe = true
 	}
-
 	svc.opts = opts
 	svc.mode = mode
 	f.service = svc
@@ -2311,7 +2426,6 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
-
 	return svc
 }
 
@@ -2426,7 +2540,9 @@ func (f *feature) iCallGetExportRelatedFunctionsInIsiService() error {
 
 func (f *feature) iCallUnimplementedFunctions() error {
 	_, f.err = f.service.ListSnapshots(context.Background(), new(csi.ListSnapshotsRequest))
-	_, f.err = f.service.ControllerExpandVolume(context.Background(), new(csi.ControllerExpandVolumeRequest))
+	_, f.err = f.service.NodeUnstageVolume(context.Background(), new(csi.NodeUnstageVolumeRequest))
+	_, f.err = f.service.NodeStageVolume(context.Background(), new(csi.NodeStageVolumeRequest))
+	_, f.err = f.service.ListVolumes(context.Background(), new(csi.ListVolumesRequest))
 	_, f.err = f.service.NodeExpandVolume(context.Background(), new(csi.NodeExpandVolumeRequest))
 	return nil
 }
@@ -2454,6 +2570,7 @@ func (f *feature) iCallSetAllowedNetworkswithmultiplenetworks(envIP1 string, env
 }
 
 func (f *feature) iCallNodeGetInfowithinvalidnetworks() error {
+	MockK8sAPI()
 	req := new(csi.NodeGetInfoRequest)
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
 	if f.err != nil {
@@ -3144,6 +3261,212 @@ func (f *feature) iCallDeleteSnapshotIsiService() error {
 	f.err = clusterConfig.isiSvc.DeleteSnapshot(ctx, 64, "")
 	if f.err != nil {
 		log.Printf("inside iCallDeleteSnapshotIsiService error %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateVolumeReplicationEnabled() error {
+	req := getCreatevolumeReplicationEnabled(f.service)
+	f.createVolumeRequestTest = req
+	f.createVolumeResponseTest, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		stepHandlersErrors.ExportNotFoundError = false
+		stepHandlersErrors.VolumeNotExistError = false
+	}
+	return nil
+}
+
+func getCreatevolumeReplicationEnabled(s *service) *csi.CreateVolumeRequest {
+	req := new(csi.CreateVolumeRequest)
+	req.Name = "volume1"
+	capacityRange := new(csi.CapacityRange)
+	capacityRange.RequiredBytes = 8 * 1024 * 1024 * 1024
+	req.CapacityRange = capacityRange
+	mount := new(csi.VolumeCapability_MountVolume)
+	capability := new(csi.VolumeCapability)
+	accessType := new(csi.VolumeCapability_Mount)
+	accessType.Mount = mount
+	capability.AccessType = accessType
+	accessMode := new(csi.VolumeCapability_AccessMode)
+	accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
+	capability.AccessMode = accessMode
+	capabilities := make([]*csi.VolumeCapability, 0)
+	capabilities = append(capabilities, capability)
+	parameters := make(map[string]string)
+	parameters[AccessZoneParam] = "System"
+	parameters[IsiPathParam] = "/ifs/data/csi-isilon"
+	parameters[s.WithRP(KeyReplicationEnabled)] = "true"
+	parameters[s.WithRP(KeyReplicationVGPrefix)] = "volumeGroupPrefix"
+	parameters[s.WithRP(KeyReplicationRPO)] = "Five_Minutes"
+	parameters[s.WithRP(KeyReplicationRemoteSystem)] = "cluster1"
+	parameters[req.VolumeContentSource.String()] = "contentsource"
+	req.Parameters = parameters
+	return req
+}
+
+func (f *feature) aValidCreateVolumeRespIsReturned() error {
+	if f.err != nil {
+		stepHandlersErrors.ExportNotFoundError = false
+		stepHandlersErrors.VolumeNotExistError = false
+	}
+	return nil
+}
+
+func getTypicalCreateROVolumeFromSnapshotRequest() *csi.CreateVolumeRequest {
+	req := new(csi.CreateVolumeRequest)
+	req.Name = "volume1"
+	capacityRange := new(csi.CapacityRange)
+	capacityRange.RequiredBytes = 8 * 1024 * 1024 * 1024
+	req.CapacityRange = capacityRange
+	mount := new(csi.VolumeCapability_MountVolume)
+	capability := new(csi.VolumeCapability)
+	accessType := new(csi.VolumeCapability_Mount)
+	accessType.Mount = mount
+	capability.AccessType = accessType
+	accessMode := new(csi.VolumeCapability_AccessMode)
+	accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
+	capability.AccessMode = accessMode
+	capabilities := make([]*csi.VolumeCapability, 0)
+	capabilities = append(capabilities, capability)
+	parameters := make(map[string]string)
+	parameters[AccessZoneParam] = "System"
+	parameters[IsiPathParam] = "/ifs/data/csi-isilon"
+	req.Parameters = parameters
+	req.VolumeCapabilities = capabilities
+	return req
+}
+
+func (f *feature) iCallCreateROVolumeFromSnapshot(name string) error {
+	req := getTypicalCreateROVolumeFromSnapshotRequest()
+	if f.rootClientEnabled != "" {
+		req.Parameters[RootClientEnabledParam] = f.rootClientEnabled
+	}
+	f.createVolumeRequest = req
+	req.Name = name
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("volume name '%s' created\n", name)
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateVolumeFromSnapshotMultiReader(srcSnapshotID, name string) error {
+	req := getTypicalCreateROVolumeFromSnapshotRequest()
+	f.createVolumeRequest = req
+	req.Name = name
+	req = f.setVolumeContent(true, srcSnapshotID)
+	log.Printf("called iCallCreateVolumeFromSnapshotMultiReader")
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume call failed: '%s'\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("volume name '%s' created\n", name)
+	}
+	return nil
+}
+
+func (f *feature) iCallDeleteVolumeFromSnapshot(id string) error {
+	if f.deleteVolumeRequest == nil {
+		req := getTypicalDeleteVolumeRequest()
+		f.deleteVolumeRequest = req
+	}
+	req := f.deleteVolumeRequest
+	req.VolumeId = id
+
+	ctx, log, _ := GetRunIDLog(context.Background())
+
+	f.deleteVolumeResponse, f.err = f.service.DeleteVolume(ctx, req)
+	if f.err != nil {
+		log.Printf("DeleteVolume call failed: '%v'\n", f.err)
+	}
+	return nil
+}
+
+func (f *feature) aValidDeleteSnapshotResponseIsReturned() error {
+	if f.err != nil {
+		return f.err
+	}
+	return nil
+}
+
+func (f *feature) iCallControllerPublishVolumeOnSnapshot(volID, accessMode, nodeID, path string) error {
+	log.Printf("iCallControllerPublishVolume called with %s and %s", accessMode, nodeID)
+	header := metadata.New(map[string]string{"csi.requestid": "1"})
+	ctx := metadata.NewIncomingContext(context.Background(), header)
+	req := f.publishVolumeRequest
+	if f.publishVolumeRequest == nil {
+		req = f.getControllerPublishVolumeRequestOnSnapshot(accessMode, nodeID, path)
+		f.publishVolumeRequest = req
+	}
+
+	// a customized volume ID can be specified to overwrite the default one
+	if volID != "" {
+		req.VolumeId = volID
+	}
+
+	log.Printf("Calling controllerPublishVolume with request %v", req)
+	f.publishVolumeResponse, f.err = f.service.ControllerPublishVolume(ctx, req)
+	if f.err != nil {
+		log.Printf("PublishVolume call failed: %s\n", f.err.Error())
+	}
+	f.publishVolumeRequest = nil
+	return nil
+}
+
+func (f *feature) getControllerPublishVolumeRequestOnSnapshot(accessType, nodeID, path string) *csi.ControllerPublishVolumeRequest {
+	capability := new(csi.VolumeCapability)
+
+	mountVolume := new(csi.VolumeCapability_MountVolume)
+	mountVolume.MountFlags = make([]string, 0)
+	mount := new(csi.VolumeCapability_Mount)
+	mount.Mount = mountVolume
+	capability.AccessType = mount
+
+	if !inducedErrors.omitAccessMode {
+		capability.AccessMode = getAccessMode(accessType)
+	}
+	fmt.Printf("capability.AccessType %v\n", capability.AccessType)
+	fmt.Printf("capability.AccessMode %v\n", capability.AccessMode)
+	req := new(csi.ControllerPublishVolumeRequest)
+	if !inducedErrors.noVolumeID {
+		if inducedErrors.invalidVolumeID || f.createVolumeResponse == nil {
+			req.VolumeId = "000-000"
+		} else {
+			req.VolumeId = "volume1=_=_=19=_=_=System"
+		}
+	}
+	if !inducedErrors.noNodeID {
+		req.NodeId = nodeID
+	}
+	req.Readonly = false
+	if !inducedErrors.omitVolumeCapability {
+		req.VolumeCapability = capability
+	}
+	// add in the context
+	attributes := map[string]string{}
+	attributes[AccessZoneParam] = f.accessZone
+	if f.rootClientEnabled != "" {
+		attributes[RootClientEnabledParam] = f.rootClientEnabled
+	}
+	attributes[ExportPathParam] = path
+	//ExportPathParam
+	req.VolumeContext = attributes
+	return req
+}
+
+func (f *feature) iCallQueryArrayStatus(apiPort string) error {
+
+	// Calling http mock server
+	MockK8sAPI()
+	ctx := context2.Background()
+	url := "http://" + "127.0.0.1:" + apiPort + arrayStatus + "/" + "cluster1"
+	_, err := f.service.queryArrayStatus(ctx, url)
+	if err != nil {
+		log.Printf("queryArrayStatus failed: %s", err)
 	}
 	return nil
 }

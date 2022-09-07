@@ -70,7 +70,7 @@ Feature: Isilon CSI interface
     | "GetSnapshotError"      | "cannot check the existence of the snapshot"    |
     | "DeleteSnapshotError"   | "error deleting snapshot"                      |
   
-@todo
+
   Scenario Outline: Controller delete snapshot various use cases from examples
     Given a Isilon service
     When I call Probe
@@ -79,9 +79,20 @@ Feature: Isilon CSI interface
 
     Examples:
     | snapshotId   | errormsg                                 |
-    | "34"         | "none"                                   |
     | "34=_=_=cluster2" | "failed to get cluster config details for clusterName: 'cluster2'"                                   |
     | ""           | "snapshot id to be deleted is required"  |
     | "404"        | "none"                                   |
     | "str"        | "cannot convert snapshot to integer"     |
 
+  Scenario: Calling Snapshot create and delete functionality
+    Given a Isilon service
+    When I call CreateVolume "volume2"
+    And I call ControllerPublishVolume with "single-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
+    And I call DeleteVolume "volume2=_=_=43=_=_=System"
+    And I call ValidateVolumeCapabilities with voltype "mount" access "single-writer"
+    And I call GetCapacity
+    And I call CreateSnapshot "volume2=_=_=43=_=_=System" "existent_comp_snapshot_name" "/ifs/data/csi-isilon"
+    And I call DeleteSnapshot "34"
+    And I call NodePublishVolume
+    And I call NodeUnpublishVolume
+    Then the error contains "none"

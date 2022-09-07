@@ -160,6 +160,12 @@ Feature: Isilon CSI interface
       And I call ControllerPublishVolume with name "volume2=_=_=43=_=_=System" and access type "multiple-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
       Then a valid ControllerPublishVolumeResponse is returned
 
+    Scenario: Calling ControllerPublishVolume function with autoProbe failed
+      Given a Isilon service
+      And I induce error "autoProbeFailed"
+      And I call ControllerPublishVolume with name "volume2=_=_=43=_=_=System" and access type "multiple-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
+      Then the error contains "auto probe is not enabled"
+
     Scenario Outline: ControllerPublishVolume with different volume id and access type
       Given a Isilon service
       When I call Probe
@@ -288,10 +294,22 @@ Feature: Isilon CSI interface
       | times    | errormsg     |
       | 100      | "none"       |
 
-    Scenario: Calling functions with noProbeOnStart set to true
+    Scenario: Calling BeforeServe function with noProbeOnStart set to true
       Given a Isilon service
       When I set noProbeOnStart to "true"
       When I call BeforeServe
+      Then the error contains "none"
+
+   Scenario: Calling probe function with noProbeOnStart set to true
+      Given a Isilon service
+      When I set noProbeOnStart to "true"
+      When I call Probe
+      Then the error contains "none"
+
+    Scenario: Calling NodeGetInfo function with noProbeOnStart set to true
+      Given a Isilon service
+      When I set noProbeOnStart to "true"
+      When I call NodeGetInfo
       Then the error contains "none"
 
     Scenario: Calling BeforeServe
@@ -329,6 +347,7 @@ Feature: Isilon CSI interface
       And I call CreateSnapshot "volume2=_=_=19=_=_=System" "existent_comp_snapshot_name" "/ifs/data/csi-isilon"
       And I call DeleteSnapshot "34"
       And I call NodePublishVolume
+      And I call NodeUnpublishVolume
       Then the error contains "auto probe is not enabled"
 
     Scenario: Initialize Service object
@@ -365,20 +384,78 @@ Feature: Isilon CSI interface
       And I induce error "VolumeNotExistError"
       And I call ControllerGetVolume with name ""
       Then the error contains "no VolumeID found in request"
+
+    Scenario: ControllerGetVolume with Invalid clustername
+      Given a Isilon service
+      When I call Probe
+      And I call ControllerGetVolume with name "volume2=_=_=43=_=_=System=_=_=cluster2"
+      Then the error contains "failed to get cluster config details for clusterName: 'cluster2'"
+  
+    Scenario: Calling functions with autoProbe failed
+      Given a Isilon service
+      And I induce error "autoProbeFailed"
+      And I call ControllerGetVolume with name "volume2=_=_=43=_=_=System=_=_=cluster1"
+      Then the error contains "auto probe is not enabled"
+  
+    Scenario: ControllerGetVolume volume does not exist scenario
+      Given a Isilon service
+      And I call ControllerGetVolume with name "volume2=_=_=43"
+      Then the error contains "cannot be split into tokens"
+  
+    Scenario: ControllerGetVolume volume does not exist scenario
+      Given a Isilon service
+      When I call Probe
+      And I call ControllerGetVolume with name "volume3=_=_=43=_=_=System=_=_=cluster1"
+      Then a valid ControllerGetVolumeResponse is returned
+  
+    Scenario: Calling functions with autoProbe failed
+      Given a Isilon service
+      And I induce error "autoProbeFailed"
+      And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1"
+      Then the error contains "auto probe is not enabled"
   
     Scenario: NodeGetVolumeStats volume does not exist scenario
       Given a Isilon service
       When I call Probe
-      And I induce error "VolumeNotExistError"
-      And I call NodeGetVolumeStats with name "" and path ""
+      And I call NodeGetVolumeStats with name ""
       Then the error contains "no VolumeID found in request"
-  
+
+    Scenario: NodeGetVolumeStats volume path not found scenario
+      Given a Isilon service
+      When I call Probe
+      And I induce error "volumePathNotFound"
+      And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1"
+      Then the error contains "no Volume Path found in request"
+
     Scenario: NodeGetVolumeStats volume does not exist scenario
       Given a Isilon service
       When I call Probe
-      And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1" and path ""
-      Then the error contains "no Volume Path found in request"
-  
+      And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1"
+      Then a NodeGetVolumeResponse is returned
+      
+    Scenario: NodeGetVolumeStats volume does not exist at path scenario
+      Given a Isilon service
+      When I call Probe
+      And I call NodeGetVolumeStats with name "volume3=_=_=43=_=_=System=_=_=cluster1"
+      Then a NodeGetVolumeResponse is returned
+
+    Scenario: NodeGetVolumeStats cluster does not exist scenario
+      Given a Isilon service
+      When I call Probe
+      And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster2"
+      Then the error contains "failed to get cluster config details for clusterName: 'cluster2'"
+
+    Scenario: NodeGetVolumeStats correct scenario
+      Given a Isilon service
+      When I call Probe
+      And I call ControllerPublishVolume with name "volume2=_=_=43=_=_=System" and access type "multiple-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
+      And a capability with voltype "mount" access "single-writer"
+      And get Node Publish Volume Request with Volume Name "volume2=_=_=43=_=_=System=_=_=cluster1"
+      When I call Probe
+      And I call NodePublishVolume
+      And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1"
+      Then a NodeGetVolumeResponse is returned
+ 
     Scenario: Identity GetReplicationCapabilities call
       Given a Isilon service
       When I call GetReplicationCapabilities
@@ -403,3 +480,85 @@ Feature: Isilon CSI interface
         | file                  | level   |
         | "logLevelInfo.yaml"   | "info" |
         | "logConfigError.yaml" | "debug" |
+
+    Scenario: Create Volume with Replication Enabled
+      Given a Isilon service
+      When I call CreateVolumeRequest
+      Then the error contains "json: cannot unmarshal number into Go value of type api.JSONError"
+
+    Scenario Outline: Create RO Volume from snapshot
+      Given a Isilon service
+      When I call CreateVolumeFromSnapshotMultiReader <exportID> <snapVolName>
+      Then a valid CreateVolumeResponse is returned
+      Examples:
+        | exportID  | snapVolName |
+        | "43"      | "snapVol1"  |
+        | "44"      | "snapVol2"  |
+
+    Scenario: Call DeleteVolume From Snapshot
+      Given a Isilon service
+      When I call DeleteVolume "snapVol3=_=_=47=_=_=System=_=_=cluster1"
+      Then a valid DeleteVolumeResponse is returned
+
+    Scenario: Call DeleteSnapshot
+      Given a Isilon service
+      When I call DeleteSnapshot "48"
+      Then the error contains "failed to unexport volume directory '0' in access zone '' : 'EOF'"
+
+    Scenario Outline: podmon enable change
+      Given a Isilon service
+      And I set podmon enable to <value>
+      And I call BeforeServe
+      When I call startAPIService
+      Then the error contains "probe of all isilon clusters failed"
+      Examples:
+        | value |
+        | "true" |
+        | "false" |
+
+    Scenario Outline: startAPIService with different polling feq and API port
+      Given a Isilon service
+      And I set mode to <mode>
+      And I call BeforeServe
+      And I set podmon enable to <value>
+      And I set API port to <port>
+      And I set polling freq to <freq>
+      And I call startAPIService
+      Then the error contains "probe of all isilon clusters failed"
+      Examples:
+       | mode | value | port   | freq |
+       |"controller"  | "false" |"8097" | "70"  |
+       | "controller" | "true" | "7089" | "90" |
+       | "controller" | "true" | "0" | "0" |
+
+  Scenario: Create RO volume from snapshot With RootClient Enabled
+    Given a Isilon service
+    And I set RootClientEnabled to "true"
+    And I call CreateVolumeFromSnapshotMultiReader "43" "snapVol1"
+    And I call ControllerPublishVolume on Snapshot with name "snapVol1=_=_=43=_=_=System" and access type "multiple-reader" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1" and path "/ifs/.snapshot/snapshot-snappath"
+    Then a valid ControllerPublishVolumeResponse is returned
+    Then a valid CreateVolumeResponse is returned
+
+  Scenario: Call ProbeController with invalid input
+    Given a Isilon service with params "" "controller"
+    And I call ProbeController
+    Then the error contains "probe of all isilon clusters failed"
+  
+  Scenario: ControllerGetVolume export does not exist scenario
+    Given a Isilon service
+    When I call Probe
+    And I induce error "GetExportInternalError"
+    And I call ControllerGetVolume with name "volume2=_=_=43=_=_=System=_=_=cluster1"
+    Then the error contains "none"
+
+  Scenario: Create RO volume from snapshot with NodePublishVolume
+    Given a Isilon service
+    When I call Probe
+    And I call CreateVolumeFromSnapshotMultiReader "43" "snapVol1"
+    And I call ControllerPublishVolume on Snapshot with name "snapVol1=_=_=43=_=_=System" and access type "multiple-reader" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1" and path "/ifs/.snapshot/snapshot-snappath"
+    And a capability with voltype "mount" access "multiple-reader"
+    And get Node Publish Volume Request with Volume Name "volume2=_=_=43=_=_=System=_=_=cluster1" and path "/ifs/.snapshot/snapshot-snappath"
+    And I call NodePublishVolume
+    And get Node Unpublish Volume Request for RO Snapshot "volume2=_=_=43=_=_=System=_=_=cluster1" and path "/ifs/.snapshot/snapshot-snappath"
+    And I call NodeUnpublishVolume
+    Then a valid CreateVolumeResponse is returned

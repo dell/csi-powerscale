@@ -348,8 +348,8 @@ autoProbe: true
 authorization:
   enabled: false
   # sidecarProxyImage: the container image used for the csm-authorization-sidecar.
-  # Default value: dellemc/csm-authorization-sidecar:v1.3.0
-  sidecarProxyImage: dellemc/csm-authorization-sidecar:v1.3.0
+  # Default value: dellemc/csm-authorization-sidecar:v1.4.0
+  sidecarProxyImage: dellemc/csm-authorization-sidecar:v1.4.0
   # proxyHost: hostname of the csm-authorization server
   # Default value: None
   proxyHost:
@@ -363,7 +363,7 @@ authorization:
 # Enable this feature only after contact support for additional information
 podmon:
   enabled: false
-  image: dellemc/podmon:v1.2.0
+  image: dellemc/podmon:v1.3.0
   #controller:
   #  args:
   #    - "--csisock=unix:/var/run/csi/csi.sock"
@@ -384,3 +384,32 @@ podmon:
   #    - "--leaderelection=false"
   #    - "--driver-config-params=/csi-isilon-config-params/driver-config-params.yaml"
   #    - "--driverPodLabelValue=dell-storage"
+
+encryption:
+  # enabled: Enable/disable volume encryption feature.
+  enabled: false
+
+  # pluginName: The name of the provisioner to use for encrypted volumes.
+  pluginName: "sec-isilon.dellemc.com"
+
+  # image: Encryption driver image name.
+  image: "dellemc/csm-encryption:v0.1.0"
+
+  # imagePullPolicy: If specified, overrides the chart global imagePullPolicy.
+  imagePullPolicy:
+
+  # logLevel: Log level of the encryption driver.
+  # Allowed values: "error", "warning", "info", "debug", "trace".
+  logLevel: "error"
+  
+  # livenessPort: HTTP liveness probe port number. 
+  # Leave empty to disable the liveness probe.
+  # Example: 8080
+  livenessPort:
+
+  # extraArgs: Extra command line parameters to pass to the encryption driver.
+  # Allowed values:
+  # --sharedStorage - may be required by some applications to work properly.
+  # When set, performance is reduced and hard links cannot be created.
+  # See the gocryptfs documentation for more details.
+  extraArgs: []

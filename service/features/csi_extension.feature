@@ -20,10 +20,19 @@ Feature: Isilon CSI interface
     And I call ValidateConnectivity
     Then the error contains "the NodeID is a required field"
 
-
   Scenario: Call ValidateConnectivity with no Volume no Node
     Given a Isilon service
     And I induce error "no-volume-no-nodeId"
     And I call ValidateConnectivity
     Then the error contains "ValidateVolumeHostConnectivity is implemented"
 
+  Scenario: Call Validate Url Status
+    Given a Isilon service
+    And I call QueryArrayStatus "36443"
+    Then the error contains "none"
+
+  Scenario: Call Modify LastAttempt with delay
+    Given a Isilon service
+    And I induce error "ModifyLastAttempt"
+    And I call QueryArrayStatus "36443"
+    Then the error contains "none"

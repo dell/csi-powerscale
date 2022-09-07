@@ -14,7 +14,7 @@ Feature: Isilon CSI interface
       And I call get export related functions in isiService
       Then the error contains "EOF"
 
-    Scenario: GetSnapshotNameFromIsiPath with params
+    Scenario Outline: GetSnapshotNameFromIsiPath with params
     Given a Isilon service
     And I call GetSnapshotNameFromIsiPath with <isipath>
     Then the error contains <errormsg>
