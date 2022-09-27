@@ -1,7 +1,7 @@
 name: csi-isilon
-version: 2.4.0
-appVersion: 2.4.0
-kubeVersion: ">= 1.21.0 < 1.25.0"
+version: 2.5.0
+appVersion: 2.5.0
+kubeVersion: ">= 1.21.0 <= 1.25.0"
 #If you are using a complex K8s version like "v1.22.3-mirantis-1", use this kubeVersion check instead
 #WARNING: this version of the check will allow the use of alpha and beta versions, which is NOT SUPPORTED
 #kubeVersion: ">= 1.21.0-0 < 1.25.0-0"
