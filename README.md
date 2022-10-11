@@ -14,6 +14,21 @@ It supports CSI specification version 1.5.
 
 This project may be compiled as a stand-alone binary using Golang that, when run, provides a valid CSI endpoint. It also can be used as a precompiled container image.
 
+## Table of Contents
+
+* [Code of Conduct](https://github.com/dell/csm/blob/main/docs/CODE_OF_CONDUCT.md)
+* [Maintainer Guide](https://github.com/dell/csm/blob/main/docs/MAINTAINER_GUIDE.md)
+* [Committer Guide](https://github.com/dell/csm/blob/main/docs/COMMITTER_GUIDE.md)
+* [Contributing Guide](https://github.com/dell/csm/blob/main/docs/CONTRIBUTING.md)
+* [List of Adopters](https://github.com/dell/csm/blob/main/docs/ADOPTERS.md)
+* [Support](#support)
+* [Security](https://github.com/dell/csm/blob/main/docs/SECURITY.md)
+* [Building](#building)
+* [Runtime Dependecies](#runtime-dependencies)
+* [Driver Installation](#driver-installation)
+* [Using Driver](#using-driver)
+* [Documentation](#documentation)
+
 ## Support
 For any CSI driver issues, questions or feedback, please follow our [support process](https://github.com/dell/csm/blob/main/docs/SUPPORT.md)
 
