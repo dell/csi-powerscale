@@ -374,6 +374,8 @@ podmon:
   #    - "--skipArrayConnectionValidation=false"
   #    - "--driver-config-params=/csi-isilon-config-params/driver-config-params.yaml"
   #    - "--driverPodLabelValue=dell-storage"
+  #    - "--ignoreVolumelessPods=false"
+
   #node:
   #  args:
   #    - "--csisock=unix:/var/lib/kubelet/plugins/csi-isilon/csi_sock"
@@ -384,6 +386,7 @@ podmon:
   #    - "--leaderelection=false"
   #    - "--driver-config-params=/csi-isilon-config-params/driver-config-params.yaml"
   #    - "--driverPodLabelValue=dell-storage"
+  #    - "--ignoreVolumelessPods=false"
 
 encryption:
   # enabled: Enable/disable volume encryption feature.
