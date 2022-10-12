@@ -261,7 +261,7 @@ spec:
         {{ end }}
         {{ end }}
         - name: attacher{{ $csiSidecarSuffix }}
-          image: {{ required "Must provide the CSI attacher container image."  ( include "csi-isilon.attacherImage" . )}}
+          image: {{ required "Must provide the CSI attacher container image." ( include "csi-isilon.attacherImage" . ) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--csi-address={{ $driverSockPath }}"
@@ -344,7 +344,7 @@ spec:
         {{- if eq .Values.controller.snapshot.enabled true }}
         - name: snapshotter{{ $csiSidecarSuffix }}
           #image: quay.io/k8scsi/csi-snapshotter:v1.0.0
-          image: {{ required "Must provide the CSI snapshotter container image."  ( include "csi-isilon.snapshotterImage" . )}}
+          image: {{ required "Must provide the CSI snapshotter container image." ( include "csi-isilon.snapshotterImage" . ) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--csi-address={{ $driverSockPath }}"
