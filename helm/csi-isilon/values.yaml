@@ -2,7 +2,7 @@
 ########################
 # version: version of this values file
 # Note: Do not change this value
-version: "2.5.0"
+version: "v2.5.0"
 
 # CSI driver log level
 # Allowed values: "error", "warn"/"warning", "info", "debug"
@@ -413,3 +413,7 @@ encryption:
   # When set, performance is reduced and hard links cannot be created.
   # See the gocryptfs documentation for more details.
   extraArgs: []
+
+images:
+  # "driver" defines the container image, used for the driver container.
+  driverRepository: dellemc

@@ -237,7 +237,7 @@ spec:
         {{- if hasKey .Values.controller "resizer" }}
         {{- if eq .Values.controller.resizer.enabled true }}
         - name: resizer{{ $csiSidecarSuffix }}
-          image: {{ required "Must provide the CSI resizer container image." .Values.images.resizer }}
+          image: {{ required "Must provide the CSI resizer container image." ( include "csi-isilon.resizerImage" . ) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--csi-address={{ $driverSockPath }}"
@@ -261,7 +261,7 @@ spec:
         {{ end }}
         {{ end }}
         - name: attacher{{ $csiSidecarSuffix }}
-          image: {{ required "Must provide the CSI attacher container image." .Values.images.attacher }}
+          image: {{ required "Must provide the CSI attacher container image."  ( include "csi-isilon.attacherImage" . )}}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--csi-address={{ $driverSockPath }}"
@@ -286,7 +286,7 @@ spec:
         {{- if hasKey .Values.controller "healthMonitor" }}
         {{- if eq .Values.controller.healthMonitor.enabled true }}
         - name: external-health-monitor-controller
-          image: {{ required "Must provide the CSI external-health-monitor-controller container image." .Values.images.externalhealthmonitorcontroller }}
+          image: {{ required "Must provide the CSI external-health-monitor-controller container image." ( include "csi-isilon.healthmonitorImage" . ) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--csi-address={{ $driverSockPath }}"
@@ -314,7 +314,7 @@ spec:
         {{end}}
         {{- end }}
         - name: provisioner{{ $csiSidecarSuffix }}
-          image: {{ required "Must provide the CSI provisioner container image." .Values.images.provisioner }}
+          image: {{ required "Must provide the CSI provisioner container image." ( include "csi-isilon.provisionerImage" . ) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--csi-address={{ $driverSockPath }}"
@@ -344,7 +344,7 @@ spec:
         {{- if eq .Values.controller.snapshot.enabled true }}
         - name: snapshotter{{ $csiSidecarSuffix }}
           #image: quay.io/k8scsi/csi-snapshotter:v1.0.0
-          image: {{ required "Must provide the CSI snapshotter container image." .Values.images.snapshotter }}
+          image: {{ required "Must provide the CSI snapshotter container image."  ( include "csi-isilon.snapshotterImage" . )}}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--csi-address={{ $driverSockPath }}"
@@ -370,7 +370,7 @@ spec:
         {{end}}
         {{- if not $encrypted }}
         - name: driver
-          image: {{ required "Must provide the Isilon driver container image." .Values.images.driver }}
+          image: {{ required "Must provide the Isilon driver image repository." .Values.images.driverRepository }}/{{ .Chart.Name }}:{{ .Values.version }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           command: [ "/csi-isilon" ]
           args:
