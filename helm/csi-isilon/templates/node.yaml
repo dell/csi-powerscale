@@ -167,7 +167,7 @@ spec:
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: {{ required "Must provide the Isilon driver container image." .Values.images.driver }}
+          image: {{ required "Must provide the Isilon driver image repository." .Values.images.driverRepository }}/{{ .Chart.Name }}:{{ .Values.version }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           env:
             - name: CSI_ENDPOINT
@@ -251,7 +251,7 @@ spec:
               mountPath: /csi-isilon-config-params
         {{- end }}
         - name: registrar{{ $csiSidecarSuffix }}
-          image: {{ required "Must provide the CSI node registrar container image." .Values.images.registrar }}
+          image: {{ required "Must provide the CSI node registrar container image." ( include "csi-isilon.registrarImage" . ) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--v=5"

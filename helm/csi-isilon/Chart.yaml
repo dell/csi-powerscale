@@ -1,5 +1,3 @@
-name: csi-isilon
-version: 2.5.0
 appVersion: 2.5.0
 kubeVersion: ">= 1.21.0 < 1.26.0"
 #If you are using a complex K8s version like "v1.22.3-mirantis-1", use this kubeVersion check instead
@@ -12,8 +10,9 @@ description: |
 keywords:
 - csi
 - storage
-sources:
-- https://github.com/dell/csi-isilon
 maintainers:
 - name: DellEMC
-engine: gotpl
+name: csi-isilon
+sources:
+- https://github.com/dell/csi-isilon
+version: 2.5.0
