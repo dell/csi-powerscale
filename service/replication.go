@@ -3,12 +3,13 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/dell/csi-isilon/common/constants"
-	v11 "github.com/dell/goisilon/api/v11"
-	v2 "github.com/dell/goisilon/api/v2"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/dell/csi-isilon/common/constants"
+	v11 "github.com/dell/goisilon/api/v11"
+	v2 "github.com/dell/goisilon/api/v2"
 
 	"github.com/dell/csi-isilon/common/utils"
 	csiext "github.com/dell/dell-csi-extensions/replication"
@@ -132,13 +133,17 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	}
 
 	remoteVolume := getRemoteCSIVolume(ctx, remoteExportID, volName, accessZone, volumeSize, remoteClusterName)
+	azServiceIp, ok := req.Parameters["AzServiceIP"]
+	if !ok {
+		azServiceIp = remoteIsiConfig.Endpoint
+	}
 	volumeContext := map[string]string{
 		"Path":              exportPath,
 		"AccessZone":        accessZone,
 		"ID":                strconv.Itoa(remoteExportID),
 		"Name":              volName,
 		"ClusterName":       remoteClusterName,
-		"AzServiceIP":       remoteIsiConfig.Endpoint,
+		"AzServiceIP":       azServiceIp,
 		"RootClientEnabled": req.Parameters["RootClientEnabled"],
 	}
 
