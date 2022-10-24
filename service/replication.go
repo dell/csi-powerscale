@@ -133,9 +133,9 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	}
 
 	remoteVolume := getRemoteCSIVolume(ctx, remoteExportID, volName, accessZone, volumeSize, remoteClusterName)
-	azServiceIp, ok := req.Parameters["AzServiceIP"]
+	azServiceIP, ok := req.Parameters["AzServiceIP"]
 	if !ok {
-		azServiceIp = remoteIsiConfig.Endpoint
+		azServiceIP = remoteIsiConfig.Endpoint
 	}
 	volumeContext := map[string]string{
 		"Path":              exportPath,
@@ -143,7 +143,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 		"ID":                strconv.Itoa(remoteExportID),
 		"Name":              volName,
 		"ClusterName":       remoteClusterName,
-		"AzServiceIP":       azServiceIp,
+		"AzServiceIP":       azServiceIP,
 		"RootClientEnabled": req.Parameters["RootClientEnabled"],
 	}
 
