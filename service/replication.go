@@ -8,13 +8,12 @@ import (
 	"time"
 
 	"github.com/dell/csi-isilon/common/constants"
-	v11 "github.com/dell/goisilon/api/v11"
-	v2 "github.com/dell/goisilon/api/v2"
-
 	"github.com/dell/csi-isilon/common/utils"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	isi "github.com/dell/goisilon"
 	isiApi "github.com/dell/goisilon/api"
+	v11 "github.com/dell/goisilon/api/v11"
+	v2 "github.com/dell/goisilon/api/v2"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -77,7 +76,14 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	exportPath := (*export.Paths)[0]
 
 	isiPath := utils.GetIsiPathFromExportPath(exportPath)
-	ppName := strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(isiPath, isiConfig.IsiPath), "/", ""), ".", "-")
+	pathToStrip := ""
+	storageClassIsi, ok := req.Parameters["IsiPath"]
+	if !ok {
+		pathToStrip = isiConfig.IsiPath
+	} else {
+		pathToStrip = storageClassIsi
+	}
+	ppName := strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(isiPath, pathToStrip), "/", ""), ".", "-")
 
 	err = isiConfig.isiSvc.client.SyncPolicy(ctx, ppName)
 	if err != nil {
