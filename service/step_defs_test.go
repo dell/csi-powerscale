@@ -19,7 +19,6 @@ import (
 	context2 "context"
 	"errors"
 	"fmt"
-	"github.com/dell/csi-isilon/service/mock/k8s"
 	"log"
 	"net"
 	"net/http/httptest"
@@ -28,6 +27,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dell/csi-isilon/service/mock/k8s"
 
 	"github.com/dell/csi-isilon/common/utils"
 
@@ -3297,6 +3298,10 @@ func getCreatevolumeReplicationEnabled(s *service) *csi.CreateVolumeRequest {
 	parameters[IsiPathParam] = "/ifs/data/csi-isilon"
 	parameters[s.WithRP(KeyReplicationEnabled)] = "true"
 	parameters[s.WithRP(KeyReplicationVGPrefix)] = "volumeGroupPrefix"
+	parameters[s.WithRP(KeyReplicationRemoteAccessZone)] = "remoteAccessZone"
+	parameters[s.WithRP(KeyReplicationRemoteAzServiceIP)] = "remoteAzServiceIP"
+	parameters[s.WithRP(KeyReplicationRemoteIsiPath)] = "remoteIsiPath"
+	parameters[s.WithRP(KeyReplicationRemoteRootClientEnabled)] = "remoteRootClientEnabled"
 	parameters[s.WithRP(KeyReplicationRPO)] = "Five_Minutes"
 	parameters[s.WithRP(KeyReplicationRemoteSystem)] = "cluster1"
 	parameters[req.VolumeContentSource.String()] = "contentsource"
