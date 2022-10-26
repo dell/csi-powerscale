@@ -3300,7 +3300,6 @@ func getCreatevolumeReplicationEnabled(s *service) *csi.CreateVolumeRequest {
 	parameters[s.WithRP(KeyReplicationVGPrefix)] = "volumeGroupPrefix"
 	parameters[s.WithRP(KeyReplicationRemoteAccessZone)] = "remoteAccessZone"
 	parameters[s.WithRP(KeyReplicationRemoteAzServiceIP)] = "remoteAzServiceIP"
-	parameters[s.WithRP(KeyReplicationRemoteIsiPath)] = "remoteIsiPath"
 	parameters[s.WithRP(KeyReplicationRemoteRootClientEnabled)] = "remoteRootClientEnabled"
 	parameters[s.WithRP(KeyReplicationRPO)] = "Five_Minutes"
 	parameters[s.WithRP(KeyReplicationRemoteSystem)] = "cluster1"

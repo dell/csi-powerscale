@@ -76,13 +76,11 @@ const (
 	KeyReplicationVGPrefix = "volumeGroupPrefix"
 	// KeyReplicationRemoteSystem represents key for replication remote system
 	KeyReplicationRemoteSystem = "remoteSystem"
-	// KeyReplicationVGPrefix represents key for replication remote access zone
+	// KeyReplicationRemoteAccessZone represents key for replication remote access zone
 	KeyReplicationRemoteAccessZone = "remoteAccessZone"
-	// KeyReplicationVGPrefix represents key for replication remote AzServiceIP
+	// KeyReplicationRemoteAzServiceIP represents key for replication remote AzServiceIP
 	KeyReplicationRemoteAzServiceIP = "remoteAzServiceIP"
-	// KeyReplicationVGPrefix represents key for replication remote Isipath
-	KeyReplicationRemoteIsiPath = "remoteIsiPath"
-	// KeyReplicationVGPrefix represents key for replication remote root client enabled
+	// KeyReplicationRemoteRootClientEnabled represents key for replication remote root client enabled
 	KeyReplicationRemoteRootClientEnabled = "remoteRootClientEnabled"
 	// KeyReplicationIgnoreNamespaces represents key for replication ignore namespaces
 	KeyReplicationIgnoreNamespaces = "ignoreNamespaces"

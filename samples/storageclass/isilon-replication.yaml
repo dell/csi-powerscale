@@ -66,14 +66,6 @@ parameters:
   # Default value: endpoint of the remote cluster ClusterName
   # replication.storage.dell.com/remoteAzServiceIP: 192.168.2.1
 
-  # replication.storage.dell.com/remoteIsiPath: The base path for the volumes to be created on the remote PowerScale cluster.
-  # Ensure that this path exists on the remote PowerScale cluster.
-  # Allowed values: unix absolute path
-  # Optional: true
-  # Default value: value specified in values.yaml for isiPath
-  # Examples: /ifs/data/csi, /ifs/engineering
-  replication.storage.dell.com/remoteIsiPath: /ifs/data/csi
-
   # replication.storage.dell.com/remoteRootClientEnabled: When a PVC is being created, this parameter determines, when a node mounts the PVC,
   # whether to add the remote k8s node to the "Root clients" field or "Clients" field of the NFS export.
   # Allowed values:

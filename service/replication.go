@@ -96,10 +96,6 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	if !ok {
 		remoteAccessZone = accessZone
 	}
-	remoteIsiPath, ok := req.Parameters[s.WithRP(KeyReplicationRemoteIsiPath)]
-	if !ok {
-		remoteIsiPath = isiPath
-	}
 
 	// Check if export exists
 	remoteExport, err := remoteIsiConfig.isiSvc.GetExportWithPathAndZone(ctx, exportPath, remoteAccessZone)
@@ -126,7 +122,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 		} else {
 			quotaID = quota.Id
 		}
-		if remoteExportID, err = remoteIsiConfig.isiSvc.ExportVolumeWithZone(ctx, remoteIsiPath, volName, remoteAccessZone, utils.GetQuotaIDWithCSITag(quotaID)); err == nil && remoteExportID != 0 {
+		if remoteExportID, err = remoteIsiConfig.isiSvc.ExportVolumeWithZone(ctx, isiPath, volName, remoteAccessZone, utils.GetQuotaIDWithCSITag(quotaID)); err == nil && remoteExportID != 0 {
 			// get the export and retry if not found to ensure the export has been created
 			for i := 0; i < MaxRetries; i++ {
 				if export, _ := remoteIsiConfig.isiSvc.GetExportByIDWithZone(ctx, remoteExportID, remoteAccessZone); export != nil {
@@ -153,6 +149,10 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	if !ok {
 		remoteAzServiceIP = remoteIsiConfig.Endpoint
 	}
+	remoteRootClientEnabled, ok := req.Parameters[s.WithRP(KeyReplicationRemoteRootClientEnabled)]
+	if !ok {
+		remoteRootClientEnabled = RootClientEnabledParamDefault
+	}
 	volumeContext := map[string]string{
 		"Path":              exportPath,
 		"AccessZone":        remoteAccessZone,
@@ -160,7 +160,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 		"Name":              volName,
 		"ClusterName":       remoteClusterName,
 		"AzServiceIP":       remoteAzServiceIP,
-		"RootClientEnabled": req.Parameters[s.WithRP(KeyReplicationRemoteRootClientEnabled)],
+		"RootClientEnabled": remoteRootClientEnabled,
 	}
 
 	log.Println(volumeContext)
