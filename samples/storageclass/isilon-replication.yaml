@@ -55,6 +55,26 @@ parameters:
   # Default value: None
   replication.storage.dell.com/volumeGroupPrefix: "csi"
 
+  # replication.storage.dell.com/remoteAccessZone: name of the access zone a remote volume can be created in
+  # Optional: true
+  # Default value: default value specified in values.yaml
+  # Examples: System, zone1
+  replication.storage.dell.com/remoteAccessZone: System
+
+  # replication.storage.dell.com/remoteAzServiceIP: AccessZone groupnet service IP. Update AzServiceIP if different than remote cluster endpoint.
+  # Optional: true
+  # Default value: endpoint of the remote cluster ClusterName
+  # replication.storage.dell.com/remoteAzServiceIP: 192.168.2.1
+
+  # replication.storage.dell.com/remoteRootClientEnabled: When a PVC is being created, this parameter determines, when a node mounts the PVC,
+  # whether to add the remote k8s node to the "Root clients" field or "Clients" field of the NFS export.
+  # Allowed values:
+  #   "true": adds remote k8s node to the "Root clients" field of the NFS export
+  #   "false": adds remote k8s node to the "Clients" field of the NFS export
+  # Optional: true
+  # Default value: "false"
+  replication.storage.dell.com/remoteRootClientEnabled: "false"
+
   # The name of the access zone a volume can be created in
   # Optional: true
   # Default value: default value specified in values.yaml

@@ -91,8 +91,14 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	}
 	volumeSize := isiConfig.isiSvc.GetVolumeSize(ctx, isiPath, volName)
 	log.Info("Volume size got: ", volumeSize)
+
+	remoteAccessZone, ok := req.Parameters[s.WithRP(KeyReplicationRemoteAccessZone)]
+	if !ok {
+		remoteAccessZone = accessZone
+	}
+
 	// Check if export exists
-	remoteExport, err := remoteIsiConfig.isiSvc.GetExportWithPathAndZone(ctx, exportPath, accessZone)
+	remoteExport, err := remoteIsiConfig.isiSvc.GetExportWithPathAndZone(ctx, exportPath, remoteAccessZone)
 	if err != nil {
 		log.Info("Remote export error")
 		return nil, status.Error(codes.NotFound, err.Error())
@@ -116,13 +122,13 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 		} else {
 			quotaID = quota.Id
 		}
-		if remoteExportID, err = remoteIsiConfig.isiSvc.ExportVolumeWithZone(ctx, isiPath, volName, accessZone, utils.GetQuotaIDWithCSITag(quotaID)); err == nil && remoteExportID != 0 {
+		if remoteExportID, err = remoteIsiConfig.isiSvc.ExportVolumeWithZone(ctx, isiPath, volName, remoteAccessZone, utils.GetQuotaIDWithCSITag(quotaID)); err == nil && remoteExportID != 0 {
 			// get the export and retry if not found to ensure the export has been created
 			for i := 0; i < MaxRetries; i++ {
-				if export, _ := remoteIsiConfig.isiSvc.GetExportByIDWithZone(ctx, remoteExportID, accessZone); export != nil {
+				if export, _ := remoteIsiConfig.isiSvc.GetExportByIDWithZone(ctx, remoteExportID, remoteAccessZone); export != nil {
 					// Add dummy localhost entry for pvc security
-					if !remoteIsiConfig.isiSvc.IsHostAlreadyAdded(ctx, remoteExportID, accessZone, utils.DummyHostNodeID) {
-						err = remoteIsiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, remoteClusterName, remoteExportID, accessZone, utils.DummyHostNodeID, remoteIsiConfig.isiSvc.AddExportClientByIDWithZone)
+					if !remoteIsiConfig.isiSvc.IsHostAlreadyAdded(ctx, remoteExportID, remoteAccessZone, utils.DummyHostNodeID) {
+						err = remoteIsiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, remoteClusterName, remoteExportID, remoteAccessZone, utils.DummyHostNodeID, remoteIsiConfig.isiSvc.AddExportClientByIDWithZone)
 						if err != nil {
 							log.Debugf("Error while adding dummy localhost entry to export '%d'", remoteExportID)
 						}
@@ -138,15 +144,23 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 		remoteExportID = remoteExport.ID
 	}
 
-	remoteVolume := getRemoteCSIVolume(ctx, remoteExportID, volName, accessZone, volumeSize, remoteClusterName)
+	remoteVolume := getRemoteCSIVolume(ctx, remoteExportID, volName, remoteAccessZone, volumeSize, remoteClusterName)
+	remoteAzServiceIP, ok := req.Parameters[s.WithRP(KeyReplicationRemoteAzServiceIP)]
+	if !ok {
+		remoteAzServiceIP = remoteIsiConfig.Endpoint
+	}
+	remoteRootClientEnabled, ok := req.Parameters[s.WithRP(KeyReplicationRemoteRootClientEnabled)]
+	if !ok {
+		remoteRootClientEnabled = RootClientEnabledParamDefault
+	}
 	volumeContext := map[string]string{
 		"Path":              exportPath,
-		"AccessZone":        accessZone,
+		"AccessZone":        remoteAccessZone,
 		"ID":                strconv.Itoa(remoteExportID),
 		"Name":              volName,
 		"ClusterName":       remoteClusterName,
-		"AzServiceIP":       remoteIsiConfig.Endpoint,
-		"RootClientEnabled": req.Parameters["RootClientEnabled"],
+		"AzServiceIP":       remoteAzServiceIP,
+		"RootClientEnabled": remoteRootClientEnabled,
 	}
 
 	log.Println(volumeContext)
