@@ -410,6 +410,13 @@ encryption:
   # Example: 8080
   livenessPort:
 
+  # ocp: Enable when running on OpenShift Container Platform with CoreOS worker nodes.
+  ocp: false
+  
+  # ocpCoreID: User ID and group ID of user core on CoreOS worker nodes.
+  # Ignored when ocp is set to false.
+  ocpCoreID: "1000:1000"
+
   # extraArgs: Extra command line parameters to pass to the encryption driver.
   # Allowed values:
   # --sharedStorage - may be required by some applications to work properly.
