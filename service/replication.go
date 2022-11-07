@@ -405,8 +405,6 @@ func (s *service) ExecuteAction(ctx context.Context, req *csiext.ExecuteActionRe
 		actionFunc = failover
 	case csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL.String():
 		actionFunc = failoverUnplanned
-	case csiext.ActionTypes_REPROTECT_LOCAL.String():
-		actionFunc = reprotect
 	case csiext.ActionTypes_SYNC.String():
 		actionFunc = syncAction
 	case csiext.ActionTypes_SUSPEND.String():
@@ -637,13 +635,6 @@ func failover(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIs
 		}
 	}
 
-	log.Info("Enabling writes on TGT site")
-
-	err = remoteIsiConfig.isiSvc.client.AllowWrites(ctx, ppName)
-	if err != nil {
-		return status.Errorf(codes.Internal, "failover: can't allow writes on target site %s", err.Error())
-	}
-
 	log.Info("Disabling policy on SRC site")
 
 	err = localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
@@ -656,23 +647,11 @@ func failover(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIs
 		return status.Errorf(codes.Internal, "failover: policy couldn't reach disabled condition %s", err.Error())
 	}
 
-	log.Info("Disabling writes on SRC site, if we have target policy created here")
+	log.Info("Enabling writes on TGT site")
 
-	// Disable writes on local (if we can)
-	tp, err := localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+	err = remoteIsiConfig.isiSvc.client.AllowWrites(ctx, ppName)
 	if err != nil {
-		if e, ok := err.(*isiApi.JSONError); ok {
-			if e.StatusCode != 404 {
-				return status.Errorf(codes.Internal, "failover: couldn't get target policy %s", err.Error())
-			}
-		}
-	}
-
-	if tp != nil {
-		err := localIsiConfig.isiSvc.client.DisallowWrites(ctx, ppName)
-		if err != nil {
-			return status.Errorf(codes.Internal, "failover: can't disallow writes on local site %s", err.Error())
-		}
+		return status.Errorf(codes.Internal, "failover: can't allow writes on target site %s", err.Error())
 	}
 
 	return nil
@@ -680,7 +659,7 @@ func failover(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIs
 
 func failoverUnplanned(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
 	log.Info("Running unplanned failover action")
-	// With unplanned failover -- do minimum requests, we will ensure mirrored policy is created in further reprotect call
+	// With unplanned failover -- do minimum requests, we will ensure mirrored policy is created in further (currently unimplemented) reprotect call
 	// We can't use remote config because we need to assume it's down
 
 	ppName := strings.ReplaceAll(vgName, ".", "-")
@@ -689,126 +668,6 @@ func failoverUnplanned(ctx context.Context, localIsiConfig *IsilonClusterConfig,
 	err := localIsiConfig.isiSvc.client.BreakAssociation(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "unplanned failover: can't break association on target site %s", err.Error())
-	}
-
-	return nil
-}
-
-func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
-	log.Info("Running reprotect action")
-	// this assumes we run reprotect_local action hence we use localIsiConfig
-
-	ppName := strings.ReplaceAll(vgName, ".", "-")
-	// if local allowed writes -- do not do failover
-
-	s1TP, err := localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
-	if err != nil {
-		return status.Errorf(codes.Internal, "reprotect: can't find remote replication policy, unexpected error %s", err.Error())
-	}
-
-	if s1TP.FailoverFailbackState == "writes_disabled" {
-		return status.Errorf(codes.InvalidArgument, "reprotect: unable to perform reprotect with writes disabled, perform reprotect on another side")
-	}
-
-	remotePolicy, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
-	if err != nil {
-		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode != 404 {
-			return status.Errorf(codes.Internal, "reprotect: can't get policy %s by name %s", ppName, err.Error())
-		}
-	}
-
-	if remotePolicy != nil && remotePolicy.Enabled {
-		// If remote policy is enabled we assume we got here after unplanned failover call
-		log.Info("Protection Policy is still enabled on TGT site, disabling it")
-		err = remoteIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
-		if err != nil {
-			return status.Errorf(codes.Internal, "reprotect: can't disable the policy on TGT %s", err.Error())
-		}
-
-		err = remoteIsiConfig.isiSvc.client.WaitForPolicyEnabledFieldCondition(ctx, ppName, false)
-		if err != nil {
-			return status.Errorf(codes.Internal, "reprotect: policy couldn't reach enabled condition on TGT %s", err.Error())
-		}
-
-		log.Info("Resetting the policy")
-		err = remoteIsiConfig.isiSvc.client.ResetPolicy(ctx, ppName)
-		if err != nil {
-			return status.Errorf(codes.Internal, "reprotect: policy couldn't reach enabled condition on TGT %s", err.Error())
-		}
-	}
-
-	var jobDelay int
-	var sourcePath, targetPath string
-
-	if remotePolicy != nil {
-		log.Info("Remote policy is NOT empty, taking replication parameters")
-		jobDelay = remotePolicy.JobDelay
-		sourcePath = remotePolicy.SourcePath
-		targetPath = remotePolicy.TargetPath
-	} else {
-		log.Info("Remote policy is empty, figuring out replication parameters")
-		s := strings.Split(vgName, "-") // split by "_" and get last part -- it would be RPO
-		rpo := s[len(s)-1]
-
-		rpoEnum := RPOEnum(rpo)
-		if err := rpoEnum.IsValid(); err != nil {
-			return status.Errorf(codes.InvalidArgument, "invalid rpo value")
-		}
-
-		rpoint, err := rpoEnum.ToInt()
-		if err != nil {
-			return status.Errorf(codes.InvalidArgument, "unable to parse rpo seconds")
-		}
-
-		jobDelay = rpoint
-		sourcePath = localIsiConfig.IsiPath + "/" + vgName
-		targetPath = remoteIsiConfig.IsiPath + "/" + vgName
-	}
-
-	log.Info("Ensuring that policy exists on local site")
-	_, err = localIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
-	if err != nil {
-		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode == 404 {
-			err := localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, jobDelay,
-				sourcePath, targetPath, remoteIsiConfig.Endpoint, remoteIsiConfig.ReplicationCertificateID, true)
-			if err != nil {
-				return status.Errorf(codes.Internal, "reprotect: can't create protection policy %s", err.Error())
-			}
-			err = localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.FINISHED)
-			if err != nil {
-				return status.Errorf(codes.Internal, "reprotect: policy job couldn't reach FINISHED state %s", err.Error())
-			}
-		} else {
-			return status.Errorf(codes.Internal, "reprotect: can't ensure protection policy exists %s", err.Error())
-		}
-	}
-
-	log.Info("Enabling policy")
-	err = localIsiConfig.isiSvc.client.EnablePolicy(ctx, ppName)
-	if err != nil {
-		return status.Errorf(codes.Internal, "reprotect: can't enable policy %s", err.Error())
-	}
-
-	err = localIsiConfig.isiSvc.client.WaitForPolicyEnabledFieldCondition(ctx, ppName, true)
-	if err != nil {
-		return status.Errorf(codes.Internal, "reprotect: policy couldn't reach enabled condition %s", err.Error())
-	}
-
-	log.Info("Disable writes on remote")
-	tp, err := remoteIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
-	if err != nil {
-		if e, ok := err.(*isiApi.JSONError); ok {
-			if e.StatusCode != 404 {
-				return status.Errorf(codes.Internal, "reprotect: couldn't get target policy %s", err.Error())
-			}
-		}
-	}
-
-	if tp != nil {
-		err := remoteIsiConfig.isiSvc.client.DisallowWrites(ctx, ppName)
-		if err != nil {
-			return status.Errorf(codes.Internal, "reprotect: can't disallow writes on remote site %s", err.Error())
-		}
 	}
 
 	return nil
