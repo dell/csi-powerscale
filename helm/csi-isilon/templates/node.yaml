@@ -330,6 +330,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            {{- if eq .Values.encryption.ocp true }}
+            - name: CORE_ID
+              value: "{{ required "encryption.ocpCoreID not set to core user uid:gid" .Values.encryption.ocpCoreID }}"
+            {{- end }}
           volumeMounts:
             - name: vault-config
               mountPath: /etc/dea/vault
@@ -341,8 +345,12 @@ spec:
             - name: staging-dir
               mountPath: {{ .Values.kubeletConfigDir }}/plugins/kubernetes.io/csi
               mountPropagation: Bidirectional
-            - name: hostroot
-              mountPath: /hostroot
+            - name: user-home
+              {{- if eq .Values.encryption.ocp true }}
+              mountPath: /corehome
+              {{- else }}
+              mountPath: /roothome
+              {{- end }}
             - name: license-config
               mountPath: /etc/dea/license
           {{- if .Values.encryption.livenessPort }}
@@ -435,9 +443,13 @@ spec:
           hostPath:
             path: {{ .Values.kubeletConfigDir }}/plugins/kubernetes.io/csi
             type: DirectoryOrCreate
-        - name: hostroot
+        - name: user-home
           hostPath:
+            {{- if eq .Values.encryption.ocp true }}
+            path: /home/core
+            {{- else }}
             path: /root
+            {{- end }}
             type: Directory
         - name: license-config
           secret:
