@@ -29,7 +29,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-//TODO: All WithFields call containing logrus have to be converted to log
+// TODO: All WithFields call containing logrus have to be converted to log
 func publishVolume(
 	ctx context.Context,
 	req *csi.NodePublishVolumeRequest,

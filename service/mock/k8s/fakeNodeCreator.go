@@ -14,13 +14,13 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-//K8sValueFile values file that stories k8s node labels applied
+// K8sValueFile values file that stories k8s node labels applied
 const K8sValueFile = "k8sValues.csv"
 
-//K8sLabel defines the field label to be used
+// K8sLabel defines the field label to be used
 const K8sLabel = "label"
 
-//WriteK8sValueToFile writes the values to a file to used in fakeNode
+// WriteK8sValueToFile writes the values to a file to used in fakeNode
 func WriteK8sValueToFile(inputType, value string) {
 	DeleteK8sValuesFile()
 	log.Printf("writing k8s values input=%s, value=%s", inputType, value)
@@ -48,7 +48,7 @@ func WriteK8sValueToFile(inputType, value string) {
 	fmt.Printf("wrote the values to file - %s \n", absPath)
 }
 
-//DeleteK8sValuesFile deletes the values in the file used in fakeNode
+// DeleteK8sValuesFile deletes the values in the file used in fakeNode
 func DeleteK8sValuesFile() bool {
 	abspath, err := filepath.Abs(K8sValueFile)
 	if err != nil {
@@ -95,7 +95,7 @@ func readAppliedLabels() (string, string) {
 	return label, value
 }
 
-//GetFakeNode returns a fake node with labels including current hostname
+// GetFakeNode returns a fake node with labels including current hostname
 func GetFakeNode() *v1.Node {
 	client := fake.NewSimpleClientset()
 	hostname, err := os.Hostname()

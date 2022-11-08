@@ -56,7 +56,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//To maintain runid for Non debug mode. Note: CSI will not generate runid if CSI_DEBUG=false
+// To maintain runid for Non debug mode. Note: CSI will not generate runid if CSI_DEBUG=false
 var runid int64
 var isilonConfigFile string
 
@@ -112,12 +112,12 @@ type service struct {
 	defaultIsiClusterName string
 }
 
-//IsilonClusters To unmarshal secret.yaml file
+// IsilonClusters To unmarshal secret.yaml file
 type IsilonClusters struct {
 	IsilonClusters []IsilonClusterConfig `yaml:"isilonClusters"`
 }
 
-//IsilonClusterConfig To hold config details of a isilon cluster
+// IsilonClusterConfig To hold config details of a isilon cluster
 type IsilonClusterConfig struct {
 	ClusterName               string `yaml:"clusterName"`
 	Endpoint                  string `yaml:"endpoint"`
@@ -134,7 +134,7 @@ type IsilonClusterConfig struct {
 	isiSvc                    *isiService
 }
 
-//To display the IsilonClusterConfig of a cluster
+// To display the IsilonClusterConfig of a cluster
 func (s IsilonClusterConfig) String() string {
 	return fmt.Sprintf("ClusterName: %s, Endpoint: %s, EndpointPort: %s, EndpointURL: %s, User: %s, SkipCertificateValidation: %v, IsiPath: %s, IsiVolumePathPermissions: %s, IsDefault: %v, isiSvc: %v",
 		s.ClusterName, s.Endpoint, s.EndpointPort, s.EndpointURL, s.User, *s.SkipCertificateValidation, s.IsiPath, s.IsiVolumePathPermissions, *s.IsDefault, s.isiSvc)
@@ -589,7 +589,7 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 	return nil
 }
 
-//Returns the size of arrays
+// Returns the size of arrays
 func (s *service) getIsilonClusterLength() (length int) {
 	length = 0
 	s.isiClusters.Range(func(_, _ interface{}) bool {
@@ -601,7 +601,7 @@ func (s *service) getIsilonClusterLength() (length int) {
 
 var syncMutex sync.Mutex
 
-//Reads the credentials from secrets and initialize all arrays.
+// Reads the credentials from secrets and initialize all arrays.
 func (s *service) syncIsilonConfigs(ctx context.Context) error {
 	ctx, log := GetLogger(ctx)
 	log.Info("************* Synchronizing Isilon Clusters' config **************")
@@ -873,19 +873,19 @@ func (s *service) getIsiPathForVolumeFromClusterConfig(clusterConfig *IsilonClus
 	return clusterConfig.IsiPath
 }
 
-//Set cluster name in log messages and re-initialize the context
+// Set cluster name in log messages and re-initialize the context
 func setClusterContext(ctx context.Context, clusterName string) (context.Context, *logrus.Entry) {
 	return setLogFieldsInContext(ctx, clusterName, utils.ClusterName)
 }
 
-//Set runID in log messages and re-initialize the context
+// Set runID in log messages and re-initialize the context
 func setRunIDContext(ctx context.Context, runID string) (context.Context, *logrus.Entry) {
 	return setLogFieldsInContext(ctx, runID, utils.RunID)
 }
 
 var logMutex sync.Mutex
 
-//Common method to get log and context
+// Common method to get log and context
 func setLogFieldsInContext(ctx context.Context, logParam string, logType string) (context.Context, *logrus.Entry) {
 	logMutex.Lock()
 	defer logMutex.Unlock()

@@ -28,7 +28,7 @@ var apiPort string
 // probeStatus map[string]ArrayConnectivityStatus
 var probeStatus *sync.Map
 
-//ArrayConnectivityStatus Status of the array probe
+// ArrayConnectivityStatus Status of the array probe
 type ArrayConnectivityStatus struct {
 	LastSuccess int64 `json:"lastSuccess"` // connectivity status
 	LastAttempt int64 `json:"lastAttempt"` // last timestamp attempted to check connectivity
@@ -46,7 +46,7 @@ func setAPIPort(ctx context.Context) {
 	log.Debugf("set podmon API port to %s", apiPort)
 }
 
-//reads the pollingFrequency from Env, sets default if not found
+// reads the pollingFrequency from Env, sets default if not found
 func setPollingFrequency(ctx context.Context) int64 {
 	pollRate, err := utils.ParseInt64FromContext(ctx, constants.EnvPodmonArrayConnectivityPollRate)
 	if err != nil || pollRate == 0 {
@@ -68,7 +68,7 @@ func MarshalSyncMapToJSON(m *sync.Map) ([]byte, error) {
 	return json.Marshal(tmpMap)
 }
 
-//startAPIService reads nodes to array status periodically
+// startAPIService reads nodes to array status periodically
 func (s *service) startAPIService(ctx context.Context) {
 	isPodmonEnabled := utils.ParseBooleanFromContext(ctx, constants.EnvPodmonEnabled)
 	if !isPodmonEnabled {
@@ -88,7 +88,7 @@ func (s *service) startAPIService(ctx context.Context) {
 	s.apiRouter(ctx)
 }
 
-//apiRouter serves http requests
+// apiRouter serves http requests
 func (s *service) apiRouter(ctx context.Context) {
 	log.Infof("starting http server on port %s", apiPort)
 	//create a new router
@@ -110,7 +110,7 @@ func (s *service) apiRouter(ctx context.Context) {
 	}
 }
 
-//getArrayConnectivityStatus lists status of the requested array
+// getArrayConnectivityStatus lists status of the requested array
 func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 	arrayID := mux.Vars(r)["arrayId"]
 	log.Infof("GetArrayConnectivityStatus called for array %s \n", arrayID)
@@ -140,14 +140,14 @@ func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//nodeHealth states if node is up
+// nodeHealth states if node is up
 func nodeHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, "node is up and running \n")
 }
 
-//connectivityStatus Returns array connectivity status
+// connectivityStatus Returns array connectivity status
 func connectivityStatus(w http.ResponseWriter, r *http.Request) {
 	log.Infof("connectivityStatus called, urr status is %v \n", probeStatus)
 	w.Header().Set("Content-Type", "application/json")
@@ -169,7 +169,7 @@ func connectivityStatus(w http.ResponseWriter, r *http.Request) {
 
 }
 
-//startNodeToArrayConnectivityCheck starts connectivityTest as one goroutine for each cluster
+// startNodeToArrayConnectivityCheck starts connectivityTest as one goroutine for each cluster
 func (s *service) startNodeToArrayConnectivityCheck(ctx context.Context) {
 	log.Debug("startNodeToArrayConnectivityCheck called")
 	probeStatus = new(sync.Map)
@@ -181,8 +181,8 @@ func (s *service) startNodeToArrayConnectivityCheck(ctx context.Context) {
 	log.Infof("startNodeToArrayConnectivityCheck is running probes at pollingFrequency %d ", pollingFrequencyInSeconds/2)
 }
 
-//testConnectivityAndUpdateStatus runs probe to test connectivity from node to array
-//updates probeStatus map[array]ArrayConnectivityStatus
+// testConnectivityAndUpdateStatus runs probe to test connectivity from node to array
+// updates probeStatus map[array]ArrayConnectivityStatus
 func (s *service) testConnectivityAndUpdateStatus(ctx context.Context, cluster *IsilonClusterConfig, timeout time.Duration) {
 	defer func() {
 		if err := recover(); err != nil {
