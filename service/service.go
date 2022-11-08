@@ -32,10 +32,9 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/akutz/gournal"
+	"github.com/dell/csi-isilon/common/k8sutils"
 	"google.golang.org/grpc/metadata"
 	"gopkg.in/yaml.v3"
-
-	"github.com/dell/csi-isilon/common/k8sutils"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/common/constants"
@@ -98,6 +97,7 @@ type Opts struct {
 	MaxVolumesPerNode         int64
 	isiAuthType               uint8
 	IsHealthMonitorEnabled    bool
+	IgnoreHosts               bool
 	replicationContextPrefix  string
 	replicationPrefix         string
 }
@@ -230,6 +230,7 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 	opts.Verbose = utils.ParseUintFromContext(ctx, constants.EnvVerbose)
 	opts.CustomTopologyEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvCustomTopologyEnabled)
 	opts.IsHealthMonitorEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvIsHealthMonitorEnabled)
+	opts.IgnoreHosts = utils.ParseBooleanFromContext(ctx, constants.EnvIgnoreHosts)
 
 	s.opts = opts
 

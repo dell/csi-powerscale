@@ -39,6 +39,10 @@ const (
 	// EnvIsiVolumePathPermissions is the default permissions for volume directory path, e.g. 0777
 	EnvIsiVolumePathPermissions = "X_CSI_ISI_VOLUME_PATH_PERMISSIONS"
 
+	// EnvIgnoreHosts exhibits default OneFS behavior of failing to add export if any of existing hosts from
+	// same export is unresolvable
+	EnvIgnoreHosts = "X_CSI_ISI_IGNORE_HOSTS"
+
 	// EnvAutoProbe is the name of the environment variable used to specify
 	// that the controller service should automatically probe itself if it
 	// receives incoming requests before having been probed, in direct

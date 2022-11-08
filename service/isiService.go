@@ -18,7 +18,9 @@ package service
 import (
 	"context"
 	"fmt"
+	"os"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -540,7 +542,7 @@ func getClientToUseForNodeID(ctx context.Context, clusterToNodeIDMap *sync.Map, 
 	return "", fmt.Errorf("entry for cluster '%s' not found in cluster to nodeID map", clusterName)
 }
 
-func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.Context, clusterName string, exportID int, accessZone, nodeID string, addClientFunc func(ctx context.Context, exportID int, accessZone, clientIP string) error) error {
+func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.Context, clusterName string, exportID int, accessZone, nodeID string, addClientFunc func(ctx context.Context, exportID int, accessZone, clientIP string, ignoreHosts bool) error) error {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 	var clientToUse string
@@ -563,14 +565,34 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 	}
 
 	log.Debugf("AddExportClientNetworkIdentifierByID adding '%s' as client to export id '%d'", clientToUse, exportID)
-	if err = addClientFunc(ctx, exportID, accessZone, clientToUse); err == nil {
+
+	// Reading ignoreHosts value as bool
+	ignoreHosts, err1 := strconv.ParseBool(os.Getenv("X_CSI_ISI_IGNORE_HOSTS"))
+	if err1 == nil {
+		log.Debugf("IgnoreHosts value '%t' ", ignoreHosts)
+	} else {
+		log.Warnf("IgnoreHosts Invalid '%s'", err1)
+	}
+
+	if err = addClientFunc(ctx, exportID, accessZone, clientToUse, false); err == nil {
 		if err := updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, clientToUse); err != nil {
 			// not returning with error as export is already updated with client
 			log.Warnf("failed to update cluster to nodeID map: '%s'", err)
 		}
-
 		return nil
 	}
+
+	// Export error is not for the current client; ignoreHosts=true
+	if ignoreHosts && !strings.Contains(err.Error(), clientToUse) {
+		if err = addClientFunc(ctx, exportID, accessZone, clientToUse, ignoreHosts); err == nil {
+			if err := updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, clientToUse); err != nil {
+				// not returning with error as export is already updated with client
+				log.Warnf("failed to update cluster to nodeID map: '%s'", err)
+			}
+			return nil
+		}
+	}
+
 	log.Warnf("failed to add client '%s' to export id '%d': '%v'", clientToUse, exportID, err)
 
 	// try updating export with other client
@@ -579,52 +601,64 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 		otherClientToUse = clientIP
 	}
 	log.Debugf("AddExportClientNetworkIdentifierByID trying to add '%s' as client to export id '%d'", otherClientToUse, exportID)
-	if err = addClientFunc(ctx, exportID, accessZone, otherClientToUse); err == nil {
+	if err = addClientFunc(ctx, exportID, accessZone, otherClientToUse, false); err == nil {
 		if err := updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, otherClientToUse); err != nil {
 			// not returning with error as export is already updated with client
 			log.Warnf("failed to update cluster to nodeID map '%s'", err)
 		}
 		return nil
 	}
+
+	// Export error is not for the current client; ignoreHosts=true
+	if ignoreHosts && !strings.Contains(err.Error(), otherClientToUse) {
+		if err = addClientFunc(ctx, exportID, accessZone, otherClientToUse, ignoreHosts); err == nil {
+			if err := updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, otherClientToUse); err != nil {
+				// not returning with error as export is already updated with client
+				log.Warnf("failed to update cluster to nodeID map '%s'", err)
+			}
+			return nil
+		}
+	}
+
 	log.Warnf("failed to add client '%s' to export id '%d': '%v'", otherClientToUse, exportID, err)
 
 	return fmt.Errorf("failed to add clients '%s' or '%s' to export id '%d'", clientToUse, otherClientToUse, exportID)
 }
 
-func (svc *isiService) AddExportClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string) error {
+func (svc *isiService) AddExportClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string, ignoreHosts bool) error {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
 	log.Debugf("AddExportClientByID client '%s'", clientIP)
-	if err := svc.client.AddExportClientsByIDWithZone(ctx, exportID, accessZone, []string{clientIP}); err != nil {
+	if err := svc.client.AddExportClientsByIDWithZone(ctx, exportID, accessZone, []string{clientIP}, ignoreHosts); err != nil {
 		return fmt.Errorf("failed to add client to export id '%d' with access zone '%s' : '%s'", exportID, accessZone, err.Error())
 	}
 	return nil
 }
 
-func (svc *isiService) AddExportRootClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string) error {
+func (svc *isiService) AddExportRootClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string, ignoreHosts bool) error {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
 	log.Debugf("AddExportRootClientByID client '%s'", clientIP)
-	if err := svc.client.AddExportRootClientsByIDWithZone(ctx, exportID, accessZone, []string{clientIP}); err != nil {
+	if err := svc.client.AddExportRootClientsByIDWithZone(ctx, exportID, accessZone, []string{clientIP}, ignoreHosts); err != nil {
 		return fmt.Errorf("failed to add client to export id '%d' with access zone '%s' : '%s'", exportID, accessZone, err.Error())
 	}
 	return nil
 }
 
-func (svc *isiService) AddExportReadOnlyClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string) error {
+func (svc *isiService) AddExportReadOnlyClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string, ignoreHosts bool) error {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
 	log.Debugf("AddExportReadOnlyClientByID client '%s'", clientIP)
-	if err := svc.client.AddExportReadOnlyClientsByIDWithZone(ctx, exportID, accessZone, []string{clientIP}); err != nil {
+	if err := svc.client.AddExportReadOnlyClientsByIDWithZone(ctx, exportID, accessZone, []string{clientIP}, ignoreHosts); err != nil {
 		return fmt.Errorf("failed to add read only client to export id '%d' with access zone '%s' : '%s'", exportID, accessZone, err.Error())
 	}
 	return nil
 }
 
-func (svc *isiService) RemoveExportClientByIDWithZone(ctx context.Context, exportID int, accessZone, nodeID string) error {
+func (svc *isiService) RemoveExportClientByIDWithZone(ctx context.Context, exportID int, accessZone, nodeID string, ignoreHosts bool) error {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
@@ -640,7 +674,7 @@ func (svc *isiService) RemoveExportClientByIDWithZone(ctx context.Context, expor
 
 	log.Debugf("RemoveExportClientByName client '%v'", clientsToRemove)
 
-	if err := svc.client.RemoveExportClientsByIDWithZone(ctx, exportID, accessZone, clientsToRemove); err != nil {
+	if err := svc.client.RemoveExportClientsByIDWithZone(ctx, exportID, accessZone, clientsToRemove, ignoreHosts); err != nil {
 		//Return success if export doesn't exist
 		if notFoundErr, ok := err.(*api.JSONError); ok {
 			if notFoundErr.StatusCode == 404 {

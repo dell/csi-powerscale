@@ -996,7 +996,7 @@ func (s *service) ControllerExpandVolume(
 	return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: false}, nil
 }
 
-func (s *service) getAddClientFunc(rootClientEnabled bool, isiConfig *IsilonClusterConfig) (addClientFunc func(ctx context.Context, exportID int, accessZone, clientIP string) error) {
+func (s *service) getAddClientFunc(rootClientEnabled bool, isiConfig *IsilonClusterConfig) (addClientFunc func(ctx context.Context, exportID int, accessZone, clientIP string, ignoreHosts bool) error) {
 	if rootClientEnabled {
 		return isiConfig.isiSvc.AddExportRootClientByIDWithZone
 	}
@@ -1349,8 +1349,8 @@ func (s *service) ControllerUnpublishVolume(
 		return nil, status.Error(codes.InvalidArgument,
 			utils.GetMessageWithRunID(runID, "node ID is required"))
 	}
-
-	if err := isiConfig.isiSvc.RemoveExportClientByIDWithZone(ctx, exportID, accessZone, nodeID); err != nil {
+	ignoreHosts := s.opts.IgnoreHosts
+	if err := isiConfig.isiSvc.RemoveExportClientByIDWithZone(ctx, exportID, accessZone, nodeID, ignoreHosts); err != nil {
 		if strings.Contains(err.Error(), "No such file or directory") {
 			_, delErr := s.DeleteVolume(ctx, &csi.DeleteVolumeRequest{VolumeId: req.VolumeId})
 			if delErr != nil {
