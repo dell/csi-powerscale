@@ -100,7 +100,7 @@ const (
 // clusterToNodeIDMap is a map[clusterName][]*nodeIDToClientMap
 var clusterToNodeIDMap = new(sync.Map)
 
-//type nodeIDElementsMap map[string]string
+// type nodeIDElementsMap map[string]string
 type nodeIDToClientMap map[string]string
 
 // IsValid - checks valid RPO
@@ -1826,7 +1826,7 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteSnapshot(
 	return nil
 }
 
-//Validate volume capabilities
+// Validate volume capabilities
 func validateVolumeCaps(
 	vcs []*csi.VolumeCapability,
 	vol isi.Volume) (bool, string) {

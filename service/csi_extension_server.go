@@ -96,7 +96,7 @@ func (s *service) getArrayIdsFromVolumes(ctx context.Context, systemIDs map[stri
 }
 
 // checkIfNodeIsConnected looks at the 'nodeId' to determine if there is connectivity to the 'arrayId' array.
-//The 'rep' object will be filled with the results of the check.
+// The 'rep' object will be filled with the results of the check.
 func (s *service) checkIfNodeIsConnected(ctx context.Context, arrayID string, nodeID string, rep *podmon.ValidateVolumeHostConnectivityResponse) error {
 	ctx, log, _ := GetRunIDLog(ctx)
 	log.Infof("Checking if array %s is connected to node %s", arrayID, nodeID)

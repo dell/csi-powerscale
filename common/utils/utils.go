@@ -398,7 +398,7 @@ func ParseNormalizedSnapshotID(ctx context.Context, snapID string) (string, stri
 	return tokens[0], clusterName, nil
 }
 
-//ParseNodeID parses NodeID to node name, node FQDN and IP address using pattern '^(.+)=#=#=(.+)=#=#=(.+)'
+// ParseNodeID parses NodeID to node name, node FQDN and IP address using pattern '^(.+)=#=#=(.+)=#=#=(.+)'
 func ParseNodeID(ctx context.Context, nodeID string) (string, string, string, error) {
 	log := GetRunIDLogger(ctx)
 

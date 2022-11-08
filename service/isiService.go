@@ -668,19 +668,20 @@ func (svc *isiService) GetExportsWithLimit(ctx context.Context, limit string) (i
 	return exports.Exports, exports.Resume, nil
 }
 
-/* func (svc *isiService) GetExportsWithResume(ctx context.Context, resume string) (isi.ExportList, string, error) {
-	// Fetch log handler
-	log := utils.GetRunIDLogger(ctx)
+/*
+	 func (svc *isiService) GetExportsWithResume(ctx context.Context, resume string) (isi.ExportList, string, error) {
+		// Fetch log handler
+		log := utils.GetRunIDLogger(ctx)
 
-	log.Debug("begin getting exports for Isilon")
-	var exports isi.Exports
-	var err error
-	if exports, err = svc.client.GetExportsWithResume(ctx, resume); err != nil {
-		log.Error("failed to get exports: " + err.Error())
-		return nil, "", err
+		log.Debug("begin getting exports for Isilon")
+		var exports isi.Exports
+		var err error
+		if exports, err = svc.client.GetExportsWithResume(ctx, resume); err != nil {
+			log.Error("failed to get exports: " + err.Error())
+			return nil, "", err
+		}
+		return exports.Exports, exports.Resume, nil
 	}
-	return exports.Exports, exports.Resume, nil
-}
 */
 func (svc *isiService) DeleteSnapshot(ctx context.Context, id int64, name string) error {
 	// Fetch log handler

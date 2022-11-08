@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-//timeout for making http requests
+// timeout for making http requests
 const timeout = time.Second * 5
 
-//queryStatus make API call to the specified url to retrieve connection status
+// queryStatus make API call to the specified url to retrieve connection status
 func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error) {
 	ctx, log, _ := GetRunIDLog(ctx)
 	defer func() {
