@@ -472,35 +472,34 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	// obtain local policy for local cluster
 	localP, err := isiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 	if err != nil {
-		log.Error("can't find local replication policy on local cluster, unexpected error ", err.Error())
+		log.Error("Can't find local replication policy on local cluster, unexpected error ", err.Error())
 	}
 
 	// obtain target policy for local cluster
 	localTP, err := isiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
 	if err != nil {
-		log.Error("can't find target replication policy on local cluster, unexpected error ", err.Error())
+		log.Error("Can't find target replication policy on local cluster, unexpected error ", err.Error())
 	}
 
 	// obtain local policy for remote cluster
 	remoteP, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 	if err != nil {
-		log.Error("can't find local replication policy on remote cluster, unexpected error ", err.Error())
+		log.Error("Can't find local replication policy on remote cluster, unexpected error ", err.Error())
 	}
 
 	// obtain target policy for remote cluster
 	remoteTP, err := remoteIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
 	if err != nil {
-		log.Error("can't find target replication policy on remote cluster, unexpected error ", err.Error())
+		log.Error("Can't find target replication policy on remote cluster, unexpected error ", err.Error())
 	}
 
-	var isSyncInProgress, failedSyncCheck bool
-
 	// Check if any of the policy jobs are currently running
+	var isSyncInProgress, isSyncCheckFailed bool
 	localJob, err := isiConfig.isiSvc.client.GetJobsByPolicyName(ctx, ppName)
 	if err != nil {
 		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode != 404 {
 			log.Error("Unexpected error while querying active jobs for local policy ", err.Error())
-			failedSyncCheck = true
+			isSyncCheckFailed = true
 		}
 	}
 	for _, i := range localJob {
@@ -513,7 +512,7 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	if err != nil {
 		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode != 404 {
 			log.Error("Unexpected error while querying active jobs for remote policy ", err.Error())
-			failedSyncCheck = true
+			isSyncCheckFailed = true
 		}
 	}
 	for _, i := range remoteJob {
@@ -522,72 +521,36 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 		}
 	}
 
-	if (localP == nil && remoteP == nil) || (localTP == nil && remoteTP == nil) || failedSyncCheck {
-		errMsg := "unable to find either source OR target policy information"
-		if failedSyncCheck {
-			errMsg = "Unexpected error while querying active jobs for local or remote policy"
+	linkState := getGroupLinkState(localP, localTP, remoteP, remoteTP, isSyncInProgress)
+
+	if linkState == csiext.StorageProtectionGroupStatus_UNKNOWN || isSyncCheckFailed {
+		errMsg := "unexpected error while getting link state"
+		if isSyncCheckFailed {
+			errMsg = "unexpected error while querying active jobs for local or remote policy"
 		}
+		log.Error(errMsg)
 		resp := &csiext.GetStorageProtectionGroupStatusResponse{
 			Status: &csiext.StorageProtectionGroupStatus{
 				State: csiext.StorageProtectionGroupStatus_UNKNOWN,
+				// do not update isSource
 			},
 		}
 		return resp, status.Errorf(codes.Internal, errMsg)
 	}
 
-	/**
-		Synchronized:
-			- (Source side) If the local policy is enabled, remote policy is disabled, local is write enabled and remote is write disabled
-	 		- (Target side) If the local policy is disabled, remote policy is enabled, local is write disabled and remote is write enabled
-		Suspended:
-			- (Source side) If the local policy is disabled, remote policy is disabled, local is write enabled and remote is write disabled
-	 		- (Target side) If the local policy is disabled, remote policy is disabled, local is write disabled and remote is write enabled
-		Failover:
-			1. Planned failover
-			 - (both sides) local policy is disabled, remote policy is disabled, local is write enabled and remote is write enabled
-			2. Unplanned failover (source down)
-			 - (Source side) source is down. remote policy is still disabled and remote is write enabled
-			 - (Target side) source is down. local policy is still disabled and local is write enabled
-			3. Unplanned failover but source is up now
-			 - (Source side) If the local policy is enabled, remote policy is disabled, local is write enabled and remote is write enabled
-	 		 - (Target side) If the local policy is disabled, remote policy is enabled, local is write enabled and remote is write enabled
-	*/
-	var state csiext.StorageProtectionGroupStatus_State
-	if (localP == nil && !remoteP.Enabled && localTP == nil && remoteTP.FailoverFailbackState == "writes_enabled") || // unplanned failover & source down - source side
-		(!localP.Enabled && remoteP == nil && localTP.FailoverFailbackState == "writes_enabled" && remoteTP == nil) { // target side
-		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
-	} else if (localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_enabled") || // unplanned failover & source up now - source side
-		(!localP.Enabled && remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_enabled") { // target side
-		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
-	} else if !localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_enabled" { // planned failover - source OR target side
-		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
-	} else if (localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_disabled") || // Synchronized state - source side
-		(!localP.Enabled && remoteP.Enabled && localTP.FailoverFailbackState == "writes_disabled" && remoteTP.FailoverFailbackState == "writes_enabled") { // target side
-		state = csiext.StorageProtectionGroupStatus_SYNCHRONIZED
-	} else if (!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_disabled") || // Suspended state - source side
-		(!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_disabled" && remoteTP.FailoverFailbackState == "writes_enabled") { // target side
-		state = csiext.StorageProtectionGroupStatus_SUSPENDED
-	} else if isSyncInProgress { // sync-in-progress state
-		state = csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS
-	} else if localTP.LastJobState == "failed" || remoteTP.LastJobState == "failed" { // invalid state, sync job failed
-		state = csiext.StorageProtectionGroupStatus_INVALID
-	} else { // unknown state
-		state = csiext.StorageProtectionGroupStatus_UNKNOWN
-	}
-
-	log.Info("trying to get replication direction")
+	log.Info("Trying to get replication direction")
 	source := false
-	if state != csiext.StorageProtectionGroupStatus_FAILEDOVER && // no side can be source when in failed over state
-		((localP != nil && localP.Enabled) || // when synchronized
-			(!remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_disabled")) { // when suspended
+	if linkState != csiext.StorageProtectionGroupStatus_FAILEDOVER && // no side can be source when in failed over state
+		(localP.Enabled || // when synchronized
+			(!remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_disabled")) { // when suspended (source side)
 		source = true
 		log.Info("Current side is source")
 	}
 
-	log.Infof("The current state for group (%s) is (%s).", groupID, state.String())
+	log.Infof("The current state for group (%s) is (%s).", groupID, linkState.String())
 	resp := &csiext.GetStorageProtectionGroupStatusResponse{
 		Status: &csiext.StorageProtectionGroupStatus{
-			State:    state,
+			State:    linkState,
 			IsSource: source,
 		},
 	}
@@ -727,4 +690,50 @@ func getRemoteCSIVolume(ctx context.Context, exportID int, volName, accessZone s
 		VolumeContext: nil, // TODO: add values to volume context if needed
 	}
 	return volume
+}
+
+/** Identify the status of the protection group from local and remote policies.
+	Synchronized:
+		- (Source side) If the local policy is enabled, remote policy is disabled, local is write enabled and remote is write disabled
+ 		- (Target side) If the local policy is disabled, remote policy is enabled, local is write disabled and remote is write enabled
+	Suspended:
+		- (Source side) If the local policy is disabled, remote policy is disabled, local is write enabled and remote is write disabled
+ 		- (Target side) If the local policy is disabled, remote policy is disabled, local is write disabled and remote is write enabled
+	Failover:
+		1. Planned failover
+		 - (both sides) local policy is disabled, remote policy is disabled, local is write enabled and remote is write enabled
+		2. Unplanned failover (source down)
+		 - (Source side) source is down. remote policy is still disabled and remote is write enabled
+		 - (Target side) source is down. local policy is still disabled and local is write enabled
+		3. Unplanned failover but source is up now
+		 - (Source side) If the local policy is enabled, remote policy is disabled, local is write enabled and remote is write enabled
+ 		 - (Target side) If the local policy is disabled, remote policy is enabled, local is write enabled and remote is write enabled
+*/
+func getGroupLinkState(localP isi.Policy, localTP isi.TargetPolicy, remoteP isi.Policy, remoteTP isi.TargetPolicy, isSyncInProgress bool) csiext.StorageProtectionGroupStatus_State {
+	var state csiext.StorageProtectionGroupStatus_State
+	if isSyncInProgress { // sync-in-progress state
+		state = csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS
+	} else if (localP == nil && remoteP != nil && !remoteP.Enabled && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == "writes_enabled") || // unplanned failover & source down - source side
+		(localP != nil && !localP.Enabled && remoteP == nil && localTP != nil && localTP.FailoverFailbackState == "writes_enabled" && remoteTP == nil) { // target side
+		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
+	} else if localP == nil || remoteP == nil || localTP == nil || remoteTP == nil { // both arrays should be up - unexpected case
+		state = csiext.StorageProtectionGroupStatus_UNKNOWN
+	} else if (localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_enabled") || // unplanned failover & source up now - source side
+		(!localP.Enabled && remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_enabled") { // target side
+		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
+	} else if !localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_enabled" { // planned failover - source OR target side
+		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
+	} else if (localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_disabled") || // Synchronized state - source side
+		(!localP.Enabled && remoteP.Enabled && localTP.FailoverFailbackState == "writes_disabled" && remoteTP.FailoverFailbackState == "writes_enabled") { // target side
+		state = csiext.StorageProtectionGroupStatus_SYNCHRONIZED
+	} else if (!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_disabled") || // Suspended state - source side
+		(!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_disabled" && remoteTP.FailoverFailbackState == "writes_enabled") { // target side
+		state = csiext.StorageProtectionGroupStatus_SUSPENDED
+	} else if localTP.LastJobState == "failed" || remoteTP.LastJobState == "failed" { // invalid state, sync job failed
+		state = csiext.StorageProtectionGroupStatus_INVALID
+	} else { // unknown state
+		state = csiext.StorageProtectionGroupStatus_UNKNOWN
+	}
+
+	return state
 }
