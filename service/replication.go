@@ -469,33 +469,6 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 
-	var isSync bool
-
-	// Check if any of the policy jobs are currently running
-	localJob, err := isiConfig.isiSvc.client.GetJobsByPolicyName(ctx, ppName)
-	if err != nil {
-		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode != 404 {
-			return nil, status.Errorf(codes.Internal, "can't find active jobs for local policy %s by name %s", ppName, err.Error())
-		}
-	}
-	for _, i := range localJob {
-		if i.Action == v11.SYNC {
-			isSync = true
-		}
-	}
-
-	remoteJob, err := remoteIsiConfig.isiSvc.client.GetJobsByPolicyName(ctx, ppName)
-	if err != nil {
-		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode != 404 {
-			return nil, status.Errorf(codes.Internal, "can't find active jobs for remote policy %s by name %s", ppName, err.Error())
-		}
-	}
-	for _, i := range remoteJob {
-		if i.Action == v11.SYNC {
-			isSync = true
-		}
-	}
-
 	// obtain local policy for local cluster
 	localP, err := isiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 	if err != nil {
@@ -520,14 +493,46 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 		log.Error("can't find target replication policy on remote cluster, unexpected error ", err.Error())
 	}
 
-	if (localP == nil && remoteP == nil) || (localTP == nil && remoteTP == nil) {
-		err := status.Errorf(codes.Internal, "unable to find either source OR target policy information")
+	var isSyncInProgress, failedSyncCheck bool
+
+	// Check if any of the policy jobs are currently running
+	localJob, err := isiConfig.isiSvc.client.GetJobsByPolicyName(ctx, ppName)
+	if err != nil {
+		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode != 404 {
+			log.Error("Unexpected error while querying active jobs for local policy ", err.Error())
+			failedSyncCheck = true
+		}
+	}
+	for _, i := range localJob {
+		if i.Action == v11.SYNC {
+			isSyncInProgress = true
+		}
+	}
+
+	remoteJob, err := remoteIsiConfig.isiSvc.client.GetJobsByPolicyName(ctx, ppName)
+	if err != nil {
+		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode != 404 {
+			log.Error("Unexpected error while querying active jobs for remote policy ", err.Error())
+			failedSyncCheck = true
+		}
+	}
+	for _, i := range remoteJob {
+		if i.Action == v11.SYNC {
+			isSyncInProgress = true
+		}
+	}
+
+	if (localP == nil && remoteP == nil) || (localTP == nil && remoteTP == nil) || failedSyncCheck {
+		errMsg := "unable to find either source OR target policy information"
+		if failedSyncCheck {
+			errMsg = "Unexpected error while querying active jobs for local or remote policy"
+		}
 		resp := &csiext.GetStorageProtectionGroupStatusResponse{
 			Status: &csiext.StorageProtectionGroupStatus{
 				State: csiext.StorageProtectionGroupStatus_UNKNOWN,
 			},
 		}
-		return resp, err
+		return resp, status.Errorf(codes.Internal, errMsg)
 	}
 
 	/**
@@ -562,7 +567,7 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	} else if (!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_disabled") || // Suspended state - source side
 		(!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_disabled" && remoteTP.FailoverFailbackState == "writes_enabled") { // target side
 		state = csiext.StorageProtectionGroupStatus_SUSPENDED
-	} else if isSync { // sync-in-progress state
+	} else if isSyncInProgress { // sync-in-progress state
 		state = csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS
 	} else if localTP.LastJobState == "failed" || remoteTP.LastJobState == "failed" { // invalid state, sync job failed
 		state = csiext.StorageProtectionGroupStatus_INVALID
