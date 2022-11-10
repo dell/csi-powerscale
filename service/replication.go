@@ -7,13 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dell/csi-isilon/common/constants"
 	"github.com/dell/csi-isilon/common/utils"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	isi "github.com/dell/goisilon"
 	isiApi "github.com/dell/goisilon/api"
 	v11 "github.com/dell/goisilon/api/v11"
-	v2 "github.com/dell/goisilon/api/v2"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -574,49 +572,11 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 
 	log.Info("trying to get replication direction")
 	source := false
-	if (localP != nil && localP.Enabled) || // when synchronized
-		(!remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_disabled") { // when suspended
+	if state != csiext.StorageProtectionGroupStatus_FAILEDOVER && // no side can be source when in failed over state
+		((localP != nil && localP.Enabled) || // when synchronized
+			(!remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_disabled")) { // when suspended
 		source = true
 		log.Info("Current side is source")
-
-		localExportsMap := make(map[string]v2.Export)
-		remoteExportsMap := make(map[string]v2.Export)
-
-		localExports, err := isiConfig.isiSvc.client.GetExports(ctx)
-		if err != nil {
-			log.Error("error occured while getting local exports ", err.Error())
-		}
-		for _, i := range localExports {
-			for _, j := range *i.Paths {
-				localExportsMap[j] = *i
-
-			}
-		}
-
-		remoteExports, err := remoteIsiConfig.isiSvc.client.GetExports(ctx)
-		if err != nil {
-			log.Error("error occured while getting remote exports ", err.Error())
-		}
-		for _, i := range remoteExports {
-			for _, j := range *i.Paths {
-				remoteExportsMap[j] = *i
-			}
-		}
-
-		deleteList := make(map[int]struct{})
-		for key, val := range remoteExportsMap {
-			if _, ok := localExportsMap[key]; !ok && strings.Contains(key, vgName) {
-				deleteList[val.ID] = struct{}{}
-			}
-		}
-
-		for k := range deleteList {
-			err = remoteIsiConfig.isiSvc.UnexportByIDWithZone(ctx, k, constants.DefaultAccessZone)
-			log.Info("unexporting", k)
-			if err != nil {
-				log.Error("failed to cleanup exports.")
-			}
-		}
 	}
 
 	log.Infof("The current state for group (%s) is (%s).", groupID, state.String())
