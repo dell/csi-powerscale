@@ -554,7 +554,7 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 			IsSource: source,
 		},
 	}
-	return resp, err
+	return resp, nil
 }
 
 func failover(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
