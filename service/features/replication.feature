@@ -161,17 +161,15 @@ Feature: Isilon CSI interface
     Then the error contains <errormsg>
 
     Examples:
-      | induced                        | errormsg                                   |
-      | "GetJobsInternalError"         | "can't find active jobs for local policy"  |
-      | "GetPolicyInternalError"       | "can't find local replication policy"      |
-      | "GetTargetPolicyInternalError" | "can't find local replication policy"      |
-      | "GetExportInternalError"       | "none"                                     |
-      | "UnexportError"                | "none"                                     |
-      | "FailedStatus"                 | "none"                                     |
-      | "UnknownStatus"                | "none"                                     |
-      | "Jobs"                         | "can't find active jobs for remote policy" |
-      | "GetSpgErrors"                 | "can't find remote replication policy"     |
-      | "GetSpgTPErrors"               | "can't find remote replication policy"     |
+      | induced                        | errormsg                                           |
+      | "GetJobsInternalError"         | "querying active jobs for local or remote policy"  |
+      | "GetPolicyInternalError"       | "error while getting link state"                   |
+      | "GetTargetPolicyInternalError" | "error while getting link state"                   |
+      | "FailedStatus"                 | "none"                                             |
+      | "UnknownStatus"                | "error while getting link state"                                             |
+      | "Jobs"                         | "querying active jobs for local or remote policy"  |
+      | "GetSpgErrors"                 | "error while getting link state"                   |
+      | "GetSpgTPErrors"               | "error while getting link state"                   |
 
   @executeAction
     @v1.0.0
@@ -190,16 +188,6 @@ Feature: Isilon CSI interface
 
   Scenario Outline: Execute action suspend
     Given a Isilon service
-    And I enable quota
-    When I call SuspendExecuteAction
-    Then the error contains <errormsg>
-
-    Examples:
-      | errormsg                                                                                                  |
-      | "suspend: can't create suspend volume in csi-prov-test-19743d82-192-168-111-25-Five_Minutes volume group" |
-
-  Scenario Outline: Execute action suspend
-    Given a Isilon service
     And I induce error <induced>
     When I call SuspendExecuteAction
     Then the error contains <errormsg>
@@ -208,12 +196,6 @@ Feature: Isilon CSI interface
       | induced                  | errormsg                              |
       | "UpdatePolicyError"      | "suspend: can't disable local policy" |
       | "autoProbeFailed"        | "auto probe is not enabled" |
-    
-  Scenario: Execute action sync
-    Given a Isilon service
-    And I enable quota
-    When I call SyncExecuteAction
-    Then a valid ExecuteActionResponse is returned
 
   Scenario Outline: Execute action sync
     Given a Isilon service
@@ -224,17 +206,6 @@ Feature: Isilon CSI interface
     Examples:
       | induced          | errormsg             |
       | "GetPolicyError" | "policy sync failed" |
-
-  Scenario: Execute action failover
-    Given a Isilon service
-    And I enable quota
-    When I call FailoverExecuteAction
-    Then a valid ExecuteActionResponse is returned
-
-  Scenario: Execute action unplanned failover
-    Given a Isilon service
-    When I call FailoverUnplannedExecuteAction
-    Then a valid ExecuteActionResponse is returned
 
   Scenario Outline: Execute action failover
     Given a Isilon service
@@ -247,7 +218,6 @@ Feature: Isilon CSI interface
       | "GetJobsInternalError"   | "failover: can't allow writes on target site EOF"        |
       | "UpdatePolicyError"      | "failover: can't disable local policy"                   |
       | "Failover"               | "failover: can't create protection policy"               |
-      | "FailoverTP"             | "failover: couldn't get target policy"                   |
       | "GetSpgTPErrors"         | "failover: can't allow writes on target site"            |
 
   Scenario Outline: Execute action unplanned failover
@@ -256,8 +226,8 @@ Feature: Isilon CSI interface
     And I call FailoverUnplannedExecuteAction
     Then the error contains <errormsg>
     Examples:
-      | induced                        | errormsg                                                     |
-      | "GetTargetPolicyInternalError" | "unplanned failover: can't break association on target site" |
+      | induced                        | errormsg                                                 |
+      | "GetTargetPolicyInternalError" | "unplanned failover: allow writes on target site failed" |
 
   Scenario Outline: Execute action reprotect
     Given a Isilon service
@@ -265,13 +235,8 @@ Feature: Isilon CSI interface
     And I call ReprotectExecuteAction
     Then the error contains <errormsg>
     Examples:
-      | induced                        | errormsg                                                    |
-      | "GetPolicyInternalError"       | "reprotect: can't get policy"                               |
-      | "GetPolicyNotFoundError"       | "reprotect: can't create protection policy EOF"             |
-      | "GetTargetPolicyInternalError" | "reprotect: can't find remote replication policy"           |
-      | "GetPolicyError"               | "reprotect: can't ensure protection policy exists "         |
-      | "Reprotect"                    | "reprotect: policy couldn't reach enabled condition on TGT" |
-      | "ReprotectTP"                  | "none" |
+      | induced                        | errormsg                                                 |
+      | "GetPolicyInternalError"       | "requested action does not match with supported actions" |
 
   Scenario Outline: Execute action
     Given a Isilon service
@@ -279,12 +244,5 @@ Feature: Isilon CSI interface
     And I call ExecuteAction to <systemName> to <clusterNameOne> to <clusterNameTwo> to <remoteSystemName> to <vgname> to <ppname>
     Then the error contains <errormsg>
     Examples:
-      | induced                  | systemName   | clusterNameOne | clusterNameTwo | remoteSystemName   | vgname            | ppname                                               | errormsg                              |
-      | "GetPolicyInternalError" | "systemName" | "cluster1"     | "cluster1"     | "remoteSystemName" | "VolumeGroupName" | "csi-prov-test-19743d82-192-168-111-25-Five_Minutes" | "suspend: can't disable local policy" |
-
-
-
-
-
-
-
+      | induced                  | systemName   | clusterNameOne | clusterNameTwo | remoteSystemName   | vgname            | ppname                                               | errormsg                            |
+      | "GetPolicyInternalError" | "systemName" | "cluster1"     | "cluster1"     | "remoteSystemName" | "VolumeGroupName" | "csi-prov-test-19743d82-192-168-111-25-Five_Minutes" | "resume: can't enable local policy" |
