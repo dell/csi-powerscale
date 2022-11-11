@@ -246,3 +246,11 @@ Feature: Isilon CSI interface
     Examples:
       | induced                  | systemName   | clusterNameOne | clusterNameTwo | remoteSystemName   | vgname            | ppname                                               | errormsg                            |
       | "GetPolicyInternalError" | "systemName" | "cluster1"     | "cluster1"     | "remoteSystemName" | "VolumeGroupName" | "csi-prov-test-19743d82-192-168-111-25-Five_Minutes" | "resume: can't enable local policy" |
+
+  Scenario Outline: Execute bad action
+    Given a Isilon service
+    When I call BadExecuteAction
+    Then the error contains <errormsg>
+    Examples:
+      | errormsg                                                 |
+      | "requested action does not match with supported actions" |

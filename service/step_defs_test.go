@@ -391,6 +391,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a valid ExecuteActionResponse is returned$`, f.aValidExecuteActionResponseIsReturned)
 	s.Step(`I call FailoverExecuteAction`, f.iCallExecuteActionSyncFailover)
 	s.Step(`I call FailoverUnplannedExecuteAction`, f.iCallExecuteActionSyncFailoverUnplanned)
+	s.Step(`I call BadExecuteAction`, f.iCallExecuteActionBad)
 	s.Step(`^I call BadCreateRemoteVolume`, f.iCallCreateRemoteVolumeBad)
 	s.Step(`^I call BadCreateStorageProtectionGroup`, f.iCallCreateStorageProtectionGroupBad)
 	//s.Step(`I call ExecuteActionWithParams "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)"$`, f.iCallExecuteActionWithParams)
@@ -2987,6 +2988,37 @@ func executeActionRequestWithParams(s *service, systemName, clusterNameOne, clus
 		//s.opts.replicationContextPrefix + remoteSystemName: clusterNameTwo,
 		//s.opts.replicationContextPrefix + vgname:  ppname,
 
+	}
+	req := &csiext.ExecuteActionRequest{
+		ActionId:                        "",
+		ProtectionGroupId:               "",
+		ActionTypes:                     &csiext.ExecuteActionRequest_Action{Action: action},
+		ProtectionGroupAttributes:       params,
+		RemoteProtectionGroupId:         "",
+		RemoteProtectionGroupAttributes: nil,
+	}
+
+	return req
+}
+
+func (f *feature) iCallExecuteActionBad() error {
+	req := executeActionRequestBad(f.service)
+	f.executeActionRequest = req
+	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
+	if f.err != nil {
+		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func executeActionRequestBad(s *service) *csiext.ExecuteActionRequest {
+	action := &csiext.Action{
+		ActionTypes: csiext.ActionTypes_UNKNOWN_ACTION,
+	}
+	params := map[string]string{
+		s.opts.replicationContextPrefix + "systemName":       "cluster1",
+		s.opts.replicationContextPrefix + "remoteSystemName": "cluster1",
+		s.opts.replicationContextPrefix + "VolumeGroupName":  "csi-prov-test-19743d82-192-168-111-25-Five_Minutes",
 	}
 	req := &csiext.ExecuteActionRequest{
 		ActionId:                        "",
