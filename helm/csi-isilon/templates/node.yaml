@@ -322,6 +322,7 @@ spec:
             {{- if .Values.encryption.livenessPort }}
             - --livenessPort={{ .Values.encryption.livenessPort }}
             {{- end}}
+            - --apiPort={{ .Values.encryption.apiPort }}
             {{- range index .Values.encryption.extraArgs }}
             - {{ . | quote }}
             {{- end }}
