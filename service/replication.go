@@ -126,7 +126,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 				if export, _ := remoteIsiConfig.isiSvc.GetExportByIDWithZone(ctx, remoteExportID, remoteAccessZone); export != nil {
 					// Add dummy localhost entry for pvc security
 					if !remoteIsiConfig.isiSvc.IsHostAlreadyAdded(ctx, remoteExportID, remoteAccessZone, utils.DummyHostNodeID) {
-						err = remoteIsiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, remoteClusterName, remoteExportID, remoteAccessZone, utils.DummyHostNodeID, remoteIsiConfig.isiSvc.AddExportClientByIDWithZone)
+						err = remoteIsiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, remoteClusterName, remoteExportID, remoteAccessZone, utils.DummyHostNodeID, *remoteIsiConfig.IgnoreUnresolvableHosts, remoteIsiConfig.isiSvc.AddExportClientByIDWithZone)
 						if err != nil {
 							log.Debugf("Error while adding dummy localhost entry to export '%d'", remoteExportID)
 						}
@@ -692,22 +692,23 @@ func getRemoteCSIVolume(ctx context.Context, exportID int, volName, accessZone s
 	return volume
 }
 
-/** Identify the status of the protection group from local and remote policies.
-	Synchronized:
-		- (Source side) If the local policy is enabled, remote policy is disabled, local is write enabled and remote is write disabled
- 		- (Target side) If the local policy is disabled, remote policy is enabled, local is write disabled and remote is write enabled
-	Suspended:
-		- (Source side) If the local policy is disabled, remote policy is disabled, local is write enabled and remote is write disabled
- 		- (Target side) If the local policy is disabled, remote policy is disabled, local is write disabled and remote is write enabled
-	Failover:
-		1. Planned failover
-		 - (both sides) local policy is disabled, remote policy is disabled, local is write enabled and remote is write enabled
-		2. Unplanned failover (source down)
-		 - (Source side) source is down. remote policy is still disabled and remote is write enabled
-		 - (Target side) source is down. local policy is still disabled and local is write enabled
-		3. Unplanned failover but source is up now
-		 - (Source side) If the local policy is enabled, remote policy is disabled, local is write enabled and remote is write enabled
- 		 - (Target side) If the local policy is disabled, remote policy is enabled, local is write enabled and remote is write enabled
+/*
+  - Identify the status of the protection group from local and remote policies.
+    Synchronized:
+  - (Source side) If the local policy is enabled, remote policy is disabled, local is write enabled and remote is write disabled
+  - (Target side) If the local policy is disabled, remote policy is enabled, local is write disabled and remote is write enabled
+    Suspended:
+  - (Source side) If the local policy is disabled, remote policy is disabled, local is write enabled and remote is write disabled
+  - (Target side) If the local policy is disabled, remote policy is disabled, local is write disabled and remote is write enabled
+    Failover:
+    1. Planned failover
+  - (both sides) local policy is disabled, remote policy is disabled, local is write enabled and remote is write enabled
+    2. Unplanned failover (source down)
+  - (Source side) source is down. remote policy is still disabled and remote is write enabled
+  - (Target side) source is down. local policy is still disabled and local is write enabled
+    3. Unplanned failover but source is up now
+  - (Source side) If the local policy is enabled, remote policy is disabled, local is write enabled and remote is write enabled
+  - (Target side) If the local policy is disabled, remote policy is enabled, local is write enabled and remote is write enabled
 */
 func getGroupLinkState(localP isi.Policy, localTP isi.TargetPolicy, remoteP isi.Policy, remoteTP isi.TargetPolicy, isSyncInProgress bool) csiext.StorageProtectionGroupStatus_State {
 	var state csiext.StorageProtectionGroupStatus_State
