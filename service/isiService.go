@@ -554,53 +554,50 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 		return err
 	}
 
+	log.Debugf("ignoreUnresolvableHosts set to '%v' for cluster '%s'", ignoreUnresolvableHosts, clusterName)
 	if ignoreUnresolvableHosts {
-		log.Debugf("ignoreUnresolvableHosts value is set to '%v' for cluster '%s'", ignoreUnresolvableHosts, clusterName)
-		log.Debugf("AddExportClientNetworkIdentifierByID adding '%v' as client to export id '%d'", clientIP, exportID)
-		if err = addClientFunc(ctx, exportID, accessZone, clientIP, ignoreUnresolvableHosts); err == nil {
-			log.Debugf("nodeID map doesn't get updated as ignoreUnresolvableHosts being set")
+		if err = addClientFunc(ctx, exportID, accessZone, clientIP, true); err != nil {
+			log.Errorf("failed to add client '%s' to export id '%d': '%v'", clientIP, exportID, err)
+			return fmt.Errorf("failed to add client '%s' to the export id '%d'", clientIP, exportID)
 		}
-
-	} else {
-		log.Debugf("ignoreUnresolvableHosts value is set to '%v' for cluster '%s'", ignoreUnresolvableHosts, clusterName)
-
-		currentClient, err := getClientToUseForNodeID(ctx, clusterToNodeIDMap, clusterName, nodeID)
-		if err != nil {
-			log.Debugf(err.Error())
-			clientToUse = clientFQDN
-		} else {
-			clientToUse = currentClient
-		}
-
-		log.Debugf("AddExportClientNetworkIdentifierByID adding '%s' as client to export id '%d'", clientToUse, exportID)
-		if err = addClientFunc(ctx, exportID, accessZone, clientToUse, ignoreUnresolvableHosts); err == nil {
-			if err := updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, clientToUse); err != nil {
-				// not returning with error as export is already updated with client
-				log.Warnf("failed to update cluster to nodeID map: '%s'", err)
-			}
-
-			return nil
-		}
-		log.Warnf("failed to add client '%s' to export id '%d': '%v'", clientToUse, exportID, err)
-
-		// try updating export with other client
-		otherClientToUse := clientFQDN
-		if clientToUse == clientFQDN {
-			otherClientToUse = clientIP
-		}
-		log.Debugf("AddExportClientNetworkIdentifierByID trying to add '%s' as client to export id '%d'", otherClientToUse, exportID)
-		if err = addClientFunc(ctx, exportID, accessZone, otherClientToUse, ignoreUnresolvableHosts); err == nil {
-			if err := updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, otherClientToUse); err != nil {
-				// not returning with error as export is already updated with client
-				log.Warnf("failed to update cluster to nodeID map '%s'", err)
-			}
-			return nil
-		}
-		log.Warnf("failed to add client '%s' to export id '%d': '%v'", otherClientToUse, exportID, err)
-
-		return fmt.Errorf("failed to add clients '%s' or '%s' to export id '%d'", clientToUse, otherClientToUse, exportID)
+		return nil
 	}
-	return nil
+
+	currentClient, err := getClientToUseForNodeID(ctx, clusterToNodeIDMap, clusterName, nodeID)
+	if err != nil {
+		log.Debug(err.Error())
+		clientToUse = clientFQDN
+	} else {
+		clientToUse = currentClient
+	}
+
+	log.Debugf("AddExportClientNetworkIdentifierByID adding '%s' as client to export id '%d'", clientToUse, exportID)
+	if err = addClientFunc(ctx, exportID, accessZone, clientToUse, false); err == nil {
+		if err := updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, clientToUse); err != nil {
+			// not returning with error as export is already updated with client
+			log.Warnf("failed to update cluster to nodeID map: '%s'", err)
+		}
+
+		return nil
+	}
+	log.Warnf("failed to add client '%s' to export id '%d': '%v'", clientToUse, exportID, err)
+
+	// try updating export with other client
+	otherClientToUse := clientFQDN
+	if clientToUse == clientFQDN {
+		otherClientToUse = clientIP
+	}
+	log.Debugf("AddExportClientNetworkIdentifierByID trying to add '%s' as client to export id '%d'", otherClientToUse, exportID)
+	if err = addClientFunc(ctx, exportID, accessZone, otherClientToUse, false); err == nil {
+		if err := updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, otherClientToUse); err != nil {
+			// not returning with error as export is already updated with client
+			log.Warnf("failed to update cluster to nodeID map '%s'", err)
+		}
+		return nil
+	}
+	log.Warnf("failed to add client '%s' to export id '%d': '%v'", otherClientToUse, exportID, err)
+
+	return fmt.Errorf("failed to add clients '%s' or '%s' to export id '%d'", clientToUse, otherClientToUse, exportID)
 }
 
 func (svc *isiService) AddExportClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error {
