@@ -398,9 +398,6 @@ encryption:
   # image: Encryption driver image name.
   image: "dellemc/csm-encryption:v0.2.0"
 
-  # imagePullPolicy: If specified, overrides the chart global imagePullPolicy.
-  imagePullPolicy:
-
   # apiPort: TCP port number used by the REST API server.
   apiPort: 3838
 

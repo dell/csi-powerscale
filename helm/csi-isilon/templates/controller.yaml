@@ -497,7 +497,7 @@ spec:
         {{- if $encrypted }}
         - name: driver-sec
           image: {{ .Values.encryption.image }}
-          imagePullPolicy: {{ default .Values.imagePullPolicy .Values.encryption.imagePullPolicy }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - --name={{ .Values.encryption.pluginName }}
             - --nodeId=$(NODE_ID)
