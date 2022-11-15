@@ -243,7 +243,10 @@ func createIsilonClient() (*isi.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	ignoreUnresolvableHosts, err := strconv.ParseBool(os.Getenv("GOISILON_UNRESOLVABLE_HOSTS"))
+	if err != nil {
+		return nil, err
+	}
 	isiClient, err = isi.NewClientWithArgs(
 		ctx,
 		"https://"+IPaddr+":"+os.Getenv(constants.EnvPort),
@@ -254,6 +257,7 @@ func createIsilonClient() (*isi.Client, error) {
 		password,
 		os.Getenv(constants.EnvPath),
 		os.Getenv(constants.DefaultIsiVolumePathPermissions),
+		ignoreUnresolvableHosts,
 		uint8(utils.ParseUintFromContext(ctx, constants.EnvIsiAuthType)))
 	if err != nil {
 		fmt.Printf("error creating isilon client: '%s'\n", err.Error())
