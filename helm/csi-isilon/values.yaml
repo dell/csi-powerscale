@@ -329,6 +329,17 @@ isiPath: /ifs/data/csi
 # Examples: "0777", "777", "0755"
 isiVolumePathPermissions: "0777"
 
+# ignoreUnresolvableHosts: Ignore unresolvable hosts on the OneFS
+# When set to true, OneFS allows new host to add to existing export list though any of the existing hosts from the
+# same exports are unresolvable/doesn't exist anymore.
+# Note: Enabling this param will attract performance issues(fully relied on OneFS response), also if OneFS has unresolvable hosts to its
+# export, it might impact OneFS services startup time if OneFS services goes down.
+# Allowed values:
+#   true: ignore existing unresolvable hosts and append new host to the existing export
+#   false: exhibits OneFS default behavior i.e. if any of existing hosts are unresolvable while adding new one it fails
+# Default value: false
+ignoreUnresolvableHosts: false
+
 # noProbeOnStart: Indicates whether the controller/node should probe all the PowerScale clusters during driver initialization
 # When set to true, the driver will not set node labels, please manually add
 # the label <provisionerName>.dellemc.com/<powerscalefqdnorip>:<provisionerName> on the nodes for each of the clusters reachable from the node.
