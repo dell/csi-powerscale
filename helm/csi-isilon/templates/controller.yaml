@@ -412,8 +412,8 @@ spec:
               value: {{ .Values.isiPath }}
             - name: X_CSI_ISI_VOLUME_PATH_PERMISSIONS
               value: "{{ .Values.isiVolumePathPermissions }}"
-            - name: X_CSI_ISI_IGNORE_HOSTS
-              value: "{{ .Values.ignoreHosts }}"
+            - name: X_CSI_ISI_IGNORE_UNRESOLVABLE_HOSTS
+              value: "{{ .Values.ignoreUnresolvableHosts }}"
             - name: X_CSI_ISI_NO_PROBE_ON_START
               value: "{{ .Values.noProbeOnStart }}"
             - name: X_CSI_PODMON_ENABLED

@@ -50,6 +50,9 @@ const (
 	// DefaultIsiVolumePathPermissions are the default permissions for volume directory path
 	DefaultIsiVolumePathPermissions = "0777"
 
+	// DefaultIgnoreUnresolvableHosts is the default set to false
+	//DefaultIgnoreUnresolvableHosts = false
+
 	// MaxIsiConnRetries is the max number of retries to validate connection to PowerScale Array
 	MaxIsiConnRetries = 10
 

@@ -28,16 +28,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/golang/protobuf/ptypes/wrappers"
-	"google.golang.org/grpc"
-
 	"github.com/akutz/gournal"
-	"github.com/dell/csi-isilon/common/k8sutils"
-	"google.golang.org/grpc/metadata"
-	"gopkg.in/yaml.v3"
-
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/common/constants"
+	"github.com/dell/csi-isilon/common/k8sutils"
 	"github.com/dell/csi-isilon/common/utils"
 	"github.com/dell/csi-isilon/core"
 	commonext "github.com/dell/dell-csi-extensions/common"
@@ -48,10 +42,14 @@ import (
 	csictx "github.com/dell/gocsi/context"
 	isi "github.com/dell/goisilon"
 	"github.com/fsnotify/fsnotify"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"gopkg.in/yaml.v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -97,7 +95,7 @@ type Opts struct {
 	MaxVolumesPerNode         int64
 	isiAuthType               uint8
 	IsHealthMonitorEnabled    bool
-	IgnoreHosts               bool
+	IgnoreUnresolvableHosts   bool
 	replicationContextPrefix  string
 	replicationPrefix         string
 }
@@ -131,13 +129,14 @@ type IsilonClusterConfig struct {
 	IsiVolumePathPermissions  string `yaml:"isiVolumePathPermissions,omitempty"`
 	IsDefault                 *bool  `yaml:"isDefault,omitempty"`
 	ReplicationCertificateID  string `yaml:"replicationCertificateID,omitempty"`
+	IgnoreUnresolvableHosts   *bool  `yaml:"ignoreUnresolvableHosts,omitempty"`
 	isiSvc                    *isiService
 }
 
 // To display the IsilonClusterConfig of a cluster
 func (s IsilonClusterConfig) String() string {
-	return fmt.Sprintf("ClusterName: %s, Endpoint: %s, EndpointPort: %s, EndpointURL: %s, User: %s, SkipCertificateValidation: %v, IsiPath: %s, IsiVolumePathPermissions: %s, IsDefault: %v, isiSvc: %v",
-		s.ClusterName, s.Endpoint, s.EndpointPort, s.EndpointURL, s.User, *s.SkipCertificateValidation, s.IsiPath, s.IsiVolumePathPermissions, *s.IsDefault, s.isiSvc)
+	return fmt.Sprintf("ClusterName: %s, Endpoint: %s, EndpointPort: %s, EndpointURL: %s, User: %s, SkipCertificateValidation: %v, IsiPath: %s, IsiVolumePathPermissions: %s, IsDefault: %v, IgnoreUnresolvableHosts: %v, isiSvc: %v",
+		s.ClusterName, s.Endpoint, s.EndpointPort, s.EndpointURL, s.User, *s.SkipCertificateValidation, s.IsiPath, s.IsiVolumePathPermissions, *s.IsDefault, *s.IgnoreUnresolvableHosts, s.isiSvc)
 }
 
 // New returns a new Service.
@@ -230,7 +229,7 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 	opts.Verbose = utils.ParseUintFromContext(ctx, constants.EnvVerbose)
 	opts.CustomTopologyEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvCustomTopologyEnabled)
 	opts.IsHealthMonitorEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvIsHealthMonitorEnabled)
-	opts.IgnoreHosts = utils.ParseBooleanFromContext(ctx, constants.EnvIgnoreHosts)
+	opts.IgnoreUnresolvableHosts = utils.ParseBooleanFromContext(ctx, constants.EnvIgnoreUnresolvableHosts)
 
 	s.opts = opts
 
@@ -445,6 +444,7 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 		isiConfig.Password,
 		isiConfig.IsiPath,
 		isiConfig.IsiVolumePathPermissions,
+		*isiConfig.IgnoreUnresolvableHosts,
 		s.opts.isiAuthType,
 	)
 
@@ -717,6 +717,10 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 			config.IsiVolumePathPermissions = s.opts.IsiVolumePathPermissions
 		}
 
+		if config.IgnoreUnresolvableHosts == nil {
+			config.IgnoreUnresolvableHosts = &s.opts.IgnoreUnresolvableHosts
+		}
+
 		config.EndpointURL = fmt.Sprintf("https://%s:%s", config.Endpoint, config.EndpointPort)
 		clientCtx, _ := GetLogger(ctx)
 		if !noProbeOnStart {
@@ -760,6 +764,7 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 			"IsiPath":                   config.IsiPath,
 			"IsiVolumePathPermissions":  config.IsiVolumePathPermissions,
 			"IsDefault":                 *config.IsDefault,
+			"IgnoreUnresolvableHosts":   *config.IgnoreUnresolvableHosts,
 		}
 		// TODO: Replace logrus with log
 		logrus.WithFields(fields).Infof("new config details set for cluster %s", config.ClusterName)
