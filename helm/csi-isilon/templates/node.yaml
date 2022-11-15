@@ -304,7 +304,7 @@ spec:
         {{- if $encrypted }}
         - name: driver-sec
           image: {{ .Values.encryption.image }}
-          imagePullPolicy: {{ default .Values.imagePullPolicy .Values.encryption.imagePullPolicy }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
           securityContext:
             privileged: true
             allowPrivilegeEscalation: true
@@ -322,6 +322,7 @@ spec:
             {{- if .Values.encryption.livenessPort }}
             - --livenessPort={{ .Values.encryption.livenessPort }}
             {{- end}}
+            - --apiPort={{ .Values.encryption.apiPort }}
             {{- range index .Values.encryption.extraArgs }}
             - {{ . | quote }}
             {{- end }}
