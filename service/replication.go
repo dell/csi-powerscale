@@ -17,10 +17,13 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const POLICY_SCHEDULING_MANUAL = ""
-const POLICY_SCHEDULING_AUTOMATIC = "when-source-modified"
-const WRITES_ENABLED = "writes_enabled"
-const WRITES_DISABLED = "writes_disabled"
+// constants for ease of understanding
+const (
+	PolicySchedulingManual    = ""
+	PolicySchedulingAutomatic = "when-source-modified"
+	WritesEnabled             = "writes_enabled"
+	WritesDisabled            = "writes_disabled"
+)
 
 func (s *service) CreateRemoteVolume(ctx context.Context,
 	req *csiext.CreateRemoteVolumeRequest) (*csiext.CreateRemoteVolumeResponse, error) {
@@ -551,7 +554,7 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	source := false
 	if linkState != csiext.StorageProtectionGroupStatus_FAILEDOVER && // no side can be source when in failed over state
 		(localP.Enabled || // when synchronized
-			(!remoteP.Enabled && localTP.FailoverFailbackState == WRITES_ENABLED && remoteTP.FailoverFailbackState == WRITES_DISABLED)) { // when suspended (source side)
+			(!remoteP.Enabled && localTP.FailoverFailbackState == WritesEnabled && remoteTP.FailoverFailbackState == WritesDisabled)) { // when suspended (source side)
 		source = true
 		log.Info("Current side is source")
 	}
@@ -659,7 +662,7 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 
 	// Edit the source policy to manual.
 	log.Info("Setting SRC policy to manual")
-	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, "", "", 0)
+	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, "", PolicySchedulingManual, 0)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): can't set local policy to manual %s", err.Error())
 	}
@@ -708,14 +711,14 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 
 	// Edit target policy name (remove _mirror). Make target policy automatic. Get RPO from policy name.
 	log.Info("Renaming TGT mirror policy and setting it to automatic")
-	err = remoteIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppNameMirror, ppName, "when-source-modified", rpoInt)
+	err = remoteIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppNameMirror, ppName, PolicySchedulingAutomatic, rpoInt)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): can't set remote policy to automatic %s", err.Error())
 	}
 
 	// Edit source policy to automatic
 	log.Info("Setting SRC policy to automatic")
-	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, "", "when-source-modified", rpoInt)
+	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, "", PolicySchedulingAutomatic, rpoInt)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): can't set local policy to automatic %s", err.Error())
 	}
@@ -743,7 +746,7 @@ func failbackDiscardRemote(ctx context.Context, localIsiConfig *IsilonClusterCon
 
 	// Edit the source policy to manual.
 	log.Info("Setting SRC policy to manual")
-	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, "", "", 0)
+	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, "", PolicySchedulingManual, 0)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard remote): can't set local policy to manual %s", err.Error())
 	}
@@ -757,7 +760,7 @@ func failbackDiscardRemote(ctx context.Context, localIsiConfig *IsilonClusterCon
 
 	// set source policy to automatic
 	log.Info("Setting SRC policy to automatic")
-	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, "", "when-source-modified", rpoInt)
+	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, "", PolicySchedulingAutomatic, rpoInt)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard remote): can't set local policy to automatic %s", err.Error())
 	}
@@ -857,21 +860,21 @@ func getGroupLinkState(localP isi.Policy, localTP isi.TargetPolicy, remoteP isi.
 	var state csiext.StorageProtectionGroupStatus_State
 	if isSyncInProgress { // sync-in-progress state
 		state = csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS
-	} else if (localP == nil && remoteP != nil && !remoteP.Enabled && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WRITES_ENABLED) || // unplanned failover & source down - source side
-		(localP != nil && !localP.Enabled && remoteP == nil && localTP != nil && localTP.FailoverFailbackState == WRITES_ENABLED && remoteTP == nil) { // target side
+	} else if (localP == nil && remoteP != nil && !remoteP.Enabled && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesEnabled) || // unplanned failover & source down - source side
+		(localP != nil && !localP.Enabled && remoteP == nil && localTP != nil && localTP.FailoverFailbackState == WritesEnabled && remoteTP == nil) { // target side
 		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
 	} else if localP == nil || remoteP == nil || localTP == nil || remoteTP == nil { // both arrays should be up - unexpected case
 		state = csiext.StorageProtectionGroupStatus_UNKNOWN
-	} else if (localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == WRITES_ENABLED && remoteTP.FailoverFailbackState == WRITES_ENABLED) || // unplanned failover & source up now - source side
-		(!localP.Enabled && remoteP.Enabled && localTP.FailoverFailbackState == WRITES_ENABLED && remoteTP.FailoverFailbackState == WRITES_ENABLED) { // target side
+	} else if (localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == WritesEnabled && remoteTP.FailoverFailbackState == WritesEnabled) || // unplanned failover & source up now - source side
+		(!localP.Enabled && remoteP.Enabled && localTP.FailoverFailbackState == WritesEnabled && remoteTP.FailoverFailbackState == WritesEnabled) { // target side
 		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
-	} else if !localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == WRITES_ENABLED && remoteTP.FailoverFailbackState == WRITES_ENABLED { // planned failover - source OR target side
+	} else if !localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == WritesEnabled && remoteTP.FailoverFailbackState == WritesEnabled { // planned failover - source OR target side
 		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
-	} else if (localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == WRITES_ENABLED && remoteTP.FailoverFailbackState == WRITES_DISABLED) || // Synchronized state - source side
-		(!localP.Enabled && remoteP.Enabled && localTP.FailoverFailbackState == WRITES_DISABLED && remoteTP.FailoverFailbackState == WRITES_ENABLED) { // target side
+	} else if (localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == WritesEnabled && remoteTP.FailoverFailbackState == WritesDisabled) || // Synchronized state - source side
+		(!localP.Enabled && remoteP.Enabled && localTP.FailoverFailbackState == WritesDisabled && remoteTP.FailoverFailbackState == WritesEnabled) { // target side
 		state = csiext.StorageProtectionGroupStatus_SYNCHRONIZED
-	} else if (!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == WRITES_ENABLED && remoteTP.FailoverFailbackState == WRITES_DISABLED) || // Suspended state - source side
-		(!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == WRITES_DISABLED && remoteTP.FailoverFailbackState == WRITES_ENABLED) { // target side
+	} else if (!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == WritesEnabled && remoteTP.FailoverFailbackState == WritesDisabled) || // Suspended state - source side
+		(!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == WritesDisabled && remoteTP.FailoverFailbackState == WritesEnabled) { // target side
 		state = csiext.StorageProtectionGroupStatus_SUSPENDED
 	} else if localTP.LastJobState == "failed" || remoteTP.LastJobState == "failed" { // invalid state, sync job failed
 		state = csiext.StorageProtectionGroupStatus_INVALID
