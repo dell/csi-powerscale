@@ -635,12 +635,152 @@ func failoverUnplanned(ctx context.Context, localIsiConfig *IsilonClusterConfig,
 
 func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
 	log.Info("Running failback action - discard local")
+	ppName := strings.ReplaceAll(vgName, ".", "-")
+	ppNameMirror := ppName + "_mirror"
+
+	log.Info("Obtaining RPO value from policy name")
+	var rpoInt int
+	s := strings.Split(vgName, "-") // split by "_" and get last part -- it would be RPO
+	rpo := s[len(s)-1]
+
+	rpoEnum := RPOEnum(rpo)
+	if err := rpoEnum.IsValid(); err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid rpo value")
+	}
+
+	rpoInt, err := rpoEnum.ToInt()
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "unable to parse rpo seconds")
+	}
+
+	// If source policy is not disabled (unplanned failover), disable it
+	// TODO: Verify that this does not cause error when src policy is already disabled (planned FO)
+	log.Info("Ensuring source policy is disabled")
+	err = localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): can't disable local policy %s", err.Error())
+	}
+
+	// Edit the source policy to manual.
+	log.Info("Setting SRC policy to manual")
+	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, "", "", 0)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): can't set local policy to manual %s", err.Error())
+	}
+
+	// Delete the policy on the target
+	log.Info("Deleting TGT policy")
+	err = remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): delete policy on target site failed %s", err.Error())
+	}
+
+	// Enable the source policy
+	log.Info("Enabling SRC policy")
+	err = localIsiConfig.isiSvc.client.EnablePolicy(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): can't enable local policy %s", err.Error())
+	}
+
+	// Run Resync-prep on source (also disables source policy)
+	log.Info("Running resync-prep on SRC policy")
+	err = localIsiConfig.isiSvc.client.ResyncPrep(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): can't run resync-prep on local policy %s", err.Error())
+	}
+
+	// Run Sync-Job on target policy (_mirror)
+	log.Info("Running sync job on TGT mirror policy")
+	err = remoteIsiConfig.isiSvc.client.SyncPolicy(ctx, ppNameMirror)
+	if err != nil {
+		return status.Errorf(codes.Internal, "policy sync failed %s", err.Error())
+	}
+
+	// Allow write on source
+	log.Info("Allowing write on SRC")
+	err = localIsiConfig.isiSvc.client.AllowWrites(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): allow writes on source site failed %s", err.Error())
+	}
+
+	// Run resync-prep on target (also disables target policy)
+	log.Info("Running resync-prep on TGT mirror policy")
+	err = remoteIsiConfig.isiSvc.client.ResyncPrep(ctx, ppNameMirror)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): can't run resync-prep on remote mirror policy %s", err.Error())
+	}
+
+	// Edit target policy name (remove _mirror). Make target policy automatic. Get RPO from policy name.
+	log.Info("Renaming TGT mirror policy and setting it to automatic")
+	err = remoteIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppNameMirror, ppName, "when-source-modified", rpoInt)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): can't set remote policy to automatic %s", err.Error())
+	}
+
+	// Edit source policy to automatic
+	log.Info("Setting SRC policy to automatic")
+	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, "", "when-source-modified", rpoInt)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): can't set local policy to automatic %s", err.Error())
+	}
 
 	return nil
 }
 
 func failbackDiscardRemote(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
 	log.Info("Running failback action - discard remote")
+	ppName := strings.ReplaceAll(vgName, ".", "-")
+
+	var rpoInt int
+	log.Info("Obtaining RPO value from policy name")
+	s := strings.Split(vgName, "-") // split by "_" and get last part -- it would be RPO
+	rpo := s[len(s)-1]
+
+	rpoEnum := RPOEnum(rpo)
+	if err := rpoEnum.IsValid(); err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid rpo value")
+	}
+
+	rpoInt, err := rpoEnum.ToInt()
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "unable to parse rpo seconds")
+	}
+
+	// If source policy is not disabled (unplanned failover), disable it
+	// TODO: Verify that this does not cause error when src policy is already disabled (planned FO)
+	log.Info("Ensuring source policy is disabled")
+	err = localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard remote): can't disable local policy %s", err.Error())
+	}
+
+	// Edit the source policy to manual.
+	log.Info("Setting SRC policy to manual")
+	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, "", "", 0)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard remote): can't set local policy to manual %s", err.Error())
+	}
+
+	// disallow writes on target
+	log.Info("Disabling writes on TGT site")
+	err = remoteIsiConfig.isiSvc.client.DisallowWrites(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard remote): disallow writes on target site failed %s", err.Error())
+	}
+
+	// set source policy to automatic
+	log.Info("Setting SRC policy to automatic")
+	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, "", "when-source-modified", rpoInt)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard remote): can't set local policy to automatic %s", err.Error())
+	}
+
+	// enable source policy
+	log.Info("Enabling SRC policy")
+	err = localIsiConfig.isiSvc.client.EnablePolicy(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard remote): can't enable local policy %s", err.Error())
+	}
 
 	return nil
 }
