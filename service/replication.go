@@ -649,12 +649,11 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 	log.Info("Obtaining RPO value from policy name")
 	rpoInt := getRpoInt(vgName)
 	if rpoInt == -1 {
-		return status.Errorf(codes.InvalidArgument, "unable to parse rpo seconds")
+		return status.Errorf(codes.InvalidArgument, "unable to parse RPO seconds")
 	}
 
 	// If source policy is not disabled (unplanned failover), disable it
-	// TODO: Verify that this does not cause error when src policy is already disabled (planned FO)
-	log.Info("Ensuring source policy is disabled")
+	log.Info("Ensuring SRC policy is disabled")
 	err := localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): can't disable local policy %s", err.Error())
@@ -733,12 +732,11 @@ func failbackDiscardRemote(ctx context.Context, localIsiConfig *IsilonClusterCon
 	log.Info("Obtaining RPO value from policy name")
 	rpoInt := getRpoInt(vgName)
 	if rpoInt == -1 {
-		return status.Errorf(codes.InvalidArgument, "unable to parse rpo seconds")
+		return status.Errorf(codes.InvalidArgument, "unable to parse RPO seconds")
 	}
 
 	// If source policy is not disabled (unplanned failover), disable it
-	// TODO: Verify that this does not cause error when src policy is already disabled (planned FO)
-	log.Info("Ensuring source policy is disabled")
+	log.Info("Ensuring SRC policy is disabled")
 	err := localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard remote): can't disable local policy %s", err.Error())

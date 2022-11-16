@@ -154,7 +154,12 @@ func (s *service) GetReplicationCapabilities(ctx context.Context, req *csiext.Ge
 			},
 			{
 				Actions: &csiext.SupportedActions_Type{
-					Type: csiext.ActionTypes_REPROTECT_LOCAL,
+					Type: csiext.ActionTypes_FAILBACK_LOCAL,
+				},
+			},
+			{
+				Actions: &csiext.SupportedActions_Type{
+					Type: csiext.ActionTypes_ACTION_FAILBACK_DISCARD_CHANGES_LOCAL,
 				},
 			},
 			{
