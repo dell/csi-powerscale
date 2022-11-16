@@ -402,6 +402,10 @@ func (s *service) ExecuteAction(ctx context.Context, req *csiext.ExecuteActionRe
 		actionFunc = failover
 	case csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL.String():
 		actionFunc = failoverUnplanned
+	case csiext.ActionTypes_FAILBACK_LOCAL.String(): // FAILBACK_REMOTE is not supported as of now.
+		actionFunc = failbackDiscardLocal
+	case csiext.ActionTypes_ACTION_FAILBACK_DISCARD_CHANGES_LOCAL.String(): // FAILBACK_REMOTE is not supported as of now.
+		actionFunc = failbackDiscardRemote
 	case csiext.ActionTypes_SYNC.String():
 		actionFunc = syncAction
 	case csiext.ActionTypes_SUSPEND.String():
@@ -625,6 +629,18 @@ func failoverUnplanned(ctx context.Context, localIsiConfig *IsilonClusterConfig,
 	if err != nil {
 		return status.Errorf(codes.Internal, "unplanned failover: allow writes on target site failed %s", err.Error())
 	}
+
+	return nil
+}
+
+func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
+	log.Info("Running failback action - discard local")
+
+	return nil
+}
+
+func failbackDiscardRemote(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
+	log.Info("Running failback action - discard remote")
 
 	return nil
 }
