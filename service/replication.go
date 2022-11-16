@@ -17,6 +17,11 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const POLICY_SCHEDULING_MANUAL = ""
+const POLICY_SCHEDULING_AUTOMATIC = "when-source-modified"
+const WRITES_ENABLED = "writes_enabled"
+const WRITES_DISABLED = "writes_disabled"
+
 func (s *service) CreateRemoteVolume(ctx context.Context,
 	req *csiext.CreateRemoteVolumeRequest) (*csiext.CreateRemoteVolumeResponse, error) {
 	ctx, log, _ := GetRunIDLog(ctx)
@@ -546,7 +551,7 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	source := false
 	if linkState != csiext.StorageProtectionGroupStatus_FAILEDOVER && // no side can be source when in failed over state
 		(localP.Enabled || // when synchronized
-			(!remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_disabled")) { // when suspended (source side)
+			(!remoteP.Enabled && localTP.FailoverFailbackState == WRITES_ENABLED && remoteTP.FailoverFailbackState == WRITES_DISABLED)) { // when suspended (source side)
 		source = true
 		log.Info("Current side is source")
 	}
@@ -639,24 +644,15 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 	ppNameMirror := ppName + "_mirror"
 
 	log.Info("Obtaining RPO value from policy name")
-	var rpoInt int
-	s := strings.Split(vgName, "-") // split by "_" and get last part -- it would be RPO
-	rpo := s[len(s)-1]
-
-	rpoEnum := RPOEnum(rpo)
-	if err := rpoEnum.IsValid(); err != nil {
-		return status.Errorf(codes.InvalidArgument, "invalid rpo value")
-	}
-
-	rpoInt, err := rpoEnum.ToInt()
-	if err != nil {
+	rpoInt := getRpoInt(vgName)
+	if rpoInt == -1 {
 		return status.Errorf(codes.InvalidArgument, "unable to parse rpo seconds")
 	}
 
 	// If source policy is not disabled (unplanned failover), disable it
 	// TODO: Verify that this does not cause error when src policy is already disabled (planned FO)
 	log.Info("Ensuring source policy is disabled")
-	err = localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
+	err := localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): can't disable local policy %s", err.Error())
 	}
@@ -731,25 +727,16 @@ func failbackDiscardRemote(ctx context.Context, localIsiConfig *IsilonClusterCon
 	log.Info("Running failback action - discard remote")
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 
-	var rpoInt int
 	log.Info("Obtaining RPO value from policy name")
-	s := strings.Split(vgName, "-") // split by "_" and get last part -- it would be RPO
-	rpo := s[len(s)-1]
-
-	rpoEnum := RPOEnum(rpo)
-	if err := rpoEnum.IsValid(); err != nil {
-		return status.Errorf(codes.InvalidArgument, "invalid rpo value")
-	}
-
-	rpoInt, err := rpoEnum.ToInt()
-	if err != nil {
+	rpoInt := getRpoInt(vgName)
+	if rpoInt == -1 {
 		return status.Errorf(codes.InvalidArgument, "unable to parse rpo seconds")
 	}
 
 	// If source policy is not disabled (unplanned failover), disable it
 	// TODO: Verify that this does not cause error when src policy is already disabled (planned FO)
 	log.Info("Ensuring source policy is disabled")
-	err = localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
+	err := localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard remote): can't disable local policy %s", err.Error())
 	}
@@ -870,21 +857,21 @@ func getGroupLinkState(localP isi.Policy, localTP isi.TargetPolicy, remoteP isi.
 	var state csiext.StorageProtectionGroupStatus_State
 	if isSyncInProgress { // sync-in-progress state
 		state = csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS
-	} else if (localP == nil && remoteP != nil && !remoteP.Enabled && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == "writes_enabled") || // unplanned failover & source down - source side
-		(localP != nil && !localP.Enabled && remoteP == nil && localTP != nil && localTP.FailoverFailbackState == "writes_enabled" && remoteTP == nil) { // target side
+	} else if (localP == nil && remoteP != nil && !remoteP.Enabled && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WRITES_ENABLED) || // unplanned failover & source down - source side
+		(localP != nil && !localP.Enabled && remoteP == nil && localTP != nil && localTP.FailoverFailbackState == WRITES_ENABLED && remoteTP == nil) { // target side
 		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
 	} else if localP == nil || remoteP == nil || localTP == nil || remoteTP == nil { // both arrays should be up - unexpected case
 		state = csiext.StorageProtectionGroupStatus_UNKNOWN
-	} else if (localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_enabled") || // unplanned failover & source up now - source side
-		(!localP.Enabled && remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_enabled") { // target side
+	} else if (localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == WRITES_ENABLED && remoteTP.FailoverFailbackState == WRITES_ENABLED) || // unplanned failover & source up now - source side
+		(!localP.Enabled && remoteP.Enabled && localTP.FailoverFailbackState == WRITES_ENABLED && remoteTP.FailoverFailbackState == WRITES_ENABLED) { // target side
 		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
-	} else if !localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_enabled" { // planned failover - source OR target side
+	} else if !localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == WRITES_ENABLED && remoteTP.FailoverFailbackState == WRITES_ENABLED { // planned failover - source OR target side
 		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
-	} else if (localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_disabled") || // Synchronized state - source side
-		(!localP.Enabled && remoteP.Enabled && localTP.FailoverFailbackState == "writes_disabled" && remoteTP.FailoverFailbackState == "writes_enabled") { // target side
+	} else if (localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == WRITES_ENABLED && remoteTP.FailoverFailbackState == WRITES_DISABLED) || // Synchronized state - source side
+		(!localP.Enabled && remoteP.Enabled && localTP.FailoverFailbackState == WRITES_DISABLED && remoteTP.FailoverFailbackState == WRITES_ENABLED) { // target side
 		state = csiext.StorageProtectionGroupStatus_SYNCHRONIZED
-	} else if (!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_disabled") || // Suspended state - source side
-		(!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_disabled" && remoteTP.FailoverFailbackState == "writes_enabled") { // target side
+	} else if (!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == WRITES_ENABLED && remoteTP.FailoverFailbackState == WRITES_DISABLED) || // Suspended state - source side
+		(!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == WRITES_DISABLED && remoteTP.FailoverFailbackState == WRITES_ENABLED) { // target side
 		state = csiext.StorageProtectionGroupStatus_SUSPENDED
 	} else if localTP.LastJobState == "failed" || remoteTP.LastJobState == "failed" { // invalid state, sync job failed
 		state = csiext.StorageProtectionGroupStatus_INVALID
@@ -893,4 +880,21 @@ func getGroupLinkState(localP isi.Policy, localTP isi.TargetPolicy, remoteP isi.
 	}
 
 	return state
+}
+
+func getRpoInt(vgName string) int {
+	s := strings.Split(vgName, "-") // split by "_" and get last part -- it would be RPO
+	rpo := s[len(s)-1]
+
+	rpoEnum := RPOEnum(rpo)
+	if err := rpoEnum.IsValid(); err != nil {
+		return -1
+	}
+
+	rpoInt, err := rpoEnum.ToInt()
+	if err != nil {
+		return -1
+	}
+
+	return rpoInt
 }
