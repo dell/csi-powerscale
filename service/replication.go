@@ -534,6 +534,7 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	}
 
 	linkState := getGroupLinkState(localP, localTP, remoteP, remoteTP, isSyncInProgress)
+	log.Infof("The current state for group (%s) is (%s).", groupID, linkState.String())
 
 	if linkState == csiext.StorageProtectionGroupStatus_UNKNOWN || isSyncCheckFailed {
 		errMsg := "unexpected error while getting link state"
@@ -550,16 +551,24 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 		return resp, status.Errorf(codes.Internal, errMsg)
 	}
 
+	if linkState == csiext.StorageProtectionGroupStatus_FAILEDOVER {
+		resp := &csiext.GetStorageProtectionGroupStatusResponse{
+			Status: &csiext.StorageProtectionGroupStatus{
+				State: linkState,
+				// do not update the isSource in failed over state so that failback can be executed on source side
+			},
+		}
+		return resp, nil
+	}
+
 	log.Info("Trying to get replication direction")
 	source := false
-	if linkState != csiext.StorageProtectionGroupStatus_FAILEDOVER && // no side can be source when in failed over state
-		(localP.Enabled || // when synchronized
-			(!remoteP.Enabled && localTP.FailoverFailbackState == WritesEnabled && remoteTP.FailoverFailbackState == WritesDisabled)) { // when suspended (source side)
+	if localP.Enabled || // when synchronized
+		(!remoteP.Enabled && localTP.FailoverFailbackState == WritesEnabled && remoteTP.FailoverFailbackState == WritesDisabled) { // when suspended (source side)
 		source = true
 		log.Info("Current side is source")
 	}
 
-	log.Infof("The current state for group (%s) is (%s).", groupID, linkState.String())
 	resp := &csiext.GetStorageProtectionGroupStatusResponse{
 		Status: &csiext.StorageProtectionGroupStatus{
 			State:    linkState,
@@ -668,7 +677,10 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 
 	// Delete the policy on the target
 	log.Info("Deleting TGT policy")
-	err = remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+	remoteP, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+	if remoteP != nil {
+		err = remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+	}
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): delete policy on target site failed %s", err.Error())
 	}
