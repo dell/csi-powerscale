@@ -678,11 +678,11 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 	// Delete the policy on the target
 	log.Info("Deleting TGT policy")
 	remoteP, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
-	if remoteP != nil {
+	if remoteP != nil && err == nil {
 		err = remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
-	}
-	if err != nil {
-		return status.Errorf(codes.Internal, "failback (discard local): delete policy on target site failed %s", err.Error())
+		if err != nil {
+			return status.Errorf(codes.Internal, "failback (discard local): delete policy on target site failed %s", err.Error())
+		}
 	}
 
 	// Enable the source policy
@@ -694,7 +694,7 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 
 	// Run Resync-prep on source (also disables source policy)
 	log.Info("Running resync-prep on SRC policy")
-	err = localIsiConfig.isiSvc.client.ResyncPrep(ctx, ppName)
+	err = localIsiConfig.isiSvc.client.ResyncPrep(ctx, ppName, ppNameMirror)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): can't run resync-prep on local policy %s", err.Error())
 	}
@@ -715,7 +715,7 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 
 	// Run resync-prep on target (also disables target policy)
 	log.Info("Running resync-prep on TGT mirror policy")
-	err = remoteIsiConfig.isiSvc.client.ResyncPrep(ctx, ppNameMirror)
+	err = remoteIsiConfig.isiSvc.client.ResyncPrep(ctx, ppNameMirror, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): can't run resync-prep on remote mirror policy %s", err.Error())
 	}
