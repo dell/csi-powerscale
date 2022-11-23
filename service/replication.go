@@ -449,6 +449,8 @@ func (s *service) ExecuteAction(ctx context.Context, req *csiext.ExecuteActionRe
 
 func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csiext.GetStorageProtectionGroupStatusRequest) (*csiext.GetStorageProtectionGroupStatusResponse, error) {
 	ctx, log, _ := GetRunIDLog(ctx)
+
+	log.Info("Getting storage protection group status")
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
 	isiPath := utils.GetIsiPathFromPgID(groupID)
@@ -576,6 +578,7 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 			IsSource: source,
 		},
 	}
+	log.Info("Get storage protection group status completed")
 	return resp, nil
 }
 
@@ -615,7 +618,6 @@ func failover(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIs
 	}
 
 	log.Info("Disabling policy on SRC site")
-
 	err = localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failover: can't disable local policy %s", err.Error())
@@ -627,12 +629,12 @@ func failover(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIs
 	}
 
 	log.Info("Enabling writes on TGT site")
-
 	err = remoteIsiConfig.isiSvc.client.AllowWrites(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failover: can't allow writes on target site %s", err.Error())
 	}
 
+	log.Info("Failover action completed")
 	return nil
 }
 
@@ -648,6 +650,7 @@ func failoverUnplanned(ctx context.Context, localIsiConfig *IsilonClusterConfig,
 		return status.Errorf(codes.Internal, "unplanned failover: allow writes on target site failed %s", err.Error())
 	}
 
+	log.Info("Unplanned failover action completed")
 	return nil
 }
 
@@ -751,15 +754,25 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 		return status.Errorf(codes.Internal, "failback (discard local): unexpected error while querying local policy %s", err.Error())
 	}
 	err = remoteIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, rpoInt,
-		localP.TargetPath, localP.SourcePath, localIsiConfig.Endpoint, localIsiConfig.ReplicationCertificateID, false)
+		localP.TargetPath, localP.SourcePath, localIsiConfig.Endpoint, localIsiConfig.ReplicationCertificateID, true) // disable later, otherwise target policy on local never gets created
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): create policy on target site failed %s", err.Error())
 	}
-	// Wait for target policy to be recreated on the local site so that GetStatus() after executeAction() would succeed
-	log.Info("Ensuring target policy is recreated on the local site")
-	err = localIsiConfig.isiSvc.client.WaitForTargetPolicyCreation(ctx, ppName)
+	err = remoteIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.FINISHED)
 	if err != nil {
-		return status.Errorf(codes.Internal, "failback (discard local): error waiting for local target policy creation %s", err.Error())
+		return status.Errorf(codes.Internal, "failback (discard local): remote policy job couldn't reach FINISHED state %s", err.Error())
+	}
+	err = localIsiConfig.isiSvc.client.AllowWrites(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): allow writes on local site failed %s", err.Error())
+	}
+	err = remoteIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): disabling the remote policy failed %s", err.Error())
+	}
+	err = remoteIsiConfig.isiSvc.client.WaitForPolicyEnabledFieldCondition(ctx, ppName, false)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): remote policy couldn't reach disabled condition %s", err.Error())
 	}
 
 	// Edit source policy to automatic
@@ -769,6 +782,7 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 		return status.Errorf(codes.Internal, "failback (discard local): can't set local policy to automatic %s", err.Error())
 	}
 
+	log.Info("Failback action - discard local completed")
 	return nil
 }
 
@@ -817,6 +831,7 @@ func failbackDiscardRemote(ctx context.Context, localIsiConfig *IsilonClusterCon
 		return status.Errorf(codes.Internal, "failback (discard remote): can't enable local policy %s", err.Error())
 	}
 
+	log.Info("Failback action - discard remote completed")
 	return nil
 }
 
@@ -831,6 +846,7 @@ func syncAction(ctx context.Context, localIsiConfig *IsilonClusterConfig, remote
 		return status.Errorf(codes.Internal, "policy sync failed %s", err.Error())
 	}
 
+	log.Info("Sync action completed")
 	return nil
 }
 
@@ -840,7 +856,6 @@ func suspend(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsi
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 
 	log.Info("Disabling policy on SRC site")
-
 	err := localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "suspend: can't disable local policy %s", err.Error())
@@ -851,6 +866,7 @@ func suspend(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsi
 		return status.Errorf(codes.Internal, "suspend: policy couldn't reach disabled condition %s", err.Error())
 	}
 
+	log.Info("Suspend action completed")
 	return nil
 }
 
@@ -860,7 +876,6 @@ func resume(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiC
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 
 	log.Info("Enabling policy on SRC site")
-
 	err := localIsiConfig.isiSvc.client.EnablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "resume: can't enable local policy %s", err.Error())
@@ -871,6 +886,7 @@ func resume(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiC
 		return status.Errorf(codes.Internal, "resume: policy couldn't reach enabled condition %s", err.Error())
 	}
 
+	log.Info("Resume action completed")
 	return nil
 }
 
