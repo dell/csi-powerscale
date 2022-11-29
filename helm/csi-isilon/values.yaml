@@ -332,8 +332,6 @@ isiVolumePathPermissions: "0777"
 # ignoreUnresolvableHosts: Ignore unresolvable hosts on the OneFS
 # When set to true, OneFS allows new host to add to existing export list though any of the existing hosts from the
 # same exports are unresolvable/doesn't exist anymore.
-# Note: Enabling this param will attract performance issues(fully relied on OneFS response), also if OneFS has unresolvable hosts to its
-# export, it might impact OneFS services startup time if OneFS services goes down.
 # Allowed values:
 #   true: ignore existing unresolvable hosts and append new host to the existing export
 #   false: exhibits OneFS default behavior i.e. if any of existing hosts are unresolvable while adding new one it fails
@@ -359,8 +357,8 @@ autoProbe: true
 authorization:
   enabled: false
   # sidecarProxyImage: the container image used for the csm-authorization-sidecar.
-  # Default value: dellemc/csm-authorization-sidecar:v1.4.0
-  sidecarProxyImage: dellemc/csm-authorization-sidecar:v1.4.0
+  # Default value: dellemc/csm-authorization-sidecar:v1.5.0
+  sidecarProxyImage: dellemc/csm-authorization-sidecar:v1.5.0
   # proxyHost: hostname of the csm-authorization server
   # Default value: None
   proxyHost:
@@ -374,7 +372,7 @@ authorization:
 # Enable this feature only after contact support for additional information
 podmon:
   enabled: false
-  image: dellemc/podmon:v1.3.0
+  image: dellemc/podmon:v1.4.0
   #controller:
   #  args:
   #    - "--csisock=unix:/var/run/csi/csi.sock"
