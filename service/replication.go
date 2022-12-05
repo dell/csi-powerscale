@@ -868,8 +868,9 @@ func getGroupLinkState(localP isi.Policy, localTP isi.TargetPolicy, remoteP isi.
 	} else if (localP != nil && !localP.Enabled && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesEnabled) || // planned failover - source side
 		(localP == nil && remoteP != nil && !remoteP.Enabled && localTP != nil && localTP.FailoverFailbackState == WritesEnabled && remoteTP == nil) { // target side
 		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
-	} else if (localP == nil && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesEnabled) || // unplanned failover & source down - source side
-		(localP == nil && remoteP == nil && localTP != nil && localTP.FailoverFailbackState == WritesEnabled && remoteTP == nil) { // target side
+	} else if localP == nil && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesEnabled { // unplanned failover & source down - source side
+		state = csiext.StorageProtectionGroupStatus_UNKNOWN // report UNKNOWN and maintain isSource when source is down on failedover
+	} else if localP == nil && remoteP == nil && localTP != nil && localTP.FailoverFailbackState == WritesEnabled && remoteTP == nil { // unplanned failover & source down - target side
 		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
 	} else if (localP != nil && localP.Enabled && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesEnabled) || // unplanned failover & source up now - source side
 		(localP == nil && remoteP != nil && remoteP.Enabled && localTP != nil && localTP.FailoverFailbackState == WritesEnabled && remoteTP == nil) { // target side
