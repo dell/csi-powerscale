@@ -119,10 +119,10 @@ github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.1 h1:EQAa1da2njL31e
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.1/go.mod h1:etLWwS1G2IqHDuArHqB0OWQvpdcztuBxopWrRE+mpk0=
 github.com/dell/gocsi v1.6.0 h1:ZmoMi17v1jK0RE0OGEivu52/RqHbOhP5cqs9SHExqa0=
 github.com/dell/gocsi v1.6.0/go.mod h1:+ihwgNYeFTv69Ym2X2Ij1idK72JYoNR8CeiWYJrrbho=
-github.com/dell/gofsutil v1.10.0 h1:BDEZj5/xeUugwyXftYTH8Xjc0kT5dvIXofQr7CGWMho=
-github.com/dell/gofsutil v1.10.0/go.mod h1:oebB2eaWWF1jniBQpsMGP6qeZcOPjgeWS0WwShS2KWY=
-github.com/dell/goisilon v1.9.1-0.20221115083817-4d2ff15057f3 h1:RvIqwR27qH4sbLCM17erfw47I98RiVNovVwiQQYGIo8=
-github.com/dell/goisilon v1.9.1-0.20221115083817-4d2ff15057f3/go.mod h1:fJXHyh1JBcbsmPBquEulaNOFTpj1eEN5vISDf/UY1RQ=
+github.com/dell/gofsutil v1.11.0 h1:HHLQVdoWF9xjI0/sLGTzX7i8aAGdZwJG/s7nzKwHLbw=
+github.com/dell/gofsutil v1.11.0/go.mod h1:j639KWtc61yK9oPBZSZrSEDqhFKe446XK9etJpk/KtI=
+github.com/dell/goisilon v1.10.0 h1:3TgECPV/6RzTQsDfhc1rR5rFyKJMNLYopbUJtHpYfyc=
+github.com/dell/goisilon v1.10.0/go.mod h1:fJXHyh1JBcbsmPBquEulaNOFTpj1eEN5vISDf/UY1RQ=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96/go.mod h1:Qh8CwZgvJUkLughtfhJv5dyTYa91l1fOUCrgjqmcifM=
