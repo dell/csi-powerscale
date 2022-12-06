@@ -635,6 +635,45 @@ func failoverUnplanned(ctx context.Context, localIsiConfig *IsilonClusterConfig,
 	return nil
 }
 
+func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
+	log.Info("Running reprotect action")
+	ppName := strings.ReplaceAll(vgName, ".", "-")
+
+	// If remote policy does not exist, remote Isilon is not the source
+	remotePolicy, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "reprotect: can't find remote replication policy, unexpected error %s", err.Error())
+	}
+
+	// ensure current local array's local target is write enabled
+	err = remoteIsiConfig.isiSvc.client.WaitForTargetPolicyCondition(ctx, ppName, WritesEnabled)
+	if err != nil {
+		return status.Errorf(codes.Internal, "reprotect: error waiting for condition on the LOCAL local target policy. %s", err.Error())
+	}
+
+	// Delete the remote policy
+	log.Info("Deleting original source SyncIQ policy")
+	err = remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "reprotect: delete policy on original source site failed %s", err.Error())
+	}
+
+	// Create a new local policy based on previous remote policy's parameters
+	log.Info("Creating new local SyncIQ policy")
+	err = localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
+		remotePolicy.TargetPath, remotePolicy.SourcePath, remoteIsiConfig.Endpoint, localIsiConfig.ReplicationCertificateID, true)
+	if err != nil {
+		return status.Errorf(codes.Internal, "reprotect: can't create protection policy %s", err.Error())
+	}
+	err = localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.FINISHED)
+	if err != nil {
+		return status.Errorf(codes.Internal, "reprotect: remote policy job couldn't reach FINISHED state %s", err.Error())
+	}
+
+	log.Info("Reprotect action completed")
+	return nil
+}
+
 func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
 	log.Info("Running failback action - discard local")
 	ppName := strings.ReplaceAll(vgName, ".", "-")
