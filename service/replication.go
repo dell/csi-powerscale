@@ -423,14 +423,16 @@ func (s *service) ExecuteAction(ctx context.Context, req *csiext.ExecuteActionRe
 	var actionFunc func(context.Context, *IsilonClusterConfig, *IsilonClusterConfig, string, *logrus.Entry) error
 
 	switch action {
-	case csiext.ActionTypes_FAILOVER_REMOTE.String(): // FAILOVER_LOCAL is not supported as of now. Need to handle failover steps in the mirrored perspective.
+	case csiext.ActionTypes_FAILOVER_REMOTE.String(): // FAILOVER_LOCAL is not supported. Need to handle failover steps in the mirrored perspective.
 		actionFunc = failover
-	case csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL.String():
+	case csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL.String(): // UNPLANNED_FAILOVER_REMOTE is not supported.
 		actionFunc = failoverUnplanned
-	case csiext.ActionTypes_FAILBACK_LOCAL.String(): // FAILBACK_REMOTE is not supported as of now.
+	case csiext.ActionTypes_FAILBACK_LOCAL.String(): // FAILBACK_REMOTE is not supported.
 		actionFunc = failbackDiscardLocal
-	case csiext.ActionTypes_ACTION_FAILBACK_DISCARD_CHANGES_LOCAL.String(): // FAILBACK_REMOTE is not supported as of now.
+	case csiext.ActionTypes_ACTION_FAILBACK_DISCARD_CHANGES_LOCAL.String(): // ACTION_FAILBACK_DISCARD_CHANGES_REMOTE is not supported.
 		actionFunc = failbackDiscardRemote
+	case csiext.ActionTypes_REPROTECT_LOCAL.String(): // REPROTECT_REMOTE is not supported.
+		actionFunc = reprotect
 	case csiext.ActionTypes_SYNC.String():
 		actionFunc = synchronize
 	case csiext.ActionTypes_SUSPEND.String():
@@ -639,23 +641,26 @@ func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteI
 	log.Info("Running reprotect action")
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 
-	// If remote policy does not exist, remote Isilon is not the source
+	// Ensure local array's target policy exists and is write enabled (original target)
+	localTP, err := localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "reprotect: can't find target policy on the local site, perform reprotect on another side. %s", err.Error())
+	}
+	if localTP.FailoverFailbackState != WritesEnabled {
+		return status.Errorf(codes.InvalidArgument, "reprotect: unable to perform reprotect with writes disabled, should perform failover first.")
+	}
+
+	// Get remote policy
 	remotePolicy, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "reprotect: can't find remote replication policy, unexpected error %s", err.Error())
 	}
 
-	// ensure current local array's local target is write enabled
-	err = remoteIsiConfig.isiSvc.client.WaitForTargetPolicyCondition(ctx, ppName, WritesEnabled)
-	if err != nil {
-		return status.Errorf(codes.Internal, "reprotect: error waiting for condition on the LOCAL local target policy. %s", err.Error())
-	}
-
 	// Delete the remote policy
-	log.Info("Deleting original source SyncIQ policy")
+	log.Info("Deleting SyncIQ policy on the remote")
 	err = remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
 	if err != nil {
-		return status.Errorf(codes.Internal, "reprotect: delete policy on original source site failed %s", err.Error())
+		return status.Errorf(codes.Internal, "reprotect: delete policy on remote site failed %s", err.Error())
 	}
 
 	// Create a new local policy based on previous remote policy's parameters
@@ -663,11 +668,11 @@ func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteI
 	err = localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
 		remotePolicy.TargetPath, remotePolicy.SourcePath, remoteIsiConfig.Endpoint, localIsiConfig.ReplicationCertificateID, true)
 	if err != nil {
-		return status.Errorf(codes.Internal, "reprotect: can't create protection policy %s", err.Error())
+		return status.Errorf(codes.Internal, "reprotect: create protection policy on the local site failed %s", err.Error())
 	}
 	err = localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.FINISHED)
 	if err != nil {
-		return status.Errorf(codes.Internal, "reprotect: remote policy job couldn't reach FINISHED state %s", err.Error())
+		return status.Errorf(codes.Internal, "reprotect: policy job couldn't reach FINISHED state %s", err.Error())
 	}
 
 	log.Info("Reprotect action completed")
