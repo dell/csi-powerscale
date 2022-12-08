@@ -444,7 +444,7 @@ func (s *service) ExecuteAction(ctx context.Context, req *csiext.ExecuteActionRe
 	}
 
 	if err := actionFunc(ctx, isiConfig, remoteIsiConfig, vgName, log.WithFields(fields)); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unknown, err.Error()) // Error while executing action, shouldn't be retried.
 	}
 
 	statusResp, err := s.GetStorageProtectionGroupStatus(ctx, &csiext.GetStorageProtectionGroupStatusRequest{
