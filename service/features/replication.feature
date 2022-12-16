@@ -26,7 +26,6 @@ Feature: Isilon CSI interface
     When I call Probe
     And I call WithParamsCreateRemoteVolume <volhand> <keyreplremsys>
     Then the error contains <errormsg>
-
     Examples:
       | volhand                                  | keyreplremsys                | errormsg                                                              |
       | ""                                       | "KeyReplicationRemoteSystem" | "volume ID is required"                                               |
@@ -42,7 +41,6 @@ Feature: Isilon CSI interface
     And I induce error <induced>
     And I call CreateRemoteVolume
     Then the error contains <errormsg>
-
     Examples:
       | induced                  | errormsg                     |
       | "InstancesError"         | "none"                       |
@@ -64,7 +62,6 @@ Feature: Isilon CSI interface
     And I induce error <serverError2>
     And I call CreateRemoteVolume
     Then the error contains <errormsg>
-
     Examples:
       | getVolumeError        | getExportError        | serverError1    | serverError2 | errormsg |
       | "VolumeExists"        | "ExportExists"        | "none"          | "none"       | "none"   |
@@ -96,7 +93,6 @@ Feature: Isilon CSI interface
     And I induce error <induced>
     And I call CreateStorageProtectionGroup
     Then the error contains <errormsg>
-
     Examples:
       | induced                      | errormsg                           |
       | "GetExportByIDNotFoundError" | "Export id 9999999 does not exist" |
@@ -108,7 +104,6 @@ Feature: Isilon CSI interface
     When I call Probe
     And I call WithParamsCreateStorageProtectionGroup <volhand> <keyreplremsys>
     Then the error contains <errormsg>
-
     Examples:
       | volhand                                  | keyreplremsys  | errormsg                                                              |
       | ""                                       | "remoteSystem" | "volume ID is required"                                               |
@@ -130,20 +125,11 @@ Feature: Isilon CSI interface
       | ""                                       | "systemName"      | "cluster1"  | "Unable to get Volume Group ''"                                    |
       | ""                                       | ""                | "cluster1"  | "Can't get systemName from PG params"                              |
 
-
-  @getStorageProtectionGroupStatus
-  @v1.0.0
-  Scenario: Get storage protection group status
-    Given a Isilon service
-    When I call GetStorageProtectionGroupStatus
-    Then a valid GetStorageProtectionGroupStatusResponse is returned
-
   Scenario Outline: Get storage protection group status with parameters
     Given a Isilon service
     When I call Probe
     And I call WithParamsGetStorageProtectionGroupStatus <id> <localSystemName> <remoteSystemName> <vgname> <clustername1> <clustername2>
     Then the error contains <errormsg>
-
     Examples:
       | id         | localSystemName   | remoteSystemName   | vgname   | clustername1 | clustername2 | errormsg                                                                                                                   |
       | "cluster2" | "wrongSystemName" | "wrongSystemName"  | "vgname" | "cluster1"   | "cluster1"   | "can't find `systemName` in replication group"                                                                             |
@@ -159,7 +145,6 @@ Feature: Isilon CSI interface
     And I induce error <induced>
     And I call GetStorageProtectionGroupStatus
     Then the error contains <errormsg>
-
     Examples:
       | induced                        | errormsg                                           |
       | "GetJobsInternalError"         | "querying active jobs for local or remote policy"  |
@@ -179,7 +164,7 @@ Feature: Isilon CSI interface
     Then the error contains <errormsg>
     Examples:
       | systemName        | clusterNameOne | clusterNameTwo | remoteSystemName   | vgname            | ppname                                               | errormsg                                                                                                                   |
-      | "systemName"      | "cluster1"     | "cluster1"     | "remoteSystemName" | "VolumeGroupName" | "csi-prov-test-19743d82-192-168-111-25-Five_Minutes" | "none"                                                                                                                     |
+      | "systemName"      | "cluster1"     | "cluster1"     | "remoteSystemName" | "VolumeGroupName" | "csi-prov-test-19743d82-192-168-111-25-Five_Minutes" | "error while getting link state"                                                                                           |
       | "wrongSystemName" | "cluster1"     | "cluster1"     | "remoteSystemName" | "VolumeGroupName" | "csi-prov-test-19743d82-192-168-111-25-Five_Minutes" | "can't find `systemName` parameter in replication group"                                                                   |
       | "systemName"      | "cluster2"     | "cluster1"     | "remoteSystemName" | "VolumeGroupName" | "csi-prov-test-19743d82-192-168-111-25-Five_Minutes" | "can't find cluster with name cluster2 in driver config: failed to get cluster config details for clusterName: 'cluster2'" |
       | "systemName"      | "cluster1"     | "cluster2"     | "remoteSystemName" | "VolumeGroupName" | "csi-prov-test-19743d82-192-168-111-25-Five_Minutes" | "can't find cluster with name cluster2 in driver config: failed to get cluster config details for clusterName: 'cluster2'" |
@@ -191,7 +176,6 @@ Feature: Isilon CSI interface
     And I induce error <induced>
     When I call SuspendExecuteAction
     Then the error contains <errormsg>
-
     Examples:
       | induced                  | errormsg                              |
       | "UpdatePolicyError"      | "suspend: can't disable local policy" |
@@ -202,10 +186,9 @@ Feature: Isilon CSI interface
     And I induce error <induced>
     When I call SyncExecuteAction
     Then the error contains <errormsg>
-
     Examples:
-      | induced          | errormsg             |
-      | "GetPolicyError" | "policy sync failed" |
+      | induced          | errormsg                   |
+      | "GetPolicyError" | "sync: policy sync failed" |
 
   Scenario Outline: Execute action failover
     Given a Isilon service
@@ -215,9 +198,8 @@ Feature: Isilon CSI interface
     Examples:
       | induced                  | errormsg                                                 |
       | "GetPolicyInternalError" | "failover: encountered error when trying to sync policy" |
-      | "GetJobsInternalError"   | "failover: can't allow writes on target site EOF"        |
+      | "GetJobsInternalError"   | "failover: can't allow writes on target site"            |
       | "UpdatePolicyError"      | "failover: can't disable local policy"                   |
-      | "Failover"               | "failover: can't create protection policy"               |
       | "GetSpgTPErrors"         | "failover: can't allow writes on target site"            |
 
   Scenario Outline: Execute action unplanned failover
@@ -229,14 +211,38 @@ Feature: Isilon CSI interface
       | induced                        | errormsg                                                 |
       | "GetTargetPolicyInternalError" | "unplanned failover: allow writes on target site failed" |
 
+  Scenario Outline: Execute action failback discard local
+    Given a Isilon service
+    When I induce error <induced>
+    And I call FailbackExecuteAction
+    Then the error contains <errormsg>
+    Examples:
+      | induced                        | errormsg                                                                            |
+      | "GetPolicyInternalError"       | "failback (discard local): can't disable local policy"                              |
+      | "GetTargetPolicyInternalError" | "failback (discard local): error waiting for condition on the remote target policy" |
+      | "UpdatePolicyError"            | "failback (discard local): can't disable local policy"                              |
+      | "GetJobsInternalError"         | "failback (discard local): can't run resync-prep on local policy"                   |
+
+  Scenario Outline: Execute action failback discard remote
+    Given a Isilon service
+    When I induce error <induced>
+    And I call FailbackDiscardExecuteAction
+    Then the error contains <errormsg>
+    Examples:
+      | induced                        | errormsg                                                           |
+      | "GetPolicyInternalError"       | "failback (discard remote): can't disable local policy"            |
+      | "GetTargetPolicyInternalError" | "failback (discard remote): disallow writes on target site failed" |
+      | "UpdatePolicyError"            | "failback (discard remote): can't disable local policy"            |
+
   Scenario Outline: Execute action reprotect
     Given a Isilon service
     When I induce error <induced>
     And I call ReprotectExecuteAction
     Then the error contains <errormsg>
     Examples:
-      | induced                        | errormsg                                                 |
-      | "GetPolicyInternalError"       | "requested action does not match with supported actions" |
+      | induced                        | errormsg                                                                                   |
+      | "GetTargetPolicyInternalError" | "reprotect: can't find target policy on the local site, perform reprotect on another side" |
+      | "GetPolicyInternalError"       | "reprotect: can't find remote replication policy"                                          |
 
   Scenario Outline: Execute action
     Given a Isilon service
@@ -247,6 +253,24 @@ Feature: Isilon CSI interface
       | induced                  | systemName   | clusterNameOne | clusterNameTwo | remoteSystemName   | vgname            | ppname                                               | errormsg                            |
       | "GetPolicyInternalError" | "systemName" | "cluster1"     | "cluster1"     | "remoteSystemName" | "VolumeGroupName" | "csi-prov-test-19743d82-192-168-111-25-Five_Minutes" | "resume: can't enable local policy" |
 
+  @executeAction
+  Scenario Outline: Execute action failback with bad params
+    Given a Isilon service
+    And I call ExecuteActionFailBackWithParams to <systemName> to <clusterNameOne> to <clusterNameTwo> to <remoteSystemName> to <vgname> to <ppname>
+    Then the error contains <errormsg>
+    Examples:
+      | systemName   | clusterNameOne | clusterNameTwo | remoteSystemName   | vgname            | ppname                                            | errormsg                      |
+      | "systemName" | "cluster1"     | "cluster1"     | "remoteSystemName" | "VolumeGroupName" | "csi-prov-test-19743d82-192-168-111-25-Fifty_Min" | "unable to parse RPO seconds" |
+
+  @executeAction
+  Scenario Outline: Execute action failback discard with bad params
+    Given a Isilon service
+    And I call ExecuteActionFailBackDiscardWithParams to <systemName> to <clusterNameOne> to <clusterNameTwo> to <remoteSystemName> to <vgname> to <ppname>
+    Then the error contains <errormsg>
+    Examples:
+      | systemName   | clusterNameOne | clusterNameTwo | remoteSystemName   | vgname            | ppname                                            | errormsg                      |
+      | "systemName" | "cluster1"     | "cluster1"     | "remoteSystemName" | "VolumeGroupName" | "csi-prov-test-19743d82-192-168-111-25-Fifty_Min" | "unable to parse RPO seconds" |
+  
   Scenario Outline: Execute bad action
     Given a Isilon service
     When I call BadExecuteAction

@@ -393,10 +393,13 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a valid ExecuteActionResponse is returned$`, f.aValidExecuteActionResponseIsReturned)
 	s.Step(`I call FailoverExecuteAction`, f.iCallExecuteActionSyncFailover)
 	s.Step(`I call FailoverUnplannedExecuteAction`, f.iCallExecuteActionSyncFailoverUnplanned)
+	s.Step(`I call FailbackExecuteAction`, f.iCallExecuteActionFailback)
+	s.Step(`I call FailbackDiscardExecuteAction`, f.iCallExecuteActionFailbackDiscard)
 	s.Step(`I call BadExecuteAction`, f.iCallExecuteActionBad)
 	s.Step(`^I call BadCreateRemoteVolume`, f.iCallCreateRemoteVolumeBad)
 	s.Step(`^I call BadCreateStorageProtectionGroup`, f.iCallCreateStorageProtectionGroupBad)
-	//s.Step(`I call ExecuteActionWithParams "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)"$`, f.iCallExecuteActionWithParams)
+	s.Step(`I call ExecuteActionFailBackWithParams to "([^"]*)" to "([^"]*)" to "([^"]*)" to "([^"]*)" to "([^"]*)" to "([^"]*)"$`, f.iCallExecuteActionFailbackWithParams)
+	s.Step(`I call ExecuteActionFailBackDiscardWithParams to "([^"]*)" to "([^"]*)" to "([^"]*)" to "([^"]*)" to "([^"]*)" to "([^"]*)"$`, f.iCallExecuteActionFailbackDiscardWithParams)
 	s.Step(`^I call GetReplicationCapabilities`, f.iCallGetReplicationCapabilities)
 	s.Step(`^a valid GetReplicationCapabilitiesResponse is returned$`, f.aValidGetReplicationCapabilitiesResponseIsReturned)
 	s.Step(`^I call ValidateConnectivity$`, f.iCallValidateVolumeHostConnectivity)
@@ -2977,8 +2980,8 @@ func executeActionRequestFailoverUnplanned(s *service) *csiext.ExecuteActionRequ
 	return req
 }
 
-func (f *feature) iCallExecuteActionSyncFailover() error {
-	req := executeActionRequestFailover(f.service)
+func (f *feature) iCallExecuteActionFailback() error {
+	req := executeActionRequestFailback(f.service)
 	f.executeActionRequest = req
 	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
 	if f.err != nil {
@@ -2987,15 +2990,14 @@ func (f *feature) iCallExecuteActionSyncFailover() error {
 	return nil
 }
 
-func executeActionRequestWithParams(s *service, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname string) *csiext.ExecuteActionRequest {
+func executeActionRequestFailback(s *service) *csiext.ExecuteActionRequest {
 	action := &csiext.Action{
-		ActionTypes: csiext.ActionTypes_RESUME,
+		ActionTypes: csiext.ActionTypes_FAILBACK_LOCAL,
 	}
 	params := map[string]string{
-		//s.opts.replicationContextPrefix + systemName: clusterNameOne,
-		//s.opts.replicationContextPrefix + remoteSystemName: clusterNameTwo,
-		//s.opts.replicationContextPrefix + vgname:  ppname,
-
+		s.opts.replicationContextPrefix + "systemName":       "cluster1",
+		s.opts.replicationContextPrefix + "remoteSystemName": "cluster1",
+		s.opts.replicationContextPrefix + "VolumeGroupName":  "csi-prov-test-19743d82-192-168-111-25-Five_Minutes",
 	}
 	req := &csiext.ExecuteActionRequest{
 		ActionId:                        "",
@@ -3007,6 +3009,47 @@ func executeActionRequestWithParams(s *service, systemName, clusterNameOne, clus
 	}
 
 	return req
+}
+
+func (f *feature) iCallExecuteActionFailbackDiscard() error {
+	req := executeActionRequestFailbackDiscard(f.service)
+	f.executeActionRequest = req
+	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
+	if f.err != nil {
+		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func executeActionRequestFailbackDiscard(s *service) *csiext.ExecuteActionRequest {
+	action := &csiext.Action{
+		ActionTypes: csiext.ActionTypes_ACTION_FAILBACK_DISCARD_CHANGES_LOCAL,
+	}
+	params := map[string]string{
+		s.opts.replicationContextPrefix + "systemName":       "cluster1",
+		s.opts.replicationContextPrefix + "remoteSystemName": "cluster1",
+		s.opts.replicationContextPrefix + "VolumeGroupName":  "csi-prov-test-19743d82-192-168-111-25-Five_Minutes",
+	}
+	req := &csiext.ExecuteActionRequest{
+		ActionId:                        "",
+		ProtectionGroupId:               "",
+		ActionTypes:                     &csiext.ExecuteActionRequest_Action{Action: action},
+		ProtectionGroupAttributes:       params,
+		RemoteProtectionGroupId:         "",
+		RemoteProtectionGroupAttributes: nil,
+	}
+
+	return req
+}
+
+func (f *feature) iCallExecuteActionSyncFailover() error {
+	req := executeActionRequestFailover(f.service)
+	f.executeActionRequest = req
+	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
+	if f.err != nil {
+		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+	}
+	return nil
 }
 
 func (f *feature) iCallExecuteActionBad() error {
@@ -3040,14 +3083,48 @@ func executeActionRequestBad(s *service) *csiext.ExecuteActionRequest {
 	return req
 }
 
-func (f *feature) iCallExecuteActionWithParams(s *service, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname string) error {
-	req := executeActionRequestWithParams(f.service, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname)
+func (f *feature) iCallExecuteActionFailbackWithParams(systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname string) error {
+	action := &csiext.Action{
+		ActionTypes: csiext.ActionTypes_FAILBACK_LOCAL,
+	}
+	req := executeActionFailbackRequestWithParams(f.service, action, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname)
 	f.executeActionRequest = req
 	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
 	if f.err != nil {
-		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+		log.Printf("iCallExecuteActionFailbackWithParams call failed: %s\n", f.err.Error())
 	}
 	return nil
+}
+
+func (f *feature) iCallExecuteActionFailbackDiscardWithParams(systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname string) error {
+	action := &csiext.Action{
+		ActionTypes: csiext.ActionTypes_ACTION_FAILBACK_DISCARD_CHANGES_LOCAL,
+	}
+	req := executeActionFailbackRequestWithParams(f.service, action, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname)
+	f.executeActionRequest = req
+	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
+	if f.err != nil {
+		log.Printf("iCallExecuteActionFailbackDiscardWithParams call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func executeActionFailbackRequestWithParams(s *service, action *csiext.Action, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname string) *csiext.ExecuteActionRequest {
+	params := map[string]string{
+		s.opts.replicationContextPrefix + systemName:       clusterNameOne,
+		s.opts.replicationContextPrefix + remoteSystemName: clusterNameTwo,
+		s.opts.replicationContextPrefix + vgname:           ppname,
+	}
+	req := &csiext.ExecuteActionRequest{
+		ActionId:                        "",
+		ProtectionGroupId:               "",
+		ActionTypes:                     &csiext.ExecuteActionRequest_Action{Action: action},
+		ProtectionGroupAttributes:       params,
+		RemoteProtectionGroupId:         "",
+		RemoteProtectionGroupAttributes: nil,
+	}
+
+	return req
 }
 
 func getCreateRemoteVolumeRequestBad(s *service) *csiext.CreateRemoteVolumeRequest {
@@ -3130,6 +3207,10 @@ func (f *feature) aValidGetReplicationCapabilitiesResponseIsReturned() error {
 			case csiext.ActionTypes_FAILOVER_REMOTE:
 				count = count + 1
 			case csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL:
+				count = count + 1
+			case csiext.ActionTypes_FAILBACK_LOCAL:
+				count = count + 1
+			case csiext.ActionTypes_ACTION_FAILBACK_DISCARD_CHANGES_LOCAL:
 				count = count + 1
 			case csiext.ActionTypes_REPROTECT_LOCAL:
 				count = count + 1

@@ -730,7 +730,7 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 	log.Info("Running sync job on TGT mirror policy")
 	err = remoteIsiConfig.isiSvc.client.SyncPolicy(ctx, ppNameMirror)
 	if err != nil {
-		return status.Errorf(codes.Internal, "policy sync failed %s", err.Error())
+		return status.Errorf(codes.Internal, "failback (discard local): policy sync failed %s", err.Error())
 	}
 
 	// Allow write on source
@@ -826,7 +826,7 @@ func synchronize(ctx context.Context, localIsiConfig *IsilonClusterConfig, remot
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 	err := localIsiConfig.isiSvc.client.SyncPolicy(ctx, ppName)
 	if err != nil {
-		return status.Errorf(codes.Internal, "policy sync failed %s", err.Error())
+		return status.Errorf(codes.Internal, "sync: policy sync failed %s", err.Error())
 	}
 
 	log.Info("Sync action completed")
