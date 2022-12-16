@@ -222,6 +222,7 @@ func (f *feature) getService() *service {
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
 	opts.SkipCertificateValidation = true
+	opts.IgnoreUnresolvableHosts = false
 	opts.isiAuthType = 0
 	opts.Verbose = 1
 	opts.KubeConfigPath = "mock/k8s/admin.conf"
@@ -234,6 +235,7 @@ func (f *feature) getService() *service {
 	newConfig.User = "blah"
 	newConfig.Password = "blah"
 	newConfig.SkipCertificateValidation = &opts.SkipCertificateValidation
+	newConfig.IgnoreUnresolvableHosts = &opts.IgnoreUnresolvableHosts
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
 	boolTrue := true
 	newConfig.IsDefault = &boolTrue
@@ -2383,6 +2385,7 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
 	opts.SkipCertificateValidation = true
+	opts.IgnoreUnresolvableHosts = false
 	opts.isiAuthType = 0
 	opts.Verbose = 1
 	opts.CustomTopologyEnabled = true
@@ -2397,6 +2400,7 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	newConfig.User = user
 	newConfig.Password = "blah"
 	newConfig.SkipCertificateValidation = &opts.SkipCertificateValidation
+	newConfig.IgnoreUnresolvableHosts = &opts.IgnoreUnresolvableHosts
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
 	boolTrue := true
 	newConfig.IsDefault = &boolTrue
@@ -2439,6 +2443,7 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
 	opts.SkipCertificateValidation = true
+	opts.IgnoreUnresolvableHosts = false
 	opts.isiAuthType = 0
 	opts.Verbose = 1
 
@@ -2450,6 +2455,7 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	newConfig.User = user
 	newConfig.Password = "blah"
 	newConfig.SkipCertificateValidation = &opts.SkipCertificateValidation
+	newConfig.IgnoreUnresolvableHosts = &opts.IgnoreUnresolvableHosts
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
 	boolTrue := true
 	newConfig.IsDefault = &boolTrue
@@ -2478,6 +2484,7 @@ func (f *feature) getServiceWithsessionauth() *service {
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
 	opts.SkipCertificateValidation = true
+	opts.IgnoreUnresolvableHosts = false
 	opts.isiAuthType = 1
 	opts.Verbose = 1
 
@@ -2489,6 +2496,7 @@ func (f *feature) getServiceWithsessionauth() *service {
 	newConfig.User = "blah"
 	newConfig.Password = "blah"
 	newConfig.SkipCertificateValidation = &opts.SkipCertificateValidation
+	newConfig.IgnoreUnresolvableHosts = &opts.IgnoreUnresolvableHosts
 	newConfig.IsiPath = "/ifs/data/csi-isilon"
 	boolTrue := false
 	newConfig.IsDefault = &boolTrue
