@@ -18,7 +18,7 @@ PROG="${0}"
 NODE_VERIFY=1
 VERIFY=1
 MODE="install"
-DEFAULT_DRIVER_VERSION="nightly"
+DEFAULT_DRIVER_VERSION="v2.6.0"
 WATCHLIST=""
 
 # export the name of the debug log, so child processes will see it
