@@ -151,8 +151,9 @@ Feature: Isilon CSI interface
       | "GetPolicyInternalError"       | "error while getting link state"                   |
       | "GetTargetPolicyInternalError" | "error while getting link state"                   |
       | "FailedStatus"                 | "none"                                             |
-      | "UnknownStatus"                | "error while getting link state"                                             |
+      | "UnknownStatus"                | "error while getting link state"                   |
       | "Jobs"                         | "querying active jobs for local or remote policy"  |
+      | "RunningJob"                   | "none"                                             |
       | "GetSpgErrors"                 | "error while getting link state"                   |
       | "GetSpgTPErrors"               | "error while getting link state"                   |
 
@@ -177,9 +178,10 @@ Feature: Isilon CSI interface
     When I call SuspendExecuteAction
     Then the error contains <errormsg>
     Examples:
-      | induced                  | errormsg                              |
-      | "UpdatePolicyError"      | "suspend: can't disable local policy" |
-      | "autoProbeFailed"        | "auto probe is not enabled" |
+      | induced                  | errormsg                                            |
+      | "UpdatePolicyError"      | "suspend: can't disable local policy"               |
+      | "autoProbeFailed"        | "auto probe is not enabled"                         |
+      | "GetSpgErrors"           | "suspend: policy couldn't reach disabled condition" |
 
   Scenario Outline: Execute action sync
     Given a Isilon service
@@ -221,6 +223,7 @@ Feature: Isilon CSI interface
       | "GetPolicyInternalError"       | "failback (discard local): can't disable local policy"                              |
       | "GetTargetPolicyInternalError" | "failback (discard local): error waiting for condition on the remote target policy" |
       | "UpdatePolicyError"            | "failback (discard local): can't disable local policy"                              |
+      | "ModifyPolicyError"            | "failback (discard local): can't set local policy to manual"                        |
       | "GetJobsInternalError"         | "failback (discard local): can't run resync-prep on local policy"                   |
 
   Scenario Outline: Execute action failback discard remote
@@ -233,6 +236,7 @@ Feature: Isilon CSI interface
       | "GetPolicyInternalError"       | "failback (discard remote): can't disable local policy"            |
       | "GetTargetPolicyInternalError" | "failback (discard remote): disallow writes on target site failed" |
       | "UpdatePolicyError"            | "failback (discard remote): can't disable local policy"            |
+      | "ModifyPolicyError"            | "failback (discard remote): can't set local policy to manual"      |
 
   Scenario Outline: Execute action reprotect
     Given a Isilon service
@@ -243,6 +247,8 @@ Feature: Isilon CSI interface
       | induced                        | errormsg                                                                                   |
       | "GetTargetPolicyInternalError" | "reprotect: can't find target policy on the local site, perform reprotect on another side" |
       | "GetPolicyInternalError"       | "reprotect: can't find remote replication policy"                                          |
+      | "DeletePolicyError"            | "reprotect: delete policy on remote site failed"                                           |
+      | "CreatePolicyError"            | "reprotect: create protection policy on the local site failed"                             |
 
   Scenario Outline: Execute action
     Given a Isilon service
@@ -250,8 +256,9 @@ Feature: Isilon CSI interface
     And I call ExecuteAction to <systemName> to <clusterNameOne> to <clusterNameTwo> to <remoteSystemName> to <vgname> to <ppname>
     Then the error contains <errormsg>
     Examples:
-      | induced                  | systemName   | clusterNameOne | clusterNameTwo | remoteSystemName   | vgname            | ppname                                               | errormsg                            |
-      | "GetPolicyInternalError" | "systemName" | "cluster1"     | "cluster1"     | "remoteSystemName" | "VolumeGroupName" | "csi-prov-test-19743d82-192-168-111-25-Five_Minutes" | "resume: can't enable local policy" |
+      | induced                  | systemName   | clusterNameOne | clusterNameTwo | remoteSystemName   | vgname            | ppname                                               | errormsg                                          |
+      | "GetPolicyInternalError" | "systemName" | "cluster1"     | "cluster1"     | "remoteSystemName" | "VolumeGroupName" | "csi-prov-test-19743d82-192-168-111-25-Five_Minutes" | "resume: can't enable local policy"               |
+      | "GetSpgErrors"           | "systemName" | "cluster1"     | "cluster1"     | "remoteSystemName" | "VolumeGroupName" | "csi-prov-test-19743d82-192-168-111-25-Five_Minutes" | "resume: policy couldn't reach enabled condition" |
 
   @executeAction
   Scenario Outline: Execute action failback with bad params

@@ -413,6 +413,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call GetSubDirectoryCount`, f.iCallGetSubDirectoryCount)
 	s.Step(`^I call DeleteSnapshot`, f.iCallDeleteSnapshotIsiService)
 	s.Step(`^I call CreateVolumeRequest$`, f.iCallCreateVolumeReplicationEnabled)
+	s.Step(`^I call CreateVolumeRequestWithReplicationParams "([^"]*)" "([^"]*)" "([^"]*)"$`, f.iCallCreateVolumeReplicationEnabledWithParams)
 	s.Step(`^I call CreateVolumeFromSnapshotMultiReader "([^"]*)" "([^"]*)"$`, f.iCallCreateVolumeFromSnapshotMultiReader)
 	s.Step(`^a valid DeleteSnapshotResponse is returned$`, f.aValidDeleteSnapshotResponseIsReturned)
 	s.Step(`^I set mode to "([^"]*)"$`, f.iSetModeTo)
@@ -872,12 +873,16 @@ func (f *feature) iInduceError(errtype string) error {
 		stepHandlersErrors.DeletePolicyInternalError = true
 	case "DeletePolicyNotAPIError":
 		stepHandlersErrors.DeletePolicyNotAPIError = true
+	case "CreatePolicyError":
+		stepHandlersErrors.CreatePolicyError = true
 	case "FailedStatus":
 		stepHandlersErrors.FailedStatus = true
 	case "UnknownStatus":
 		stepHandlersErrors.UnknownStatus = true
 	case "UpdatePolicyError":
 		stepHandlersErrors.UpdatePolicyError = true
+	case "ModifyPolicyError":
+		stepHandlersErrors.ModifyPolicyError = true
 	case "Reprotect":
 		stepHandlersErrors.Reprotect = true
 	case "ReprotectTP":
@@ -890,6 +895,8 @@ func (f *feature) iInduceError(errtype string) error {
 		stepHandlersErrors.FailoverTP = true
 	case "Jobs":
 		stepHandlersErrors.Jobs = true
+	case "RunningJob":
+		stepHandlersErrors.RunningJob = true
 	case "GetSpgErrors":
 		stepHandlersErrors.GetSpgErrors = true
 	case "GetSpgTPErrors":
@@ -1116,17 +1123,21 @@ func clearErrors() {
 	stepHandlersErrors.getPolicyTPCount = 0
 	stepHandlersErrors.getPolicyInternalErrorTPCount = 0
 	stepHandlersErrors.getPolicyNotFoundTPCount = 0
+	stepHandlersErrors.ModifyPolicyCount = 0
 	stepHandlersErrors.DeletePolicyError = false
 	stepHandlersErrors.DeletePolicyInternalError = false
 	stepHandlersErrors.DeletePolicyNotAPIError = false
+	stepHandlersErrors.CreatePolicyError = false
 	stepHandlersErrors.FailedStatus = false
 	stepHandlersErrors.UnknownStatus = false
 	stepHandlersErrors.UpdatePolicyError = false
+	stepHandlersErrors.ModifyPolicyError = false
 	stepHandlersErrors.Reprotect = false
 	stepHandlersErrors.ReprotectTP = false
 	stepHandlersErrors.Failover = false
 	stepHandlersErrors.FailoverTP = false
 	stepHandlersErrors.Jobs = false
+	stepHandlersErrors.RunningJob = false
 	stepHandlersErrors.GetPolicyError = false
 	stepHandlersErrors.GetSpgErrors = false
 	stepHandlersErrors.GetSpgTPErrors = false
@@ -3426,6 +3437,51 @@ func getCreatevolumeReplicationEnabled(s *service) *csi.CreateVolumeRequest {
 	parameters[s.WithRP(KeyReplicationRemoteSystem)] = "cluster1"
 	parameters[req.VolumeContentSource.String()] = "contentsource"
 	req.Parameters = parameters
+	return req
+}
+
+func (f *feature) iCallCreateVolumeReplicationEnabledWithParams(vgPrefix, rpo, remoteSystem string) error {
+	req := getCreatevolumeReplicationEnabledWithParams(f.service, vgPrefix, rpo, remoteSystem)
+	f.createVolumeRequestTest = req
+	f.createVolumeResponseTest, f.err = f.service.CreateVolume(context.Background(), req)
+	return nil
+}
+
+func getCreatevolumeReplicationEnabledWithParams(s *service, vgPrefix, rpo, remoteSystem string) *csi.CreateVolumeRequest {
+	req := new(csi.CreateVolumeRequest)
+	req.Name = "volume1"
+	capacityRange := new(csi.CapacityRange)
+	capacityRange.RequiredBytes = 8 * 1024 * 1024 * 1024
+	req.CapacityRange = capacityRange
+	mount := new(csi.VolumeCapability_MountVolume)
+	capability := new(csi.VolumeCapability)
+	accessType := new(csi.VolumeCapability_Mount)
+	accessType.Mount = mount
+	capability.AccessType = accessType
+	accessMode := new(csi.VolumeCapability_AccessMode)
+	accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
+	capability.AccessMode = accessMode
+	capabilities := make([]*csi.VolumeCapability, 0)
+	capabilities = append(capabilities, capability)
+	parameters := make(map[string]string)
+	parameters[AccessZoneParam] = "System"
+	parameters[IsiPathParam] = "/ifs/data/csi-isilon"
+	parameters[s.WithRP(KeyReplicationEnabled)] = "true"
+	if vgPrefix != "" {
+		parameters[s.WithRP(KeyReplicationVGPrefix)] = vgPrefix
+	}
+	parameters[s.WithRP(KeyReplicationRemoteAccessZone)] = "remoteAccessZone"
+	parameters[s.WithRP(KeyReplicationRemoteAzServiceIP)] = "remoteAzServiceIP"
+	parameters[s.WithRP(KeyReplicationRemoteRootClientEnabled)] = "remoteRootClientEnabled"
+	if rpo != "" {
+		parameters[s.WithRP(KeyReplicationRPO)] = rpo
+	}
+	if remoteSystem != "" {
+		parameters[s.WithRP(KeyReplicationRemoteSystem)] = remoteSystem
+	}
+	parameters[req.VolumeContentSource.String()] = "contentsource"
+	req.Parameters = parameters
+	req.VolumeCapabilities = capabilities
 	return req
 }
 
