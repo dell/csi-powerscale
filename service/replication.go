@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2023 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -293,6 +293,12 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 		return nil, status.Errorf(codes.InvalidArgument, "Error: Can't get systemName from PG params")
 	}
 
+	vgName, ok := localParams[s.opts.replicationContextPrefix+"VolumeGroupName"]
+	if !ok {
+		log.Error("Can't get protection policy name from PG params")
+		return nil, status.Errorf(codes.InvalidArgument, "can't find `VolumeGroupName` parameter from PG params")
+	}
+
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
@@ -314,19 +320,25 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 	} else if err != nil {
 		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group '%s'", isiPath)
 	}
+	// TODO: This does not support storageclass IsiPath being anything other than a subdirectory of array secret's IsiPath.
+	// Need to enhance IsiPath priority logic and querying logic.
 	childs, err := isiConfig.isiSvc.client.QueryVolumeChildren(ctx, strings.TrimPrefix(isiPath, isiConfig.IsiPath))
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Error: Unable to get VG's childs at '%s'", isiPath)
 	}
 	for key := range childs {
 		log.Info("Child Path: ", key)
-		_, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, key, "")
-		if err == nil {
+		exports, _ := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, key, "")
+		if exports != nil {
 			return nil, status.Errorf(codes.Internal, "VG '%s' is not empty", isiPath)
 		}
 	}
 
-	ppName := strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(isiPath, isiConfig.IsiPath), "/", ""), ".", "-")
+	ppName := strings.ReplaceAll(vgName, ".", "-")
+	log.Info("!!!!!!!!!!!")
+	log.Info("ppName: " + ppName)
+	log.Info("!!!!!!!!!!!")
+
 	err = isiConfig.isiSvc.client.SyncPolicy(ctx, ppName)
 	if err != nil {
 		log.Error("Failed to sync before deletion ", err.Error())
@@ -730,7 +742,7 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 	log.Info("Running sync job on TGT mirror policy")
 	err = remoteIsiConfig.isiSvc.client.SyncPolicy(ctx, ppNameMirror)
 	if err != nil {
-		return status.Errorf(codes.Internal, "failback (discard local): policy sync failed %s", err.Error())
+		return status.Errorf(codes.Internal, "policy sync failed %s", err.Error())
 	}
 
 	// Allow write on source
@@ -826,7 +838,7 @@ func synchronize(ctx context.Context, localIsiConfig *IsilonClusterConfig, remot
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 	err := localIsiConfig.isiSvc.client.SyncPolicy(ctx, ppName)
 	if err != nil {
-		return status.Errorf(codes.Internal, "sync: policy sync failed %s", err.Error())
+		return status.Errorf(codes.Internal, "policy sync failed %s", err.Error())
 	}
 
 	log.Info("Sync action completed")
