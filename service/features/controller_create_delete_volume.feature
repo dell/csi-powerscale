@@ -103,6 +103,27 @@ Feature: Isilon CSI interface
       | "volume1=_=_=10=_=_=System"   | "volume1"       | "failed to get volume"       |
       | "volume2=_=_=20=_=_=System"   | "volume2"       | "none"                       |
 
+    Scenario Outline: Create Volume with Replication Enabled and with invalid arguments
+      Given a Isilon service
+      When I call CreateVolumeRequestWithReplicationParams <vgPrefix> <rpo> <remoteSystemName>
+      Then the error contains <errormsg>
+      Examples:
+      |  vgPrefix           | rpo             | remoteSystemName | errormsg                                                   |
+      | ""                  | "Five_Minutes"  | "cluster1"       | "replication enabled but no volume group prefix specified" |
+      | "volumeGroupPrefix" | ""              | "cluster1"       | "replication enabled but no RPO specified"                 |
+      | "volumeGroupPrefix" | "Fifty_Minutes" | "cluster1"       | "invalid rpo value"                                        |
+      | "volumeGroupPrefix" | "Five_Minutes"  | ""               | "replication enabled but no remote system specified"       |
+
+    Scenario Outline: Create Volume with Replication Enabled and induced errors
+      Given a Isilon service
+      And I induce error <induced>
+      When I call CreateVolumeRequestWithReplicationParams "volumeGroupPrefix" "Five_Minutes" "cluster1"
+      Then the error contains <errormsg>
+      Examples:
+      | induced                  | errormsg                                   |
+      | "GetPolicyInternalError" | "can't ensure protection policy exists"    |
+      | "GetPolicyNotFoundError" | "policy job couldn't reach FINISHED state" |
+
 @deleteVolume
 @v1.0.0
     Scenario: Delete volume good scenario with quota enabled

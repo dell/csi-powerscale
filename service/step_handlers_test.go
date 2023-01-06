@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2023 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -19,18 +19,20 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/dell/csi-isilon/service/mock/k8s"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/dell/csi-isilon/service/mock/k8s"
+
+	"sync"
+
 	isiapi "github.com/dell/goisilon/api"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
-	"sync"
 )
 
 var (
@@ -77,19 +79,23 @@ var (
 		getSpgCount                   int
 		getSpgTPCount                 int
 		getExportCount                int
+		ModifyPolicyCount             int
 		GetPolicyNotFoundError        bool
 		DeletePolicyError             bool
 		DeletePolicyInternalError     bool
 		DeletePolicyNotAPIError       bool
+		CreatePolicyError             bool
 		FailedStatus                  bool
 		UnknownStatus                 bool
 		UpdatePolicyError             bool
+		ModifyPolicyError             bool
 		Reprotect                     bool
 		ReprotectTP                   bool
 		Failover                      bool
 		FailoverTP                    bool
 		GetPolicyError                bool
 		Jobs                          bool
+		RunningJob                    bool
 		GetSpgErrors                  bool
 		GetSpgTPErrors                bool
 		GetExportPolicyError          bool
@@ -174,6 +180,7 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/{snapshot_id}/", handleDeleteSnapshot).Methods("DELETE")
 	isilonRouter.HandleFunc("/platform/1/snapshot/snapshots/{snapshot_id}/", handleGetSnapshotByID).Methods("GET")
 	isilonRouter.HandleFunc("/namespace/ifs/.snapshot/{snapshot_name}/data/csi-isilon/{volume_id}", handleGetSnapshotSize).Methods("GET").Queries("detail", "size", "max-depth", "-1")
+	isilonRouter.HandleFunc("/platform/11/sync/policies/", handleCreatePolicy).Methods("POST")
 	isilonRouter.HandleFunc("/platform/11/sync/policies/", handleGetPoliciesByName).Methods("GET")
 	isilonRouter.HandleFunc("/platform/11/sync/policies/{id}", handleGetPoliciesByName).Methods("GET")
 	isilonRouter.HandleFunc("/platform/11/sync/policies/{name}", handleGetPoliciesByName).Methods("GET")
@@ -732,7 +739,7 @@ func handleGetPoliciesByName(w http.ResponseWriter, r *http.Request) {
 			writeError(w, "", http.StatusNotFound, codes.NotFound)
 		}
 	}
-	if stepHandlersErrors.UpdatePolicyError {
+	if stepHandlersErrors.UpdatePolicyError || stepHandlersErrors.ModifyPolicyError {
 		w.Write(readFromFile("mock/policy/get_policies.txt"))
 	}
 
@@ -775,6 +782,9 @@ func handleGetJobs(w http.ResponseWriter, r *http.Request) {
 		case 1:
 			writeError(w, "", http.StatusInternalServerError, codes.Internal)
 		}
+	}
+	if stepHandlersErrors.RunningJob {
+		w.Write(readFromFile("mock/jobs/running.json"))
 	}
 	w.Write(readFromFile("mock/jobs/empty.json"))
 }
@@ -910,6 +920,14 @@ func handleGetTargetPoliciesByName(w http.ResponseWriter, r *http.Request) {
 		w.Write(readFromFile("mock/policy/empty.txt"))
 	}
 
+	if stepHandlersErrors.DeletePolicyError {
+		w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
+	}
+
+	if stepHandlersErrors.CreatePolicyError {
+		w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
+	}
+
 	defer func() {
 		stepHandlersErrors.count++
 	}()
@@ -920,11 +938,32 @@ func handleGetTargetPoliciesByName(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func handleCreatePolicy(w http.ResponseWriter, r *http.Request) {
+	if stepHandlersErrors.CreatePolicyError {
+		writeError(w, "", http.StatusNotFound, codes.Internal)
+		return
+	}
+
+	w.Write(readFromFile("mock/policy/get_policies.txt"))
+}
+
 func handleUpdatePolicy(w http.ResponseWriter, r *http.Request) {
 	if stepHandlersErrors.UpdatePolicyError {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	if stepHandlersErrors.ModifyPolicyError {
+		defer func() {
+			stepHandlersErrors.ModifyPolicyCount++
+		}()
+		if stepHandlersErrors.ModifyPolicyCount%2 == 0 {
+			w.Write(readFromFile("mock/policy/get_policies2.txt"))
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
 	w.Write(readFromFile("mock/policy/get_policies2.txt"))
 }
 

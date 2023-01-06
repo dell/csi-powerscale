@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2023 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -393,10 +393,13 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a valid ExecuteActionResponse is returned$`, f.aValidExecuteActionResponseIsReturned)
 	s.Step(`I call FailoverExecuteAction`, f.iCallExecuteActionSyncFailover)
 	s.Step(`I call FailoverUnplannedExecuteAction`, f.iCallExecuteActionSyncFailoverUnplanned)
+	s.Step(`I call FailbackExecuteAction`, f.iCallExecuteActionFailback)
+	s.Step(`I call FailbackDiscardExecuteAction`, f.iCallExecuteActionFailbackDiscard)
 	s.Step(`I call BadExecuteAction`, f.iCallExecuteActionBad)
 	s.Step(`^I call BadCreateRemoteVolume`, f.iCallCreateRemoteVolumeBad)
 	s.Step(`^I call BadCreateStorageProtectionGroup`, f.iCallCreateStorageProtectionGroupBad)
-	//s.Step(`I call ExecuteActionWithParams "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)"$`, f.iCallExecuteActionWithParams)
+	s.Step(`I call ExecuteActionFailBackWithParams to "([^"]*)" to "([^"]*)" to "([^"]*)" to "([^"]*)" to "([^"]*)" to "([^"]*)"$`, f.iCallExecuteActionFailbackWithParams)
+	s.Step(`I call ExecuteActionFailBackDiscardWithParams to "([^"]*)" to "([^"]*)" to "([^"]*)" to "([^"]*)" to "([^"]*)" to "([^"]*)"$`, f.iCallExecuteActionFailbackDiscardWithParams)
 	s.Step(`^I call GetReplicationCapabilities`, f.iCallGetReplicationCapabilities)
 	s.Step(`^a valid GetReplicationCapabilitiesResponse is returned$`, f.aValidGetReplicationCapabilitiesResponseIsReturned)
 	s.Step(`^I call ValidateConnectivity$`, f.iCallValidateVolumeHostConnectivity)
@@ -410,6 +413,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call GetSubDirectoryCount`, f.iCallGetSubDirectoryCount)
 	s.Step(`^I call DeleteSnapshot`, f.iCallDeleteSnapshotIsiService)
 	s.Step(`^I call CreateVolumeRequest$`, f.iCallCreateVolumeReplicationEnabled)
+	s.Step(`^I call CreateVolumeRequestWithReplicationParams "([^"]*)" "([^"]*)" "([^"]*)"$`, f.iCallCreateVolumeReplicationEnabledWithParams)
 	s.Step(`^I call CreateVolumeFromSnapshotMultiReader "([^"]*)" "([^"]*)"$`, f.iCallCreateVolumeFromSnapshotMultiReader)
 	s.Step(`^a valid DeleteSnapshotResponse is returned$`, f.aValidDeleteSnapshotResponseIsReturned)
 	s.Step(`^I set mode to "([^"]*)"$`, f.iSetModeTo)
@@ -869,12 +873,16 @@ func (f *feature) iInduceError(errtype string) error {
 		stepHandlersErrors.DeletePolicyInternalError = true
 	case "DeletePolicyNotAPIError":
 		stepHandlersErrors.DeletePolicyNotAPIError = true
+	case "CreatePolicyError":
+		stepHandlersErrors.CreatePolicyError = true
 	case "FailedStatus":
 		stepHandlersErrors.FailedStatus = true
 	case "UnknownStatus":
 		stepHandlersErrors.UnknownStatus = true
 	case "UpdatePolicyError":
 		stepHandlersErrors.UpdatePolicyError = true
+	case "ModifyPolicyError":
+		stepHandlersErrors.ModifyPolicyError = true
 	case "Reprotect":
 		stepHandlersErrors.Reprotect = true
 	case "ReprotectTP":
@@ -887,6 +895,8 @@ func (f *feature) iInduceError(errtype string) error {
 		stepHandlersErrors.FailoverTP = true
 	case "Jobs":
 		stepHandlersErrors.Jobs = true
+	case "RunningJob":
+		stepHandlersErrors.RunningJob = true
 	case "GetSpgErrors":
 		stepHandlersErrors.GetSpgErrors = true
 	case "GetSpgTPErrors":
@@ -1113,17 +1123,21 @@ func clearErrors() {
 	stepHandlersErrors.getPolicyTPCount = 0
 	stepHandlersErrors.getPolicyInternalErrorTPCount = 0
 	stepHandlersErrors.getPolicyNotFoundTPCount = 0
+	stepHandlersErrors.ModifyPolicyCount = 0
 	stepHandlersErrors.DeletePolicyError = false
 	stepHandlersErrors.DeletePolicyInternalError = false
 	stepHandlersErrors.DeletePolicyNotAPIError = false
+	stepHandlersErrors.CreatePolicyError = false
 	stepHandlersErrors.FailedStatus = false
 	stepHandlersErrors.UnknownStatus = false
 	stepHandlersErrors.UpdatePolicyError = false
+	stepHandlersErrors.ModifyPolicyError = false
 	stepHandlersErrors.Reprotect = false
 	stepHandlersErrors.ReprotectTP = false
 	stepHandlersErrors.Failover = false
 	stepHandlersErrors.FailoverTP = false
 	stepHandlersErrors.Jobs = false
+	stepHandlersErrors.RunningJob = false
 	stepHandlersErrors.GetPolicyError = false
 	stepHandlersErrors.GetSpgErrors = false
 	stepHandlersErrors.GetSpgTPErrors = false
@@ -2977,8 +2991,8 @@ func executeActionRequestFailoverUnplanned(s *service) *csiext.ExecuteActionRequ
 	return req
 }
 
-func (f *feature) iCallExecuteActionSyncFailover() error {
-	req := executeActionRequestFailover(f.service)
+func (f *feature) iCallExecuteActionFailback() error {
+	req := executeActionRequestFailback(f.service)
 	f.executeActionRequest = req
 	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
 	if f.err != nil {
@@ -2987,15 +3001,14 @@ func (f *feature) iCallExecuteActionSyncFailover() error {
 	return nil
 }
 
-func executeActionRequestWithParams(s *service, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname string) *csiext.ExecuteActionRequest {
+func executeActionRequestFailback(s *service) *csiext.ExecuteActionRequest {
 	action := &csiext.Action{
-		ActionTypes: csiext.ActionTypes_RESUME,
+		ActionTypes: csiext.ActionTypes_FAILBACK_LOCAL,
 	}
 	params := map[string]string{
-		//s.opts.replicationContextPrefix + systemName: clusterNameOne,
-		//s.opts.replicationContextPrefix + remoteSystemName: clusterNameTwo,
-		//s.opts.replicationContextPrefix + vgname:  ppname,
-
+		s.opts.replicationContextPrefix + "systemName":       "cluster1",
+		s.opts.replicationContextPrefix + "remoteSystemName": "cluster1",
+		s.opts.replicationContextPrefix + "VolumeGroupName":  "csi-prov-test-19743d82-192-168-111-25-Five_Minutes",
 	}
 	req := &csiext.ExecuteActionRequest{
 		ActionId:                        "",
@@ -3007,6 +3020,47 @@ func executeActionRequestWithParams(s *service, systemName, clusterNameOne, clus
 	}
 
 	return req
+}
+
+func (f *feature) iCallExecuteActionFailbackDiscard() error {
+	req := executeActionRequestFailbackDiscard(f.service)
+	f.executeActionRequest = req
+	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
+	if f.err != nil {
+		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func executeActionRequestFailbackDiscard(s *service) *csiext.ExecuteActionRequest {
+	action := &csiext.Action{
+		ActionTypes: csiext.ActionTypes_ACTION_FAILBACK_DISCARD_CHANGES_LOCAL,
+	}
+	params := map[string]string{
+		s.opts.replicationContextPrefix + "systemName":       "cluster1",
+		s.opts.replicationContextPrefix + "remoteSystemName": "cluster1",
+		s.opts.replicationContextPrefix + "VolumeGroupName":  "csi-prov-test-19743d82-192-168-111-25-Five_Minutes",
+	}
+	req := &csiext.ExecuteActionRequest{
+		ActionId:                        "",
+		ProtectionGroupId:               "",
+		ActionTypes:                     &csiext.ExecuteActionRequest_Action{Action: action},
+		ProtectionGroupAttributes:       params,
+		RemoteProtectionGroupId:         "",
+		RemoteProtectionGroupAttributes: nil,
+	}
+
+	return req
+}
+
+func (f *feature) iCallExecuteActionSyncFailover() error {
+	req := executeActionRequestFailover(f.service)
+	f.executeActionRequest = req
+	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
+	if f.err != nil {
+		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+	}
+	return nil
 }
 
 func (f *feature) iCallExecuteActionBad() error {
@@ -3040,14 +3094,48 @@ func executeActionRequestBad(s *service) *csiext.ExecuteActionRequest {
 	return req
 }
 
-func (f *feature) iCallExecuteActionWithParams(s *service, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname string) error {
-	req := executeActionRequestWithParams(f.service, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname)
+func (f *feature) iCallExecuteActionFailbackWithParams(systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname string) error {
+	action := &csiext.Action{
+		ActionTypes: csiext.ActionTypes_FAILBACK_LOCAL,
+	}
+	req := executeActionFailbackRequestWithParams(f.service, action, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname)
 	f.executeActionRequest = req
 	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
 	if f.err != nil {
-		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+		log.Printf("iCallExecuteActionFailbackWithParams call failed: %s\n", f.err.Error())
 	}
 	return nil
+}
+
+func (f *feature) iCallExecuteActionFailbackDiscardWithParams(systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname string) error {
+	action := &csiext.Action{
+		ActionTypes: csiext.ActionTypes_ACTION_FAILBACK_DISCARD_CHANGES_LOCAL,
+	}
+	req := executeActionFailbackRequestWithParams(f.service, action, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname)
+	f.executeActionRequest = req
+	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
+	if f.err != nil {
+		log.Printf("iCallExecuteActionFailbackDiscardWithParams call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func executeActionFailbackRequestWithParams(s *service, action *csiext.Action, systemName, clusterNameOne, clusterNameTwo, remoteSystemName, vgname, ppname string) *csiext.ExecuteActionRequest {
+	params := map[string]string{
+		s.opts.replicationContextPrefix + systemName:       clusterNameOne,
+		s.opts.replicationContextPrefix + remoteSystemName: clusterNameTwo,
+		s.opts.replicationContextPrefix + vgname:           ppname,
+	}
+	req := &csiext.ExecuteActionRequest{
+		ActionId:                        "",
+		ProtectionGroupId:               "",
+		ActionTypes:                     &csiext.ExecuteActionRequest_Action{Action: action},
+		ProtectionGroupAttributes:       params,
+		RemoteProtectionGroupId:         "",
+		RemoteProtectionGroupAttributes: nil,
+	}
+
+	return req
 }
 
 func getCreateRemoteVolumeRequestBad(s *service) *csiext.CreateRemoteVolumeRequest {
@@ -3130,6 +3218,10 @@ func (f *feature) aValidGetReplicationCapabilitiesResponseIsReturned() error {
 			case csiext.ActionTypes_FAILOVER_REMOTE:
 				count = count + 1
 			case csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL:
+				count = count + 1
+			case csiext.ActionTypes_FAILBACK_LOCAL:
+				count = count + 1
+			case csiext.ActionTypes_ACTION_FAILBACK_DISCARD_CHANGES_LOCAL:
 				count = count + 1
 			case csiext.ActionTypes_REPROTECT_LOCAL:
 				count = count + 1
@@ -3345,6 +3437,51 @@ func getCreatevolumeReplicationEnabled(s *service) *csi.CreateVolumeRequest {
 	parameters[s.WithRP(KeyReplicationRemoteSystem)] = "cluster1"
 	parameters[req.VolumeContentSource.String()] = "contentsource"
 	req.Parameters = parameters
+	return req
+}
+
+func (f *feature) iCallCreateVolumeReplicationEnabledWithParams(vgPrefix, rpo, remoteSystem string) error {
+	req := getCreatevolumeReplicationEnabledWithParams(f.service, vgPrefix, rpo, remoteSystem)
+	f.createVolumeRequestTest = req
+	f.createVolumeResponseTest, f.err = f.service.CreateVolume(context.Background(), req)
+	return nil
+}
+
+func getCreatevolumeReplicationEnabledWithParams(s *service, vgPrefix, rpo, remoteSystem string) *csi.CreateVolumeRequest {
+	req := new(csi.CreateVolumeRequest)
+	req.Name = "volume1"
+	capacityRange := new(csi.CapacityRange)
+	capacityRange.RequiredBytes = 8 * 1024 * 1024 * 1024
+	req.CapacityRange = capacityRange
+	mount := new(csi.VolumeCapability_MountVolume)
+	capability := new(csi.VolumeCapability)
+	accessType := new(csi.VolumeCapability_Mount)
+	accessType.Mount = mount
+	capability.AccessType = accessType
+	accessMode := new(csi.VolumeCapability_AccessMode)
+	accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
+	capability.AccessMode = accessMode
+	capabilities := make([]*csi.VolumeCapability, 0)
+	capabilities = append(capabilities, capability)
+	parameters := make(map[string]string)
+	parameters[AccessZoneParam] = "System"
+	parameters[IsiPathParam] = "/ifs/data/csi-isilon"
+	parameters[s.WithRP(KeyReplicationEnabled)] = "true"
+	if vgPrefix != "" {
+		parameters[s.WithRP(KeyReplicationVGPrefix)] = vgPrefix
+	}
+	parameters[s.WithRP(KeyReplicationRemoteAccessZone)] = "remoteAccessZone"
+	parameters[s.WithRP(KeyReplicationRemoteAzServiceIP)] = "remoteAzServiceIP"
+	parameters[s.WithRP(KeyReplicationRemoteRootClientEnabled)] = "remoteRootClientEnabled"
+	if rpo != "" {
+		parameters[s.WithRP(KeyReplicationRPO)] = rpo
+	}
+	if remoteSystem != "" {
+		parameters[s.WithRP(KeyReplicationRemoteSystem)] = remoteSystem
+	}
+	parameters[req.VolumeContentSource.String()] = "contentsource"
+	req.Parameters = parameters
+	req.VolumeCapabilities = capabilities
 	return req
 }
 

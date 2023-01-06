@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2023 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -31,6 +31,15 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+)
+
+// constants for ease of understanding
+const (
+	PolicySchedulingManual    = ""
+	PolicySchedulingAutomatic = "when-source-modified"
+	WritesEnabled             = "writes_enabled"
+	WritesDisabled            = "writes_disabled"
+	ResyncPolicyCreated       = "resync_policy_created"
 )
 
 func (s *service) CreateRemoteVolume(ctx context.Context,
@@ -414,12 +423,18 @@ func (s *service) ExecuteAction(ctx context.Context, req *csiext.ExecuteActionRe
 	var actionFunc func(context.Context, *IsilonClusterConfig, *IsilonClusterConfig, string, *logrus.Entry) error
 
 	switch action {
-	case csiext.ActionTypes_FAILOVER_REMOTE.String(): // FAILOVER_LOCAL is not supported as of now. Need to handle failover steps in the mirrored perspective.
+	case csiext.ActionTypes_FAILOVER_REMOTE.String(): // FAILOVER_LOCAL is not supported. Need to handle failover steps in the mirrored perspective.
 		actionFunc = failover
-	case csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL.String():
+	case csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL.String(): // UNPLANNED_FAILOVER_REMOTE is not supported.
 		actionFunc = failoverUnplanned
+	case csiext.ActionTypes_FAILBACK_LOCAL.String(): // FAILBACK_REMOTE is not supported.
+		actionFunc = failbackDiscardLocal
+	case csiext.ActionTypes_ACTION_FAILBACK_DISCARD_CHANGES_LOCAL.String(): // ACTION_FAILBACK_DISCARD_CHANGES_REMOTE is not supported.
+		actionFunc = failbackDiscardRemote
+	case csiext.ActionTypes_REPROTECT_LOCAL.String(): // REPROTECT_REMOTE is not supported.
+		actionFunc = reprotect
 	case csiext.ActionTypes_SYNC.String():
-		actionFunc = syncAction
+		actionFunc = synchronize
 	case csiext.ActionTypes_SUSPEND.String():
 		actionFunc = suspend
 	case csiext.ActionTypes_RESUME.String():
@@ -429,7 +444,7 @@ func (s *service) ExecuteAction(ctx context.Context, req *csiext.ExecuteActionRe
 	}
 
 	if err := actionFunc(ctx, isiConfig, remoteIsiConfig, vgName, log.WithFields(fields)); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unknown, err.Error()) // Error while executing action, shouldn't be retried.
 	}
 
 	statusResp, err := s.GetStorageProtectionGroupStatus(ctx, &csiext.GetStorageProtectionGroupStatusRequest{
@@ -452,6 +467,8 @@ func (s *service) ExecuteAction(ctx context.Context, req *csiext.ExecuteActionRe
 
 func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csiext.GetStorageProtectionGroupStatusRequest) (*csiext.GetStorageProtectionGroupStatusResponse, error) {
 	ctx, log, _ := GetRunIDLog(ctx)
+
+	log.Info("Getting storage protection group status")
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
 	isiPath := utils.GetIsiPathFromPgID(groupID)
@@ -488,25 +505,25 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	// obtain local policy for local cluster
 	localP, err := isiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 	if err != nil {
-		log.Error("Can't find local replication policy on local cluster, unexpected error ", err.Error())
+		log.Warn("Can't find local replication policy on local cluster, unexpected error ", err.Error())
 	}
 
 	// obtain target policy for local cluster
 	localTP, err := isiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
 	if err != nil {
-		log.Error("Can't find target replication policy on local cluster, unexpected error ", err.Error())
+		log.Warn("Can't find target replication policy on local cluster, unexpected error ", err.Error())
 	}
 
 	// obtain local policy for remote cluster
 	remoteP, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 	if err != nil {
-		log.Error("Can't find local replication policy on remote cluster, unexpected error ", err.Error())
+		log.Warn("Can't find local replication policy on remote cluster, unexpected error ", err.Error())
 	}
 
 	// obtain target policy for remote cluster
 	remoteTP, err := remoteIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
 	if err != nil {
-		log.Error("Can't find target replication policy on remote cluster, unexpected error ", err.Error())
+		log.Warn("Can't find target replication policy on remote cluster, unexpected error ", err.Error())
 	}
 
 	// Check if any of the policy jobs are currently running
@@ -514,7 +531,7 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	localJob, err := isiConfig.isiSvc.client.GetJobsByPolicyName(ctx, ppName)
 	if err != nil {
 		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode != 404 {
-			log.Error("Unexpected error while querying active jobs for local policy ", err.Error())
+			log.Warn("Unexpected error while querying active jobs for local policy ", err.Error())
 			isSyncCheckFailed = true
 		}
 	}
@@ -527,7 +544,7 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	remoteJob, err := remoteIsiConfig.isiSvc.client.GetJobsByPolicyName(ctx, ppName)
 	if err != nil {
 		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode != 404 {
-			log.Error("Unexpected error while querying active jobs for remote policy ", err.Error())
+			log.Warn("Unexpected error while querying active jobs for remote policy ", err.Error())
 			isSyncCheckFailed = true
 		}
 	}
@@ -538,6 +555,7 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	}
 
 	linkState := getGroupLinkState(localP, localTP, remoteP, remoteTP, isSyncInProgress)
+	log.Infof("The current state for group (%s) is (%s).", groupID, linkState.String())
 
 	if linkState == csiext.StorageProtectionGroupStatus_UNKNOWN || isSyncCheckFailed {
 		errMsg := "unexpected error while getting link state"
@@ -556,20 +574,18 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 
 	log.Info("Trying to get replication direction")
 	source := false
-	if linkState != csiext.StorageProtectionGroupStatus_FAILEDOVER && // no side can be source when in failed over state
-		(localP.Enabled || // when synchronized
-			(!remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_disabled")) { // when suspended (source side)
+	if localP != nil { // Policy can exist only on the source side
 		source = true
 		log.Info("Current side is source")
 	}
 
-	log.Infof("The current state for group (%s) is (%s).", groupID, linkState.String())
 	resp := &csiext.GetStorageProtectionGroupStatusResponse{
 		Status: &csiext.StorageProtectionGroupStatus{
 			State:    linkState,
 			IsSource: source,
 		},
 	}
+	log.Info("Get storage protection group status completed")
 	return resp, nil
 }
 
@@ -584,32 +600,7 @@ func failover(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIs
 		return status.Errorf(codes.Internal, "failover: encountered error when trying to sync policy %s", err.Error())
 	}
 
-	log.Info("Ensuring that mirror policy exists on target site")
-	// Get local policy to get necessary info
-	localPolicy, err := localIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
-	if err != nil {
-		return status.Errorf(codes.Internal, "failover: can't find local replication policy, unexpected error %s", err.Error())
-	}
-
-	_, err = remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
-	if err != nil {
-		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode == 404 {
-			err := remoteIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, localPolicy.JobDelay,
-				localPolicy.SourcePath, localPolicy.TargetPath, localIsiConfig.Endpoint, localIsiConfig.ReplicationCertificateID, false)
-			if err != nil {
-				return status.Errorf(codes.Internal, "failover: can't create protection policy %s", err.Error())
-			}
-			err = remoteIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.UNKNOWN) // UNKNOWN because we created disabled policy
-			if err != nil {
-				return status.Errorf(codes.Internal, "failover: remote policy job couldn't reach UNKNOWN state %s", err.Error())
-			}
-		} else {
-			return status.Errorf(codes.Internal, "failover: can't ensure protection policy exists %s", err.Error())
-		}
-	}
-
 	log.Info("Disabling policy on SRC site")
-
 	err = localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failover: can't disable local policy %s", err.Error())
@@ -621,12 +612,12 @@ func failover(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIs
 	}
 
 	log.Info("Enabling writes on TGT site")
-
 	err = remoteIsiConfig.isiSvc.client.AllowWrites(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failover: can't allow writes on target site %s", err.Error())
 	}
 
+	log.Info("Failover action completed")
 	return nil
 }
 
@@ -642,10 +633,192 @@ func failoverUnplanned(ctx context.Context, localIsiConfig *IsilonClusterConfig,
 		return status.Errorf(codes.Internal, "unplanned failover: allow writes on target site failed %s", err.Error())
 	}
 
+	log.Info("Unplanned failover action completed")
 	return nil
 }
 
-func syncAction(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
+func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
+	log.Info("Running reprotect action")
+	ppName := strings.ReplaceAll(vgName, ".", "-")
+
+	// Ensure local array's target policy exists and is write enabled (original target)
+	localTP, err := localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "reprotect: can't find target policy on the local site, perform reprotect on another side. %s", err.Error())
+	}
+	if localTP.FailoverFailbackState != WritesEnabled {
+		return status.Errorf(codes.InvalidArgument, "reprotect: unable to perform reprotect with writes disabled, should perform failover first.")
+	}
+
+	// Get remote policy
+	remotePolicy, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "reprotect: can't find remote replication policy, unexpected error %s", err.Error())
+	}
+
+	// Delete the remote policy
+	log.Info("Deleting SyncIQ policy on the remote")
+	err = remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "reprotect: delete policy on remote site failed %s", err.Error())
+	}
+
+	// Create a new local policy based on previous remote policy's parameters
+	log.Info("Creating new local SyncIQ policy")
+	err = localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
+		remotePolicy.TargetPath, remotePolicy.SourcePath, remoteIsiConfig.Endpoint, localIsiConfig.ReplicationCertificateID, true)
+	if err != nil {
+		return status.Errorf(codes.Internal, "reprotect: create protection policy on the local site failed %s", err.Error())
+	}
+	err = localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.FINISHED)
+	if err != nil {
+		return status.Errorf(codes.Internal, "reprotect: policy job couldn't reach FINISHED state %s", err.Error())
+	}
+
+	log.Info("Reprotect action completed")
+	return nil
+}
+
+func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
+	log.Info("Running failback action - discard local")
+	ppName := strings.ReplaceAll(vgName, ".", "-")
+	ppNameMirror := ppName + "_mirror"
+
+	log.Info("Obtaining RPO value from policy name")
+	rpoInt := getRpoInt(vgName)
+	if rpoInt == -1 {
+		return status.Errorf(codes.InvalidArgument, "unable to parse RPO seconds")
+	}
+
+	// If source policy is not disabled (unplanned failover), disable it
+	log.Info("Ensuring SRC policy is disabled")
+	err := localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): can't disable local policy %s", err.Error())
+	}
+
+	// Edit the source policy to manual.
+	log.Info("Setting SRC policy to manual")
+	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, PolicySchedulingManual, 0)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): can't set local policy to manual %s", err.Error())
+	}
+
+	// Enable the source policy
+	log.Info("Enabling SRC policy")
+	err = localIsiConfig.isiSvc.client.EnablePolicy(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): can't enable local policy %s", err.Error())
+	}
+
+	// Run Resync-prep on source (also disables source policy)
+	log.Info("Running resync-prep on SRC policy")
+	err = localIsiConfig.isiSvc.client.ResyncPrep(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): can't run resync-prep on local policy %s", err.Error())
+	}
+	err = remoteIsiConfig.isiSvc.client.WaitForTargetPolicyCondition(ctx, ppName, ResyncPolicyCreated)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): error waiting for condition on the remote target policy. %s", err.Error())
+	}
+	err = remoteIsiConfig.isiSvc.client.WaitForPolicyEnabledFieldCondition(ctx, ppNameMirror, true)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): TGT mirror policy couldn't reach enabled condition %s", err.Error())
+	}
+
+	// Run Sync-Job on target policy (_mirror)
+	log.Info("Running sync job on TGT mirror policy")
+	err = remoteIsiConfig.isiSvc.client.SyncPolicy(ctx, ppNameMirror)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): policy sync failed %s", err.Error())
+	}
+
+	// Allow write on source
+	log.Info("Allowing write on SRC")
+	err = localIsiConfig.isiSvc.client.AllowWrites(ctx, ppNameMirror)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): allow writes on local site failed %s", err.Error())
+	}
+
+	// Run resync-prep on target (also disables target policy)
+	log.Info("Running resync-prep on TGT mirror policy")
+	err = remoteIsiConfig.isiSvc.client.ResyncPrep(ctx, ppNameMirror)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): can't run resync-prep on remote mirror policy %s", err.Error())
+	}
+	err = localIsiConfig.isiSvc.client.WaitForTargetPolicyCondition(ctx, ppNameMirror, ResyncPolicyCreated)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): error waiting for condition on the local target policy. %s", err.Error())
+	}
+
+	// Delete the target mirror policy as recommended
+	log.Info("Deleting TGT mirror policy")
+	err = remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppNameMirror)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): delete mirror policy on target site failed %s", err.Error())
+	}
+
+	// Edit source policy to automatic
+	log.Info("Setting SRC policy to automatic")
+	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, PolicySchedulingAutomatic, rpoInt)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): can't set local policy to automatic %s", err.Error())
+	}
+
+	log.Info("Failback action - discard local completed")
+	return nil
+}
+
+func failbackDiscardRemote(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
+	log.Info("Running failback action - discard remote")
+	ppName := strings.ReplaceAll(vgName, ".", "-")
+
+	log.Info("Obtaining RPO value from policy name")
+	rpoInt := getRpoInt(vgName)
+	if rpoInt == -1 {
+		return status.Errorf(codes.InvalidArgument, "unable to parse RPO seconds")
+	}
+
+	// If source policy is not disabled (unplanned failover), disable it
+	log.Info("Ensuring SRC policy is disabled")
+	err := localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard remote): can't disable local policy %s", err.Error())
+	}
+
+	// Edit the source policy to manual.
+	log.Info("Setting SRC policy to manual")
+	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, PolicySchedulingManual, 0)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard remote): can't set local policy to manual %s", err.Error())
+	}
+
+	// disallow writes on target
+	log.Info("Disabling writes on TGT site")
+	err = remoteIsiConfig.isiSvc.client.DisallowWrites(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard remote): disallow writes on target site failed %s", err.Error())
+	}
+
+	// set source policy to automatic
+	log.Info("Setting SRC policy to automatic")
+	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, PolicySchedulingAutomatic, rpoInt)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard remote): can't set local policy to automatic %s", err.Error())
+	}
+
+	// enable source policy
+	log.Info("Enabling SRC policy")
+	err = localIsiConfig.isiSvc.client.EnablePolicy(ctx, ppName)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard remote): can't enable local policy %s", err.Error())
+	}
+
+	log.Info("Failback action - discard remote completed")
+	return nil
+}
+
+func synchronize(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
 	log.Info("Running sync action")
 	// get all running
 	// if running - wait for it and succeed
@@ -653,9 +826,10 @@ func syncAction(ctx context.Context, localIsiConfig *IsilonClusterConfig, remote
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 	err := localIsiConfig.isiSvc.client.SyncPolicy(ctx, ppName)
 	if err != nil {
-		return status.Errorf(codes.Internal, "policy sync failed %s", err.Error())
+		return status.Errorf(codes.Internal, "sync: policy sync failed %s", err.Error())
 	}
 
+	log.Info("Sync action completed")
 	return nil
 }
 
@@ -665,7 +839,6 @@ func suspend(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsi
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 
 	log.Info("Disabling policy on SRC site")
-
 	err := localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "suspend: can't disable local policy %s", err.Error())
@@ -676,6 +849,7 @@ func suspend(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsi
 		return status.Errorf(codes.Internal, "suspend: policy couldn't reach disabled condition %s", err.Error())
 	}
 
+	log.Info("Suspend action completed")
 	return nil
 }
 
@@ -685,7 +859,6 @@ func resume(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiC
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 
 	log.Info("Enabling policy on SRC site")
-
 	err := localIsiConfig.isiSvc.client.EnablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "resume: can't enable local policy %s", err.Error())
@@ -696,6 +869,7 @@ func resume(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiC
 		return status.Errorf(codes.Internal, "resume: policy couldn't reach enabled condition %s", err.Error())
 	}
 
+	log.Info("Resume action completed")
 	return nil
 }
 
@@ -711,46 +885,64 @@ func getRemoteCSIVolume(ctx context.Context, exportID int, volName, accessZone s
 /*
   - Identify the status of the protection group from local and remote policies.
     Synchronized:
-  - (Source side) If the local policy is enabled, remote policy is disabled, local is write enabled and remote is write disabled
-  - (Target side) If the local policy is disabled, remote policy is enabled, local is write disabled and remote is write enabled
+  - (Source side) If the local policy is enabled, remote policy is NIL, local TP is NIL and remote TP is write disabled
+  - (Target side) If the local policy is NIL, remote policy is enabled, local TP is write disabled and remote TP is NIL
     Suspended:
-  - (Source side) If the local policy is disabled, remote policy is disabled, local is write enabled and remote is write disabled
-  - (Target side) If the local policy is disabled, remote policy is disabled, local is write disabled and remote is write enabled
+  - (Source side) If the local policy is disabled, remote policy is NIL, local TP is NIL and remote is write disabled
+  - (Target side) If the local policy is NIL, remote policy is disabled, local TP is write disabled and remote TP is NIL
     Failover:
     1. Planned failover
-  - (both sides) local policy is disabled, remote policy is disabled, local is write enabled and remote is write enabled
+  - (Source side) If the local policy is disabled, remote policy is NIL, local TP is NIL and remote TP is write enabled
+  - (Target side) If the local policy is NIL, remote policy is disabled, local TP is write enabled and remote TP is NIL
     2. Unplanned failover (source down)
-  - (Source side) source is down. remote policy is still disabled and remote is write enabled
-  - (Target side) source is down. local policy is still disabled and local is write enabled
+  - (Source side) source is down. remote policy is NIL and remote TP is write enabled
+  - (Target side) source is down. local policy is NIL and local TP is write enabled
     3. Unplanned failover but source is up now
-  - (Source side) If the local policy is enabled, remote policy is disabled, local is write enabled and remote is write enabled
-  - (Target side) If the local policy is disabled, remote policy is enabled, local is write enabled and remote is write enabled
+  - (Source side) If the local policy is enabled, remote policy is NIL, local TP is NIL and remote TP is write enabled
+  - (Target side) If the local policy is NIL, remote policy is enabled, local TP is write enabled and remote TP is NIL
 */
 func getGroupLinkState(localP isi.Policy, localTP isi.TargetPolicy, remoteP isi.Policy, remoteTP isi.TargetPolicy, isSyncInProgress bool) csiext.StorageProtectionGroupStatus_State {
 	var state csiext.StorageProtectionGroupStatus_State
-	if isSyncInProgress { // sync-in-progress state
-		state = csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS
-	} else if (localP == nil && remoteP != nil && !remoteP.Enabled && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == "writes_enabled") || // unplanned failover & source down - source side
-		(localP != nil && !localP.Enabled && remoteP == nil && localTP != nil && localTP.FailoverFailbackState == "writes_enabled" && remoteTP == nil) { // target side
-		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
-	} else if localP == nil || remoteP == nil || localTP == nil || remoteTP == nil { // both arrays should be up - unexpected case
-		state = csiext.StorageProtectionGroupStatus_UNKNOWN
-	} else if (localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_enabled") || // unplanned failover & source up now - source side
-		(!localP.Enabled && remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_enabled") { // target side
-		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
-	} else if !localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_enabled" { // planned failover - source OR target side
-		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
-	} else if (localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_disabled") || // Synchronized state - source side
-		(!localP.Enabled && remoteP.Enabled && localTP.FailoverFailbackState == "writes_disabled" && remoteTP.FailoverFailbackState == "writes_enabled") { // target side
+	if (localP != nil && localP.Enabled && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesDisabled) || // Synchronized state - source side
+		(localP == nil && remoteP != nil && remoteP.Enabled && localTP != nil && localTP.FailoverFailbackState == WritesDisabled && remoteTP == nil) { // target side
 		state = csiext.StorageProtectionGroupStatus_SYNCHRONIZED
-	} else if (!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_enabled" && remoteTP.FailoverFailbackState == "writes_disabled") || // Suspended state - source side
-		(!localP.Enabled && !remoteP.Enabled && localTP.FailoverFailbackState == "writes_disabled" && remoteTP.FailoverFailbackState == "writes_enabled") { // target side
+	} else if (localP != nil && !localP.Enabled && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesDisabled) || // Suspended state - source side
+		(localP == nil && remoteP != nil && !remoteP.Enabled && localTP != nil && localTP.FailoverFailbackState == WritesDisabled && remoteTP == nil) { // target side
 		state = csiext.StorageProtectionGroupStatus_SUSPENDED
-	} else if localTP.LastJobState == "failed" || remoteTP.LastJobState == "failed" { // invalid state, sync job failed
+	} else if (localP != nil && !localP.Enabled && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesEnabled) || // planned failover - source side
+		(localP == nil && remoteP != nil && !remoteP.Enabled && localTP != nil && localTP.FailoverFailbackState == WritesEnabled && remoteTP == nil) { // target side
+		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
+	} else if localP == nil && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesEnabled { // unplanned failover & source down - source side
+		state = csiext.StorageProtectionGroupStatus_UNKNOWN // report UNKNOWN and maintain isSource when source is down on failedover
+	} else if localP == nil && remoteP == nil && localTP != nil && localTP.FailoverFailbackState == WritesEnabled && remoteTP == nil { // unplanned failover & source down - target side
+		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
+	} else if (localP != nil && localP.Enabled && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesEnabled) || // unplanned failover & source up now - source side
+		(localP == nil && remoteP != nil && remoteP.Enabled && localTP != nil && localTP.FailoverFailbackState == WritesEnabled && remoteTP == nil) { // target side
+		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
+	} else if isSyncInProgress { // sync-in-progress state
+		state = csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS
+	} else if (remoteTP != nil && remoteTP.LastJobState == "failed") || (localTP != nil && localTP.LastJobState == "failed") { // invalid state, sync job failed
 		state = csiext.StorageProtectionGroupStatus_INVALID
 	} else { // unknown state
 		state = csiext.StorageProtectionGroupStatus_UNKNOWN
 	}
 
 	return state
+}
+
+func getRpoInt(vgName string) int {
+	s := strings.Split(vgName, "-") // split by "_" and get last part -- it would be RPO
+	rpo := s[len(s)-1]
+
+	rpoEnum := RPOEnum(rpo)
+	if err := rpoEnum.IsValid(); err != nil {
+		return -1
+	}
+
+	rpoInt, err := rpoEnum.ToInt()
+	if err != nil {
+		return -1
+	}
+
+	return rpoInt
 }

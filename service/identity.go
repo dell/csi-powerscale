@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2023 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -150,6 +150,16 @@ func (s *service) GetReplicationCapabilities(ctx context.Context, req *csiext.Ge
 			{
 				Actions: &csiext.SupportedActions_Type{
 					Type: csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL,
+				},
+			},
+			{
+				Actions: &csiext.SupportedActions_Type{
+					Type: csiext.ActionTypes_FAILBACK_LOCAL,
+				},
+			},
+			{
+				Actions: &csiext.SupportedActions_Type{
+					Type: csiext.ActionTypes_ACTION_FAILBACK_DISCARD_CHANGES_LOCAL,
 				},
 			},
 			{
