@@ -947,17 +947,3 @@ func getRpoInt(vgName string) int {
 
 	return rpoInt
 }
-
-// GetIsiPath obtains the IsiPath from one of three sources, in order of priority:
-// Storage Class, Array Secret, Installation Values YAML
-/*func GetIsiPath(req *csiext.CreateRemoteVolumeRequest) string {
-	var isiPath string
-	storageClassIsi, ok := req.Parameters["IsiPath"]
-	if !ok {
-		pathToStrip = isiConfig.IsiPath
-	} else {
-		pathToStrip = storageClassIsi
-	}
-	return isiPath
-}
-*/
