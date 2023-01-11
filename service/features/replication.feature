@@ -42,15 +42,15 @@ Feature: Isilon CSI interface
     And I call CreateRemoteVolume
     Then the error contains <errormsg>
     Examples:
-      | induced                  | errormsg                     |
-      | "InstancesError"         | "none"                       |
-      | "CreateQuotaError"       | "EOF"                        |
-      | "CreateExportError"      | "EOF"                        |
-      | "GetExportInternalError" | "EOF"                        |
-      | "none"                   | "none"                       |
-      | "GetPolicyInternalError" | "failed to sync data "       |
-      | "GetExportPolicyError"   | "NotFound"                   |
-      | "autoProbeFailed"        | "auto probe is not enabled"  |
+      | induced                  | errormsg                    |
+      | "InstancesError"         | "none"                      |
+      | "CreateQuotaError"       | "EOF"                       |
+      | "CreateExportError"      | "EOF"                       |
+      | "GetExportInternalError" | "EOF"                       |
+      | "none"                   | "none"                      |
+      | "GetPolicyInternalError" | "failed to sync data "      |
+      | "GetExportPolicyError"   | "NotFound"                  |
+      | "autoProbeFailed"        | "auto probe is not enabled" |
 
   Scenario Outline: Create remote volume with different volume and export status and induce server errors
     Given a Isilon service
@@ -112,18 +112,18 @@ Feature: Isilon CSI interface
       | "volume1=_=_=43"                         | "remoteSystem" | "cannot be split into tokens"                                         |
 
   @deleteStorageProtectionGroup
-    @v1.0.0
+  @v1.0.0
   Scenario Outline: Delete storage protection group
     Given a Isilon service
     When I call StorageProtectionGroupDelete <volume> and <systemname> and <clustername>
     Then the error contains <errormsg>
     Examples:
-      | volume                                   | systemname        | clustername | errormsg                                                           |
-      | "cluster1::/ifs/data/csi-isilon/volume1" | "systemName"      | "cluster1"  | "Unable to get Volume Group '/ifs/data/csi-isilon/volume1'"        |
-      | "cluster1::/ifs/data/csi-isilon/volume1" | "wrongSystemName" | "cluster5"  | "Can't get systemName from PG params"                              |
-      | "cluster1::/ifs/data/csi-isilon/volume1" | "systemName"      | "cluster5"  | "failed to get cluster config details for clusterName: 'cluster5'" |
-      | ""                                       | "systemName"      | "cluster1"  | "Unable to get Volume Group ''"                                    |
-      | ""                                       | ""                | "cluster1"  | "Can't get systemName from PG params"                              |
+      | volume                                   | systemname        | clustername | errormsg                                                |
+      | "cluster1::/ifs/data/csi-isilon/volume1" | "systemName"      | "cluster1"  | "can't find `VolumeGroupName` parameter from PG params" |
+      | "cluster1::/ifs/data/csi-isilon/volume1" | "wrongSystemName" | "cluster5"  | "Can't get systemName from PG params"                   |
+      | "cluster1::/ifs/data/csi-isilon/volume1" | "systemName"      | "cluster5"  | "can't find `VolumeGroupName` parameter from PG params" |
+      | ""                                       | "systemName"      | "cluster1"  | "can't find `VolumeGroupName` parameter from PG params" |
+      | ""                                       | ""                | "cluster1"  | "Can't get systemName from PG params"                   |
 
   Scenario Outline: Get storage protection group status with parameters
     Given a Isilon service
@@ -146,19 +146,19 @@ Feature: Isilon CSI interface
     And I call GetStorageProtectionGroupStatus
     Then the error contains <errormsg>
     Examples:
-      | induced                        | errormsg                                           |
-      | "GetJobsInternalError"         | "querying active jobs for local or remote policy"  |
-      | "GetPolicyInternalError"       | "error while getting link state"                   |
-      | "GetTargetPolicyInternalError" | "error while getting link state"                   |
-      | "FailedStatus"                 | "none"                                             |
-      | "UnknownStatus"                | "error while getting link state"                   |
-      | "Jobs"                         | "querying active jobs for local or remote policy"  |
-      | "RunningJob"                   | "none"                                             |
-      | "GetSpgErrors"                 | "error while getting link state"                   |
-      | "GetSpgTPErrors"               | "error while getting link state"                   |
+      | induced                        | errormsg                                          |
+      | "GetJobsInternalError"         | "querying active jobs for local or remote policy" |
+      | "GetPolicyInternalError"       | "error while getting link state"                  |
+      | "GetTargetPolicyInternalError" | "error while getting link state"                  |
+      | "FailedStatus"                 | "none"                                            |
+      | "UnknownStatus"                | "error while getting link state"                  |
+      | "Jobs"                         | "querying active jobs for local or remote policy" |
+      | "RunningJob"                   | "none"                                            |
+      | "GetSpgErrors"                 | "error while getting link state"                  |
+      | "GetSpgTPErrors"               | "error while getting link state"                  |
 
   @executeAction
-    @v1.0.0
+  @v1.0.0
   Scenario Outline: Execute action
     Given a Isilon service
     When I call ExecuteAction to <systemName> to <clusterNameOne> to <clusterNameTwo> to <remoteSystemName> to <vgname> to <ppname>
@@ -178,10 +178,10 @@ Feature: Isilon CSI interface
     When I call SuspendExecuteAction
     Then the error contains <errormsg>
     Examples:
-      | induced                  | errormsg                                            |
-      | "UpdatePolicyError"      | "suspend: can't disable local policy"               |
-      | "autoProbeFailed"        | "auto probe is not enabled"                         |
-      | "GetSpgErrors"           | "suspend: policy couldn't reach disabled condition" |
+      | induced             | errormsg                                            |
+      | "UpdatePolicyError" | "suspend: can't disable local policy"               |
+      | "autoProbeFailed"   | "auto probe is not enabled"                         |
+      | "GetSpgErrors"      | "suspend: policy couldn't reach disabled condition" |
 
   Scenario Outline: Execute action sync
     Given a Isilon service
@@ -189,8 +189,8 @@ Feature: Isilon CSI interface
     When I call SyncExecuteAction
     Then the error contains <errormsg>
     Examples:
-      | induced          | errormsg                   |
-      | "GetPolicyError" | "sync: policy sync failed" |
+      | induced          | errormsg             |
+      | "GetPolicyError" | "policy sync failed" |
 
   Scenario Outline: Execute action failover
     Given a Isilon service
@@ -277,7 +277,7 @@ Feature: Isilon CSI interface
     Examples:
       | systemName   | clusterNameOne | clusterNameTwo | remoteSystemName   | vgname            | ppname                                            | errormsg                      |
       | "systemName" | "cluster1"     | "cluster1"     | "remoteSystemName" | "VolumeGroupName" | "csi-prov-test-19743d82-192-168-111-25-Fifty_Min" | "unable to parse RPO seconds" |
-  
+
   Scenario Outline: Execute bad action
     Given a Isilon service
     When I call BadExecuteAction
