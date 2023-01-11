@@ -285,7 +285,7 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 	ctx, log, _ := GetRunIDLog(ctx)
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
-	isiPath := utils.GetIsiPathFromPgID(groupID)
+	isiPath := utils.GetIsiPathFromPgID(groupID) // includes both replication IsiPath AND replication directory name
 	log.Infof("IsiPath: %s", isiPath)
 	clusterName, ok := localParams[s.opts.replicationContextPrefix+"systemName"]
 	if !ok {
@@ -320,36 +320,41 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 	} else if err != nil {
 		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group '%s'", isiPath)
 	}
-	// TODO: This does not support storageclass IsiPath being anything other than a subdirectory of array secret's IsiPath.
-	// Need to enhance IsiPath priority logic and querying logic.
-	childs, err := isiConfig.isiSvc.client.QueryVolumeChildren(ctx, strings.TrimPrefix(isiPath, isiConfig.IsiPath))
+
+	// NOTE: '.' and '..' are counted as subdirectories, so numSubdirectories will be 2 when folder is empty
+	numSubdirectories, err := isiConfig.isiSvc.GetSubDirectoryCount(ctx, strings.TrimSuffix(isiPath, vgName+"/"), vgName)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Error: Unable to get VG's childs at '%s'", isiPath)
+		return nil, status.Errorf(codes.Internal, "Error: Failed to get number of subdirectories '%s' when attempting deletion.", isiPath)
 	}
-	for key := range childs {
-		log.Info("Child Path: ", key)
-		exports, _ := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, key, "")
-		if exports != nil {
-			return nil, status.Errorf(codes.Internal, "VG '%s' is not empty", isiPath)
-		}
+	if numSubdirectories > 2 {
+		return nil, status.Errorf(codes.Internal, "Error: Subdirectories must not exist on Volume Group path '%s' when attempting deletion.", isiPath)
+	}
+	volumeSize := isiConfig.isiSvc.GetVolumeSize(ctx, strings.TrimSuffix(isiPath, vgName+"/"), vgName)
+	if volumeSize > 0 {
+		return nil, status.Errorf(codes.Internal, "Error: Files must not exist on Volume Group path '%s' when attempting deletion.", isiPath)
 	}
 
 	ppName := strings.ReplaceAll(vgName, ".", "-")
-	log.Info("!!!!!!!!!!!")
-	log.Info("ppName: " + ppName)
-	log.Info("!!!!!!!!!!!")
+	policy, err := isiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+	if policy != nil {
+		err = isiConfig.isiSvc.client.SyncPolicy(ctx, ppName)
+		if err != nil {
+			log.Error("Failed to sync before deletion ", err.Error())
+		}
 
-	err = isiConfig.isiSvc.client.SyncPolicy(ctx, ppName)
-	if err != nil {
-		log.Error("Failed to sync before deletion ", err.Error())
-	}
-
-	log.Info("Breaking association on SRC site")
-	err = isiConfig.isiSvc.client.BreakAssociation(ctx, ppName)
-	e, ok := err.(*isiApi.JSONError)
-	if err != nil {
-		if (ok && e.StatusCode != 404) || !strings.Contains(err.Error(), "not found") {
-			return nil, status.Errorf(codes.Internal, "can't break association on source site %s", err.Error())
+		err = isiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Unknown error while deleting PP "+ppName, err.Error())
+		} else {
+			log.Info("Protection Policy deleted.")
+		}
+	} else { //policy does not exist or was not able to be retrieved
+		if e, ok := err.(*isiApi.JSONError); ok {
+			if e.StatusCode == 404 {
+				log.Info("Policy PP" + ppName + " was not found. This may be the target-side in replication.")
+			} else {
+				return nil, status.Errorf(codes.Internal, "Unknown error while retrieving PP "+ppName, err.Error())
+			}
 		}
 	}
 
@@ -357,22 +362,8 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
+	log.Info("Contents of Volume Group deleted.")
 
-	log.Info(ppName, "ppname")
-	err = isiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
-	if err != nil {
-		if e, ok := err.(*isiApi.JSONError); ok {
-			if e.StatusCode == 404 {
-				log.Info("No PP Found")
-			} else {
-				log.Errorf("Failed to delete PP %s.", ppName)
-			}
-		} else {
-			log.Errorf("Unknown error while deleting PP %s", ppName)
-		}
-	}
-
-	log.Info("PP cleared out")
 	return &csiext.DeleteStorageProtectionGroupResponse{}, nil
 }
 
@@ -483,8 +474,6 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	log.Info("Getting storage protection group status")
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
-	isiPath := utils.GetIsiPathFromPgID(groupID)
-	log.Infof("IsiPath: %s", isiPath)
 	clusterName, ok := localParams[s.opts.replicationContextPrefix+"systemName"]
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "Error: can't find `systemName` in replication group")
@@ -958,3 +947,17 @@ func getRpoInt(vgName string) int {
 
 	return rpoInt
 }
+
+// GetIsiPath obtains the IsiPath from one of three sources, in order of priority:
+// Storage Class, Array Secret, Installation Values YAML
+/*func GetIsiPath(req *csiext.CreateRemoteVolumeRequest) string {
+	var isiPath string
+	storageClassIsi, ok := req.Parameters["IsiPath"]
+	if !ok {
+		pathToStrip = isiConfig.IsiPath
+	} else {
+		pathToStrip = storageClassIsi
+	}
+	return isiPath
+}
+*/
