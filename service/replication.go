@@ -345,9 +345,8 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 		err = isiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Unknown error while deleting PP "+ppName, err.Error())
-		} else {
-			log.Info("Protection Policy deleted.")
 		}
+		log.Info("Protection Policy deleted.")
 	} else { //policy does not exist or was not able to be retrieved
 		if e, ok := err.(*isiApi.JSONError); ok {
 			if e.StatusCode == 404 {
