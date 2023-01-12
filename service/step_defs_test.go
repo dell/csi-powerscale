@@ -377,7 +377,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a valid CreateRemoteVolumeResponse is returned$`, f.aValidCreateRemoteVolumeResponseIsReturned)
 	s.Step(`I call CreateStorageProtectionGroup`, f.iCallCreateStorageProtectionGroup)
 	s.Step(`^a valid CreateStorageProtectionGroupResponse is returned$`, f.aValidCreateStorageProtectionGroupResponseIsReturned)
-	s.Step(`^I call StorageProtectionGroupDelete "([^"]*)" and "([^"]*)" and "([^"]*)"$`, f.iCallStorageProtectionGroupDelete)
+	s.Step(`^I call StorageProtectionGroupDelete "([^"]*)" and "([^"]*)" and "([^"]*)" and "([^"]*)"$`, f.iCallStorageProtectionGroupDelete)
 	s.Step(`^a valid DeleteStorageProtectionGroupResponse is returned$`, f.aValidDeleteStorageProtectionGroupResponseIsReturned)
 	//s.Step(`^I call DeleteStorageProtectionGroupWithParams"$`, f.iCallWithParamsDeleteStorageProtectionGroup)
 	s.Step(`^I call WithParamsCreateRemoteVolume "([^"]*)" "([^"]*)"$`, f.iCallCreateRemoteVolumeWithParams)
@@ -2710,7 +2710,7 @@ func (f *feature) aValidCreateStorageProtectionGroupResponseIsReturned() error {
 	return nil
 }
 
-func deleteStorageProtectionGroupRequest(s *service, volume, systemName, clustername string) *csiext.DeleteStorageProtectionGroupRequest {
+func deleteStorageProtectionGroupRequest(s *service, volume, systemName, clustername, vgname string) *csiext.DeleteStorageProtectionGroupRequest {
 
 	req := new(csiext.DeleteStorageProtectionGroupRequest)
 
@@ -2719,11 +2719,14 @@ func deleteStorageProtectionGroupRequest(s *service, volume, systemName, cluster
 	req.ProtectionGroupAttributes = map[string]string{
 		s.opts.replicationContextPrefix + systemName: clustername,
 	}
+	if vgname != "" {
+		req.ProtectionGroupAttributes[s.opts.replicationContextPrefix+"VolumeGroupName"] = vgname
+	}
 	return req
 }
 
-func (f *feature) iCallStorageProtectionGroupDelete(volume, systemName, clustername string) error {
-	req := deleteStorageProtectionGroupRequest(f.service, volume, systemName, clustername)
+func (f *feature) iCallStorageProtectionGroupDelete(volume, systemName, clustername, vgname string) error {
+	req := deleteStorageProtectionGroupRequest(f.service, volume, systemName, clustername, vgname)
 	f.deleteStorageProtectionGroupRequest = req
 	f.deleteStorageProtectionGroupResponse, f.err = f.service.DeleteStorageProtectionGroup(context.Background(), req)
 	if f.err != nil {

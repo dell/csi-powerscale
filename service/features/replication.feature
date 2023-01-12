@@ -115,15 +115,15 @@ Feature: Isilon CSI interface
   @v1.0.0
   Scenario Outline: Delete storage protection group
     Given a Isilon service
-    When I call StorageProtectionGroupDelete <volume> and <systemname> and <clustername>
+    When I call StorageProtectionGroupDelete <volume> and <systemname> and <clustername> and <vgname>
     Then the error contains <errormsg>
     Examples:
-      | volume                                   | systemname        | clustername | errormsg                                                |
-      | "cluster1::/ifs/data/csi-isilon/volume1" | "systemName"      | "cluster1"  | "can't find `VolumeGroupName` parameter from PG params" |
-      | "cluster1::/ifs/data/csi-isilon/volume1" | "wrongSystemName" | "cluster5"  | "Can't get systemName from PG params"                   |
-      | "cluster1::/ifs/data/csi-isilon/volume1" | "systemName"      | "cluster5"  | "can't find `VolumeGroupName` parameter from PG params" |
-      | ""                                       | "systemName"      | "cluster1"  | "can't find `VolumeGroupName` parameter from PG params" |
-      | ""                                       | ""                | "cluster1"  | "Can't get systemName from PG params"                   |
+      | volume                                   | systemname        | clustername | vgname   | errormsg                                                           |
+      | "cluster1::/ifs/data/csi-isilon/volume1" | "systemName"      | "cluster1"  | ""       | "can't find `VolumeGroupName` parameter from PG params"            |
+      | "cluster1::/ifs/data/csi-isilon/volume1" | "wrongSystemName" | "cluster5"  | "vgname" | "Can't get systemName from PG params"                              |
+      | "cluster1::/ifs/data/csi-isilon/volume1" | "systemName"      | "cluster5"  | "vgname" | "failed to get cluster config details for clusterName: 'cluster5'" |
+      | ""                                       | "systemName"      | "cluster1"  | "vgname" | "Unable to get Volume Group"                                       |
+
 
   Scenario Outline: Get storage protection group status with parameters
     Given a Isilon service
