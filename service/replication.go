@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2023 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -287,6 +287,9 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 	groupID := req.GetProtectionGroupId()
 	isiPath := utils.GetIsiPathFromPgID(groupID) // includes both replication IsiPath AND replication directory name
 	log.Infof("IsiPath: %s", isiPath)
+	if isiPath == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "Error: Can't obtain valid isiPath from PG")
+	}
 	clusterName, ok := localParams[s.opts.replicationContextPrefix+"systemName"]
 	if !ok {
 		log.Error("Can't get systemName from PG params")
@@ -311,27 +314,28 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 
 	log.WithFields(fields).Info("Deleting storage protection group")
 
-	_, err = isiConfig.isiSvc.GetVolume(ctx, isiPath, "", "")
-	if e, ok := err.(*isiApi.JSONError); ok {
-		if e.StatusCode == 404 {
-			return &csiext.DeleteStorageProtectionGroupResponse{}, nil
+	volume, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", "")
+	if err != nil {
+		if e, ok := err.(*isiApi.JSONError); ok {
+			if e.StatusCode != 404 {
+				return nil, status.Errorf(codes.Internal, "Error: Unknown error while getting Volume Group "+isiPath, err.Error())
+			}
 		}
-		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group '%s'", isiPath)
-	} else if err != nil {
-		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group '%s'", isiPath)
 	}
 
-	// NOTE: '.' and '..' are counted as subdirectories, so numSubdirectories will be 2 when folder is empty
-	numSubdirectories, err := isiConfig.isiSvc.GetSubDirectoryCount(ctx, strings.TrimSuffix(isiPath, vgName+"/"), vgName)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Error: Failed to get number of subdirectories '%s' when attempting deletion.", isiPath)
-	}
-	if numSubdirectories > 2 {
-		return nil, status.Errorf(codes.Internal, "Error: Subdirectories must not exist on Volume Group path '%s' when attempting deletion.", isiPath)
-	}
-	volumeSize := isiConfig.isiSvc.GetVolumeSize(ctx, strings.TrimSuffix(isiPath, vgName+"/"), vgName)
-	if volumeSize > 0 {
-		return nil, status.Errorf(codes.Internal, "Error: Files must not exist on Volume Group path '%s' when attempting deletion.", isiPath)
+	if volume != nil {
+		// NOTE: '.' and '..' are counted as subdirectories, so numSubdirectories will be 2 when folder is empty
+		numSubdirectories, err := isiConfig.isiSvc.GetSubDirectoryCount(ctx, strings.TrimSuffix(isiPath, vgName+"/"), vgName)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Error: Failed to get number of subdirectories '%s' when attempting deletion.", isiPath)
+		}
+		if numSubdirectories > 2 {
+			return nil, status.Errorf(codes.Internal, "Error: Subdirectories must not exist on Volume Group path '%s' when attempting deletion.", isiPath)
+		}
+		volumeSize := isiConfig.isiSvc.GetVolumeSize(ctx, strings.TrimSuffix(isiPath, vgName+"/"), vgName)
+		if volumeSize > 0 {
+			return nil, status.Errorf(codes.Internal, "Error: Files must not exist on Volume Group path '%s' when attempting deletion.", isiPath)
+		}
 	}
 
 	ppName := strings.ReplaceAll(vgName, ".", "-")
@@ -357,11 +361,15 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 		}
 	}
 
-	err = isiConfig.isiSvc.DeleteVolume(ctx, isiPath, "")
-	if err != nil {
-		return nil, err
+	if volume != nil {
+		err = isiConfig.isiSvc.DeleteVolume(ctx, isiPath, "")
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Unknown error while deleting volume group's directory "+isiPath, err.Error())
+		}
+		log.Info("Contents of Volume Group deleted.")
+	} else {
+		log.Info("No directory for this Volume Group was found. It may have already been deleted.")
 	}
-	log.Info("Contents of Volume Group deleted.")
 
 	return &csiext.DeleteStorageProtectionGroupResponse{}, nil
 }
@@ -730,7 +738,7 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 	log.Info("Running sync job on TGT mirror policy")
 	err = remoteIsiConfig.isiSvc.client.SyncPolicy(ctx, ppNameMirror)
 	if err != nil {
-		return status.Errorf(codes.Internal, "policy sync failed %s", err.Error())
+		return status.Errorf(codes.Internal, "failback (discard local): policy sync failed %s", err.Error())
 	}
 
 	// Allow write on source
@@ -826,7 +834,7 @@ func synchronize(ctx context.Context, localIsiConfig *IsilonClusterConfig, remot
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 	err := localIsiConfig.isiSvc.client.SyncPolicy(ctx, ppName)
 	if err != nil {
-		return status.Errorf(codes.Internal, "policy sync failed %s", err.Error())
+		return status.Errorf(codes.Internal, "sync: policy sync failed %s", err.Error())
 	}
 
 	log.Info("Sync action completed")
