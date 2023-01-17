@@ -285,12 +285,21 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 	ctx, log, _ := GetRunIDLog(ctx)
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
-	isiPath := utils.GetIsiPathFromPgID(groupID)
+	isiPath := utils.GetIsiPathFromPgID(groupID) // includes both replication IsiPath AND replication directory name
 	log.Infof("IsiPath: %s", isiPath)
+	if isiPath == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "Error: Can't obtain valid isiPath from PG")
+	}
 	clusterName, ok := localParams[s.opts.replicationContextPrefix+"systemName"]
 	if !ok {
 		log.Error("Can't get systemName from PG params")
 		return nil, status.Errorf(codes.InvalidArgument, "Error: Can't get systemName from PG params")
+	}
+
+	vgName, ok := localParams[s.opts.replicationContextPrefix+"VolumeGroupName"]
+	if !ok {
+		log.Error("Can't get protection policy name from PG params")
+		return nil, status.Errorf(codes.InvalidArgument, "can't find `VolumeGroupName` parameter from PG params")
 	}
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
@@ -305,62 +314,63 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 
 	log.WithFields(fields).Info("Deleting storage protection group")
 
-	_, err = isiConfig.isiSvc.GetVolume(ctx, isiPath, "", "")
-	if e, ok := err.(*isiApi.JSONError); ok {
-		if e.StatusCode == 404 {
-			return &csiext.DeleteStorageProtectionGroupResponse{}, nil
-		}
-		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group '%s'", isiPath)
-	} else if err != nil {
-		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group '%s'", isiPath)
-	}
-	childs, err := isiConfig.isiSvc.client.QueryVolumeChildren(ctx, strings.TrimPrefix(isiPath, isiConfig.IsiPath))
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Error: Unable to get VG's childs at '%s'", isiPath)
-	}
-	for key := range childs {
-		log.Info("Child Path: ", key)
-		_, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, key, "")
-		if err == nil {
-			return nil, status.Errorf(codes.Internal, "VG '%s' is not empty", isiPath)
-		}
-	}
-
-	ppName := strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(isiPath, isiConfig.IsiPath), "/", ""), ".", "-")
-	err = isiConfig.isiSvc.client.SyncPolicy(ctx, ppName)
-	if err != nil {
-		log.Error("Failed to sync before deletion ", err.Error())
-	}
-
-	log.Info("Breaking association on SRC site")
-	err = isiConfig.isiSvc.client.BreakAssociation(ctx, ppName)
-	e, ok := err.(*isiApi.JSONError)
-	if err != nil {
-		if (ok && e.StatusCode != 404) || !strings.Contains(err.Error(), "not found") {
-			return nil, status.Errorf(codes.Internal, "can't break association on source site %s", err.Error())
-		}
-	}
-
-	err = isiConfig.isiSvc.DeleteVolume(ctx, isiPath, "")
-	if err != nil {
-		return nil, err
-	}
-
-	log.Info(ppName, "ppname")
-	err = isiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+	volume, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", "")
 	if err != nil {
 		if e, ok := err.(*isiApi.JSONError); ok {
-			if e.StatusCode == 404 {
-				log.Info("No PP Found")
-			} else {
-				log.Errorf("Failed to delete PP %s.", ppName)
+			if e.StatusCode != 404 {
+				return nil, status.Errorf(codes.Internal, "Error: Unknown error while getting Volume Group "+isiPath, err.Error())
 			}
-		} else {
-			log.Errorf("Unknown error while deleting PP %s", ppName)
 		}
 	}
 
-	log.Info("PP cleared out")
+	if volume != nil {
+		// NOTE: '.' and '..' are counted as subdirectories, so numSubdirectories will be 2 when folder is empty
+		numSubdirectories, err := isiConfig.isiSvc.GetSubDirectoryCount(ctx, strings.TrimSuffix(isiPath, vgName+"/"), vgName)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Error: Failed to get number of subdirectories '%s' when attempting deletion.", isiPath)
+		}
+		if numSubdirectories > 2 {
+			return nil, status.Errorf(codes.Internal, "Error: Subdirectories must not exist on Volume Group path '%s' when attempting deletion.", isiPath)
+		}
+		volumeSize := isiConfig.isiSvc.GetVolumeSize(ctx, strings.TrimSuffix(isiPath, vgName+"/"), vgName)
+		if volumeSize > 0 {
+			return nil, status.Errorf(codes.Internal, "Error: Files must not exist on Volume Group path '%s' when attempting deletion.", isiPath)
+		}
+	}
+
+	ppName := strings.ReplaceAll(vgName, ".", "-")
+	policy, err := isiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+	if policy != nil {
+		err = isiConfig.isiSvc.client.SyncPolicy(ctx, ppName)
+		if err != nil {
+			log.Error("Failed to sync before deletion ", err.Error())
+		}
+
+		err = isiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Unknown error while deleting PP "+ppName, err.Error())
+		}
+		log.Info("Protection Policy deleted.")
+	} else { //policy does not exist or was not able to be retrieved
+		if e, ok := err.(*isiApi.JSONError); ok {
+			if e.StatusCode == 404 {
+				log.Info("Policy PP" + ppName + " was not found. This may be the target-side in replication.")
+			} else {
+				return nil, status.Errorf(codes.Internal, "Unknown error while retrieving PP "+ppName, err.Error())
+			}
+		}
+	}
+
+	if volume != nil {
+		err = isiConfig.isiSvc.DeleteVolume(ctx, isiPath, "")
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Unknown error while deleting volume group's directory "+isiPath, err.Error())
+		}
+		log.Info("Contents of Volume Group deleted.")
+	} else {
+		log.Info("No directory for this Volume Group was found. It may have already been deleted.")
+	}
+
 	return &csiext.DeleteStorageProtectionGroupResponse{}, nil
 }
 
@@ -471,8 +481,6 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	log.Info("Getting storage protection group status")
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
-	isiPath := utils.GetIsiPathFromPgID(groupID)
-	log.Infof("IsiPath: %s", isiPath)
 	clusterName, ok := localParams[s.opts.replicationContextPrefix+"systemName"]
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "Error: can't find `systemName` in replication group")
