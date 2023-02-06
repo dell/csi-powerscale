@@ -698,7 +698,7 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 		// Let Endpoint be generic.
 		// Take out https prefix from it, if present, and let it's consumers to use it the way they want
 		if strings.HasPrefix(config.Endpoint, "https://") {
-			config.Endpoint = strings.TrimLeft(config.Endpoint, "https://")
+			config.Endpoint = strings.TrimPrefix(config.Endpoint, "https://")
 		}
 
 		if config.EndpointPort == "" {
