@@ -7,7 +7,7 @@ require (
 	github.com/cucumber/godog v0.10.0
 	github.com/dell/dell-csi-extensions/common v1.1.0
 	github.com/dell/dell-csi-extensions/podmon v1.1.1
-	github.com/dell/dell-csi-extensions/replication v1.2.1
+	github.com/dell/dell-csi-extensions/replication v1.2.2-0.20230112204455-8f3445ef5483
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.1
 	github.com/dell/gocsi v1.6.0
 	github.com/dell/gofsutil v1.11.0
