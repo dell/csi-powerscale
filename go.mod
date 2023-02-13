@@ -10,7 +10,7 @@ require (
 	github.com/dell/dell-csi-extensions/replication v1.2.2-0.20230112204455-8f3445ef5483
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.1
 	github.com/dell/gocsi v1.6.0
-	github.com/dell/gofsutil v1.11.0
+	github.com/dell/gofsutil v1.11.1-0.20230213102436-478d15c59d1d
 	github.com/dell/goisilon v1.10.1-0.20230105231012-7aec9b1a2f2b
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang/protobuf v1.5.2

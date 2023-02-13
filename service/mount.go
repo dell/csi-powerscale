@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"os"
+	"time"
 
 	"strings"
 
@@ -120,8 +121,24 @@ func publishVolume(
 
 	log.Infof("The mountOptions being used for mount are: %s", mntOptions)
 	if err := gofsutil.Mount(context.Background(), nfsExportURL, target, "nfs", mntOptions...); err != nil {
-		log.Errorf("%v", err)
-		return err
+		var count = 0
+		var errmsg = err.Error()
+		//Both substring validation is for NFSv3 and NFSv4 errors resp.
+		for (strings.Contains(strings.ToLower(errmsg), "access denied by server while mounting") || (strings.Contains(strings.ToLower(errmsg), "no such file or directory"))) && count < 5 {
+			time.Sleep(2 * time.Second)
+			log.Infof("Mount re-trial attempt-%d", count)
+			err = gofsutil.Mount(context.Background(), nfsExportURL, target, "nfs", mntOptions...)
+			if err != nil {
+				errmsg = err.Error()
+			} else {
+				break
+			}
+			count++
+		}
+		if err != nil {
+			log.Errorf("%v", err)
+			return err
+		}
 	}
 	return nil
 }
