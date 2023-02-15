@@ -20,14 +20,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/dell/csi-isilon/common/constants"
-	"github.com/dell/csi-isilon/common/utils"
-	"github.com/gorilla/mux"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/dell/csi-isilon/v2/common/utils"
+	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 )
 
 const (

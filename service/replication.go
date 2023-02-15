@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dell/csi-isilon/common/utils"
+	"github.com/dell/csi-isilon/v2/common/utils"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	isi "github.com/dell/goisilon"
 	isiApi "github.com/dell/goisilon/api"

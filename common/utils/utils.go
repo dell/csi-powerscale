@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"net"
 	"os"
 	"path"
@@ -28,9 +27,11 @@ import (
 	"strconv"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/Showmax/go-fqdn"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-isilon/common/constants"
+	"github.com/dell/csi-isilon/v2/common/constants"
 	csictx "github.com/dell/gocsi/context"
 	isi "github.com/dell/goisilon"
 	"github.com/google/uuid"

@@ -18,18 +18,15 @@ package service
 
 import (
 	"fmt"
-
-	csiext "github.com/dell/dell-csi-extensions/replication"
-
 	"strings"
 
 	"golang.org/x/net/context"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/dell/csi-isilon/v2/core"
+	csiext "github.com/dell/dell-csi-extensions/replication"
 	wrappers "github.com/golang/protobuf/ptypes/wrappers"
-
-	"github.com/dell/csi-isilon/common/constants"
-	"github.com/dell/csi-isilon/core"
 )
 
 func (s *service) GetPluginInfo(

@@ -19,7 +19,8 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/dell/csi-isilon/common/utils"
+
+	"github.com/dell/csi-isilon/v2/common/utils"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 )
 

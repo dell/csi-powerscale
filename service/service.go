@@ -35,12 +35,12 @@ import (
 	"google.golang.org/grpc/metadata"
 	"gopkg.in/yaml.v3"
 
-	"github.com/dell/csi-isilon/common/k8sutils"
+	"github.com/dell/csi-isilon/v2/common/k8sutils"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-isilon/common/constants"
-	"github.com/dell/csi-isilon/common/utils"
-	"github.com/dell/csi-isilon/core"
+	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/dell/csi-isilon/v2/common/utils"
+	"github.com/dell/csi-isilon/v2/core"
 	commonext "github.com/dell/dell-csi-extensions/common"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 	csiext "github.com/dell/dell-csi-extensions/replication"

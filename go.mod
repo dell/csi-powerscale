@@ -1,4 +1,4 @@
-module github.com/dell/csi-isilon
+module github.com/dell/csi-isilon/v2
 
 require (
 	github.com/Showmax/go-fqdn v1.0.0

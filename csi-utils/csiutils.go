@@ -18,8 +18,9 @@ limitations under the License.
 
 import (
 	"fmt"
-	"github.com/dell/csi-isilon/common/utils"
 	"net"
+
+	"github.com/dell/csi-isilon/v2/common/utils"
 )
 
 // GetNFSClientIP is used to fetch IP address from networks on which NFS traffic is allowed

@@ -17,7 +17,7 @@
 function runTest() {
     rm -f unix_sock
     source ${1}
-    go test -v -coverprofile=c.linux.out -timeout 30m -coverpkg=github.com/dell/csi-isilon/service *test.go -args ${2} ${3}
+    go test -v -coverprofile=c.linux.out -timeout 30m -coverpkg=../../service *test.go -args ${2} ${3}
     wait
 }
 

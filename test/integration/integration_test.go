@@ -18,21 +18,22 @@ package integration_test
 import (
 	"context"
 	"fmt"
-	"github.com/Showmax/go-fqdn"
-	"github.com/dell/csi-isilon/common/constants"
-	"github.com/dell/csi-isilon/common/k8sutils"
 	"os"
 	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/Showmax/go-fqdn"
+	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/dell/csi-isilon/v2/common/k8sutils"
+
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
-	"github.com/dell/csi-isilon/provider"
+	"github.com/dell/csi-isilon/v2/provider"
 	"github.com/dell/gocsi/utils"
 	"google.golang.org/grpc"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (

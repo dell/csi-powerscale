@@ -21,14 +21,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/dell/csi-isilon/common/constants"
-	"github.com/dell/csi-isilon/common/k8sutils"
-	"github.com/dell/csi-isilon/service"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/dell/csi-isilon/provider"
+	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/dell/csi-isilon/v2/common/k8sutils"
+	"github.com/dell/csi-isilon/v2/provider"
+	"github.com/dell/csi-isilon/v2/service"
 	"github.com/dell/gocsi"
 )
 

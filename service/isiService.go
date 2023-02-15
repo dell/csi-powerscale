@@ -22,8 +22,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dell/csi-isilon/common/constants"
-	utils "github.com/dell/csi-isilon/common/utils"
+	"github.com/dell/csi-isilon/v2/common/constants"
+	utils "github.com/dell/csi-isilon/v2/common/utils"
 	isi "github.com/dell/goisilon"
 	"github.com/dell/goisilon/api"
 )
