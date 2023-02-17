@@ -122,7 +122,7 @@ func (f *feature) aBasicVolumeRequest(name string, size int64) error {
 	capability := new(csi.VolumeCapability)
 	mount := new(csi.VolumeCapability_MountVolume)
 	mount.FsType = "nfs"
-	mount.MountFlags = []string{"vers=4"}
+	mount.MountFlags = []string{"vers=3"}
 	mountType := new(csi.VolumeCapability_Mount)
 	mountType.Mount = mount
 	capability.AccessType = mountType
