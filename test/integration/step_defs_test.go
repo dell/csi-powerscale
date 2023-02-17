@@ -243,10 +243,8 @@ func createIsilonClient() (*isi.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	ignoreUnresolvableHosts, err := strconv.ParseBool(os.Getenv("GOISILON_UNRESOLVABLE_HOSTS"))
-	if err != nil {
-		return nil, err
-	}
+
+	ignoreUnresolvableHosts := false
 
 	isiClient, err = isi.NewClientWithArgs(
 		ctx,
