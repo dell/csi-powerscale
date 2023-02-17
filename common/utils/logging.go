@@ -19,14 +19,15 @@ package utils
 import (
 	"context"
 	"fmt"
-	"github.com/dell/csi-isilon/common/constants"
-	"github.com/sirupsen/logrus"
 	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/sirupsen/logrus"
 )
 
 var singletonLog *logrus.Logger

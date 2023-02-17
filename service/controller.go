@@ -30,8 +30,8 @@ import (
 	fPath "path"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-isilon/common/constants"
-	"github.com/dell/csi-isilon/common/utils"
+	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/dell/csi-isilon/v2/common/utils"
 	isi "github.com/dell/goisilon"
 	isiApi "github.com/dell/goisilon/api"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"

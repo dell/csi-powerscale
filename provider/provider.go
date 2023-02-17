@@ -17,8 +17,8 @@ package provider
 */
 
 import (
-	"github.com/dell/csi-isilon/common/utils"
-	"github.com/dell/csi-isilon/service"
+	"github.com/dell/csi-isilon/v2/common/utils"
+	"github.com/dell/csi-isilon/v2/service"
 	"github.com/dell/gocsi"
 	"google.golang.org/grpc"
 )

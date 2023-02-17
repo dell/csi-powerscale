@@ -23,11 +23,10 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/dell/csi-isilon/service/mock/k8s"
-
-	"sync"
+	"github.com/dell/csi-isilon/v2/service/mock/k8s"
 
 	isiapi "github.com/dell/goisilon/api"
 	"github.com/gorilla/mux"

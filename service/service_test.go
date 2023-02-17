@@ -17,13 +17,13 @@ package service
 */
 import (
 	"fmt"
-	"github.com/dell/csi-isilon/common/constants"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"testing"
 
 	"github.com/cucumber/godog"
+	"github.com/dell/csi-isilon/v2/common/constants"
 )
 
 func TestMain(m *testing.M) {

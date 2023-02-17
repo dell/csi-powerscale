@@ -29,9 +29,9 @@ import (
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
-	"github.com/dell/csi-isilon/common/constants"
-	"github.com/dell/csi-isilon/common/utils"
-	"github.com/dell/csi-isilon/service"
+	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/dell/csi-isilon/v2/common/utils"
+	"github.com/dell/csi-isilon/v2/service"
 	isi "github.com/dell/goisilon"
 	apiv1 "github.com/dell/goisilon/api/v1"
 	"gopkg.in/yaml.v3"

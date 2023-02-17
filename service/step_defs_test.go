@@ -28,11 +28,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dell/csi-isilon/service/mock/k8s"
-
-	"github.com/dell/csi-isilon/common/utils"
-
-	"github.com/dell/csi-isilon/common/constants"
+	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/dell/csi-isilon/v2/common/utils"
+	"github.com/dell/csi-isilon/v2/service/mock/k8s"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"google.golang.org/grpc"
 
