@@ -758,6 +758,10 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): error waiting for condition on the local target policy. %s", err.Error())
 	}
+	err = remoteIsiConfig.isiSvc.client.WaitForNoActiveJobs(ctx, ppNameMirror)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failback (discard local): error waiting for active jobs to finish. %s", err.Error())
+	}
 
 	// Delete the target mirror policy as recommended
 	log.Info("Deleting TGT mirror policy")
