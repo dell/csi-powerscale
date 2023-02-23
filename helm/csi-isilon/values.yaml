@@ -357,8 +357,8 @@ autoProbe: true
 authorization:
   enabled: false
   # sidecarProxyImage: the container image used for the csm-authorization-sidecar.
-  # Default value: dellemc/csm-authorization-sidecar:v1.5.0
-  sidecarProxyImage: dellemc/csm-authorization-sidecar:v1.5.0
+  # Default value: dellemc/csm-authorization-sidecar:v1.6.0
+  sidecarProxyImage: dellemc/csm-authorization-sidecar:v1.6.0
   # proxyHost: hostname of the csm-authorization server
   # Default value: None
   proxyHost:
@@ -372,7 +372,7 @@ authorization:
 # Enable this feature only after contact support for additional information
 podmon:
   enabled: false
-  image: dellemc/podmon:v1.4.0
+  image: dellemc/podmon:v1.5.0
   #controller:
   #  args:
   #    - "--csisock=unix:/var/run/csi/csi.sock"
