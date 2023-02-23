@@ -20,6 +20,8 @@ parameters:
   # Examples: /ifs/data/csi, /ifs/engineering
   IsiPath: /ifs/data/csi
 
+  SoftLimit: "10"
+  AdvisoryLimit: "25"
   # The permissions for isi volume directory path
   # This value overrides the isiVolumePathPermissions attribute of corresponding cluster config in secret, if present
   # Allowed values: valid octal mode number

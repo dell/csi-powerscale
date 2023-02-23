@@ -48,6 +48,7 @@ const (
 	EnvClusterName   = "X_CSI_CLUSTER_NAME"
 	AZServiceIPParam = "AzServiceIP"
 	EnvAZServiceIP   = "X_CSI_ISI_AZ_SERVICE_IP"
+	EnvSoftLimit     = "SoftLimit"
 )
 
 var (

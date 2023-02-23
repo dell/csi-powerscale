@@ -423,6 +423,33 @@ func (s *service) CreateVolume(
 			}
 		}
 
+		_, err = remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+		if err != nil {
+			if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode == 404 {
+				err := remoteIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, rpoint, isiPath+"/"+vgName, isiPath+"/"+vgName, isiConfig.Endpoint, isiConfig.ReplicationCertificateID, true)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "can't create protection policy %s", err.Error())
+				}
+				err = remoteIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.FINISHED)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "policy job couldn't reach FINISHED state %s", err.Error())
+				}
+			}
+		}
+
+		err = isiConfig.isiSvc.client.AllowWrites(ctx, ppName)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "can't allow writes on local site %s", err.Error())
+		}
+		err = remoteIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "can't disable the policy on TGT %s", err.Error())
+		}
+		err = remoteIsiConfig.isiSvc.client.WaitForPolicyEnabledFieldCondition(ctx, ppName, false)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "policy couldn't reach disabled condition on TGT %s", err.Error())
+		}
+
 		isiPath = isiPath + "/" + VolumeGroupDir
 	}
 
