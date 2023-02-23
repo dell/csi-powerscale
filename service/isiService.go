@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -161,11 +162,24 @@ func (svc *isiService) ExportVolumeWithZone(ctx context.Context, isiPath, volNam
 	return exportID, nil
 }
 
-func (svc *isiService) CreateQuota(ctx context.Context, path, volName string, sizeInBytes int64, quotaEnabled bool) (string, error) {
+func (svc *isiService) CreateQuota(ctx context.Context, path, volName string, softLimit string, advisoryLimit string, softGracePrd string, sizeInBytes int64, quotaEnabled bool) (string, error) {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
-
 	log.Debugf("begin to create quota for '%s', size '%d', quota enabled: '%t'", volName, sizeInBytes, quotaEnabled)
+	var softi, advisoryi int64
+	var softlimitInt, advisoryLimitInt, softGracePrdInt int64
+	softGracePrdInt, _=strconv.ParseInt(softGracePrd, 10, 64)
+
+	log.Debugf("****Shefali soft grace prd in create quota %d",softGracePrdInt)
+	//converting soft limit from %ge to value
+	if softLimit != "" {
+		softi, _ = strconv.ParseInt(softLimit, 10, 64)
+		softlimitInt = (softi * sizeInBytes) /100
+	}
+	if advisoryLimit != ""{
+		advisoryi, _= strconv.ParseInt(advisoryLimit, 10, 64)
+		advisoryLimitInt = (advisoryi * sizeInBytes) /100
+	}
 
 	// if quotas are enabled, we need to set a quota on the volume
 	if quotaEnabled {
@@ -175,7 +189,16 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName string, si
 			log.Debugf("SmartQuotas is enabled, but storage size is not requested, skip creating quotas for volume '%s'", volName)
 			return "", nil
 		}
-
+		//Check if soft and advisory < 100
+		if (softlimitInt >= sizeInBytes) || (advisoryLimitInt >= sizeInBytes){
+			log.Debugf("Soft and advisory thresholds must be smaller than the hard threshold. Skip creating Quota for Volume '%s'",volName)
+			return "", nil
+		}
+		//Check on Soft Grace periord
+		if(softlimitInt != 0) && (softGracePrdInt == 0) {
+			log.Debugf("Soft Grace Period must be configured along with Soft threshold, Skip creating Quota for Volume '%s'",volName)
+			return "", nil
+		}
 		var isQuotaActivated bool
 		var checkLicErr error
 
@@ -193,7 +216,7 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName string, si
 		// create quota with container set to true
 		var quotaID string
 		var err error
-		if quotaID, err = svc.client.CreateQuotaWithPath(ctx, path, true, sizeInBytes); err != nil {
+		if quotaID, err = svc.client.CreateQuotaWithPath(ctx, path, true, sizeInBytes, softlimitInt ,advisoryLimitInt ,softGracePrdInt ); err != nil {
 			if (isQuotaActivated) && (checkLicErr == nil) {
 				return "", fmt.Errorf("SmartQuotas is activated, but creating quota failed with error: '%v'", err)
 			}
@@ -275,13 +298,14 @@ func (svc *isiService) GetVolumeQuota(ctx context.Context, volName string, expor
 	return svc.client.GetQuotaByID(ctx, quotaID)
 }
 
-func (svc *isiService) UpdateQuotaSize(ctx context.Context, quotaID string, updatedSize int64) error {
+func (svc *isiService) UpdateQuotaSize(ctx context.Context, quotaID string, updatedSize int64, updatedSoftLimit int64, updatedAdvisoryLimit int64, softGrace int64) error {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
 	log.Debugf("updating quota by id '%s' with size '%d'", quotaID, updatedSize)
 
-	if err := svc.client.UpdateQuotaSizeByID(ctx, quotaID, updatedSize); err != nil {
+
+	if err := svc.client.UpdateQuotaSizeByID(ctx, quotaID, updatedSize, updatedSoftLimit, updatedAdvisoryLimit, softGrace ); err != nil {
 		return fmt.Errorf("failed to update quota '%s' with size '%d', error: '%s'", quotaID, updatedSize, err.Error())
 	}
 
