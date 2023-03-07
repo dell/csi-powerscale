@@ -405,7 +405,7 @@ encryption:
   pluginName: "sec-isilon.dellemc.com"
 
   # image: Encryption driver image name.
-  image: "dellemc/csm-encryption:v0.2.0"
+  image: "dellemc/csm-encryption:v0.3.0"
 
   # apiPort: TCP port number used by the REST API server.
   apiPort: 3838
