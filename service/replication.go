@@ -279,13 +279,14 @@ func (s *service) CreateStorageProtectionGroup(ctx context.Context,
 }
 
 // TODO: implement
+// DeleteLocalVolume deletes the backend volume on the storage array.
 func (s *service) DeleteLocalVolume(ctx context.Context,
 	req *csiext.DeleteLocalVolumeRequest) (*csiext.DeleteLocalVolumeResponse, error) {
 	ctx, log, _ := GetRunIDLog(ctx)
 
 	log.Info("!!! Deleting Remote Volume !!!")
 
-	return &csiext.DeleteLocalVolumeResponse{}, nil
+	return &csiext.DeleteLocalVolumeResponse{}, fmt.Errorf("DeleteLocalVolume is not yet implemented")
 }
 
 // DeleteStorageProtectionGroup deletes storage protection group
