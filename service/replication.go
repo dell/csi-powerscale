@@ -286,7 +286,7 @@ func (s *service) DeleteLocalVolume(ctx context.Context,
 
 	log.Info("!!! Deleting Remote Volume !!!")
 
-	return &csiext.DeleteLocalVolumeResponse{}, fmt.Errorf("DeleteLocalVolume is not yet implemented")
+	return nil, fmt.Errorf("DeleteLocalVolume is not yet implemented")
 }
 
 // DeleteStorageProtectionGroup deletes storage protection group
