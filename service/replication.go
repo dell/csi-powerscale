@@ -284,7 +284,7 @@ func (s *service) DeleteLocalVolume(ctx context.Context,
 	req *csiext.DeleteLocalVolumeRequest) (*csiext.DeleteLocalVolumeResponse, error) {
 	ctx, log, _ := GetRunIDLog(ctx)
 
-	log.Info("DeleteLocalVolume called. NOP for csi-powerscale. The 'sync' event will handle backend volume deletion.")
+	log.Info("DeleteLocalVolume called which is a NOP for file replication.")
 
 	return &csiext.DeleteLocalVolumeResponse{}, nil
 }
