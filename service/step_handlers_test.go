@@ -161,6 +161,7 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/volume1", handleVolumeCreation).Methods("PUT")
 	isilonRouter.HandleFunc("/platform/5/quota/license/", handleGetQuotaLicense).Methods("GET")
 	isilonRouter.HandleFunc("/platform/1/quota/quotas/{quota_id}", handleGetQuotaByID).Methods("GET")
+	isilonRouter.HandleFunc("/platform/1/quota/quotas", handleGetQuotaByPath).Methods("GET").Queries("path", "/ifs/data/csi-isilon/volume1/")
 	isilonRouter.HandleFunc("/platform/1/quota/quotas/", handleCreateQuota).Methods("POST")
 	isilonRouter.HandleFunc("/platform/1/quota/quotas/{quota_id}", handleDeleteQuotaByID).Methods("DELETE")
 	isilonRouter.HandleFunc("/platform/1/quota/quotas/{quota_id}", handleUpdateQuotaByID).Methods("PUT")
@@ -390,6 +391,20 @@ func handleDeleteQuotaByID(w http.ResponseWriter, r *http.Request) {
 
 // handleGetQuota implements GET /platform/1/quota/quotas/WACnAAEAAAAAAAAAAAAAQBUPAAAAAAAA
 func handleGetQuotaByID(w http.ResponseWriter, r *http.Request) {
+	if testControllerHasNoConnection {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+	if stepHandlersErrors.QuotaNotFoundError {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(readFromFile("mock/quota/quota_not_found.txt"))
+		return
+	}
+	w.Write(readFromFile("mock/quota/get_quota_by_id.txt"))
+}
+
+// handleGetQuota implements GET /platform/1/quota/quotas?path=/ifs/data/csi-isilon/volume1/
+func handleGetQuotaByPath(w http.ResponseWriter, r *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
