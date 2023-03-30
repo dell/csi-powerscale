@@ -278,6 +278,17 @@ func (s *service) CreateStorageProtectionGroup(ctx context.Context,
 	}, nil
 }
 
+// DeleteLocalVolume deletes the backend volume on the storage array.
+// There is no use case here, because a 'sync' event will take care of backend deletion.
+func (s *service) DeleteLocalVolume(ctx context.Context,
+	req *csiext.DeleteLocalVolumeRequest) (*csiext.DeleteLocalVolumeResponse, error) {
+	ctx, log, _ := GetRunIDLog(ctx)
+
+	log.Info("DeleteLocalVolume called which is a NOP for file replication.")
+
+	return &csiext.DeleteLocalVolumeResponse{}, nil
+}
+
 // DeleteStorageProtectionGroup deletes storage protection group
 func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 	req *csiext.DeleteStorageProtectionGroupRequest) (*csiext.DeleteStorageProtectionGroupResponse, error) {
