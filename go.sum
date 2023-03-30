@@ -115,6 +115,8 @@ github.com/dell/dell-csi-extensions/podmon v1.1.2 h1:U0p2IS3PA/GPXYwtmY3bM+xfhj7
 github.com/dell/dell-csi-extensions/podmon v1.1.2/go.mod h1:MozD04ji0JsA4yRdohPF/KzDiCE7S//5alfZqhleVco=
 github.com/dell/dell-csi-extensions/replication v1.3.1-0.20230315203650-c10cd09b0057 h1:U3o1EyjtMHPnHsNLZkzzeHEgNVNfojzQZjOebVSfuNY=
 github.com/dell/dell-csi-extensions/replication v1.3.1-0.20230315203650-c10cd09b0057/go.mod h1:NhGyohTtW8sdZR9WHF7WK+/WaOY5wNnIjjSHweY0/7M=
+github.com/dell/dell-csi-extensions/replication v1.3.1-0.20230316192210-d1b46db0cbe0 h1:8puwDAHQI+SI9KoKigJARxmwRE1tk40zRFekt6WQQ/o=
+github.com/dell/dell-csi-extensions/replication v1.3.1-0.20230316192210-d1b46db0cbe0/go.mod h1:NhGyohTtW8sdZR9WHF7WK+/WaOY5wNnIjjSHweY0/7M=
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2 h1:g3HZyuXgCiHpCkkVuCNKXFRETjvOkO6/16vrAH5ls90=
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2/go.mod h1:6jxjVKuL6FPHcdPVQ4ABGJkOoTnZgHaMZXFb0PRBlPo=
 github.com/dell/gocsi v1.7.0 h1:fMQO2zwAXCaIsUoPCcnnuPMwfQMoaI1/0aqkQVndlxU=
