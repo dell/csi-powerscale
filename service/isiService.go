@@ -194,7 +194,7 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName string, so
 			log.Warnf("Soft and advisory thresholds must be smaller than the hard threshold. Skip creating Quota for Volume '%s'", volName)
 			return "", nil
 		}
-		//Check on Soft Grace periord
+		//Check on Soft Grace period
 		if (softlimitInt != 0) && (softGracePrdInt == 0) {
 			log.Warnf("Soft Grace Period must be configured along with Soft threshold, Skip creating Quota for Volume '%s'", volName)
 			return "", nil
