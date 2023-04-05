@@ -301,45 +301,36 @@ func (s *service) CreateVolume(
 	if _, ok := params[SoftLimitParam]; ok {
 		if params[SoftLimitParam] == "" {
 			softLimit = SoftLimitParamDefault
-			log.Infof("*****Shefali setting default soft limit %s", softLimit)
 		} else {
 			softLimit = params[SoftLimitParam]
-			log.Infof("*****Shefali value for soft limit in var '%s'", softLimit)
 		}
 	} else {
 		// use the default if not set in the storage class
 		softLimit = SoftLimitParamDefault
-		log.Infof("*****Shefali value for default soft limit %s", softLimit)
 	}
 
 	// Setting Advisory Limit
 	if _, ok := params[AdvisoryLimitParam]; ok {
 		if params[AdvisoryLimitParam] == "" {
 			advisoryLimit = AdvisoryLimitParamDefault
-			log.Infof("*****Shefali setting default AdvisoryLimit %s", advisoryLimit)
 		} else {
 			advisoryLimit = params[AdvisoryLimitParam]
-			log.Infof("*****Shefali value for advisory limit in var '%s'", advisoryLimit)
 		}
 	} else {
 		// use the default if not set in the storage class
 		advisoryLimit = AdvisoryLimitParamDefault
-		log.Infof("*****Shefali value for default advisory limit %s", advisoryLimit)
 	}
 
 	// Setting Soft Grace Period
 	if _, ok := params[SoftGracePrdParam]; ok {
 		if params[SoftGracePrdParam] == "" {
 			softGracePrd = SoftGracePrdParamDefault
-			log.Infof("*****Shefali setting default SoftGracePrdParam %s", softGracePrd)
 		} else {
 			softGracePrd = params[SoftGracePrdParam]
-			log.Infof("*****Shefali value for SoftGracePrdParam in var %s", softGracePrd)
 		}
 	} else {
 		// use the default if not set in the storage class
 		softGracePrd = SoftGracePrdParamDefault
-		log.Infof("*****Shefali value for default SoftGracePrdParam %s", softGracePrd)
 	}
 
 	//CSI specific metada for authorization
@@ -1020,11 +1011,6 @@ func (s *service) ControllerExpandVolume(
 		}
 		updatedSoftLimit := quotaSizeSoft * (requiredBytes / quotaSizeHard)
 		updatedAdvisoryLimit := quotaSizeAdvisory * (requiredBytes / quotaSizeHard)
-		log.Debugf("Shefali Read required bytes : %d", requiredBytes)
-		log.Debugf("Shefali Read SoftLimit : %d", quotaSizeSoft)
-		log.Debugf("Shefali Read AdvisoryLimit : %d", quotaSizeAdvisory)
-		log.Debugf("Shefali Updated SoftLimit : %d", updatedSoftLimit)
-		log.Debugf("Shefali Updated AdvisoryLimit : %d", updatedAdvisoryLimit)
 
 		if err = isiConfig.isiSvc.UpdateQuotaSize(ctx, quota.Id, requiredBytes, updatedSoftLimit, updatedAdvisoryLimit, quotaSoftGrace); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())

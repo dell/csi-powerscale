@@ -170,7 +170,6 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName string, so
 	var softlimitInt, advisoryLimitInt, softGracePrdInt int64
 	softGracePrdInt, _ = strconv.ParseInt(softGracePrd, 10, 64)
 
-	log.Debugf("****Shefali soft grace prd in create quota %d", softGracePrdInt)
 	//converting soft limit from %ge to value
 	if softLimit != "" {
 		softi, _ = strconv.ParseInt(softLimit, 10, 64)
@@ -194,7 +193,7 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName string, so
 			log.Warnf("Soft and advisory thresholds must be smaller than the hard threshold. Skip creating Quota for Volume '%s'", volName)
 			return "", nil
 		}
-		//Check on Soft Grace period
+		//Check if Soft Grace period is set along with soft limit
 		if (softlimitInt != 0) && (softGracePrdInt == 0) {
 			log.Warnf("Soft Grace Period must be configured along with Soft threshold, Skip creating Quota for Volume '%s'", volName)
 			return "", nil
