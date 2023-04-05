@@ -61,9 +61,6 @@ const (
 	// EnvAccessZone is the name of the access zone a volume can be created in, e.g. "System"
 	EnvAccessZone = "X_CSI_ISI_ACCESS_ZONE"
 
-	//EnvSoftLimit is the soft limit used in quota
-	//EnvSoftLimit = "SoftLimit"
-
 	// EnvNoProbeOnStart indicates whether a probe should be attempted upon start
 	EnvNoProbeOnStart = "X_CSI_ISI_NO_PROBE_ON_START"
 
