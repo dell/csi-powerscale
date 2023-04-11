@@ -2546,7 +2546,7 @@ func (f *feature) iCallBeforeServe() error {
 func (f *feature) ICallCreateQuotaInIsiServiceWithNegativeSizeInBytes() error {
 	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
 	ctx, _, _ := GetRunIDLog(context.Background())
-	_, f.err = clusterConfig.isiSvc.CreateQuota(ctx, f.service.opts.Path, "volume1","0", "0", "0",-1, true)
+	_, f.err = clusterConfig.isiSvc.CreateQuota(ctx, f.service.opts.Path, "volume1", "0", "0", "0", -1, true)
 	return nil
 }
 
