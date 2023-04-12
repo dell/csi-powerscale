@@ -162,7 +162,7 @@ func (svc *isiService) ExportVolumeWithZone(ctx context.Context, isiPath, volNam
 	return exportID, nil
 }
 
-func (svc *isiService) CreateQuota(ctx context.Context, path, volName string, softLimit string, advisoryLimit string, softGracePrd string, sizeInBytes int64, quotaEnabled bool) (string, error) {
+func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit, advisoryLimit, softGracePrd string, sizeInBytes int64, quotaEnabled bool) (string, error) {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 	log.Debugf("begin to create quota for '%s', size '%d', quota enabled: '%t'", volName, sizeInBytes, quotaEnabled)
@@ -297,7 +297,7 @@ func (svc *isiService) GetVolumeQuota(ctx context.Context, volName string, expor
 	return svc.client.GetQuotaByID(ctx, quotaID)
 }
 
-func (svc *isiService) UpdateQuotaSize(ctx context.Context, quotaID string, updatedSize int64, updatedSoftLimit int64, updatedAdvisoryLimit int64, softGrace int64) error {
+func (svc *isiService) UpdateQuotaSize(ctx context.Context, quotaID string, updatedSize, updatedSoftLimit, updatedAdvisoryLimit, softGrace int64) error {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
