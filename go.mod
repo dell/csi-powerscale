@@ -11,7 +11,7 @@ require (
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2
 	github.com/dell/gocsi v1.7.0
 	github.com/dell/gofsutil v1.12.0
-	github.com/dell/goisilon v1.11.1-0.20230329150441-64bd68b71e1c
+	github.com/dell/goisilon v1.11.1
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.2.0
