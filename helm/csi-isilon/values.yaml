@@ -2,7 +2,7 @@
 ########################
 # version: version of this values file
 # Note: Do not change this value
-version: "v2.6.0"
+version: "v2.6.1"
 
 # CSI driver log level
 # Allowed values: "error", "warn"/"warning", "info", "debug"

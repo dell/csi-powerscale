@@ -112,8 +112,16 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to sync data %s", err.Error())
 	}
-	volumeSize := isiConfig.isiSvc.GetVolumeSize(ctx, isiPath, volName)
-	log.Info("Volume size got: ", volumeSize)
+	// Get source quota size if assigned and set the same on target
+	var volumeSize int64
+	sourceQuota, err := isiConfig.isiSvc.client.GetQuotaWithPath(ctx, exportPath)
+	if err != nil && !strings.Contains(err.Error(), "not found:") {
+		return nil, status.Errorf(codes.Internal, "Error while retrieving quota %s", err.Error())
+	}
+	if sourceQuota != nil {
+		volumeSize = sourceQuota.Thresholds.Hard
+	}
+	log.Info("Volume size: ", volumeSize)
 
 	remoteAccessZone, ok := req.Parameters[s.WithRP(KeyReplicationRemoteAccessZone)]
 	if !ok {
@@ -137,10 +145,14 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 		quota, err := remoteIsiConfig.isiSvc.client.GetQuotaWithPath(ctx, exportPath)
 		log.Info("Get quota", quota)
 		if err != nil {
-			log.Info("Remote quota doesn't exist, create it")
-			quotaID, err = remoteIsiConfig.isiSvc.CreateQuota(ctx, exportPath, volName, volumeSize, s.opts.QuotaEnabled)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "can't create volume quota %s", err.Error())
+			if strings.Contains(err.Error(), "not found:") {
+				log.Info("Remote quota doesn't exist, create it")
+				quotaID, err = remoteIsiConfig.isiSvc.CreateQuota(ctx, exportPath, volName, volumeSize, s.opts.QuotaEnabled)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "can't create remote quota %s", err.Error())
+				}
+			} else {
+				return nil, status.Errorf(codes.Internal, "Error while retrieving remote quota %s", err.Error())
 			}
 		} else {
 			quotaID = quota.Id
