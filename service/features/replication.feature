@@ -189,8 +189,12 @@ Feature: Isilon CSI interface
     When I call SyncExecuteAction
     Then the error contains <errormsg>
     Examples:
-      | induced          | errormsg             |
-      | "GetPolicyError" | "policy sync failed" |
+      | induced                  | errormsg                                                  |
+      | "GetPolicyError"         | "policy sync failed EOF"                                  |
+      | "GetJobsInternalError"   | "policy sync failed"                                      |
+      | "QuotaScanError"         | "error while retrieving reports for failed sync job"      |
+      | "JobReportErrorNotFound" | "found no retryable error in reports for failed sync job" |
+      | "UpdatePolicyError"      | "policy sync failed"                                      |
 
   Scenario Outline: Execute action failover
     Given a Isilon service
@@ -200,9 +204,7 @@ Feature: Isilon CSI interface
     Examples:
       | induced                  | errormsg                                                 |
       | "GetPolicyInternalError" | "failover: encountered error when trying to sync policy" |
-      | "GetJobsInternalError"   | "failover: can't allow writes on target site"            |
-      | "UpdatePolicyError"      | "failover: can't disable local policy"                   |
-      | "GetSpgTPErrors"         | "failover: can't allow writes on target site"            |
+      | "GetJobsInternalError"   | "failover: encountered error when trying to sync policy" |
 
   Scenario Outline: Execute action unplanned failover
     Given a Isilon service
