@@ -14,8 +14,8 @@
 #
 # verify-csi-isilon method
 function verify-csi-isilon() {
-  verify_k8s_versions "1.21" "1.26"
-  verify_openshift_versions "4.10" "4.11"
+  verify_k8s_versions "1.21" "1.27"
+  verify_openshift_versions "4.11" "4.12"
   verify_namespace "${NS}"
   verify_required_secrets "${RELEASE}-creds"
   verify_optional_secrets "${RELEASE}-certs"
