@@ -1424,16 +1424,6 @@ func (s *service) GetCapacity(
 		return nil, err
 	}
 
-	// Optionally validate the volume capability
-	vcs := req.GetVolumeCapabilities()
-	if vcs != nil {
-		supported, reason := validateVolumeCaps(vcs, nil)
-		if !supported {
-			log.Errorf("GetVolumeCapabilities failed with error: '%s'", reason)
-			return nil, status.Errorf(codes.InvalidArgument, utils.GetMessageWithRunID(runID, reason))
-		}
-	}
-
 	//pass the key(s) to rest api
 	keyArray := []string{"ifs.bytes.avail"}
 
@@ -1447,7 +1437,7 @@ func (s *service) GetCapacity(
 	remainingCapInBytes := stat.StatsList[0].Value
 
 	return &csi.GetCapacityResponse{
-		AvailableCapacity: int64(remainingCapInBytes),
+		AvailableCapacity: remainingCapInBytes,
 	}, nil
 }
 
@@ -2005,7 +1995,7 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 				PublishedNodeIds: nil,
 				VolumeCondition: &csi.VolumeCondition{
 					Abnormal: true,
-					Message:  fmt.Sprintf("unable to fetch export list"),
+					Message:  "unable to fetch export list",
 				},
 			},
 		}, nil

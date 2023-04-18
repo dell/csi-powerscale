@@ -63,7 +63,7 @@ enableCustomTopology: false
 # Allowed values:
 #   ReadWriteOnceWithFSType: supports volume ownership and permissions change only if the fsType is defined
 #   and the volume's accessModes contains ReadWriteOnce.
-#   File: kubernetes may use fsGroup to change permissions and ownership of the volume 
+#   File: kubernetes may use fsGroup to change permissions and ownership of the volume
 #   to match user requested fsGroup in the pod's security policy regardless of fstype or access mode.
 #   None: volumes will be mounted with no modifications.
 # Default value: ReadWriteOnceWithFSType
@@ -127,7 +127,7 @@ controller:
 
     # replicationContextPrefix: prefix to use for naming of resources created by replication feature
     # Allowed values: string
-    # Default value: powerstore
+    # Default value: powerscale
     replicationContextPrefix: "powerscale"
 
     # replicationPrefix: prefix to prepend to storage classes parameters
@@ -273,7 +273,6 @@ node:
     # Default value: None
     enabled: false
 
-
 ## PLATFORM ATTRIBUTES
 ######################
 # endpointPort: Specify the HTTPs port number of the PowerScale OneFS API server
@@ -365,9 +364,23 @@ authorization:
   # skipCertificateValidation: certificate validation of the csm-authorization server
   # Allowed Values:
   #   "true" - TLS certificate verification will be skipped
-  #   "false" - TLS certificate will be verified 
-  # Default value: "true" 
+  #   "false" - TLS certificate will be verified
+  # Default value: "true"
   skipCertificateValidation: true
+
+# Storage Capacity Tracking
+# Note: Capacity tracking is supported in kubernetes v1.24 and above, this feature will be automatically disabled in older versions.
+storageCapacity:
+  # enabled : Enable/Disable storage capacity tracking
+  # Allowed values:
+  #   true: enable storage capacity tracking
+  #   false: disable storage capacity tracking
+  # Default value: true
+  enabled: true
+  # pollInterval : Configure how often external-provisioner polls the driver to detect changed capacity
+  # Allowed values: 1m,2m,3m,...,10m,...,60m etc
+  # Default value: 5m
+  pollInterval: 5m
 
 # Enable this feature only after contact support for additional information
 podmon:
@@ -413,15 +426,15 @@ encryption:
   # logLevel: Log level of the encryption driver.
   # Allowed values: "error", "warning", "info", "debug", "trace".
   logLevel: "error"
-  
-  # livenessPort: HTTP liveness probe port number. 
+
+  # livenessPort: HTTP liveness probe port number.
   # Leave empty to disable the liveness probe.
   # Example: 8080
   livenessPort:
 
   # ocp: Enable when running on OpenShift Container Platform with CoreOS worker nodes.
   ocp: false
-  
+
   # ocpCoreID: User ID and group ID of user core on CoreOS worker nodes.
   # Ignored when ocp is set to false.
   ocpCoreID: "1000:1000"
