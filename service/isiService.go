@@ -167,17 +167,33 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit
 	log := utils.GetRunIDLogger(ctx)
 	log.Debugf("begin to create quota for '%s', size '%d', quota enabled: '%t'", volName, sizeInBytes, quotaEnabled)
 	var softi, advisoryi int64
+	var err error
 	var softlimitInt, advisoryLimitInt, softGracePrdInt int64
-	softGracePrdInt, _ = strconv.ParseInt(softGracePrd, 10, 64)
+	softGracePrdInt, err = strconv.ParseInt(softGracePrd, 10, 64)
+	if err != nil {
+		log.Debugf("Invalid softGracePrd value .Setting it to default.")
+		softGracePrdInt = 0
+	}
 
 	//converting soft limit from %ge to value
 	if softLimit != "" {
-		softi, _ = strconv.ParseInt(softLimit, 10, 64)
-		softlimitInt = (softi * sizeInBytes) / 100
+		softi, err = strconv.ParseInt(softLimit, 10, 64)
+		if err != nil {
+			log.Debugf("Invalid softLimit value .Setting it to default.")
+			softlimitInt = 0
+		} else {
+			softlimitInt = (softi * sizeInBytes) / 100
+		}
 	}
 	if advisoryLimit != "" {
-		advisoryi, _ = strconv.ParseInt(advisoryLimit, 10, 64)
-		advisoryLimitInt = (advisoryi * sizeInBytes) / 100
+		advisoryi, err = strconv.ParseInt(advisoryLimit, 10, 64)
+		if err != nil {
+			log.Debugf("Invalid advisoryLimit value .Setting it to default.")
+			advisoryLimitInt = 0
+
+		} else {
+			advisoryLimitInt = (advisoryi * sizeInBytes) / 100
+		}
 	}
 
 	// if quotas are enabled, we need to set a quota on the volume
