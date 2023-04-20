@@ -84,6 +84,8 @@ var (
 		DeletePolicyInternalError     bool
 		DeletePolicyNotAPIError       bool
 		CreatePolicyError             bool
+		QuotaScanError                bool
+		JobReportErrorNotFound        bool
 		FailedStatus                  bool
 		UnknownStatus                 bool
 		UpdatePolicyError             bool
@@ -161,6 +163,7 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/volume1", handleVolumeCreation).Methods("PUT")
 	isilonRouter.HandleFunc("/platform/5/quota/license/", handleGetQuotaLicense).Methods("GET")
 	isilonRouter.HandleFunc("/platform/1/quota/quotas/{quota_id}", handleGetQuotaByID).Methods("GET")
+	isilonRouter.HandleFunc("/platform/1/quota/quotas", handleGetQuotaByPath).Methods("GET").Queries("path", "/ifs/data/csi-isilon/volume1/")
 	isilonRouter.HandleFunc("/platform/1/quota/quotas/", handleCreateQuota).Methods("POST")
 	isilonRouter.HandleFunc("/platform/1/quota/quotas/{quota_id}", handleDeleteQuotaByID).Methods("DELETE")
 	isilonRouter.HandleFunc("/platform/1/quota/quotas/{quota_id}", handleUpdateQuotaByID).Methods("PUT")
@@ -192,6 +195,7 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/platform/11/sync/target/policies/{id}", handleBreakAssociation).Methods("DELETE")
 	isilonRouter.HandleFunc("/platform/11/sync/policies/{id}", handleDeletePolicy).Methods("DELETE")
 	isilonRouter.HandleFunc("/platform/11/sync/target/policies/{id}", handleAllowWrites).Methods("PUT")
+	isilonRouter.HandleFunc("/platform/11/sync/reports/", handleGetReportsByPolicy).Methods("GET").Queries("policy_name", "csi-prov-test-19743d82-192-168-111-25-Five_Minutes", "sort", "end_time", "reports_per_policy", "1")
 	isilonRouter.HandleFunc("/namespace/ifs/data/yian/.csi-existent_snapshot_name-tracking-dir/snapVol1", handleGetExistentSnapshotVolume).Methods("GET")
 	isilonRouter.HandleFunc("/namespace/ifs/data/yian/.csi-existent_snapshot_name-tracking-dir", handleCreateVolumeFromSnapshot).Methods("PUT")
 	isilonRouter.HandleFunc("/namespace/ifs/data/yian/.csi-existent_snapshot_name-tracking-dir/snapVol2", handleCreateVolumeFromSnapshot).Methods("PUT")
@@ -390,6 +394,20 @@ func handleDeleteQuotaByID(w http.ResponseWriter, r *http.Request) {
 
 // handleGetQuota implements GET /platform/1/quota/quotas/WACnAAEAAAAAAAAAAAAAQBUPAAAAAAAA
 func handleGetQuotaByID(w http.ResponseWriter, r *http.Request) {
+	if testControllerHasNoConnection {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+	if stepHandlersErrors.QuotaNotFoundError {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(readFromFile("mock/quota/quota_not_found.txt"))
+		return
+	}
+	w.Write(readFromFile("mock/quota/get_quota_by_id.txt"))
+}
+
+// handleGetQuota implements GET /platform/1/quota/quotas?path=/ifs/data/csi-isilon/volume1/
+func handleGetQuotaByPath(w http.ResponseWriter, r *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -755,6 +773,12 @@ func handleGetPoliciesByName(w http.ResponseWriter, r *http.Request) {
 		writeError(w, "", http.StatusNotFound, codes.NotFound)
 	}
 
+	if stepHandlersErrors.InstancesError || stepHandlersErrors.QuotaNotFoundError ||
+		stepHandlersErrors.VolumeNotExistError || stepHandlersErrors.CreateExportError ||
+		stepHandlersErrors.GetExportPolicyError || !stepHandlersErrors.VolumeNotExistError {
+		w.Write(readFromFile("mock/policy/get_policies.txt"))
+	}
+
 	defer func() {
 		stepHandlersErrors.counter++
 	}()
@@ -793,6 +817,13 @@ func handleSyncJob(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
+
+	if stepHandlersErrors.QuotaScanError || stepHandlersErrors.JobReportErrorNotFound ||
+		stepHandlersErrors.UpdatePolicyError {
+		writeError(w, "is in an error state. Please resolve it and retry", http.StatusNotFound, codes.Internal)
+		return
+	}
+
 	w.Write(readFromFile("mock/jobs/created.json"))
 }
 
@@ -997,6 +1028,26 @@ func handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 	// response body is empty
 	w.Write([]byte(""))
+}
+
+// handleGetReportsByPolicy implements GET /platform/11/sync/reports/?policy_name=csi-prov-test-19743d82-192-168-111-25-Five_Minutes&sort=end_time&reports_per_policy=1"
+func handleGetReportsByPolicy(w http.ResponseWriter, r *http.Request) {
+	if testControllerHasNoConnection {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+
+	if stepHandlersErrors.QuotaScanError {
+		writeError(w, "", http.StatusInternalServerError, codes.Internal)
+		return
+	}
+
+	if stepHandlersErrors.JobReportErrorNotFound {
+		w.Write(readFromFile("mock/report/get_report_no_error.txt"))
+		return
+	}
+
+	w.Write(readFromFile("mock/report/get_report_by_policy.txt"))
 }
 
 // handleGetExistentSnapshotVolume implements GET /namespace/ifs/data/csi-isilon/childZone/.csi-existent_snapshot_name_4-tracking-dir/volume1
