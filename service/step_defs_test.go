@@ -873,6 +873,10 @@ func (f *feature) iInduceError(errtype string) error {
 		stepHandlersErrors.DeletePolicyNotAPIError = true
 	case "CreatePolicyError":
 		stepHandlersErrors.CreatePolicyError = true
+	case "QuotaScanError":
+		stepHandlersErrors.QuotaScanError = true
+	case "JobReportErrorNotFound":
+		stepHandlersErrors.JobReportErrorNotFound = true
 	case "FailedStatus":
 		stepHandlersErrors.FailedStatus = true
 	case "UnknownStatus":
@@ -1126,6 +1130,8 @@ func clearErrors() {
 	stepHandlersErrors.DeletePolicyInternalError = false
 	stepHandlersErrors.DeletePolicyNotAPIError = false
 	stepHandlersErrors.CreatePolicyError = false
+	stepHandlersErrors.QuotaScanError = false
+	stepHandlersErrors.JobReportErrorNotFound = false
 	stepHandlersErrors.FailedStatus = false
 	stepHandlersErrors.UnknownStatus = false
 	stepHandlersErrors.UpdatePolicyError = false
