@@ -171,7 +171,7 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit
 	var softlimitInt, advisoryLimitInt, softGracePrdInt int64
 	softGracePrdInt, err = strconv.ParseInt(softGracePrd, 10, 64)
 	if err != nil {
-		log.Debugf("Invalid softGracePrd value .Setting it to default.")
+		log.Debugf("Invalid softGracePrd value. Setting it to default.")
 		softGracePrdInt = 0
 	}
 
@@ -179,7 +179,7 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit
 	if softLimit != "" {
 		softi, err = strconv.ParseInt(softLimit, 10, 64)
 		if err != nil {
-			log.Debugf("Invalid softLimit value .Setting it to default.")
+			log.Debugf("Invalid softLimit value. Setting it to default.")
 			softlimitInt = 0
 		} else {
 			softlimitInt = (softi * sizeInBytes) / 100
@@ -188,7 +188,7 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit
 	if advisoryLimit != "" {
 		advisoryi, err = strconv.ParseInt(advisoryLimit, 10, 64)
 		if err != nil {
-			log.Debugf("Invalid advisoryLimit value .Setting it to default.")
+			log.Debugf("Invalid advisoryLimit value. Setting it to default.")
 			advisoryLimitInt = 0
 
 		} else {
