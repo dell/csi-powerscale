@@ -61,6 +61,13 @@ const (
 	DeleteSnapshotMarker          = "DELETE_SNAPSHOT"
 	IgnoreDotAndDotDotSubDirs     = 2
 	ClusterNameParam              = "ClusterName"
+	SoftLimitParam                = "SoftLimit"
+	SoftLimitParamDefault         = ""
+	AdvisoryLimitParam            = "AdvisoryLimit"
+	AdvisoryLimitParamDefault     = ""
+	SoftGracePrdParam             = "SoftGracePrd"
+	SoftGracePrdParamDefault      = ""
+
 	// KeyReplicationEnabled represents key for replication enabled
 	KeyReplicationEnabled = "isReplicationEnabled"
 
@@ -176,6 +183,9 @@ func (s *service) CreateVolume(
 		snapshotTrackingDir               string
 		snapshotTrackingDirEntryForVolume string
 		clusterName                       string
+		softLimit                         string
+		advisoryLimit                     string
+		softGracePrd                      string
 		isReplication                     bool
 		VolumeGroupDir                    string
 		snapshotSourceVolumeIsiPath       string
@@ -286,6 +296,41 @@ func (s *service) CreateVolume(
 	} else {
 		// use the default if not set in the storage class
 		rootClientEnabled = RootClientEnabledParamDefault
+	}
+	//Setting Soft Limit
+	if _, ok := params[SoftLimitParam]; ok {
+		if params[SoftLimitParam] == "" {
+			softLimit = SoftLimitParamDefault
+		} else {
+			softLimit = params[SoftLimitParam]
+		}
+	} else {
+		// use the default if not set in the storage class
+		softLimit = SoftLimitParamDefault
+	}
+
+	// Setting Advisory Limit
+	if _, ok := params[AdvisoryLimitParam]; ok {
+		if params[AdvisoryLimitParam] == "" {
+			advisoryLimit = AdvisoryLimitParamDefault
+		} else {
+			advisoryLimit = params[AdvisoryLimitParam]
+		}
+	} else {
+		// use the default if not set in the storage class
+		advisoryLimit = AdvisoryLimitParamDefault
+	}
+
+	// Setting Soft Grace Period
+	if _, ok := params[SoftGracePrdParam]; ok {
+		if params[SoftGracePrdParam] == "" {
+			softGracePrd = SoftGracePrdParamDefault
+		} else {
+			softGracePrd = params[SoftGracePrdParam]
+		}
+	} else {
+		// use the default if not set in the storage class
+		softGracePrd = SoftGracePrdParamDefault
 	}
 
 	//CSI specific metada for authorization
@@ -532,7 +577,7 @@ func (s *service) CreateVolume(
 
 	if !foundVol && !isROVolumeFromSnapshot {
 		// create quota
-		if quotaID, err = isiConfig.isiSvc.CreateQuota(ctx, path, req.GetName(), sizeInBytes, s.opts.QuotaEnabled); err != nil {
+		if quotaID, err = isiConfig.isiSvc.CreateQuota(ctx, path, req.GetName(), softLimit, advisoryLimit, softGracePrd, sizeInBytes, s.opts.QuotaEnabled); err != nil {
 			log.Errorf("error creating quota ('%s', '%d' bytes), abort, also roll back by deleting the newly created volume: '%v'", req.GetName(), sizeInBytes, err)
 			//roll back, delete the newly created volume
 			if err = isiConfig.isiSvc.DeleteVolume(ctx, isiPath, req.GetName()); err != nil {
@@ -955,13 +1000,19 @@ func (s *service) ControllerExpandVolume(
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 
-		quotaSize := quota.Thresholds.Hard
-		if requiredBytes <= quotaSize {
-			// volume capacity is larger than or equal to the target capacity, return OK
-			return &csi.ControllerExpandVolumeResponse{CapacityBytes: quotaSize, NodeExpansionRequired: false}, nil
-		}
+		quotaSizeHard := quota.Thresholds.Hard
+		quotaSizeSoft := quota.Thresholds.Soft
+		quotaSizeAdvisory := quota.Thresholds.Advisory
+		quotaSoftGrace := quota.Thresholds.SoftGrace
 
-		if err = isiConfig.isiSvc.UpdateQuotaSize(ctx, quota.Id, requiredBytes); err != nil {
+		if requiredBytes <= quotaSizeHard {
+			// volume capacity is larger than or equal to the target capacity, return OK
+			return &csi.ControllerExpandVolumeResponse{CapacityBytes: quotaSizeHard, NodeExpansionRequired: false}, nil
+		}
+		updatedSoftLimit := quotaSizeSoft * (requiredBytes / quotaSizeHard)
+		updatedAdvisoryLimit := quotaSizeAdvisory * (requiredBytes / quotaSizeHard)
+
+		if err = isiConfig.isiSvc.UpdateQuotaSize(ctx, quota.Id, requiredBytes, updatedSoftLimit, updatedAdvisoryLimit, quotaSoftGrace); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
