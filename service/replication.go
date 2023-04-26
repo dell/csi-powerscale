@@ -147,7 +147,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 		if err != nil {
 			if strings.Contains(err.Error(), "not found:") {
 				log.Info("Remote quota doesn't exist, create it")
-				quotaID, err = remoteIsiConfig.isiSvc.CreateQuota(ctx, exportPath, volName,"0", "0", "0", volumeSize, s.opts.QuotaEnabled)
+				quotaID, err = remoteIsiConfig.isiSvc.CreateQuota(ctx, exportPath, volName, "0", "0", "0", volumeSize, s.opts.QuotaEnabled)
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "can't create remote quota %s", err.Error())
 				}
