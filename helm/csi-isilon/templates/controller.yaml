@@ -103,6 +103,17 @@ rules:
     verbs: ["create", "delete", "get", "list", "watch", "update", "patch"]
   {{- end}}
   {{- end}}
+  {{- if eq (include "csi-isilon.isStorageCapacitySupported" .) "true" }}
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csistoragecapacities"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get"]
+  {{- end }}
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -326,6 +337,9 @@ spec:
             - "--feature-gates=Topology=true"
             - "--leader-election"
             - "--extra-create-metadata"
+            - "--enable-capacity={{ (include "csi-isilon.isStorageCapacitySupported" .) | default false }}"
+            - "--capacity-ownerref-level=2"
+            - "--capacity-poll-interval={{ .Values.storageCapacity.pollInterval | default "5m" }}"
             {{- if hasKey .Values.controller "leaderElection" }}
             {{- if hasKey .Values.controller.leaderElection "leaderElectionRenewDeadline" }}
             - "--leader-election-renew-deadline={{ .Values.controller.leaderElection.leaderElectionRenewDeadline }}"
@@ -337,6 +351,15 @@ spec:
             - "--leader-election-retry-period={{ .Values.controller.leaderElection.leaderElectionRetryPeriod }}"
             {{end}}
             {{end}}
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
