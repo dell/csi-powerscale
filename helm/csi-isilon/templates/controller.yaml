@@ -271,6 +271,16 @@ spec:
               mountPath: /var/run/csi
         {{ end }}
         {{ end }}
+        - name: csi-metadata-retriever
+          image: dellemc/csi-metadata-retriever:v1.3.0
+          imagePullPolicy: Always
+          command: [ "/csi-metadata-retriever" ]
+          env:
+            - name: X_CSI_RETRIEVER_ENDPOINT
+              value: /var/run/csi/csi_retriever.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
         - name: attacher{{ $csiSidecarSuffix }}
           image: {{ required "Must provide the CSI attacher container image." ( include "csi-isilon.attacherImage" . ) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}

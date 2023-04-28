@@ -110,6 +110,11 @@ controller:
     # Default value: 5s
     leaderElectionRetryPeriod: 5s
 
+  # Image for csi-metadata-retriever
+  metadataretriever:
+    enabled: true
+    image: dellemc/csi-metadata-retriever:v1.3.0
+
   # replication: allows to configure replication
   # Replication CRDs must be installed before installing driver
   replication:
