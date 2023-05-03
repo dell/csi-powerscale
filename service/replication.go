@@ -168,6 +168,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 							log.Debugf("Error while adding dummy localhost entry to export '%d'", remoteExportID)
 						}
 					}
+					break
 				}
 				time.Sleep(RetrySleepTime)
 				log.Printf("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, remoteExportID, exportPath)
@@ -292,7 +293,7 @@ func (s *service) CreateStorageProtectionGroup(ctx context.Context,
 
 // DeleteLocalVolume deletes the backend volume on the storage array.
 // There is no need to delete volume here, because a 'sync' event will take care of backend (remote) deletion.
-// Use this call to delete the NFS export for the (remote) directory which will be left out in case of no PVC on this side.
+// Use this call to delete the NFS export for the (remote) directory which will be left out in case of no PVC/Pod on this side.
 func (s *service) DeleteLocalVolume(ctx context.Context,
 	req *csiext.DeleteLocalVolumeRequest) (*csiext.DeleteLocalVolumeResponse, error) {
 	ctx, log, _ := GetRunIDLog(ctx)
@@ -317,7 +318,7 @@ func (s *service) DeleteLocalVolume(ctx context.Context,
 
 	// Ideally the remote directory would be gone due to sync event but the sync may take longer if the policy has greater RPO.
 	// Check if there is a NFS export for this directory (i.e only localhost as client) and then delete the export.
-	// If there are other clients, then there is a PVC on this side whose deletion would trigger DeleteVolume() thus deleting export.
+	// If there are other clients, then there is a PVC/Pod on this side whose deletion would trigger DeleteVolume() thus deleting export.
 	export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
 	if err != nil {
 		if jsonError, ok := err.(*isiApi.JSONError); ok && jsonError.StatusCode == 404 {
