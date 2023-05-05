@@ -65,6 +65,8 @@ type feature struct {
 	createVolumeRequest                     *csi.CreateVolumeRequest
 	createRemoteVolumeRequest               *csiext.CreateRemoteVolumeRequest
 	createRemoteVolumeResponse              *csiext.CreateRemoteVolumeResponse
+	deleteLocalVolumeRequest                *csiext.DeleteLocalVolumeRequest
+	deleteLocalVolumeResponse               *csiext.DeleteLocalVolumeResponse
 	createStorageProtectionGroupRequest     *csiext.CreateStorageProtectionGroupRequest
 	createStorageProtectionGroupResponse    *csiext.CreateStorageProtectionGroupResponse
 	deleteStorageProtectionGroupRequest     *csiext.DeleteStorageProtectionGroupRequest
@@ -377,9 +379,10 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a valid CreateStorageProtectionGroupResponse is returned$`, f.aValidCreateStorageProtectionGroupResponseIsReturned)
 	s.Step(`^I call StorageProtectionGroupDelete "([^"]*)" and "([^"]*)" and "([^"]*)" and "([^"]*)"$`, f.iCallStorageProtectionGroupDelete)
 	s.Step(`^a valid DeleteStorageProtectionGroupResponse is returned$`, f.aValidDeleteStorageProtectionGroupResponseIsReturned)
-	//s.Step(`^I call DeleteStorageProtectionGroupWithParams"$`, f.iCallWithParamsDeleteStorageProtectionGroup)
 	s.Step(`^I call WithParamsCreateRemoteVolume "([^"]*)" "([^"]*)"$`, f.iCallCreateRemoteVolumeWithParams)
 	s.Step(`^I call WithParamsCreateStorageProtectionGroup "([^"]*)" "([^"]*)"$`, f.iCallCreateStorageProtectionGroupWithParams)
+	s.Step(`^I call DeleteLocalVolume`, f.iCallDeleteLocalVolume)
+	s.Step(`^I call WithParamsDeleteLocalVolume "([^"]*)"$`, f.iCallDeleteLocalVolumeWithParams)
 	s.Step(`I call GetStorageProtectionGroupStatus`, f.iCallGetStorageProtectionGroupStatus)
 	s.Step(`^a valid GetStorageProtectionGroupStatusResponse is returned$`, f.aValidGetStorageProtectionGroupStatusResponseIsReturned)
 	s.Step(`^I call WithParamsGetStorageProtectionGroupStatus "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)"$`, f.iCallGetStorageProtectionGroupStatusWithParams)
@@ -2666,6 +2669,38 @@ func (f *feature) aValidCreateRemoteVolumeResponseIsReturned() error {
 	f.volumeIDList = append(f.volumeIDList, f.createRemoteVolumeResponse.RemoteVolume.VolumeId)
 	fmt.Printf("volume '%s'\n",
 		f.createRemoteVolumeResponse.RemoteVolume.VolumeContext["Name"])
+	return nil
+}
+
+func getDeleteLocalVolumeRequest(s *service) *csiext.DeleteLocalVolumeRequest {
+	req := new(csiext.DeleteLocalVolumeRequest)
+	req.VolumeHandle = "volume1=_=_=19=_=_=System=_=_=cluster1"
+	return req
+}
+
+func (f *feature) iCallDeleteLocalVolume() error {
+	req := getDeleteLocalVolumeRequest(f.service)
+	f.deleteLocalVolumeRequest = req
+	f.deleteLocalVolumeResponse, f.err = f.service.DeleteLocalVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("DeleteLocalVolume call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func getDeleteLocalVolumeRequestWithParams(s *service, volhandle string) *csiext.DeleteLocalVolumeRequest {
+	req := new(csiext.DeleteLocalVolumeRequest)
+	req.VolumeHandle = volhandle
+	return req
+}
+
+func (f *feature) iCallDeleteLocalVolumeWithParams(volhandle string) error {
+	req := getDeleteLocalVolumeRequestWithParams(f.service, volhandle)
+	f.deleteLocalVolumeRequest = req
+	f.deleteLocalVolumeResponse, f.err = f.service.DeleteLocalVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("DeleteLocalVolume call failed: %s\n", f.err.Error())
+	}
 	return nil
 }
 

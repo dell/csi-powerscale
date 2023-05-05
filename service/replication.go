@@ -168,6 +168,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 							log.Debugf("Error while adding dummy localhost entry to export '%d'", remoteExportID)
 						}
 					}
+					break
 				}
 				time.Sleep(RetrySleepTime)
 				log.Printf("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, remoteExportID, exportPath)
@@ -291,13 +292,57 @@ func (s *service) CreateStorageProtectionGroup(ctx context.Context,
 }
 
 // DeleteLocalVolume deletes the backend volume on the storage array.
-// There is no use case here, because a 'sync' event will take care of backend deletion.
+// There is no need to delete volume here, because a 'sync' event will take care of backend (remote) deletion.
+// Use this call to delete the NFS export for the (remote) directory which will be left out in case of no PVC/Pod on this side.
 func (s *service) DeleteLocalVolume(ctx context.Context,
 	req *csiext.DeleteLocalVolumeRequest) (*csiext.DeleteLocalVolumeResponse, error) {
 	ctx, log, _ := GetRunIDLog(ctx)
+	volumeID := req.GetVolumeHandle()
 
-	log.Info("DeleteLocalVolume called which is a NOP for file replication.")
+	log.Infof("Deleting export for volume %s per request from remote replication controller", volumeID)
 
+	// Parse the input volume ID and fetch its components
+	volName, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, volumeID)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to parse volume ID '%s', error: '%s'", volumeID, err.Error()))
+	}
+
+	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
+	if err != nil {
+		log.Error("Failed to get Isilon config with error ", err.Error())
+		return nil, err
+	}
+
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
+
+	// Ideally the remote directory would be gone due to sync event but the sync may take longer if the policy has greater RPO.
+	// Check if there is a NFS export for this directory (i.e only localhost as client) and then delete the export.
+	// If there are other clients, then there is a PVC/Pod on this side whose deletion would trigger DeleteVolume() thus deleting export.
+	export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
+	if err != nil {
+		if jsonError, ok := err.(*isiApi.JSONError); ok && jsonError.StatusCode == 404 {
+			log.Info("Export with ID does not exist, may have been already deleted.")
+			return &csiext.DeleteLocalVolumeResponse{}, nil
+		}
+		return nil, err
+	}
+
+	isiPath := utils.GetIsiPathFromExportPath((*export.Paths)[0])
+	if isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", volName) {
+		log.Debugf("Local volume %s still exists, SyncIQ job has not run yet.", volName)
+	}
+
+	clients := *export.Clients
+	if len(clients) == 1 && clients[0] == "localhost" {
+		if err := isiConfig.isiSvc.UnexportByIDWithZone(ctx, exportID, accessZone); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("export for volume %s has other clients in AccessZone %s. It is not safe to delete the export", volName, accessZone)
+	}
+
+	log.Infof("Export for volume %s deleted successfully.", volumeID)
 	return &csiext.DeleteLocalVolumeResponse{}, nil
 }
 
