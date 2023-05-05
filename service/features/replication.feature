@@ -157,6 +157,30 @@ Feature: Isilon CSI interface
       | "GetSpgErrors"                 | "error while getting link state"                  |
       | "GetSpgTPErrors"               | "error while getting link state"                  |
 
+  Scenario Outline: Delete local volume with parameters
+    Given a Isilon service
+    When I call Probe
+    And I call WithParamsDeleteLocalVolume <volhandle>
+    Then the error contains <errormsg>
+    Examples:
+      | volhandle                                | errormsg                                                           |
+      | "volume1=_=_=43"                         | "cannot be split into tokens"                                      |
+      | "volume1=_=_=xx=_=_=System=_=_=cluster1" | "failed to parse volume ID"                                        |
+      | "volume1=_=_=43=_=_=System=_=_=cluster2" | "failed to get cluster config details for clusterName: 'cluster2'" |
+
+  Scenario Outline: Delete local volume with induced errors
+    Given a Isilon service
+    And I enable quota
+    When I call Probe
+    And I induce error <induced>
+    And I call DeleteLocalVolume
+    Then the error contains <errormsg>
+    Examples:
+      | induced                      | errormsg                                                                      |
+      | "GetExportByIDNotFoundError" | "none"                                                                        |
+      | "GetExportInternalError"     | "EOF"                                                                         |
+      | "none"                       | "has other clients in AccessZone System. It is not safe to delete the export" |
+
   @executeAction
   @v1.0.0
   Scenario Outline: Execute action
