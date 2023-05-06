@@ -104,8 +104,5 @@ const (
 	EnvPodmonArrayConnectivityPollRate = "X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE"
 
 	// EnvMetadataRetrieverEndpoint specifies the endpoint address for csi-metadata-retriever sidecar
-	EnvMetadataRetrieverEndpoint = "X_CSI_RETRIEVER_ENDPOINT"
-
-	// EnvMetadataRetrieverEnabled indicates that csi-metadata-retriever sidecar is enabled
-	EnvMetadataRetrieverEnabled = "X_CSI_RETRIEVER_ENABLED"
+	EnvMetadataRetrieverEndpoint = "CSI_RETRIEVER_ENDPOINT"
 )

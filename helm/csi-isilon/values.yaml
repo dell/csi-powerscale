@@ -112,7 +112,6 @@ controller:
 
   # Image for csi-metadata-retriever
   metadataretriever:
-    enabled: true
     image: dellemc/csi-metadata-retriever:v1.3.0
 
   # replication: allows to configure replication

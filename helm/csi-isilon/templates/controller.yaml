@@ -276,7 +276,7 @@ spec:
           imagePullPolicy: Always
           command: [ "/csi-metadata-retriever" ]
           env:
-            - name: X_CSI_RETRIEVER_ENDPOINT
+            - name: CSI_RETRIEVER_ENDPOINT
               value: /var/run/csi/csi_retriever.sock
           volumeMounts:
             - name: socket-dir
@@ -423,6 +423,8 @@ spec:
           env:
             - name: CSI_ENDPOINT
               value: "{{ $driverSockPath }}"
+            - name: CSI_RETRIEVER_ENDPOINT
+              value: /var/run/csi/csi_retriever.sock
             - name: X_CSI_MODE
               value: controller
             - name: X_CSI_ISI_SKIP_CERTIFICATE_VALIDATION
