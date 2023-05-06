@@ -43,6 +43,7 @@ func New() gocsi.StoragePluginProvider {
 
 	svc := service.New()
 
+	log.Info("***Shefali: provider.go**")
 	interList := []grpc.UnaryServerInterceptor{
 		interceptor.NewCustomSerialLock(),
 		interceptor.NewRewriteRequestIDInterceptor(),

@@ -68,6 +68,13 @@ const (
 	SoftGracePrdParam             = "SoftGracePrd"
 	SoftGracePrdParamDefault      = ""
 
+	// Parameters to set quota limit from pvc
+	KeyCSIPVCSoftLimit     = "csi.storage.k8s.io/pvc/pvcSoftLimit"
+	KeyCSIPVCAdvisoryLimit = "csi.storage.k8s.io/pvc/pvcAdvisoryLimit"
+	KeyCSIPVCSoftGracePrd  = "csi.storage.k8s.io/pvc/pvcSoftGracePrd"
+	// KeyCSIPVCName represents key for csi pvc name
+	KeyCSIPVCName = "csi.storage.k8s.io/pvc/name"
+
 	// KeyReplicationEnabled represents key for replication enabled
 	KeyReplicationEnabled = "isReplicationEnabled"
 
@@ -79,6 +86,7 @@ const (
 	headerPersistentVolumeName           = "x-csi-pv-name"
 	headerPersistentVolumeClaimName      = "x-csi-pv-claimname"
 	headerPersistentVolumeClaimNamespace = "x-csi-pv-namespace"
+	headerPVCSoftLimit                   = "x-csi-pvc-softlimit"
 	// KeyReplicationVGPrefix represents key for replication vg prefix
 	KeyReplicationVGPrefix = "volumeGroupPrefix"
 	// KeyReplicationRemoteSystem represents key for replication remote system
@@ -1919,6 +1927,9 @@ func addMetaData(params map[string]string) map[string]string {
 
 	if _, ok := params[csiPersistentVolumeClaimNamespace]; ok {
 		headerMetadata[headerPersistentVolumeClaimNamespace] = params[csiPersistentVolumeClaimNamespace]
+	}
+	if _, ok := params[KeyCSIPVCSoftLimit]; ok {
+		headerMetadata[headerPVCSoftLimit] = params[KeyCSIPVCSoftLimit]
 	}
 	return headerMetadata
 }

@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
+	controller "github.com/dell/csi-isilon/v2/service"
 	csictx "github.com/dell/gocsi/context"
 	mwtypes "github.com/dell/gocsi/middleware/serialvolume/types"
 	log "github.com/sirupsen/logrus"
@@ -184,6 +185,7 @@ func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeRequest,
 	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (res interface{}, resErr error) {
 
+	log.Info("***Shefali: Create volume**")
 	lock, err := i.opts.locker.GetLockWithID(ctx, req.Name)
 	if err != nil {
 		return nil, err
@@ -200,10 +202,15 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 
 	// This should be corrected to SoftLimt changes.
 	metadataReq := &retriever.GetPVCLabelsRequest{
-		Name:      req.Parameters["csi.storage.k8s.io/pvc/pvcsoftlimit"],
-		NameSpace: req.Parameters["csi.storage.k8s.io/pvc/pvcsoftlimit"],
+		Name:                 req.Parameters[controller.KeyCSIPVCName],
+		NameSpace:            req.Parameters[controller.KeyCSIPVCNamespace],
+		PVCSoftLimit:         req.Parameters[controller.KeyCSIPVCSoftLimit],
+		PVCAdvisoryLimit:     req.Parameters[controller.KeyCSIPVCAdvisoryLimit],
+		PVCSoftGracePrdLimit: req.Parameters[controller.KeyCSIPVCSoftGracePrd],
 		// This should be corrected to SoftLimt changes.
 	}
+
+	log.Info("***Shefali: Req struct filled**")
 
 	if i.opts.MetadataSidecarClient != nil {
 		metadataRes, err := i.opts.MetadataSidecarClient.GetPVCLabels(ctx, metadataReq)
@@ -217,10 +224,10 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 
 		if metadataRes != nil {
 			for k, v := range metadataRes.Parameters {
-				log.Info("***Start: Meta Data From PVC Yaml File**")
+				log.Info("***Shefali Start: Meta Data From PVC Yaml File**")
 				log.Info(k)
 				log.Info(v)
-				log.Info("***End: Meta Data From PVC Yaml File**")
+				log.Info("***Shefali End: Meta Data From PVC Yaml File**")
 				req.Parameters[k] = v
 			}
 		} else {
