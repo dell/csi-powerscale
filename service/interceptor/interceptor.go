@@ -200,38 +200,26 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 	}
 	defer lock.Unlock()
 
-	// This should be corrected to SoftLimt changes.
 	metadataReq := &retriever.GetPVCLabelsRequest{
-		Name:                 req.Parameters[controller.KeyCSIPVCName],
-		NameSpace:            req.Parameters[controller.KeyCSIPVCNamespace],
-		PVCSoftLimit:         req.Parameters[controller.KeyCSIPVCSoftLimit],
-		PVCAdvisoryLimit:     req.Parameters[controller.KeyCSIPVCAdvisoryLimit],
-		PVCSoftGracePrdLimit: req.Parameters[controller.KeyCSIPVCSoftGracePrd],
-		// This should be corrected to SoftLimt changes.
+		Name:      req.Parameters[controller.KeyCSIPVCName],
+		NameSpace: req.Parameters[controller.KeyCSIPVCNamespace],
 	}
-
-	log.Info("***Shefali: Req struct filled**")
 
 	if i.opts.MetadataSidecarClient != nil {
 		metadataRes, err := i.opts.MetadataSidecarClient.GetPVCLabels(ctx, metadataReq)
 		if err != nil {
-			/*			log.Errorf("Cannot retrieve labels for PVC %s in namespace: %s, error: %v",
-						controller.KeyCSIPVCName,
-						controller.KeyCSIPVCNamespace,
-						err.Error())
-			*/
+			log.Errorf("Cannot retrieve labels for PVC %s in namespace: %s, error: %v",
+				controller.KeyCSIPVCName,
+				controller.KeyCSIPVCNamespace,
+				err.Error())
 		}
 
 		if metadataRes != nil {
 			for k, v := range metadataRes.Parameters {
-				log.Info("***Shefali Start: Meta Data From PVC Yaml File**")
-				log.Info(k)
-				log.Info(v)
-				log.Info("***Shefali End: Meta Data From PVC Yaml File**")
 				req.Parameters[k] = v
 			}
 		} else {
-			//	log.Warnf("Metadata retrieved is nil for PVC %s in namespace")
+			log.Warnf("No Values Under Metadata")
 		}
 	}
 

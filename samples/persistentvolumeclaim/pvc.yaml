@@ -2,7 +2,11 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: test-pvc
-  pvcsoftlimit: "70"
+#Uncomment below 4 lines to set quota limit parameters
+#  labels:
+#    pvcSoftLimit: "10"
+#    pvcAdvisoryLimit: "50"
+#    pvcSoftGracePrd : "85400"
 spec:
   accessModes:
   - ReadWriteOnce
