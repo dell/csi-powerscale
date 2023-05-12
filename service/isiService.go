@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2023 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -174,7 +174,6 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit
 		log.Debugf("Invalid softGracePrd value. Setting it to default.")
 		softGracePrdInt = 0
 	}
-
 	//converting soft limit from %ge to value
 	if softLimit != "" {
 		softi, err = strconv.ParseInt(softLimit, 10, 64)
@@ -206,13 +205,13 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit
 		}
 		//Check if soft and advisory < 100
 		if (softlimitInt >= sizeInBytes) || (advisoryLimitInt >= sizeInBytes) {
-			log.Warnf("Soft and advisory thresholds must be smaller than the hard threshold. Skip creating Quota for Volume '%s'", volName)
-			return "", nil
+			log.Warnf("Soft and advisory thresholds must be smaller than the hard threshold. Setting it to default for Volume '%s'", volName)
+			softlimitInt, advisoryLimitInt, softGracePrdInt = 0, 0, 0
 		}
 		//Check if Soft Grace period is set along with soft limit
 		if (softlimitInt != 0) && (softGracePrdInt == 0) {
-			log.Warnf("Soft Grace Period must be configured along with Soft threshold, Skip creating Quota for Volume '%s'", volName)
-			return "", nil
+			log.Warnf("Soft Grace Period must be configured along with Soft threshold, Setting it to default for Volume '%s'", volName)
+			softlimitInt, softGracePrdInt = 0, 0
 		}
 		var isQuotaActivated bool
 		var checkLicErr error

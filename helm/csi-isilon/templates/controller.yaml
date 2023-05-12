@@ -274,6 +274,22 @@ spec:
         - name: csi-metadata-retriever
           image: dellemc/csi-metadata-retriever:v1.3.0
           imagePullPolicy: Always
+          args:
+            - "--csi-address={{ $driverSockPath }}"
+            - "--leader-election"
+            - "--timeout=120s"
+            - "--v=5"
+            {{- if hasKey .Values.controller "leaderElection" }}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionRenewDeadline" }}
+            - "--leader-election-renew-deadline={{ .Values.controller.leaderElection.leaderElectionRenewDeadline }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-lease-duration={{ .Values.controller.leaderElection.leaderElectionLeaseDuration }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-retry-period={{ .Values.controller.leaderElection.leaderElectionRetryPeriod }}"
+            {{end}}
+            {{end}}
           command: [ "/csi-metadata-retriever" ]
           env:
             - name: CSI_RETRIEVER_ENDPOINT
