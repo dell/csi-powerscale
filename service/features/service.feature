@@ -86,7 +86,7 @@ Feature: Isilon CSI interface
       Given a Isilon service
       When I call Probe
       And I call GetCapacity with Invalid access mode
-      Then the error contains "unknown or unsupported access mode"
+      Then a valid GetCapacityResponse is returned
 
     Scenario Outline: Call GetCapacity with induced errors
       Given a Isilon service

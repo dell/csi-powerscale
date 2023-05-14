@@ -19,6 +19,11 @@ import (
 	context2 "context"
 	"errors"
 	"fmt"
+	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/dell/csi-isilon/v2/common/utils"
+	"github.com/dell/csi-isilon/v2/service/mock/k8s"
+	csiext "github.com/dell/dell-csi-extensions/replication"
+	"google.golang.org/grpc"
 	"log"
 	"net"
 	"net/http/httptest"
@@ -27,12 +32,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/dell/csi-isilon/v2/common/constants"
-	"github.com/dell/csi-isilon/v2/common/utils"
-	"github.com/dell/csi-isilon/v2/service/mock/k8s"
-	csiext "github.com/dell/dell-csi-extensions/replication"
-	"google.golang.org/grpc"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
@@ -357,7 +356,8 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call initialize real isilon service$`, f.iCallInitializeRealIsilonService)
 	s.Step(`^I call logStatistics (\d+) times$`, f.iCallLogStatisticsTimes)
 	s.Step(`^I call BeforeServe$`, f.iCallBeforeServe)
-	s.Step(`^I call CreateQuota in isiService with negative sizeInBytes$`, f.ICallCreateQuotaInIsiServiceWithNegativeSizeInBytes)
+	s.Step(`^I call CreateQuota in isiService with "([^"]*)" "(\d+)"([^"]*)"(\d+)" <sizeInBytes>$`, f.iCallCreateQuotaInIsiServiceWithSizeInBytes)
+	s.Step(`^I call CreateQuota in isiService with "([^"]*)" "-(\d+)"([^"]*)"(\d+)" <sizeInBytes>$`, f.iCallCreateQuotaInIsiServiceWithSizeInBytes)
 	s.Step(`^I call get export related functions in isiService$`, f.iCallGetExportRelatedFunctionsInIsiService)
 	s.Step(`^I call unimplemented functions$`, f.iCallUnimplementedFunctions)
 	s.Step(`^I call init Service object$`, f.iCallInitServiceObject)
@@ -2552,10 +2552,10 @@ func (f *feature) iCallBeforeServe() error {
 	return nil
 }
 
-func (f *feature) ICallCreateQuotaInIsiServiceWithNegativeSizeInBytes() error {
+func (f *feature) iCallCreateQuotaInIsiServiceWithSizeInBytes(softLimit, advisoryLimit, softgraceprd string, sizeinBytes int) error {
 	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
 	ctx, _, _ := GetRunIDLog(context.Background())
-	_, f.err = clusterConfig.isiSvc.CreateQuota(ctx, f.service.opts.Path, "volume1", "0", "0", "0", -1, true)
+	_, f.err = clusterConfig.isiSvc.CreateQuota(ctx, f.service.opts.Path, "volume1", softLimit, advisoryLimit, softgraceprd, int64(sizeinBytes), true)
 	return nil
 }
 
