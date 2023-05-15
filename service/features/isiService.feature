@@ -3,7 +3,6 @@ Feature: Isilon CSI interface
     I want to test service methods
     So that they are known to work
 
-@shefali
     Scenario: Calling create quota in isiService with negative sizeInBytes
       Given a Isilon service
       When I call CreateQuota in isiService with <softLimit> <advisoryLimit> <softgraceprd> <sizeInBytes>
