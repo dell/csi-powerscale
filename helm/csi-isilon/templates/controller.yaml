@@ -271,9 +271,9 @@ spec:
               mountPath: /var/run/csi
         {{ end }}
         {{ end }}
-        - name: csi-metadata-retriever
-          image: dellemc/csi-metadata-retriever:v1.3.0
-          imagePullPolicy: Always
+        - name: csi-metadata-retriever {{ $csiSidecarSuffix }}
+          image: {{ required "Must provide the CSI metadata retriever container image." .Values.controller.metadataretriever.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--csi-address={{ $driverSockPath }}"
             - "--leader-election"
