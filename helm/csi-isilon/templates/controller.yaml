@@ -271,6 +271,32 @@ spec:
               mountPath: /var/run/csi
         {{ end }}
         {{ end }}
+        - name: csi-metadata-retriever {{ $csiSidecarSuffix }}
+          image: {{ required "Must provide the CSI metadata retriever container image." .Values.controller.metadataretriever.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          args:
+            - "--csi-address={{ $driverSockPath }}"
+            - "--leader-election"
+            - "--timeout=120s"
+            - "--v=5"
+            {{- if hasKey .Values.controller "leaderElection" }}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionRenewDeadline" }}
+            - "--leader-election-renew-deadline={{ .Values.controller.leaderElection.leaderElectionRenewDeadline }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-lease-duration={{ .Values.controller.leaderElection.leaderElectionLeaseDuration }}"
+            {{end}}
+            {{- if hasKey .Values.controller.leaderElection "leaderElectionLeaseDuration" }}
+            - "--leader-election-retry-period={{ .Values.controller.leaderElection.leaderElectionRetryPeriod }}"
+            {{end}}
+            {{end}}
+          command: [ "/csi-metadata-retriever" ]
+          env:
+            - name: CSI_RETRIEVER_ENDPOINT
+              value: /var/run/csi/csi_retriever.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
         - name: attacher{{ $csiSidecarSuffix }}
           image: {{ required "Must provide the CSI attacher container image." ( include "csi-isilon.attacherImage" . ) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
@@ -413,6 +439,8 @@ spec:
           env:
             - name: CSI_ENDPOINT
               value: "{{ $driverSockPath }}"
+            - name: CSI_RETRIEVER_ENDPOINT
+              value: /var/run/csi/csi_retriever.sock
             - name: X_CSI_MODE
               value: controller
             - name: X_CSI_ISI_SKIP_CERTIFICATE_VALIDATION

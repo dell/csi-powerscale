@@ -68,6 +68,13 @@ const (
 	SoftGracePrdParam             = "SoftGracePrd"
 	SoftGracePrdParamDefault      = ""
 
+	// Parameters to set quota limit from pvc
+	PVCSoftLimitParam     = "pvcSoftLimit"
+	PVCAdvisoryLimitParam = "pvcAdvisoryLimit"
+	PVCSoftGracePrdParam  = "pvcSoftGracePrd"
+	// KeyCSIPVCName represents key for csi pvc name
+	KeyCSIPVCName = "csi.storage.k8s.io/pvc/name"
+
 	// KeyReplicationEnabled represents key for replication enabled
 	KeyReplicationEnabled = "isReplicationEnabled"
 
@@ -297,7 +304,7 @@ func (s *service) CreateVolume(
 		// use the default if not set in the storage class
 		rootClientEnabled = RootClientEnabledParamDefault
 	}
-	//Setting Soft Limit
+	// Setting Soft Limit
 	if _, ok := params[SoftLimitParam]; ok {
 		if params[SoftLimitParam] == "" {
 			softLimit = SoftLimitParamDefault
@@ -305,8 +312,14 @@ func (s *service) CreateVolume(
 			softLimit = params[SoftLimitParam]
 		}
 	} else {
-		// use the default if not set in the storage class
+		// use the default if not set  in the storage class
 		softLimit = SoftLimitParamDefault
+	}
+	// If value is passed in pvc than it should get precedence
+	if _, ok := params[PVCSoftLimitParam]; ok {
+		if params[PVCSoftLimitParam] != "" {
+			softLimit = params[PVCSoftLimitParam]
+		}
 	}
 
 	// Setting Advisory Limit
@@ -320,7 +333,12 @@ func (s *service) CreateVolume(
 		// use the default if not set in the storage class
 		advisoryLimit = AdvisoryLimitParamDefault
 	}
-
+	// If value is passed in pvc than it should get precedence
+	if _, ok := params[PVCAdvisoryLimitParam]; ok {
+		if params[PVCAdvisoryLimitParam] != "" {
+			advisoryLimit = params[PVCAdvisoryLimitParam]
+		}
+	}
 	// Setting Soft Grace Period
 	if _, ok := params[SoftGracePrdParam]; ok {
 		if params[SoftGracePrdParam] == "" {
@@ -331,6 +349,12 @@ func (s *service) CreateVolume(
 	} else {
 		// use the default if not set in the storage class
 		softGracePrd = SoftGracePrdParamDefault
+	}
+	// If value is passed in pvc than it should get precedence
+	if _, ok := params[PVCSoftGracePrdParam]; ok {
+		if params[PVCSoftGracePrdParam] != "" {
+			softGracePrd = params[PVCSoftGracePrdParam]
+		}
 	}
 
 	//CSI specific metada for authorization

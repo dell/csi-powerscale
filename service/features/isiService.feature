@@ -5,8 +5,15 @@ Feature: Isilon CSI interface
 
     Scenario: Calling create quota in isiService with negative sizeInBytes
       Given a Isilon service
-      When I call CreateQuota in isiService with negative sizeInBytes
+      When I call CreateQuota in isiService with <softLimit> <advisoryLimit> <softgraceprd> <sizeInBytes>
       Then the error contains "none"
+      Examples:
+      | softLimit | advisoryLimit | softgraceprd | sizeInBytes
+      | "0"       | "30"          | "0"          | -1   
+      | "40"      | "0"           | "85600"      | 53687091
+      | "60"      | "80"          | "85600"      | 53687091
+      | "110"     | "80"          | "85600"      | 53687091
+      | "-1"      | "-1"          | "85600"      | 53687091
 
     Scenario: Calling get export with no result
       Given a Isilon service

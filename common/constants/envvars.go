@@ -102,4 +102,7 @@ const (
 
 	//EnvPodmonArrayConnectivityPollRate indicates the polling frequency to check array connectivity
 	EnvPodmonArrayConnectivityPollRate = "X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE"
+
+	// EnvMetadataRetrieverEndpoint specifies the endpoint address for csi-metadata-retriever sidecar
+	EnvMetadataRetrieverEndpoint = "CSI_RETRIEVER_ENDPOINT"
 )

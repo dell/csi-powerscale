@@ -19,6 +19,7 @@ package provider
 import (
 	"github.com/dell/csi-isilon/v2/common/utils"
 	"github.com/dell/csi-isilon/v2/service"
+	"github.com/dell/csi-isilon/v2/service/interceptor"
 	"github.com/dell/gocsi"
 	"google.golang.org/grpc"
 )
@@ -41,10 +42,16 @@ func New() gocsi.StoragePluginProvider {
 	serverOptions[0] = maxStreams
 
 	svc := service.New()
+
+	interList := []grpc.UnaryServerInterceptor{
+		interceptor.NewCustomSerialLock(),
+		interceptor.NewRewriteRequestIDInterceptor(),
+	}
 	return &gocsi.StoragePlugin{
 		Controller:                svc,
 		Identity:                  svc,
 		Node:                      svc,
+		Interceptors:              interList,
 		BeforeServe:               svc.BeforeServe,
 		ServerOpts:                serverOptions,
 		RegisterAdditionalServers: svc.RegisterAdditionalServers,
