@@ -74,7 +74,6 @@ const (
 	PVCSoftGracePrdParam  = "pvcSoftGracePrd"
 	// KeyCSIPVCName represents key for csi pvc name
 	KeyCSIPVCName = "csi.storage.k8s.io/pvc/name"
-
 	// KeyReplicationEnabled represents key for replication enabled
 	KeyReplicationEnabled = "isReplicationEnabled"
 
@@ -165,6 +164,66 @@ func validateVolSize(cr *csi.CapacityRange) (int64, error) {
 	}
 
 	return minSize, nil
+}
+
+func readQuotaLimitParams(params map[string]string) (softlimit, advisorylimit, softgraceprd string) {
+
+	var (
+		softLimit, advisoryLimit, softGracePrd string
+	)
+	// Setting Soft Limit
+	if _, ok := params[SoftLimitParam]; ok {
+		if params[SoftLimitParam] == "" {
+			softLimit = SoftLimitParamDefault
+		} else {
+			softLimit = params[SoftLimitParam]
+		}
+	} else {
+		// use the default if not set  in the storage class
+		softLimit = SoftLimitParamDefault
+	}
+	// If value is passed in pvc than it should get precedence
+	if _, ok := params[PVCSoftLimitParam]; ok {
+		if params[PVCSoftLimitParam] != "" {
+			softLimit = params[PVCSoftLimitParam]
+		}
+	}
+
+	// Setting Advisory Limit
+	if _, ok := params[AdvisoryLimitParam]; ok {
+		if params[AdvisoryLimitParam] == "" {
+			advisoryLimit = AdvisoryLimitParamDefault
+		} else {
+			advisoryLimit = params[AdvisoryLimitParam]
+		}
+	} else {
+		// use the default if not set in the storage class
+		advisoryLimit = AdvisoryLimitParamDefault
+	}
+	// If value is passed in pvc than it should get precedence
+	if _, ok := params[PVCAdvisoryLimitParam]; ok {
+		if params[PVCAdvisoryLimitParam] != "" {
+			advisoryLimit = params[PVCAdvisoryLimitParam]
+		}
+	}
+	// Setting Soft Grace Period
+	if _, ok := params[SoftGracePrdParam]; ok {
+		if params[SoftGracePrdParam] == "" {
+			softGracePrd = SoftGracePrdParamDefault
+		} else {
+			softGracePrd = params[SoftGracePrdParam]
+		}
+	} else {
+		// use the default if not set in the storage class
+		softGracePrd = SoftGracePrdParamDefault
+	}
+	// If value is passed in pvc than it should get precedence
+	if _, ok := params[PVCSoftGracePrdParam]; ok {
+		if params[PVCSoftGracePrdParam] != "" {
+			softGracePrd = params[PVCSoftGracePrdParam]
+		}
+	}
+	return softLimit, advisoryLimit, softGracePrd
 }
 
 func (s *service) CreateVolume(
@@ -304,58 +363,9 @@ func (s *service) CreateVolume(
 		// use the default if not set in the storage class
 		rootClientEnabled = RootClientEnabledParamDefault
 	}
-	// Setting Soft Limit
-	if _, ok := params[SoftLimitParam]; ok {
-		if params[SoftLimitParam] == "" {
-			softLimit = SoftLimitParamDefault
-		} else {
-			softLimit = params[SoftLimitParam]
-		}
-	} else {
-		// use the default if not set  in the storage class
-		softLimit = SoftLimitParamDefault
-	}
-	// If value is passed in pvc than it should get precedence
-	if _, ok := params[PVCSoftLimitParam]; ok {
-		if params[PVCSoftLimitParam] != "" {
-			softLimit = params[PVCSoftLimitParam]
-		}
-	}
 
-	// Setting Advisory Limit
-	if _, ok := params[AdvisoryLimitParam]; ok {
-		if params[AdvisoryLimitParam] == "" {
-			advisoryLimit = AdvisoryLimitParamDefault
-		} else {
-			advisoryLimit = params[AdvisoryLimitParam]
-		}
-	} else {
-		// use the default if not set in the storage class
-		advisoryLimit = AdvisoryLimitParamDefault
-	}
-	// If value is passed in pvc than it should get precedence
-	if _, ok := params[PVCAdvisoryLimitParam]; ok {
-		if params[PVCAdvisoryLimitParam] != "" {
-			advisoryLimit = params[PVCAdvisoryLimitParam]
-		}
-	}
-	// Setting Soft Grace Period
-	if _, ok := params[SoftGracePrdParam]; ok {
-		if params[SoftGracePrdParam] == "" {
-			softGracePrd = SoftGracePrdParamDefault
-		} else {
-			softGracePrd = params[SoftGracePrdParam]
-		}
-	} else {
-		// use the default if not set in the storage class
-		softGracePrd = SoftGracePrdParamDefault
-	}
-	// If value is passed in pvc than it should get precedence
-	if _, ok := params[PVCSoftGracePrdParam]; ok {
-		if params[PVCSoftGracePrdParam] != "" {
-			softGracePrd = params[PVCSoftGracePrdParam]
-		}
-	}
+	//Reading quota limit parameters
+	softLimit, advisoryLimit, softGracePrd = readQuotaLimitParams(params)
 
 	//CSI specific metada for authorization
 	var headerMetadata = addMetaData(params)
