@@ -172,15 +172,11 @@ func readQuotaLimitParams(params map[string]string) (softlimit, advisorylimit, s
 		softLimit, advisoryLimit, softGracePrd string
 	)
 	// Setting Soft Limit
+	softLimit = SoftLimitParamDefault
 	if _, ok := params[SoftLimitParam]; ok {
-		if params[SoftLimitParam] == "" {
-			softLimit = SoftLimitParamDefault
-		} else {
+		if params[SoftLimitParam] != "" {
 			softLimit = params[SoftLimitParam]
 		}
-	} else {
-		// use the default if not set  in the storage class
-		softLimit = SoftLimitParamDefault
 	}
 	// If value is passed in pvc than it should get precedence
 	if _, ok := params[PVCSoftLimitParam]; ok {
@@ -188,17 +184,12 @@ func readQuotaLimitParams(params map[string]string) (softlimit, advisorylimit, s
 			softLimit = params[PVCSoftLimitParam]
 		}
 	}
-
 	// Setting Advisory Limit
+	advisoryLimit = AdvisoryLimitParamDefault
 	if _, ok := params[AdvisoryLimitParam]; ok {
-		if params[AdvisoryLimitParam] == "" {
-			advisoryLimit = AdvisoryLimitParamDefault
-		} else {
+		if params[AdvisoryLimitParam] != "" {
 			advisoryLimit = params[AdvisoryLimitParam]
 		}
-	} else {
-		// use the default if not set in the storage class
-		advisoryLimit = AdvisoryLimitParamDefault
 	}
 	// If value is passed in pvc than it should get precedence
 	if _, ok := params[PVCAdvisoryLimitParam]; ok {
@@ -207,15 +198,11 @@ func readQuotaLimitParams(params map[string]string) (softlimit, advisorylimit, s
 		}
 	}
 	// Setting Soft Grace Period
+	softGracePrd = SoftGracePrdParamDefault
 	if _, ok := params[SoftGracePrdParam]; ok {
-		if params[SoftGracePrdParam] == "" {
-			softGracePrd = SoftGracePrdParamDefault
-		} else {
+		if params[SoftGracePrdParam] != "" {
 			softGracePrd = params[SoftGracePrdParam]
 		}
-	} else {
-		// use the default if not set in the storage class
-		softGracePrd = SoftGracePrdParamDefault
 	}
 	// If value is passed in pvc than it should get precedence
 	if _, ok := params[PVCSoftGracePrdParam]; ok {
