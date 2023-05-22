@@ -127,7 +127,7 @@ controller:
     # image: Image to use for dell-csi-replicator. This shouldn't be changed
     # Allowed values: string
     # Default value: None
-    image: dellemc/dell-csi-replicator:v1.4.0
+    image: dellemc/dell-csi-replicator:v1.5.0
 
     # replicationContextPrefix: prefix to use for naming of resources created by replication feature
     # Allowed values: string
