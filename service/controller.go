@@ -168,11 +168,8 @@ func validateVolSize(cr *csi.CapacityRange) (int64, error) {
 
 func readQuotaLimitParams(params map[string]string) (softlimit, advisorylimit, softgraceprd string) {
 
-	var (
-		softLimit, advisoryLimit, softGracePrd string
-	)
 	// Setting Soft Limit
-	softLimit = SoftLimitParamDefault
+	softLimit := SoftLimitParamDefault
 	if _, ok := params[SoftLimitParam]; ok {
 		if params[SoftLimitParam] != "" {
 			softLimit = params[SoftLimitParam]
@@ -185,7 +182,7 @@ func readQuotaLimitParams(params map[string]string) (softlimit, advisorylimit, s
 		}
 	}
 	// Setting Advisory Limit
-	advisoryLimit = AdvisoryLimitParamDefault
+	advisoryLimit := AdvisoryLimitParamDefault
 	if _, ok := params[AdvisoryLimitParam]; ok {
 		if params[AdvisoryLimitParam] != "" {
 			advisoryLimit = params[AdvisoryLimitParam]
@@ -198,7 +195,7 @@ func readQuotaLimitParams(params map[string]string) (softlimit, advisorylimit, s
 		}
 	}
 	// Setting Soft Grace Period
-	softGracePrd = SoftGracePrdParamDefault
+	softGracePrd := SoftGracePrdParamDefault
 	if _, ok := params[SoftGracePrdParam]; ok {
 		if params[SoftGracePrdParam] != "" {
 			softGracePrd = params[SoftGracePrdParam]
@@ -353,6 +350,9 @@ func (s *service) CreateVolume(
 
 	//Reading quota limit parameters
 	softLimit, advisoryLimit, softGracePrd = readQuotaLimitParams(params)
+	log.Infof("***Shefali softLimit: '%s'", softLimit)
+	log.Infof("***Shefali advisoryLimit: '%s'", advisoryLimit)
+	log.Infof("***Shefali softGracePrd: '%s'", softGracePrd)
 
 	//CSI specific metada for authorization
 	var headerMetadata = addMetaData(params)
