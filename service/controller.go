@@ -350,9 +350,7 @@ func (s *service) CreateVolume(
 
 	//Reading quota limit parameters
 	softLimit, advisoryLimit, softGracePrd = readQuotaLimitParams(params)
-	log.Infof("***Shefali softLimit: '%s'", softLimit)
-	log.Infof("***Shefali advisoryLimit: '%s'", advisoryLimit)
-	log.Infof("***Shefali softGracePrd: '%s'", softGracePrd)
+	log.Infof("Limit parameters considered for quota creation SoftLimit: '%s' , AdvisoryLimit: '%s',SoftGracePrd: '%s'", softLimit, advisoryLimit, softGracePrd)
 
 	//CSI specific metada for authorization
 	var headerMetadata = addMetaData(params)
