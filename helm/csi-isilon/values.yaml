@@ -389,7 +389,7 @@ storageCapacity:
 # Enable this feature only after contact support for additional information
 podmon:
   enabled: false
-  image: dellemc/podmon:v1.5.0
+  image: dellemc/podmon:v1.6.0
   #controller:
   #  args:
   #    - "--csisock=unix:/var/run/csi/csi.sock"
