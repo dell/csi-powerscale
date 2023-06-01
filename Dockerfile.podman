@@ -1,4 +1,4 @@
-# Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,17 +26,7 @@ RUN CGO_ENABLED=0 \
 
 # Stage to build the driver image
 FROM $BASEIMAGE AS driver
-# install necessary packages
-# alphabetical order for easier maintenance
-RUN microdnf update -y && \
-        microdnf install -y \
-        e4fsprogs \
-        libaio \
-        libuuid \
-        nfs-utils \
-        numactl \
-        xfsprogs && \
-    microdnf clean all
+
 # copy in the driver
 COPY --from=builder /go/src/csi-isilon /
 ENTRYPOINT ["/csi-isilon"]

@@ -1,4 +1,4 @@
-# Copyright © 2020-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2020-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
 #
 
 # DEFAULT values
-# ubi8/ubi-minimal:8.7-1085
-DEFAULT_BASEIMAGE="registry.access.redhat.com/ubi8/ubi-minimal@sha256:ab03679e683010d485ef0399e056b09a38d7843ba4a36ee7dec337dd0037f7a7"
+# ubi8/ubi-micro:8.8-1
+DEFAULT_BASEIMAGE="registry.access.redhat.com/ubi8/ubi-micro:8.8-1"
 DEFAULT_GOVERSION="1.20"
 DEFAULT_REGISTRY=""
 DEFAULT_IMAGENAME="isilon"
