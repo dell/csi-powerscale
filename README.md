@@ -8,7 +8,8 @@
 **Repository for CSI Driver for Dell EMC PowerScale**
 
 ## Description
-CSI Driver for PowerScale is part of the [CSM (Container Storage Modules)](https://github.com/dell/csm) open-source suite of Kubernetes storage enablers for Dell Technology (Dell) products. CSI Driver for PowerScale is a Container Storage Interface (CSI) driver that provides support for provisioning persistent storage using Dell PowerScale storage array. 
+
+CSI Driver for PowerScale is part of the [CSM (Container Storage Modules)](https://github.com/dell/csm) open-source suite of Kubernetes storage enablers for Dell Technology (Dell) products. CSI Driver for PowerScale is a Container Storage Interface (CSI) driver that provides support for provisioning persistent storage using Dell PowerScale storage array.
 
 It supports CSI specification version 1.5.
 
@@ -30,9 +31,11 @@ This project may be compiled as a stand-alone binary using Golang that, when run
 * [Documentation](#documentation)
 
 ## Support
+
 For any CSI driver issues, questions or feedback, please follow our [support process](https://github.com/dell/csm/blob/main/docs/SUPPORT.md)
 
 ## Building
+
 This project is a Go module (see golang.org Module information for explanation).
 The dependencies for this project are in the go.mod file.
 
@@ -45,13 +48,17 @@ To build a podman based image, execute `make podman-build`.
 You can run an integration test on a Linux system by populating the env files at `test/integration/` with values for your Dell EMC PowerScale systems and then run "`make integration-test`".
 
 ## Runtime Dependencies
+
 Both the Controller and the Node portions of the driver can only be run on nodes which have network connectivity to a “`PowerScale Cluster`” (which is used by the driver).
 
 ## Driver Installation
+
 Please consult the [Installation Guide](https://dell.github.io/csm-docs/docs/csidriver/installation)
 
 ## Using driver
+
 Please refer to the section `Testing Drivers` in the [Documentation](https://dell.github.io/csm-docs/docs/csidriver/installation/test/) for more info.
 
 ## Documentation
+
 For more detailed information on the driver, please refer to [Container Storage Modules documentation](https://dell.github.io/csm-docs/).
