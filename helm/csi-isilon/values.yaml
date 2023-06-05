@@ -112,7 +112,7 @@ controller:
 
   # Image for csi-metadata-retriever
   metadataretriever:
-    image: dellemc/csi-metadata-retriever:v1.3.0
+    image: dellemc/csi-metadata-retriever:v1.4.0
 
   # replication: allows to configure replication
   # Replication CRDs must be installed before installing driver
