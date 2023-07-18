@@ -6,7 +6,7 @@ require (
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/akutz/gosync v0.1.0
 	github.com/akutz/gournal v0.5.0
-	github.com/container-storage-interface/spec v1.5.0
+	github.com/container-storage-interface/spec v1.6.0
 	github.com/cucumber/godog v0.10.0
 	github.com/dell/csi-metadata-retriever v1.4.0
 	github.com/dell/dell-csi-extensions/common v1.1.2
@@ -15,15 +15,15 @@ require (
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.3
 	github.com/dell/gocsi v1.7.0
 	github.com/dell/gofsutil v1.12.0
-	github.com/dell/goisilon v1.12.0
+	github.com/dell/goisilon v1.12.1-0.20230718062838-d9e5abd86aae
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang/protobuf v1.5.3
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/kubernetes-csi/csi-lib-utils v0.11.0
-	github.com/sirupsen/logrus v1.9.0
+	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.7.1
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.4
 	golang.org/x/net v0.10.0
 	google.golang.org/grpc v1.55.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -87,7 +87,7 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.19.0 // indirect
 	golang.org/x/oauth2 v0.6.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
+	golang.org/x/sys v0.10.0 // indirect
 	golang.org/x/term v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
