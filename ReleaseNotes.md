@@ -1,4 +1,4 @@
-# Release Notes - CSI PowerScale v2.8.0
+# Release Notes - CSI PowerScale v2.7.0
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/dell/csi-isilon)](https://goreportcard.com/report/github.com/dell/csi-isilon)
 [![License](https://img.shields.io/github/license/dell/csi-isilon)](https://github.com/dell/csi-isilon/blob/main/LICENSE)
