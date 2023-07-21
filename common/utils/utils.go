@@ -349,20 +349,24 @@ func ParseNormalizedVolumeID(ctx context.Context, volID string) (string, int, st
 		return "", 0, "", "", fmt.Errorf("volume ID '%s' cannot be split into tokens", volID)
 	}
 
-	var clusterName string
+	volumeName := tokens[0]
+
 	exportID, err := strconv.Atoi(tokens[1])
 	if err != nil {
 		return "", 0, "", "", err
 	}
 
+	accessZone := tokens[2]
+
+	var clusterName string
 	if len(tokens) > 3 {
 		clusterName = tokens[3]
 	}
 
 	log.Debugf("volume ID '%s' parsed into volume name '%s', export ID '%d', access zone '%s' and cluster name '%s'",
-		volID, tokens[0], exportID, tokens[2], clusterName)
+		volID, volumeName, exportID, accessZone, clusterName)
 
-	return tokens[0], exportID, tokens[2], clusterName, nil
+	return volumeName, exportID, accessZone, clusterName, nil
 }
 
 // GetNormalizedSnapshotID combines snapshotID ID and cluster name to form the normalized snapshot ID
@@ -388,15 +392,16 @@ func ParseNormalizedSnapshotID(ctx context.Context, snapID string) (string, stri
 		return "", "", fmt.Errorf("snapshot ID '%s' cannot be split into tokens", snapID)
 	}
 
+	snapshotID := tokens[0]
 	var clusterName string
 	if len(tokens) > 1 {
 		clusterName = tokens[1]
 	}
 
 	log.Debugf("normalized snapshot ID '%s' parsed into snapshot ID '%s' and cluster name '%s'",
-		snapID, tokens[0], clusterName)
+		snapID, snapshotID, clusterName)
 
-	return tokens[0], clusterName, nil
+	return snapshotID, clusterName, nil
 }
 
 // ParseNodeID parses NodeID to node name, node FQDN and IP address using pattern '^(.+)=#=#=(.+)=#=#=(.+)'
