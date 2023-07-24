@@ -434,7 +434,6 @@ func (svc *isiService) GetStatistics(ctx context.Context, keys []string) (isi.St
 		log.Errorf("failed to get array statistics '%s'", err)
 		return nil, err
 	}
-	fmt.Printf("Available capacity: %+v\n", stat.StatsList[0])
 	return stat, nil
 }
 
