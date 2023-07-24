@@ -112,17 +112,7 @@ function check_error() {
   fi
 }
 
-#
-# get_drivers will populate an array of drivers found by
-# enumerating the directories in drivers/ that contain a helm chart
-function get_drivers() {
-  D="${1}"
-  TTT=$(pwd)
-  while read -r line; do
-    DDD=$(decho $line | awk -F '/' '{print $(NF-1)}')
-    VALIDDRIVERS+=("$DDD")
-  done < <(find "${D}" -maxdepth 2 -type f -name Chart.yaml | sort)
-}
+
 
 #
 # get_release will determine the helm release name to use

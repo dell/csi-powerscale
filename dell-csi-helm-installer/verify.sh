@@ -14,6 +14,7 @@
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 PROG="${0}"
 source "$SCRIPTDIR"/common.sh
+DRIVER="csi-isilon"
 
 if [ -z "${DEBUGLOG}" ]; then
   export DEBUGLOG="${SCRIPTDIR}/install-debug.log"
@@ -487,13 +488,7 @@ function validate_params() {
     usage
     exit 1
   fi
-  # make sure the driver name is valid
-  if [[ ! "${VALIDDRIVERS[@]}" =~ "${DRIVER}" ]]; then
-    decho "Driver: ${DRIVER} is invalid."
-    decho "Valid options are: ${VALIDDRIVERS[@]}"
-    usage
-    exit 1
-  fi
+
   # the namespace is required
   if [ -z "${NS}" ]; then
     decho "No namespace specified"
@@ -572,13 +567,6 @@ MASTER_NODES=$(run_command kubectl get nodes -o wide | awk ' /master/{ print $6;
 # Get the kubernetes major and minor version numbers.
 kMajorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/^.*Major:"//' -e 's/[^0-9].*//g')
 kMinorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/^.*Minor:"//' -e 's/[^0-9].*//g')
-
-# get the list of valid CSI Drivers, this will be the list of directories in drivers/ that contain helm charts
-get_drivers "${SCRIPTDIR}/../helm"
-# if only one driver was found, set the DRIVER to that one
-if [ ${#VALIDDRIVERS[@]} -eq 1 ]; then
-  DRIVER="${VALIDDRIVERS[0]}"
-fi
 
 while getopts ":h-:" optchar; do
   case "${optchar}" in
