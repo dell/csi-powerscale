@@ -36,7 +36,7 @@ This project provides the following capabilitites, each one is discussed in deta
 
 
 Most of these usages require the creation/specification of a values file. These files specify configuration settings that are passed into the driver and configure it for use. To create one of these files, the following steps should be followed:
-1. Copy a template file for the driver to a new location, naming this new file is at the users discretion. The template files are always found within the driver repo at `helm/csi-<drivername>/values.yaml`
+1. Download a template file for the driver to a new location, naming this new file is at the users discretion. The template files are always found within the driver repo at `https://github.com/dell/helm-charts/raw/csi-isilon-2.7.0/charts/csi-isilon/values.yaml`
 2. Edit the file such that it contains the proper configuration settings for the specific environment. These files are yaml formatted so maintaining the file structure is important.
 
 For example, to create a values file for the PowerScale driver the following steps can be executed
