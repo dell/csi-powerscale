@@ -356,12 +356,12 @@ func (s *service) CreateVolume(
 	var headerMetadata = addMetaData(params)
 
 	// check volume content source in the request
-	isROVolumeFromSnapshot = false
+	//isROVolumeFromSnapshot = false
+	isiConfig.isiSvc.SetIsROVolumeFromSnapshot(false)
 	if contentSource = req.GetVolumeContentSource(); contentSource != nil {
 		// Fetch source snapshot ID  or volume ID from content source
 		if snapshot := contentSource.GetSnapshot(); snapshot != nil {
 			normalizedSnapshotID := snapshot.GetSnapshotId()
-
 			// parse the input snapshot id and fetch it's components
 			var snapshotSrcClusterName string
 			sourceSnapshotID, snapshotSrcClusterName, err = utils.ParseNormalizedSnapshotID(ctx, normalizedSnapshotID)
@@ -379,9 +379,9 @@ func (s *service) CreateVolume(
 			if snapshotSourceVolumeIsiPath, err = isiConfig.isiSvc.GetSnapshotSourceVolumeIsiPath(ctx, sourceSnapshotID); err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
-			log.Infof("Snapshot source volume isiPath is '%s'", snapshotSourceVolumeIsiPath)
+			log.Infof("Snapshot source volume isiPath is '%s' accessZone '%s'", snapshotSourceVolumeIsiPath, accessZone)
 
-			if snapshotIsiPath, err = isiConfig.isiSvc.GetSnapshotIsiPath(ctx, snapshotSourceVolumeIsiPath, sourceSnapshotID); err != nil {
+			if snapshotIsiPath, err = isiConfig.isiSvc.GetSnapshotIsiPath(ctx, snapshotSourceVolumeIsiPath, sourceSnapshotID, accessZone); err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
 			log.Debugf("The Isilon directory path of snapshot is= '%s'", snapshotIsiPath)
@@ -402,6 +402,7 @@ func (s *service) CreateVolume(
 				}
 
 				if am.Mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
+					isiConfig.isiSvc.SetIsROVolumeFromSnapshot(true)
 					isROVolumeFromSnapshot = true
 					break
 				}
@@ -491,12 +492,12 @@ func (s *service) CreateVolume(
 	}
 
 	foundVol = false
+	isROVolumeFromSnapshot = isiConfig.isiSvc.GetIsROVolumeFromSnapshot()
 	if isROVolumeFromSnapshot {
 		if isReplication {
 			return nil, errors.New("Unable to create replication volume from snapshot")
 		}
 		path = snapshotIsiPath
-		accessZone = constants.DefaultAccessZone
 		snapshotSrc, err := isiConfig.isiSvc.GetSnapshot(ctx, sourceSnapshotID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get snapshot id '%s', error '%v'", sourceSnapshotID, err)
@@ -528,7 +529,7 @@ func (s *service) CreateVolume(
 		}
 	}
 
-	if !foundVol && isROVolumeFromSnapshot {
+	if isROVolumeFromSnapshot && !foundVol {
 		// Create an entry for this volume in snapshot tracking dir
 		if err = isiConfig.isiSvc.CreateVolume(ctx, snapshotSourceVolumeIsiPath, snapshotTrackingDir, volumePathPermissions); err != nil {
 			return nil, err
@@ -584,7 +585,7 @@ func (s *service) CreateVolume(
 	// if volume content source is not null and new volume request is not for RO volume from snapshot,
 	// copy content from the datasource
 	if contentSource != nil && !isROVolumeFromSnapshot {
-		err = s.createVolumeFromSource(ctx, isiConfig, isiPath, contentSource, req, sizeInBytes)
+		err = s.createVolumeFromSource(ctx, isiConfig, isiPath, contentSource, req, sizeInBytes, accessZone)
 		if err != nil {
 			// Clear volume since the volume creation is not successful
 			if err := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, req.GetName()); err != nil {
@@ -663,7 +664,7 @@ func (s *service) CreateVolume(
 }
 
 func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *IsilonClusterConfig,
-	isiPath, normalizedSnapshotID, dstVolumeName string, sizeInBytes int64) error {
+	isiPath, normalizedSnapshotID, dstVolumeName string, sizeInBytes int64, accessZone string) error {
 	var snapshotSrc isi.Snapshot
 	var err error
 
@@ -679,12 +680,12 @@ func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *Isilo
 
 	// check source snapshot size
 	snapshotSourceVolumeIsiPath := path.Dir(snapshotSrc.Path)
-	size := isiConfig.isiSvc.GetSnapshotSize(ctx, snapshotSourceVolumeIsiPath, snapshotSrc.Name)
+	size := isiConfig.isiSvc.GetSnapshotSize(ctx, snapshotSourceVolumeIsiPath, snapshotSrc.Name, accessZone)
 	if size > sizeInBytes {
 		return fmt.Errorf("specified size '%d' is smaller than source snapshot size '%d'", sizeInBytes, size)
 	}
 
-	if _, err = isiConfig.isiSvc.CopySnapshot(ctx, isiPath, snapshotSourceVolumeIsiPath, snapshotSrc.Id, dstVolumeName); err != nil {
+	if _, err = isiConfig.isiSvc.CopySnapshot(ctx, isiPath, snapshotSourceVolumeIsiPath, snapshotSrc.Id, dstVolumeName, accessZone); err != nil {
 		return fmt.Errorf("failed to copy snapshot id '%s', error '%s'", srcSnapshotID, err.Error())
 	}
 
@@ -716,10 +717,10 @@ func (s *service) createVolumeFromSource(
 	isiPath string,
 	contentSource *csi.VolumeContentSource,
 	req *csi.CreateVolumeRequest,
-	sizeInBytes int64) error {
+	sizeInBytes int64, accessZone string) error {
 	if contentSnapshot := contentSource.GetSnapshot(); contentSnapshot != nil {
 		// create volume from source snapshot
-		if err := s.createVolumeFromSnapshot(ctx, isiConfig, isiPath, contentSnapshot.GetSnapshotId(), req.GetName(), sizeInBytes); err != nil {
+		if err := s.createVolumeFromSnapshot(ctx, isiConfig, isiPath, contentSnapshot.GetSnapshotId(), req.GetName(), sizeInBytes, accessZone); err != nil {
 			return status.Error(codes.Internal, err.Error())
 		}
 	}
@@ -846,7 +847,8 @@ func (s *service) DeleteVolume(
 
 	exportPath := (*export.Paths)[0]
 
-	isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(exportPath)
+	//isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(exportPath)
+	isROVolumeFromSnapshot := isiConfig.isiSvc.GetIsROVolumeFromSnapshot()
 	// If it is a RO volume and dataSource is snapshot
 	if isROVolumeFromSnapshot {
 		if err := s.processSnapshotTrackingDirectoryDuringDeleteVolume(ctx, volName, export, isiConfig); err != nil {
@@ -1107,10 +1109,10 @@ func (s *service) ControllerPublishVolume(
 		exportPath = utils.GetPathForVolume(isiConfig.IsiPath, volName)
 	}
 
-	isROVolumeFromSnapshot = isiConfig.isiSvc.isROVolumeFromSnapshot(exportPath)
+	//isROVolumeFromSnapshot = isiConfig.isiSvc.isROVolumeFromSnapshot(exportPath)
+	isROVolumeFromSnapshot = isiConfig.isiSvc.GetIsROVolumeFromSnapshot()
 	if isROVolumeFromSnapshot {
 		log.Info("Volume source is snapshot")
-		accessZone = constants.DefaultAccessZone
 		if export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, exportPath, accessZone); err != nil || export == nil {
 			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "error retrieving export for '%s'", exportPath))
 		}
@@ -1625,6 +1627,7 @@ func (s *service) CreateSnapshot(
 		snapshotNew isi.Snapshot
 		params      map[string]string
 		isiPath     string
+		accessZone  string
 	)
 	params = req.GetParameters()
 	if _, ok := params[IsiPathParam]; ok {
@@ -1636,6 +1639,16 @@ func (s *service) CreateSnapshot(
 	} else {
 		// use the default isiPath if not set in the storage class
 		isiPath = isiConfig.IsiPath
+	}
+	if _, ok := params[AccessZoneParam]; ok {
+		if params[AccessZoneParam] == "" {
+			accessZone = s.opts.AccessZone
+		} else {
+			accessZone = params[AccessZoneParam]
+		}
+	} else {
+		// use the default access zone if not set in the storage class
+		accessZone = s.opts.AccessZone
 	}
 	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
 	if err != nil {
@@ -1649,7 +1662,7 @@ func (s *service) CreateSnapshot(
 	if snapshotByName, err = isiConfig.isiSvc.GetSnapshot(ctx, snapshotName); snapshotByName != nil {
 		if path.Base(snapshotByName.Path) == srcVolumeID {
 			// return the existent snapshot
-			return s.getCreateSnapshotResponse(ctx, strconv.FormatInt(snapshotByName.Id, 10), req.GetSourceVolumeId(), snapshotByName.Created, isiConfig.isiSvc.GetSnapshotSize(ctx, isiPath, snapshotName), clusterName), nil
+			return s.getCreateSnapshotResponse(ctx, strconv.FormatInt(snapshotByName.Id, 10), req.GetSourceVolumeId(), snapshotByName.Created, isiConfig.isiSvc.GetSnapshotSize(ctx, isiPath, snapshotName, accessZone), clusterName), nil
 		}
 		// return already exists error
 		return nil, status.Error(codes.AlreadyExists,
@@ -1666,7 +1679,7 @@ func (s *service) CreateSnapshot(
 
 	log.Infof("snapshot creation is successful")
 	// return the response
-	return s.getCreateSnapshotResponse(ctx, strconv.FormatInt(snapshotNew.Id, 10), req.GetSourceVolumeId(), snapshotNew.Created, isiConfig.isiSvc.GetSnapshotSize(ctx, isiPath, snapshotName), clusterName), nil
+	return s.getCreateSnapshotResponse(ctx, strconv.FormatInt(snapshotNew.Id, 10), req.GetSourceVolumeId(), snapshotNew.Created, isiConfig.isiSvc.GetSnapshotSize(ctx, isiPath, snapshotName, accessZone), clusterName), nil
 }
 
 // validateCreateSnapshotRequest validate the input params in CreateSnapshotRequest
@@ -1780,11 +1793,15 @@ func (s *service) DeleteSnapshot(
 			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "cannot check the existence of the snapshot: '%s'", err.Error()))
 		}
 	}
-
+	//shefali to be done for non system zone
+	var accessZone string
+	/*if strings.Contains(snapshot, "/ifs/.snapshot") {
+		accessZone = "System"
+	}*/
 	// Get snapshot path
 	snapshotSourceVolumeIsiPath, _ := isiConfig.isiSvc.GetSnapshotSourceVolumeIsiPath(ctx, snapshotID)
 	log.Infof("Snapshot source volume isiPath is '%s'", snapshotSourceVolumeIsiPath)
-	snapshotIsiPath, err := isiConfig.isiSvc.GetSnapshotIsiPath(ctx, snapshotSourceVolumeIsiPath, snapshotID)
+	snapshotIsiPath, err := isiConfig.isiSvc.GetSnapshotIsiPath(ctx, snapshotSourceVolumeIsiPath, snapshotID, accessZone)
 	if err != nil {
 		return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, err.Error()))
 	}

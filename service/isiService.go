@@ -23,7 +23,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dell/csi-isilon/v2/common/constants"
 	utils "github.com/dell/csi-isilon/v2/common/utils"
 	isi "github.com/dell/goisilon"
 	"github.com/dell/goisilon/api"
@@ -34,7 +33,7 @@ type isiService struct {
 	client   *isi.Client
 }
 
-func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSourceVolumeIsiPath string, srcSnapshotID int64, dstVolumeName string) (isi.Volume, error) {
+func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSourceVolumeIsiPath string, srcSnapshotID int64, dstVolumeName string, accessZone string) (isi.Volume, error) {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
@@ -42,7 +41,7 @@ func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSource
 
 	var volumeNew isi.Volume
 	var err error
-	if volumeNew, err = svc.client.CopySnapshotWithIsiPath(ctx, isiPath, snapshotSourceVolumeIsiPath, srcSnapshotID, "", dstVolumeName); err != nil {
+	if volumeNew, err = svc.client.CopySnapshotWithIsiPath(ctx, isiPath, snapshotSourceVolumeIsiPath, srcSnapshotID, "", dstVolumeName, accessZone); err != nil {
 		log.Errorf("copy snapshot failed, '%s'", err.Error())
 		return nil, err
 	}
@@ -755,12 +754,12 @@ func (svc *isiService) GetSnapshot(ctx context.Context, identity string) (isi.Sn
 	return snapshot, nil
 }
 
-func (svc *isiService) GetSnapshotSize(ctx context.Context, isiPath, name string) int64 {
+func (svc *isiService) GetSnapshotSize(ctx context.Context, isiPath, name string, accessZone string) int64 {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
 	log.Debugf("begin getting snapshot size with name '%s' for Isilon", name)
-	size, err := svc.client.GetSnapshotFolderSize(ctx, isiPath, name)
+	size, err := svc.client.GetSnapshotFolderSize(ctx, isiPath, name, accessZone)
 	if err != nil {
 		log.Errorf("failed to get snapshot size '%s'", err.Error())
 		return 0
@@ -784,22 +783,26 @@ func (svc *isiService) GetExportWithPathAndZone(ctx context.Context, path, acces
 	return export, nil
 }
 
-func (svc *isiService) GetSnapshotIsiPath(ctx context.Context, isiPath string, sourceSnapshotID string) (string, error) {
-	return svc.client.GetSnapshotIsiPath(ctx, isiPath, sourceSnapshotID)
+func (svc *isiService) GetSnapshotIsiPath(ctx context.Context, isiPath string, sourceSnapshotID string, accessZone string) (string, error) {
+	return svc.client.GetSnapshotIsiPath(ctx, isiPath, sourceSnapshotID, accessZone)
 }
 
-func (svc *isiService) isROVolumeFromSnapshot(isiPath string) bool {
-	if strings.Index(isiPath, constants.VolumeSnapshotsPath) == 0 {
-		return true
-	}
-	return false
+var roVolumeFromSnapshot bool
+
+func (svc *isiService) GetIsROVolumeFromSnapshot() bool {
+	return roVolumeFromSnapshot
+}
+
+func (svc *isiService) SetIsROVolumeFromSnapshot(value bool) {
+	roVolumeFromSnapshot = value
 }
 
 func (svc *isiService) GetSnapshotNameFromIsiPath(ctx context.Context, snapshotIsiPath string) (string, error) {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
-	if !svc.isROVolumeFromSnapshot(snapshotIsiPath) {
+	//isROVolumeFromSnapshot := roVolumeFromSnapshot
+	if !roVolumeFromSnapshot {
 		log.Debugf("invalid snapshot isilon path- '%s'", snapshotIsiPath)
 		return "", fmt.Errorf("invalid snapshot isilon path")
 	}
