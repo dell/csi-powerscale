@@ -19,8 +19,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -612,7 +612,7 @@ func (s *service) syncIsilonConfigs(ctx context.Context) error {
 	syncMutex.Lock()
 	defer syncMutex.Unlock()
 
-	configBytes, err := ioutil.ReadFile(filepath.Clean(isilonConfigFile))
+	configBytes, err := os.ReadFile(filepath.Clean(isilonConfigFile))
 	if err != nil {
 		return fmt.Errorf("file ('%s') error: %v", isilonConfigFile, err)
 	}
