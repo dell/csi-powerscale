@@ -565,7 +565,7 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 				if !ok {
 					return
 				}
-				if event.Op&fsnotify.Create == fsnotify.Create && event.Name == parentFolder+"/..data" {
+				if event.Has(fsnotify.Create) && event.Name == parentFolder+"/..data" {
 					log.Infof("**************** Cluster config file modified. Updating cluster config details: %s****************", event.Name)
 					//set noProbeOnStart to false so subsequent calls can lead to probe
 					noProbeOnStart = false
