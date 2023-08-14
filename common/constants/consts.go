@@ -33,7 +33,7 @@ const (
 	// cluster when no size is given, expressed in bytes
 	DefaultVolumeSizeInBytes = 3 * BytesInGiB
 
-	// BytesInGiB is the number of bytes in a gibibyte
+	// BytesInGiB is the number of bytes in a gibabyte
 	BytesInGiB = 1024 * 1024 * 1024
 	// TRUE constant
 	TRUE = "TRUE"
@@ -62,15 +62,15 @@ const (
 	//IsilonConfigFile isilon-creds file with credential info of isilon clusters
 	IsilonConfigFile = "/isilon-configs/config"
 
-	//DefaultLogLevel for csi logs
+	// DefaultLogLevel for csi logs
 	DefaultLogLevel = logrus.DebugLevel
 
-	//ParamCSILogLevel csi driver log level
+	// ParamCSILogLevel csi driver log level
 	ParamCSILogLevel = "CSI_LOG_LEVEL"
 
-	//DefaultPodmonAPIPortNumber is the port number in default to expose internal health APIs
+	// DefaultPodmonAPIPortNumber is the port number in default to expose internal health APIs
 	DefaultPodmonAPIPortNumber = "8083"
 
-	//DefaultPodmonPollRate is the default polling frequency to check for array connectivity
+	// DefaultPodmonPollRate is the default polling frequency to check for array connectivity
 	DefaultPodmonPollRate = 60
 )

@@ -19,6 +19,9 @@ package k8sutils
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/dell/gofsutil"
 	"github.com/kubernetes-csi/csi-lib-utils/leaderelection"
 	"google.golang.org/grpc/codes"
@@ -26,8 +29,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"os"
-	"time"
 )
 
 type leaderElection interface {
