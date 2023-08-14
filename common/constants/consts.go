@@ -33,7 +33,7 @@ const (
 	// cluster when no size is given, expressed in bytes
 	DefaultVolumeSizeInBytes = 3 * BytesInGiB
 
-	// BytesInGiB is the number of bytes in a gibabyte
+	// BytesInGiB is the number of bytes in a gigabyte
 	BytesInGiB = 1024 * 1024 * 1024
 	// TRUE constant
 	TRUE = "TRUE"
