@@ -18,7 +18,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -206,7 +205,7 @@ func (s *service) NodeUnpublishVolume(
 
 	if _, err := os.Stat(lockFile); err == nil {
 		isEphemeralVolume = true
-		data, err = ioutil.ReadFile(filepath.Clean(lockFile))
+		data, err = os.ReadFile(filepath.Clean(lockFile))
 		if err != nil {
 			return nil, errors.New("unable to get volume id for ephemeral volume")
 		}

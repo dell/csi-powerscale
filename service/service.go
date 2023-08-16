@@ -19,8 +19,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -565,7 +565,7 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 				if !ok {
 					return
 				}
-				if event.Op&fsnotify.Create == fsnotify.Create && event.Name == parentFolder+"/..data" {
+				if event.Has(fsnotify.Create) && event.Name == parentFolder+"/..data" {
 					log.Infof("**************** Cluster config file modified. Updating cluster config details: %s****************", event.Name)
 					//set noProbeOnStart to false so subsequent calls can lead to probe
 					noProbeOnStart = false
@@ -612,7 +612,7 @@ func (s *service) syncIsilonConfigs(ctx context.Context) error {
 	syncMutex.Lock()
 	defer syncMutex.Unlock()
 
-	configBytes, err := ioutil.ReadFile(filepath.Clean(isilonConfigFile))
+	configBytes, err := os.ReadFile(filepath.Clean(isilonConfigFile))
 	if err != nil {
 		return fmt.Errorf("file ('%s') error: %v", isilonConfigFile, err)
 	}

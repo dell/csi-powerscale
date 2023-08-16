@@ -94,13 +94,13 @@ const (
 	// EnvReplicationPrefix is used as a prefix to find out if replication is enabled
 	EnvReplicationPrefix = "X_CSI_REPLICATION_PREFIX"
 
-	//EnvPodmonEnabled indicates that podmon is enabled
+	// EnvPodmonEnabled indicates that podmon is enabled
 	EnvPodmonEnabled = "X_CSI_PODMON_ENABLED"
 
-	//EnvPodmonAPIPORT indicates the port to be used for exposing podmon API health
+	// EnvPodmonAPIPORT indicates the port to be used for exposing podmon API health
 	EnvPodmonAPIPORT = "X_CSI_PODMON_API_PORT"
 
-	//EnvPodmonArrayConnectivityPollRate indicates the polling frequency to check array connectivity
+	// EnvPodmonArrayConnectivityPollRate indicates the polling frequency to check array connectivity
 	EnvPodmonArrayConnectivityPollRate = "X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE"
 
 	// EnvMetadataRetrieverEndpoint specifies the endpoint address for csi-metadata-retriever sidecar

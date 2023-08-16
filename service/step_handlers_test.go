@@ -19,8 +19,8 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -263,7 +263,7 @@ func handleExportUpdate(w http.ResponseWriter, r *http.Request) {
 func readFromFile(relativeFilePath string) []byte {
 	var data []byte
 	var err error
-	if data, err = ioutil.ReadFile(relativeFilePath); err != nil {
+	if data, err = os.ReadFile(relativeFilePath); err != nil {
 		panic(fmt.Sprintf("failed to read mock file '%s'", relativeFilePath))
 	}
 	return data

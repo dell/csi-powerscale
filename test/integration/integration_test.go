@@ -33,6 +33,7 @@ import (
 	"github.com/dell/csi-isilon/v2/provider"
 	"github.com/dell/gocsi/utils"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -182,7 +183,7 @@ func startServer(ctx context.Context) (*grpc.ClientConn, func()) {
 	fmt.Printf("network '%v' addr '%v'\n", network, addr)
 
 	clientOpts := []grpc.DialOption{
-		grpc.WithInsecure(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
 
 	// Create a client for the piped connection.

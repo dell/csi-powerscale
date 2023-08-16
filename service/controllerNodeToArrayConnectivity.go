@@ -19,7 +19,7 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 )
@@ -60,7 +60,7 @@ func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error
 			log.Printf("Error closing HTTP response: %s", err.Error())
 		}
 	}()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Errorf("failed to read API response due to %s ", err.Error())
 		return false, err

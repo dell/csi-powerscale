@@ -3,11 +3,11 @@ package k8s
 import (
 	"context"
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,7 +76,7 @@ func readAppliedLabels() (string, string) {
 	log.Infof("abs path to read is is %s", abspath)
 	pwd, err := os.Getwd()
 	log.Infof("cwd while reading is path is %s", pwd)
-	content, err := ioutil.ReadFile(K8sValueFile)
+	content, err := os.ReadFile(K8sValueFile)
 	if err != nil {
 		log.Errorf("unable to read file - %s", err)
 		return label, value
