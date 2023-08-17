@@ -92,7 +92,7 @@ const (
 	EnvReplicationContextPrefix = "X_CSI_REPLICATION_CONTEXT_PREFIX"
 
 	// EnvReplicationPrefix is used as a prefix to find out if replication is enabled
-	EnvReplicationPrefix = "X_CSI_REPLICATION_PREFIX"
+	EnvReplicationPrefix = "X_CSI_REPLICATION_PREFIX" // #nosec G101
 
 	// EnvPodmonEnabled indicates that podmon is enabled
 	EnvPodmonEnabled = "X_CSI_PODMON_ENABLED"
