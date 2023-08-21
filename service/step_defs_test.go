@@ -3407,10 +3407,11 @@ func (f *feature) iSetNoProbeOnStart(value string) error {
 	return nil
 }
 
-func (f *feature) iCallGetSnapshotNameFromIsiPathWith(isiPath string) error {
+// shefali
+func (f *feature) iCallGetSnapshotNameFromIsiPathWith(exportPath string) error {
 	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
 	ctx, _, _ := GetRunIDLog(context.Background())
-	_, f.err = clusterConfig.isiSvc.GetSnapshotNameFromIsiPath(ctx, isiPath)
+	_, f.err = clusterConfig.isiSvc.GetSnapshotNameFromIsiPath(ctx, exportPath, "System", "/ifs")
 	if f.err != nil {
 		log.Printf("inside iCallGetSnapshotNameFromIsiPath error %s\n", f.err.Error())
 	}
@@ -3418,7 +3419,7 @@ func (f *feature) iCallGetSnapshotNameFromIsiPathWith(isiPath string) error {
 }
 func (f *feature) iCallGetSnapshotIsiPathComponents() error {
 	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
-	_, _, _ = clusterConfig.isiSvc.GetSnapshotIsiPathComponents("/ifs/.snapshot/data/csiislon")
+	_, _, _ = clusterConfig.isiSvc.GetSnapshotIsiPathComponents("/ifs/.snapshot/data/csiislon", "/ifs")
 	_ = clusterConfig.isiSvc.GetSnapshotTrackingDirName("data")
 	return nil
 }

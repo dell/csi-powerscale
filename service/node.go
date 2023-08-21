@@ -117,8 +117,7 @@ func (s *service) NodePublishVolume(
 		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no entry keyed by 'Name' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
 	}
 	accessZone := volumeContext["AccessZone"]
-	//isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(path)
-	isROVolumeFromSnapshot := isiConfig.isiSvc.GetIsROVolumeFromSnapshot()
+	isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(path, accessZone)
 	if isROVolumeFromSnapshot {
 		log.Info("Volume source is snapshot")
 		if export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, path, accessZone); err != nil || export == nil {
@@ -227,8 +226,8 @@ func (s *service) NodeUnpublishVolume(
 			return nil, err
 		}
 		exportPath := (*export.Paths)[0]
-		//	isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(exportPath)
-		isROVolumeFromSnapshot := isiConfig.isiSvc.GetIsROVolumeFromSnapshot()
+		isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(exportPath, accessZone)
+		log.Infof("Shefali in node unpublish: %t", isROVolumeFromSnapshot)
 		// If it is a RO volume from snapshot
 		if isROVolumeFromSnapshot {
 			volName = exportPath

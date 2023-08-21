@@ -18,6 +18,7 @@ package service
 import (
 	"context"
 	"fmt"
+	apiv1 "github.com/dell/goisilon/api/v1"
 	"path"
 	"strconv"
 	"strings"
@@ -41,7 +42,7 @@ func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSource
 
 	var volumeNew isi.Volume
 	var err error
-	if volumeNew, err = svc.client.CopySnapshotWithIsiPath(ctx, isiPath, snapshotSourceVolumeIsiPath, srcSnapshotID, "", dstVolumeName, accessZone); err != nil {
+	if volumeNew, err = svc.client.CopySnapshotWithIsiPath(ctx, isiPath, snapshotSourceVolumeIsiPath, srcSnapshotID, " ", dstVolumeName, accessZone); err != nil {
 		log.Errorf("copy snapshot failed, '%s'", err.Error())
 		return nil, err
 	}
@@ -787,44 +788,71 @@ func (svc *isiService) GetSnapshotIsiPath(ctx context.Context, isiPath string, s
 	return svc.client.GetSnapshotIsiPath(ctx, isiPath, sourceSnapshotID, accessZone)
 }
 
-var roVolumeFromSnapshot bool
-
-func (svc *isiService) GetIsROVolumeFromSnapshot() bool {
-	return roVolumeFromSnapshot
+func (svc *isiService) GetZoneByName(ctx context.Context, accessZone string) (*apiv1.IsiZone, error) {
+	zone, err := svc.client.GetZoneByName(ctx, accessZone)
+	return zone, err
 }
 
-func (svc *isiService) SetIsROVolumeFromSnapshot(value bool) {
-	roVolumeFromSnapshot = value
+func (svc *isiService) isROVolumeFromSnapshot(exportPath, accessZone string) bool {
+	isROVolFromSnapshot := false
+	if accessZone == "System" {
+		if strings.Index(exportPath, "/ifs/.snapshot") == 0 {
+			isROVolFromSnapshot = true
+		}
+	} else {
+		if strings.Index(exportPath, "/.snapshot") != -1 {
+			isROVolFromSnapshot = true
+		}
+	}
+	return isROVolFromSnapshot
 }
 
-func (svc *isiService) GetSnapshotNameFromIsiPath(ctx context.Context, snapshotIsiPath string) (string, error) {
+func (svc *isiService) GetSnapshotNameFromIsiPath(ctx context.Context, snapshotIsiPath, accessZone, zonePath string) (string, error) {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
-
-	//isROVolumeFromSnapshot := roVolumeFromSnapshot
-	if !roVolumeFromSnapshot {
+	var snapShotName string
+	if !svc.isROVolumeFromSnapshot(snapshotIsiPath, accessZone) {
 		log.Debugf("invalid snapshot isilon path- '%s'", snapshotIsiPath)
 		return "", fmt.Errorf("invalid snapshot isilon path")
 	}
-
 	// Snapshot isi path format /<ifs>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
-	dirs := strings.Split(snapshotIsiPath, "/")
+	//Non System Access Zone /<ifs>/<csi_zone_base_path>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
+	pathWithoutZonePath := strings.Trim(snapshotIsiPath, zonePath)
+	directories := strings.Split(pathWithoutZonePath, "/")
 	// If there is no snapshot name in snapshot isi path or if it is empty
-	if len(dirs) < 4 || dirs[3] == "" {
+	if len(directories) < 2 || directories[2] == "" {
 		log.Debugf("invalid snapshot isilon path- '%s'", snapshotIsiPath)
 		return "", fmt.Errorf("invalid snapshot isilon path")
 	}
-
-	return dirs[3], nil
+	snapShotName = directories[2]
+	return snapShotName, nil
 }
 
-func (svc *isiService) GetSnapshotIsiPathComponents(snapshotIsiPath string) (string, string, string) {
+func (svc *isiService) GetSnapshotIsiPathComponents(snapshotIsiPath, zonePath string) (string, string, string) {
 	// Returns snapshot isi path components- isiPath, snapshotName, srcVolName
+	var isiPath string
+	var snapshotName string
+	// Snapshot isi path format /<ifs>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
+	//Non System Access Zone snapshot isi path /<ifs>/<csi_zone_base_path>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
 	dirs := strings.Split(snapshotIsiPath, "/")
-	isiPath := path.Join("/", dirs[1], strings.Join(dirs[4:len(dirs)-1], "/"))
-	snapshotName := dirs[3]
 	srcVolName := dirs[len(dirs)-1]
-
+	//in case of non system access zone
+	if dirs[2] != ".snapshot" {
+		//.snapshot/snapshot_name/<volume path>
+		pathWithoutZonePath := strings.Trim(snapshotIsiPath, zonePath)
+		directories := strings.Split(pathWithoutZonePath, "/")
+		snapshotName = directories[1]
+		//isi path is different than zone path
+		if len(directories) > 3 {
+			remainIsiPath := strings.Join(directories[3:len(directories)-1], "/")
+			isiPath = path.Join("/", zonePath, remainIsiPath)
+		} else {
+			isiPath = zonePath
+		}
+	} else {
+		snapshotName = dirs[3]
+		isiPath = path.Join("/", dirs[1], strings.Join(dirs[4:len(dirs)-1], "/"))
+	}
 	return isiPath, snapshotName, srcVolName
 }
 

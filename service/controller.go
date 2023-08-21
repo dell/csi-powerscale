@@ -356,8 +356,8 @@ func (s *service) CreateVolume(
 	var headerMetadata = addMetaData(params)
 
 	// check volume content source in the request
-	//isROVolumeFromSnapshot = false
-	isiConfig.isiSvc.SetIsROVolumeFromSnapshot(false)
+	isROVolumeFromSnapshot = false
+	// check volume content source in the request
 	if contentSource = req.GetVolumeContentSource(); contentSource != nil {
 		// Fetch source snapshot ID  or volume ID from content source
 		if snapshot := contentSource.GetSnapshot(); snapshot != nil {
@@ -402,7 +402,6 @@ func (s *service) CreateVolume(
 				}
 
 				if am.Mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
-					isiConfig.isiSvc.SetIsROVolumeFromSnapshot(true)
 					isROVolumeFromSnapshot = true
 					break
 				}
@@ -492,7 +491,6 @@ func (s *service) CreateVolume(
 	}
 
 	foundVol = false
-	isROVolumeFromSnapshot = isiConfig.isiSvc.GetIsROVolumeFromSnapshot()
 	if isROVolumeFromSnapshot {
 		if isReplication {
 			return nil, errors.New("Unable to create replication volume from snapshot")
@@ -684,7 +682,6 @@ func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *Isilo
 	if size > sizeInBytes {
 		return fmt.Errorf("specified size '%d' is smaller than source snapshot size '%d'", sizeInBytes, size)
 	}
-
 	if _, err = isiConfig.isiSvc.CopySnapshot(ctx, isiPath, snapshotSourceVolumeIsiPath, snapshotSrc.Id, dstVolumeName, accessZone); err != nil {
 		return fmt.Errorf("failed to copy snapshot id '%s', error '%s'", srcSnapshotID, err.Error())
 	}
@@ -814,6 +811,7 @@ func (s *service) DeleteVolume(
 	}
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
+
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
@@ -821,7 +819,6 @@ func (s *service) DeleteVolume(
 
 	ctx, log = setClusterContext(ctx, clusterName)
 	log.Debugf("Cluster Name: %v", clusterName)
-
 	// probe
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
 		log.Error("Failed to probe with error: " + err.Error())
@@ -847,17 +844,16 @@ func (s *service) DeleteVolume(
 
 	exportPath := (*export.Paths)[0]
 
-	//isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(exportPath)
-	isROVolumeFromSnapshot := isiConfig.isiSvc.GetIsROVolumeFromSnapshot()
+	isiPath := utils.GetIsiPathFromExportPath(exportPath)
+
+	isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(exportPath, accessZone)
 	// If it is a RO volume and dataSource is snapshot
 	if isROVolumeFromSnapshot {
-		if err := s.processSnapshotTrackingDirectoryDuringDeleteVolume(ctx, volName, export, isiConfig); err != nil {
+		if err := s.processSnapshotTrackingDirectoryDuringDeleteVolume(ctx, volName, accessZone, export, isiConfig); err != nil {
 			return nil, err
 		}
 		return &csi.DeleteVolumeResponse{}, nil
 	}
-
-	isiPath := utils.GetIsiPathFromExportPath(exportPath)
 	// to ensure idempotency, check if the volume and export still exists.
 	// k8s might have made the same DeleteVolume call in quick succession and the volume was already deleted in the first run
 	log.Debugf("controller begins to delete volume, name '%s', quotaEnabled '%t'", volName, quotaEnabled)
@@ -913,6 +909,7 @@ func (s *service) DeleteVolume(
 func (s *service) processSnapshotTrackingDirectoryDuringDeleteVolume(
 	ctx context.Context,
 	volName string,
+	accessZone string,
 	export isi.Export,
 	isiConfig *IsilonClusterConfig) error {
 	exportPath := (*export.Paths)[0]
@@ -920,8 +917,14 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteVolume(
 	// Fetch log handler
 	ctx, log, _ := GetRunIDLog(ctx)
 
-	// Get snapshot name
-	snapshotName, err := isiConfig.isiSvc.GetSnapshotNameFromIsiPath(ctx, exportPath)
+	//Get Zone Path
+	zone, err := isiConfig.isiSvc.GetZoneByName(ctx, accessZone)
+	if err != nil {
+		return err
+	}
+	// Delete the snapshot tracking directory entry for this volume
+	isiPath, snapshotName, _ := isiConfig.isiSvc.GetSnapshotIsiPathComponents(exportPath, zone.Path)
+
 	if err != nil {
 		return err
 	}
@@ -933,8 +936,6 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteVolume(
 	snapshotTrackingDirEntryForVolume := path.Join(snapshotTrackingDir, volName)
 	snapshotTrackingDirDeleteMarker := path.Join(snapshotTrackingDir, DeleteSnapshotMarker)
 
-	// Delete the snapshot tracking directory entry for this volume
-	isiPath, _, _ := isiConfig.isiSvc.GetSnapshotIsiPathComponents(exportPath)
 	log.Debugf("Delete the snapshot tracking directory entry '%s' for volume '%s'", snapshotTrackingDirEntryForVolume, volName)
 	if isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", snapshotTrackingDirEntryForVolume) {
 		if err := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, snapshotTrackingDirEntryForVolume); err != nil {
@@ -1109,8 +1110,8 @@ func (s *service) ControllerPublishVolume(
 		exportPath = utils.GetPathForVolume(isiConfig.IsiPath, volName)
 	}
 
-	//isROVolumeFromSnapshot = isiConfig.isiSvc.isROVolumeFromSnapshot(exportPath)
-	isROVolumeFromSnapshot = isiConfig.isiSvc.GetIsROVolumeFromSnapshot()
+	isROVolumeFromSnapshot = isiConfig.isiSvc.isROVolumeFromSnapshot(volumeContext["Path"], accessZone)
+
 	if isROVolumeFromSnapshot {
 		log.Info("Volume source is snapshot")
 		if export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, exportPath, accessZone); err != nil || export == nil {
@@ -1742,8 +1743,8 @@ func (s *service) DeleteSnapshot(
 
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
-
 	log.Infof("DeleteSnapshot started")
+
 	if req.GetSnapshotId() == "" {
 		return nil, status.Errorf(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "snapshot id to be deleted is required"))
 	}
@@ -1793,11 +1794,8 @@ func (s *service) DeleteSnapshot(
 			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "cannot check the existence of the snapshot: '%s'", err.Error()))
 		}
 	}
-	//shefali to be done for non system zone
-	var accessZone string
-	/*if strings.Contains(snapshot, "/ifs/.snapshot") {
-		accessZone = "System"
-	}*/
+	//Reading access zone param
+	accessZone := isiConfig.accessZone
 	// Get snapshot path
 	snapshotSourceVolumeIsiPath, _ := isiConfig.isiSvc.GetSnapshotSourceVolumeIsiPath(ctx, snapshotID)
 	log.Infof("Snapshot source volume isiPath is '%s'", snapshotSourceVolumeIsiPath)
@@ -1807,7 +1805,7 @@ func (s *service) DeleteSnapshot(
 	}
 	log.Debugf("The Isilon directory path of snapshot is= %v", snapshotIsiPath)
 
-	export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, snapshotIsiPath, "")
+	export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, snapshotIsiPath, accessZone)
 	if err != nil {
 		// internal error
 		return nil, err
@@ -1843,8 +1841,14 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteSnapshot(
 	// Fetch log handler
 	ctx, log, _ := GetRunIDLog(ctx)
 
+	//get Zone details
+	zone, err := isiConfig.isiSvc.GetZoneByName(ctx, isiConfig.accessZone)
+	if err != nil {
+		return err
+	}
+
 	// Populate names for snapshot's tracking dir and snapshot delete marker
-	isiPath, snapshotName, _ := isiConfig.isiSvc.GetSnapshotIsiPathComponents(snapshotIsiPath)
+	isiPath, snapshotName, _ := isiConfig.isiSvc.GetSnapshotIsiPathComponents(snapshotIsiPath, zone.Path)
 	snapshotTrackingDir := isiConfig.isiSvc.GetSnapshotTrackingDirName(snapshotName)
 	snapshotTrackingDirDeleteMarker := path.Join(snapshotTrackingDir, DeleteSnapshotMarker)
 
