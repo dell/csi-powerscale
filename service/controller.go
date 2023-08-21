@@ -811,7 +811,6 @@ func (s *service) DeleteVolume(
 	}
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
-
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
 		return nil, err
@@ -843,8 +842,6 @@ func (s *service) DeleteVolume(
 	}
 
 	exportPath := (*export.Paths)[0]
-
-	isiPath := utils.GetIsiPathFromExportPath(exportPath)
 
 	isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(exportPath, accessZone)
 	// If it is a RO volume and dataSource is snapshot
@@ -1744,7 +1741,6 @@ func (s *service) DeleteSnapshot(
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
 	log.Infof("DeleteSnapshot started")
-
 	if req.GetSnapshotId() == "" {
 		return nil, status.Errorf(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "snapshot id to be deleted is required"))
 	}
