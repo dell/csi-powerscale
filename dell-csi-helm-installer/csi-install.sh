@@ -101,7 +101,7 @@ fi
 if [ ! -d "$DRIVERDIR/helm-charts" ]; then
 
   if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
-    git clone --quiet -c advice.detachedHead=false $DRIVERVERSION https://github.com/dell/helm-charts
+    git clone --quiet -c advice.detachedHead=false -b $DRIVERVERSION https://github.com/dell/helm-charts
   fi
   mv helm-charts $DRIVERDIR
 else 
