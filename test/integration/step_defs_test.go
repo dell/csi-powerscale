@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -234,7 +235,7 @@ func (f *feature) thereAreNoErrors() error {
 
 func createIsilonClient() (*isi.Client, error) {
 	ctx := context.Background()
-	configBytes, err := os.ReadFile(os.Getenv(constants.EnvIsilonConfigFile))
+	configBytes, err := ioutil.ReadFile(os.Getenv(constants.EnvIsilonConfigFile))
 	if err != nil {
 		return nil, fmt.Errorf("file ('%s') error: %v", os.Getenv(constants.EnvIsilonConfigFile), err)
 	}
@@ -335,7 +336,7 @@ func (f *feature) thereIsAnExportForSnapshotDir(name string) error {
 		panic(fmt.Sprintf("failed to get snapshot id for snapshot '%s', error '%v'\n", name, err))
 	}
 
-	snapshotIsiPath, err := isiClient.GetSnapshotIsiPath(ctx, f.isiPath, strconv.FormatInt(snapshotSrc.Id, 10))
+	snapshotIsiPath, err := isiClient.GetSnapshotIsiPath(ctx, f.isiPath, strconv.FormatInt(snapshotSrc.Id, 10), f.vol.VolumeContext["AccessZone"])
 	if err != nil {
 		f.addError(err)
 		fmt.Printf("failed to get snapshot dir path for snapshot '#{name}', error '#{err}'\n")

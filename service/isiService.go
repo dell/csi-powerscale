@@ -18,12 +18,12 @@ package service
 import (
 	"context"
 	"fmt"
+	apiv1 "github.com/dell/goisilon/api/v1"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/dell/csi-isilon/v2/common/constants"
 	utils "github.com/dell/csi-isilon/v2/common/utils"
 	isi "github.com/dell/goisilon"
 	"github.com/dell/goisilon/api"
@@ -34,7 +34,7 @@ type isiService struct {
 	client   *isi.Client
 }
 
-func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSourceVolumeIsiPath string, srcSnapshotID int64, dstVolumeName string) (isi.Volume, error) {
+func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSourceVolumeIsiPath string, srcSnapshotID int64, dstVolumeName string, accessZone string) (isi.Volume, error) {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
@@ -42,7 +42,7 @@ func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSource
 
 	var volumeNew isi.Volume
 	var err error
-	if volumeNew, err = svc.client.CopySnapshotWithIsiPath(ctx, isiPath, snapshotSourceVolumeIsiPath, srcSnapshotID, "", dstVolumeName); err != nil {
+	if volumeNew, err = svc.client.CopySnapshotWithIsiPath(ctx, isiPath, snapshotSourceVolumeIsiPath, srcSnapshotID, "", dstVolumeName, accessZone); err != nil {
 		log.Errorf("copy snapshot failed, '%s'", err.Error())
 		return nil, err
 	}
@@ -755,12 +755,12 @@ func (svc *isiService) GetSnapshot(ctx context.Context, identity string) (isi.Sn
 	return snapshot, nil
 }
 
-func (svc *isiService) GetSnapshotSize(ctx context.Context, isiPath, name string) int64 {
+func (svc *isiService) GetSnapshotSize(ctx context.Context, isiPath, name string, accessZone string) int64 {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
 	log.Debugf("begin getting snapshot size with name '%s' for Isilon", name)
-	size, err := svc.client.GetSnapshotFolderSize(ctx, isiPath, name)
+	size, err := svc.client.GetSnapshotFolderSize(ctx, isiPath, name, accessZone)
 	if err != nil {
 		log.Errorf("failed to get snapshot size '%s'", err.Error())
 		return 0
@@ -784,44 +784,76 @@ func (svc *isiService) GetExportWithPathAndZone(ctx context.Context, path, acces
 	return export, nil
 }
 
-func (svc *isiService) GetSnapshotIsiPath(ctx context.Context, isiPath string, sourceSnapshotID string) (string, error) {
-	return svc.client.GetSnapshotIsiPath(ctx, isiPath, sourceSnapshotID)
+func (svc *isiService) GetSnapshotIsiPath(ctx context.Context, isiPath string, sourceSnapshotID string, accessZone string) (string, error) {
+	return svc.client.GetSnapshotIsiPath(ctx, isiPath, sourceSnapshotID, accessZone)
 }
 
-func (svc *isiService) isROVolumeFromSnapshot(isiPath string) bool {
-	if strings.Index(isiPath, constants.VolumeSnapshotsPath) == 0 {
-		return true
+func (svc *isiService) GetZoneByName(ctx context.Context, accessZone string) (*apiv1.IsiZone, error) {
+	zone, err := svc.client.GetZoneByName(ctx, accessZone)
+	return zone, err
+}
+
+func (svc *isiService) isROVolumeFromSnapshot(exportPath, accessZone string) bool {
+	isROVolFromSnapshot := false
+	if accessZone == "System" {
+		if strings.Index(exportPath, "/ifs/.snapshot") == 0 {
+			isROVolFromSnapshot = true
+		}
+	} else {
+		if strings.Index(exportPath, "/.snapshot") != -1 {
+			isROVolFromSnapshot = true
+		}
 	}
-	return false
+	return isROVolFromSnapshot
 }
 
-func (svc *isiService) GetSnapshotNameFromIsiPath(ctx context.Context, snapshotIsiPath string) (string, error) {
+func (svc *isiService) GetSnapshotNameFromIsiPath(ctx context.Context, snapshotIsiPath, accessZone, zonePath string) (string, error) {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
-
-	if !svc.isROVolumeFromSnapshot(snapshotIsiPath) {
+	var snapShotName string
+	if !svc.isROVolumeFromSnapshot(snapshotIsiPath, accessZone) {
 		log.Debugf("invalid snapshot isilon path- '%s'", snapshotIsiPath)
 		return "", fmt.Errorf("invalid snapshot isilon path")
 	}
-
 	// Snapshot isi path format /<ifs>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
-	dirs := strings.Split(snapshotIsiPath, "/")
+	//Non System Access Zone /<ifs>/<csi_zone_base_path>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
+	pathWithoutZonePath := strings.Trim(snapshotIsiPath, zonePath)
+	directories := strings.Split(pathWithoutZonePath, "/")
 	// If there is no snapshot name in snapshot isi path or if it is empty
-	if len(dirs) < 4 || dirs[3] == "" {
+	if len(directories) < 2 || directories[2] == "" {
 		log.Debugf("invalid snapshot isilon path- '%s'", snapshotIsiPath)
 		return "", fmt.Errorf("invalid snapshot isilon path")
 	}
-
-	return dirs[3], nil
+	snapShotName = directories[2]
+	return snapShotName, nil
 }
 
-func (svc *isiService) GetSnapshotIsiPathComponents(snapshotIsiPath string) (string, string, string) {
+func (svc *isiService) GetSnapshotIsiPathComponents(snapshotIsiPath, zonePath string) (string, string, string) {
 	// Returns snapshot isi path components- isiPath, snapshotName, srcVolName
+	var isiPath string
+	var snapshotName string
+	// Snapshot isi path format /<ifs>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
+	//Non System Access Zone /<ifs>/<csi_zone_base_path>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
 	dirs := strings.Split(snapshotIsiPath, "/")
-	isiPath := path.Join("/", dirs[1], strings.Join(dirs[4:len(dirs)-1], "/"))
-	snapshotName := dirs[3]
 	srcVolName := dirs[len(dirs)-1]
-
+	//in case of non system access zone
+	if dirs[2] != ".snapshot" {
+		//.snapshot/snapshot_name/<volume path>
+		pathWithoutZonePath := strings.Split(snapshotIsiPath, zonePath)
+		directories := strings.Split(pathWithoutZonePath[1], "/")
+		snapshotName = directories[2]
+		//isi path is different than zone path
+		if len(directories) > 3 {
+			//volume path without volume name and ifs prefix
+			remainIsiPath := strings.Join(directories[3:len(directories)-1], "/")
+			isiPath = path.Join("/", zonePath, remainIsiPath)
+		} else {
+			isiPath = zonePath
+		}
+	} else {
+		snapshotName = dirs[3]
+		isiPath = path.Join("/", dirs[1], strings.Join(dirs[4:len(dirs)-1], "/"))
+	}
 	return isiPath, snapshotName, srcVolName
 }
 

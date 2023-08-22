@@ -20,15 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
-	"os"
-	"path"
-	"regexp"
-	"strconv"
-	"strings"
-
-	"gopkg.in/yaml.v3"
-
 	"github.com/Showmax/go-fqdn"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/v2/common/constants"
@@ -37,6 +28,13 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gopkg.in/yaml.v3"
+	"net"
+	"os"
+	"path"
+	"regexp"
+	"strconv"
+	"strings"
 )
 
 // ParseBooleanFromContext parses an environment variable into a boolean value. If an error is encountered, default is set to false, and error is logged

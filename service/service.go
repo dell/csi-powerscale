@@ -28,14 +28,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/akutz/gournal"
+	"github.com/dell/csi-isilon/v2/common/k8sutils"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"google.golang.org/grpc"
-
-	"github.com/akutz/gournal"
 	"google.golang.org/grpc/metadata"
 	"gopkg.in/yaml.v3"
-
-	"github.com/dell/csi-isilon/v2/common/k8sutils"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/v2/common/constants"
@@ -125,6 +123,7 @@ type IsilonClusterConfig struct {
 	EndpointPort              string `yaml:"endpointPort,omitempty"`
 	MountEndpoint             string `yaml:"mountEndpoint,omitempty"` // This field is used to retain the orignal Endpoint after CSM-Authorization has been injected
 	EndpointURL               string
+	accessZone                string `yaml:"accessZone,omitempty"`
 	User                      string `yaml:"username"`
 	Password                  string `yaml:"password"`
 	SkipCertificateValidation *bool  `yaml:"skipCertificateValidation,omitempty"`
@@ -138,8 +137,8 @@ type IsilonClusterConfig struct {
 
 // To display the IsilonClusterConfig of a cluster
 func (s IsilonClusterConfig) String() string {
-	return fmt.Sprintf("ClusterName: %s, Endpoint: %s, EndpointPort: %s, EndpointURL: %s, User: %s, SkipCertificateValidation: %v, IsiPath: %s, IsiVolumePathPermissions: %s, IsDefault: %v, IgnoreUnresolvableHosts: %v, isiSvc: %v",
-		s.ClusterName, s.Endpoint, s.EndpointPort, s.EndpointURL, s.User, *s.SkipCertificateValidation, s.IsiPath, s.IsiVolumePathPermissions, *s.IsDefault, *s.IgnoreUnresolvableHosts, s.isiSvc)
+	return fmt.Sprintf("ClusterName: %s, Endpoint: %s, EndpointPort: %s, EndpointURL: %s, User: %s, SkipCertificateValidation: %v, IsiPath: %s, IsiVolumePathPermissions: %s, IsDefault: %v, IgnoreUnresolvableHosts: %v, AccessZone: %s, isiSvc: %v",
+		s.ClusterName, s.Endpoint, s.EndpointPort, s.EndpointURL, s.User, *s.SkipCertificateValidation, s.IsiPath, s.IsiVolumePathPermissions, *s.IsDefault, *s.IgnoreUnresolvableHosts, s.accessZone, s.isiSvc)
 }
 
 // New returns a new Service.
