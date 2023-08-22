@@ -18,6 +18,7 @@ usage() {
    echo "Make a package for offline installation of a CSI driver"
    echo
    echo "Arguments:"
+   echo "-v             Pass the helm chart version "
    echo "-c             Create an offline bundle"
    echo "-p             Prepare this bundle for installation"
    echo "-r <registry>  Required if preparing offline bundle with '-p'"
@@ -228,10 +229,47 @@ DRIVER="csi-isilon"
 # some directories
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 REPODIR="$( dirname "${SCRIPTDIR}" )"
+
+DRIVERVERSION="csi-isilon-2.8.0"
+
+while getopts "cpr:h" opt; do
+  case $opt in
+    c)
+      CREATE="true"
+      ;;
+    p)
+      PREPARE="true"
+      ;;
+    r)
+      REGISTRY="${OPTARG}"
+      ;;
+    v)
+      HELMCHARTVERSION="${OPTARG}"
+      ;;
+    h)
+      usage
+      exit 0
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+  esac
+done
+
+
+if [ -n "$HELMCHARTVERSION" ]; then
+  DRIVERVERSION=$HELMCHARTVERSION
+fi
+
 if [ ! -d "$REPODIR/helm-charts" ]; then
 
   if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
-    git clone --quiet -c advice.detachedHead=false  https://github.com/dell/helm-charts
+    git clone --quiet -c advice.detachedHead=false -b $DRIVERVERSION https://github.com/dell/helm-charts
   fi
   mv helm-charts $REPODIR
 else 
@@ -303,32 +341,6 @@ else
     "${REPODIR}/LICENSE"
   )
 fi
-
-while getopts "cpr:h" opt; do
-  case $opt in
-    c)
-      CREATE="true"
-      ;;
-    p)
-      PREPARE="true"
-      ;;
-    r)
-      REGISTRY="${OPTARG}"
-      ;;
-    h)
-      usage
-      exit 0
-      ;;
-    \?)
-      echo "Invalid option: -$OPTARG" >&2
-      exit 1
-      ;;
-    :)
-      echo "Option -$OPTARG requires an argument." >&2
-      exit 1
-      ;;
-  esac
-done
 
 # make sure exatly one option for create/prepare was specified
 if [ "${CREATE}" == "${PREPARE}" ]; then
