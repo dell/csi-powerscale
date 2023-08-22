@@ -45,7 +45,7 @@ For example, to create a values file for the PowerScale driver the following ste
 cd dell-csi-helm-installer
 
 # copy the template file
-cp ../helm/csi-isilon/values.yaml ./my-isilon-settings.yaml
+ wget -O my-isilon-settings.yaml -b csi-isilon-2.8.0 https://raw.githubusercontent.com/dell/helm-charts/main/charts/csi-isilon/values.yaml
 
 # edit the newly created values file
 vi my-isilon-settings.yaml
