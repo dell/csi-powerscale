@@ -15,9 +15,9 @@
 #
 
 # DEFAULT values
-# ubi8/ubi-micro:8.8-1
-DEFAULT_BASEIMAGE="registry.access.redhat.com/ubi8/ubi-micro:8.8-1"
-DEFAULT_GOVERSION="1.20"
+# ubi9/ubi-micro:9.2-13
+DEFAULT_BASEIMAGE="registry.access.redhat.com/ubi9/ubi-micro@sha256:630cf7bdef807f048cadfe7180d6c27eb3aaa99323ffc3628811da230ed3322a"
+DEFAULT_GOVERSION="1.21"
 DEFAULT_REGISTRY=""
 DEFAULT_IMAGENAME="isilon"
 DEFAULT_BUILDSTAGE="final"
