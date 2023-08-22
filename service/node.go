@@ -227,7 +227,6 @@ func (s *service) NodeUnpublishVolume(
 		}
 		exportPath := (*export.Paths)[0]
 		isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(exportPath, accessZone)
-		log.Infof("Shefali in node unpublish: %t", isROVolumeFromSnapshot)
 		// If it is a RO volume from snapshot
 		if isROVolumeFromSnapshot {
 			volName = exportPath

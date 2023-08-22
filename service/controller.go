@@ -842,6 +842,7 @@ func (s *service) DeleteVolume(
 	}
 
 	exportPath := (*export.Paths)[0]
+	isiPath := utils.GetIsiPathFromExportPath(exportPath)
 
 	isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(exportPath, accessZone)
 	// If it is a RO volume and dataSource is snapshot

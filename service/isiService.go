@@ -42,7 +42,7 @@ func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSource
 
 	var volumeNew isi.Volume
 	var err error
-	if volumeNew, err = svc.client.CopySnapshotWithIsiPath(ctx, isiPath, snapshotSourceVolumeIsiPath, srcSnapshotID, " ", dstVolumeName, accessZone); err != nil {
+	if volumeNew, err = svc.client.CopySnapshotWithIsiPath(ctx, isiPath, snapshotSourceVolumeIsiPath, srcSnapshotID, "", dstVolumeName, accessZone); err != nil {
 		log.Errorf("copy snapshot failed, '%s'", err.Error())
 		return nil, err
 	}
@@ -833,17 +833,18 @@ func (svc *isiService) GetSnapshotIsiPathComponents(snapshotIsiPath, zonePath st
 	var isiPath string
 	var snapshotName string
 	// Snapshot isi path format /<ifs>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
-	//Non System Access Zone snapshot isi path /<ifs>/<csi_zone_base_path>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
+	//Non System Access Zone /<ifs>/<csi_zone_base_path>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
 	dirs := strings.Split(snapshotIsiPath, "/")
 	srcVolName := dirs[len(dirs)-1]
 	//in case of non system access zone
 	if dirs[2] != ".snapshot" {
 		//.snapshot/snapshot_name/<volume path>
-		pathWithoutZonePath := strings.Trim(snapshotIsiPath, zonePath)
-		directories := strings.Split(pathWithoutZonePath, "/")
-		snapshotName = directories[1]
+		pathWithoutZonePath := strings.Split(snapshotIsiPath, zonePath)
+		directories := strings.Split(pathWithoutZonePath[1], "/")
+		snapshotName = directories[2]
 		//isi path is different than zone path
 		if len(directories) > 3 {
+			//volume path without volume name and ifs prefix
 			remainIsiPath := strings.Join(directories[3:len(directories)-1], "/")
 			isiPath = path.Join("/", zonePath, remainIsiPath)
 		} else {
