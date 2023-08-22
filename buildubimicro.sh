@@ -18,7 +18,7 @@
 
 microcontainer=$(buildah from $1)
 micromount=$(buildah mount $microcontainer)
-dnf install --installroot $micromount --releasever=8 --nodocs --setopt install_weak_deps=false --setopt=reposdir=/etc/yum.repos.d/ libaio libuuid numactl xfsprogs e4fsprogs nfs-utils -y
+dnf install --installroot $micromount --releasever=9 --nodocs --setopt install_weak_deps=false --setopt=reposdir=/etc/yum.repos.d/ libaio libuuid numactl xfsprogs e4fsprogs nfs-utils -y
 dnf clean all --installroot $micromount
 buildah umount $microcontainer
 buildah commit $microcontainer csipowerscale-ubimicro
