@@ -12,11 +12,8 @@
 # limitations under the License
 
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-DRIVERDIR="${SCRIPTDIR}/../"
 
 DRIVERVERSION="csi-isilon-2.8.0"
-
-
 DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
 DRIVER="csi-isilon"
 VERIFYSCRIPT="${SCRIPTDIR}/verify.sh"
@@ -24,7 +21,7 @@ PROG="${0}"
 NODE_VERIFY=1
 VERIFY=1
 MODE="install"
-DEFAULT_DRIVER_VERSION="v2.8.0"
+DEFAULT_DRIVER_VERSION="v2.7.0"
 WATCHLIST=""
 
 # export the name of the debug log, so child processes will see it
@@ -296,8 +293,6 @@ function verify_kubernetes() {
 VERIFYOPTS=""
 ASSUMEYES="false"
 
-
-
 while getopts ":h-:" optchar; do
   case "${optchar}" in
   -)
@@ -376,13 +371,12 @@ while getopts ":h-:" optchar; do
   esac
 done
 
-DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
 
+DRIVERDIR="${SCRIPTDIR}/../"
 if [ -n "$HELMCHARTVERSION" ]; then
   DRIVERVERSION=$HELMCHARTVERSION
 fi
-echo "Helm Verson ${HELMCHARTVERSION}"
-echo "Driver version ${DRIVERVERSION}"
+
 
 if [ ! -d "$DRIVERDIR/helm-charts" ]; then
 
@@ -395,6 +389,8 @@ else
     rm -rf $SCRIPTDIR/helm-charts
   fi
 fi
+
+DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
 
 # by default the NAME of the helm release of the driver is the same as the driver name
 RELEASE=$(get_release_name "${DRIVER}")
