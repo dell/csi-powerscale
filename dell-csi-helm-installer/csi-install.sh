@@ -13,7 +13,7 @@
 
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-DRIVERVERSION="csi-isilon-2.8.0"
+HELM_BRANCH="csi-isilon-2.8.0"
 DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
 DRIVER="csi-isilon"
 VERIFYSCRIPT="${SCRIPTDIR}/verify.sh"
@@ -374,14 +374,14 @@ done
 
 DRIVERDIR="${SCRIPTDIR}/../"
 if [ -n "$HELMCHARTVERSION" ]; then
-  DRIVERVERSION=$HELMCHARTVERSION
+  HELM_BRANCH=$HELMCHARTVERSION
 fi
 
 
 if [ ! -d "$DRIVERDIR/helm-charts" ]; then
 
   if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
-    git clone --quiet -c advice.detachedHead=false -b $DRIVERVERSION https://github.com/dell/helm-charts
+    git clone --quiet -c advice.detachedHead=false -b $HELM_BRANCH https://github.com/dell/helm-charts
   fi
   mv helm-charts $DRIVERDIR
 else 
