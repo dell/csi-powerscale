@@ -17,21 +17,6 @@ DRIVERDIR="${SCRIPTDIR}/../"
 DRIVERVERSION="csi-isilon-2.8.0"
 
 
-if [ -n "$HELMCHARTVERSION" ]; then
-  DRIVERVERSION=$HELMCHARTVERSION
-fi
-
-if [ ! -d "$DRIVERDIR/helm-charts" ]; then
-
-  if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
-    git clone --quiet -c advice.detachedHead=false -b $DRIVERVERSION https://github.com/dell/helm-charts
-  fi
-  mv helm-charts $DRIVERDIR
-else 
-  if [  -d "$SCRIPTDIR/helm-charts" ]; then
-    rm -rf $SCRIPTDIR/helm-charts
-  fi
-fi
 DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
 DRIVER="csi-isilon"
 VERIFYSCRIPT="${SCRIPTDIR}/verify.sh"
@@ -311,7 +296,7 @@ function verify_kubernetes() {
 VERIFYOPTS=""
 ASSUMEYES="false"
 
-DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
+
 
 while getopts ":h-:" optchar; do
   case "${optchar}" in
@@ -352,7 +337,7 @@ while getopts ":h-:" optchar; do
     release=*)
       RELEASE=${OPTARG#*=}
       ;;
-       # helm chart version
+    # helm chart version
     helm-charts-version)
       HELMCHARTVERSION="${!OPTIND}"
       OPTIND=$((OPTIND + 1))
@@ -390,6 +375,26 @@ while getopts ":h-:" optchar; do
     ;;
   esac
 done
+
+DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
+
+if [ -n "$HELMCHARTVERSION" ]; then
+  DRIVERVERSION=$HELMCHARTVERSION
+fi
+echo "Helm Verson ${HELMCHARTVERSION}"
+echo "Driver version ${DRIVERVERSION}"
+
+if [ ! -d "$DRIVERDIR/helm-charts" ]; then
+
+  if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
+    git clone --quiet -c advice.detachedHead=false -b $DRIVERVERSION https://github.com/dell/helm-charts
+  fi
+  mv helm-charts $DRIVERDIR
+else 
+  if [  -d "$SCRIPTDIR/helm-charts" ]; then
+    rm -rf $SCRIPTDIR/helm-charts
+  fi
+fi
 
 # by default the NAME of the helm release of the driver is the same as the driver name
 RELEASE=$(get_release_name "${DRIVER}")
