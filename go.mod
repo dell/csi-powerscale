@@ -9,10 +9,10 @@ require (
 	github.com/container-storage-interface/spec v1.5.0
 	github.com/cucumber/godog v0.10.0
 	github.com/dell/csi-metadata-retriever v1.4.0
-	github.com/dell/dell-csi-extensions/common v1.1.2
-	github.com/dell/dell-csi-extensions/podmon v1.1.3
-	github.com/dell/dell-csi-extensions/replication v1.4.0
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.3
+	github.com/dell/dell-csi-extensions/common v1.1.3-0.20230821201344-ea25f89d957e
+	github.com/dell/dell-csi-extensions/podmon v1.1.4-0.20230821201344-ea25f89d957e
+	github.com/dell/dell-csi-extensions/replication v1.4.1-0.20230821201344-ea25f89d957e
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.4-0.20230821201344-ea25f89d957e
 	github.com/dell/gocsi v1.7.0
 	github.com/dell/gofsutil v1.12.0
 	github.com/dell/goisilon v1.12.1-0.20230822111217-6db00ba5c496
@@ -92,10 +92,10 @@ require (
 	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20230526161137-0005af68ea54 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20230525234035-dd9d682886f9 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230525234030-28d5490b6b19 // indirect
-	google.golang.org/protobuf v1.30.0 // indirect
+	google.golang.org/genproto v0.0.0-20230803162519-f966b187b2e5 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20230726155614-23370e0ffb3e // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230815205213-6bfd019c3878 // indirect
+	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
