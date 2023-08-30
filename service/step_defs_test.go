@@ -3407,7 +3407,6 @@ func (f *feature) iSetNoProbeOnStart(value string) error {
 	return nil
 }
 
-// shefali
 func (f *feature) iCallGetSnapshotNameFromIsiPathWith(exportPath string) error {
 	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
 	ctx, _, _ := GetRunIDLog(context.Background())

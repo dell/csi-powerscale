@@ -79,7 +79,7 @@ Feature: Isilon CSI interface
 
     Examples:
     | snapshotId   | errormsg                                 |
-    | "34=_=_=cluster2" | "failed to get cluster config details for clusterName: 'cluster2'"                                   |
+    | "34=_=_=cluster2=_=_=System" | "failed to get cluster config details for clusterName: 'cluster2'"                                   |
     | ""           | "snapshot id to be deleted is required"  |
     | "404"        | "none"                                   |
     | "str"        | "cannot convert snapshot to integer"     |

@@ -1,0 +1,24 @@
+{
+"zones" :
+[
+{
+"alternate_system_provider" : "lsa-file-provider:MinimumRequired",
+"auth_providers" : [ "lsa-local-provider:zone2" ],
+"cache_entry_expiry" : 14400,
+"groupnet" : "groupnet0",
+"home_directory_umask" : 63,
+"id" : "zone2",
+"ifs_restricted" : [],
+"map_untrusted" : "",
+"name" : "System",
+"negative_cache_entry_expiry" : 60,
+"netbios_name" : "",
+"path" : "/ifs",
+"skeleton_directory" : "/usr/share/skel",
+"system" : false,
+"system_provider" : "lsa-file-provider:System",
+"user_mapping_rules" : [],
+"zone_id" : 2
+}
+]
+}

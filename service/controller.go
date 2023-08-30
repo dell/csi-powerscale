@@ -364,7 +364,7 @@ func (s *service) CreateVolume(
 			normalizedSnapshotID := snapshot.GetSnapshotId()
 			// parse the input snapshot id and fetch it's components
 			var snapshotSrcClusterName string
-			sourceSnapshotID, snapshotSrcClusterName, err = utils.ParseNormalizedSnapshotID(ctx, normalizedSnapshotID)
+			sourceSnapshotID, snapshotSrcClusterName, _, err = utils.ParseNormalizedSnapshotID(ctx, normalizedSnapshotID)
 			if err != nil {
 				return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "failed to parse snapshot ID '%s', error : '%v'", normalizedSnapshotID, err))
 			}
@@ -667,7 +667,7 @@ func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *Isilo
 	var err error
 
 	// parse the input snapshot id and fetch it's components
-	srcSnapshotID, _, err := utils.ParseNormalizedSnapshotID(ctx, normalizedSnapshotID)
+	srcSnapshotID, _, _, err := utils.ParseNormalizedSnapshotID(ctx, normalizedSnapshotID)
 	if err != nil {
 		return err
 	}
@@ -1107,7 +1107,6 @@ func (s *service) ControllerPublishVolume(
 	if exportPath = volumeContext[ExportPathParam]; exportPath == "" {
 		exportPath = utils.GetPathForVolume(isiConfig.IsiPath, volName)
 	}
-
 	isROVolumeFromSnapshot = isiConfig.isiSvc.isROVolumeFromSnapshot(volumeContext["Path"], accessZone)
 
 	if isROVolumeFromSnapshot {
@@ -1600,7 +1599,7 @@ func (s *service) CreateSnapshot(
 
 	log.Infof("CreateSnapshot started")
 	// parse the input volume id and fetch it's components
-	_, _, _, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
+	_, _, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
 	if err != nil {
 		return nil, status.Error(codes.NotFound, utils.GetMessageWithRunID(runID, err.Error()))
 	}
@@ -1626,7 +1625,6 @@ func (s *service) CreateSnapshot(
 		snapshotNew isi.Snapshot
 		params      map[string]string
 		isiPath     string
-		accessZone  string
 	)
 	params = req.GetParameters()
 	if _, ok := params[IsiPathParam]; ok {
@@ -1639,29 +1637,20 @@ func (s *service) CreateSnapshot(
 		// use the default isiPath if not set in the storage class
 		isiPath = isiConfig.IsiPath
 	}
-	if _, ok := params[AccessZoneParam]; ok {
-		if params[AccessZoneParam] == "" {
-			accessZone = s.opts.AccessZone
-		} else {
-			accessZone = params[AccessZoneParam]
-		}
-	} else {
-		// use the default access zone if not set in the storage class
-		accessZone = s.opts.AccessZone
-	}
+
 	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, err.Error()))
 	}
 
-	log.Infof("snapshot name is '%s' and source volume ID is '%s' ", snapshotName, srcVolumeID)
+	log.Infof("snapshot name is '%s' and source volume ID is '%s' access Zone is '%s'", snapshotName, srcVolumeID, accessZone)
 	// check if snapshot already exists
 	var snapshotByName isi.Snapshot
 	log.Infof("check for existence of snapshot '%s'", snapshotName)
 	if snapshotByName, err = isiConfig.isiSvc.GetSnapshot(ctx, snapshotName); snapshotByName != nil {
 		if path.Base(snapshotByName.Path) == srcVolumeID {
 			// return the existent snapshot
-			return s.getCreateSnapshotResponse(ctx, strconv.FormatInt(snapshotByName.Id, 10), req.GetSourceVolumeId(), snapshotByName.Created, isiConfig.isiSvc.GetSnapshotSize(ctx, isiPath, snapshotName, accessZone), clusterName), nil
+			return s.getCreateSnapshotResponse(ctx, strconv.FormatInt(snapshotByName.Id, 10), req.GetSourceVolumeId(), snapshotByName.Created, isiConfig.isiSvc.GetSnapshotSize(ctx, isiPath, snapshotName, accessZone), clusterName, accessZone), nil
 		}
 		// return already exists error
 		return nil, status.Error(codes.AlreadyExists,
@@ -1678,7 +1667,7 @@ func (s *service) CreateSnapshot(
 
 	log.Infof("snapshot creation is successful")
 	// return the response
-	return s.getCreateSnapshotResponse(ctx, strconv.FormatInt(snapshotNew.Id, 10), req.GetSourceVolumeId(), snapshotNew.Created, isiConfig.isiSvc.GetSnapshotSize(ctx, isiPath, snapshotName, accessZone), clusterName), nil
+	return s.getCreateSnapshotResponse(ctx, strconv.FormatInt(snapshotNew.Id, 10), req.GetSourceVolumeId(), snapshotNew.Created, isiConfig.isiSvc.GetSnapshotSize(ctx, isiPath, snapshotName, accessZone), clusterName, accessZone), nil
 }
 
 // validateCreateSnapshotRequest validate the input params in CreateSnapshotRequest
@@ -1711,8 +1700,8 @@ func (s *service) validateCreateSnapshotRequest(
 	return srcVolumeID, snapshotName, nil
 }
 
-func (s *service) getCreateSnapshotResponse(ctx context.Context, snapshotID string, sourceVolumeID string, creationTime, sizeInBytes int64, clusterName string) *csi.CreateSnapshotResponse {
-	snapID := utils.GetNormalizedSnapshotID(ctx, snapshotID, clusterName)
+func (s *service) getCreateSnapshotResponse(ctx context.Context, snapshotID string, sourceVolumeID string, creationTime, sizeInBytes int64, clusterName string, accessZone string) *csi.CreateSnapshotResponse {
+	snapID := utils.GetNormalizedSnapshotID(ctx, snapshotID, clusterName, accessZone)
 	return &csi.CreateSnapshotResponse{
 		Snapshot: s.getCSISnapshot(snapID, sourceVolumeID, creationTime, sizeInBytes),
 	}
@@ -1745,13 +1734,11 @@ func (s *service) DeleteSnapshot(
 	if req.GetSnapshotId() == "" {
 		return nil, status.Errorf(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "snapshot id to be deleted is required"))
 	}
-
 	// parse the input snapshot id and fetch it's components
-	snapshotID, clusterName, err := utils.ParseNormalizedSnapshotID(ctx, req.GetSnapshotId())
+	snapshotID, clusterName, accessZone, err := utils.ParseNormalizedSnapshotID(ctx, req.GetSnapshotId())
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to parse snapshot ID '%s', error : '%v'", req.GetSnapshotId(), err))
 	}
-
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
@@ -1791,8 +1778,7 @@ func (s *service) DeleteSnapshot(
 			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "cannot check the existence of the snapshot: '%s'", err.Error()))
 		}
 	}
-	//Reading access zone param
-	accessZone := isiConfig.accessZone
+
 	// Get snapshot path
 	snapshotSourceVolumeIsiPath, _ := isiConfig.isiSvc.GetSnapshotSourceVolumeIsiPath(ctx, snapshotID)
 	log.Infof("Snapshot source volume isiPath is '%s'", snapshotSourceVolumeIsiPath)
@@ -1812,7 +1798,7 @@ func (s *service) DeleteSnapshot(
 	// Check if there are any RO volumes created from this snapshot
 	// Note: This is true only for RO volumes from snapshots
 	if export != nil {
-		if err := s.processSnapshotTrackingDirectoryDuringDeleteSnapshot(ctx, export, snapshotIsiPath, &deleteSnapshot, isiConfig); err != nil {
+		if err := s.processSnapshotTrackingDirectoryDuringDeleteSnapshot(ctx, export, snapshotIsiPath, accessZone, &deleteSnapshot, isiConfig); err != nil {
 			log.Error("Failed to get RO volume from snapshot ", err.Error())
 			return nil, err
 		}
@@ -1831,7 +1817,8 @@ func (s *service) DeleteSnapshot(
 func (s *service) processSnapshotTrackingDirectoryDuringDeleteSnapshot(
 	ctx context.Context,
 	export isi.Export,
-	snapshotIsiPath string,
+	snapshotIsiPath,
+	accessZone string,
 	deleteSnapshot *bool,
 	isiConfig *IsilonClusterConfig) error {
 
@@ -1839,7 +1826,7 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteSnapshot(
 	ctx, log, _ := GetRunIDLog(ctx)
 
 	//get Zone details
-	zone, err := isiConfig.isiSvc.GetZoneByName(ctx, isiConfig.accessZone)
+	zone, err := isiConfig.isiSvc.GetZoneByName(ctx, accessZone)
 	if err != nil {
 		return err
 	}

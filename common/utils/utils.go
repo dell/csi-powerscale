@@ -367,39 +367,40 @@ func ParseNormalizedVolumeID(ctx context.Context, volID string) (string, int, st
 	return volumeName, exportID, accessZone, clusterName, nil
 }
 
-// GetNormalizedSnapshotID combines snapshotID ID and cluster name to form the normalized snapshot ID
-// e.g. 12345 + cluster1  => 12345=_=_=cluster1
-func GetNormalizedSnapshotID(ctx context.Context, snapshotID, clusterName string) string {
+// GetNormalizedSnapshotID combines snapshotID ID and cluster name and access zone to form the normalized snapshot ID
+// e.g. 12345 + cluster1 + accessZone => 12345=_=_=cluster1=_=_=zone1
+func GetNormalizedSnapshotID(ctx context.Context, snapshotID, clusterName, accessZone string) string {
 	log := GetRunIDLogger(ctx)
 
-	snapID := fmt.Sprintf("%s%s%s", snapshotID, SnapshotIDSeparator, clusterName)
+	snapID := fmt.Sprintf("%s%s%s%s%s", snapshotID, SnapshotIDSeparator, clusterName, SnapshotIDSeparator, accessZone)
 
-	log.Debugf("combined snapshot id '%s' and cluster name '%s' to form normalized snapshot ID '%s'",
-		snapshotID, clusterName, snapID)
+	log.Debugf("combined snapshot id '%s' access zone '%s' and cluster name '%s' to form normalized snapshot ID '%s'",
+		snapshotID, accessZone, clusterName, snapID)
 
 	return snapID
 }
 
 // ParseNormalizedSnapshotID parses the normalized snapshot ID(using SnapshotIDSeparator) to extract the snapshot ID and cluster name(optional) that make up the normalized snapshot ID
 // e.g. 12345 => 12345, ""
-// e.g. 12345=_=_=cluster1 => 12345, cluster1
-func ParseNormalizedSnapshotID(ctx context.Context, snapID string) (string, string, error) {
+// e.g. 12345=_=_=cluster1=_=_=zone => 12345, cluster1, zone
+func ParseNormalizedSnapshotID(ctx context.Context, snapID string) (string, string, string, error) {
 	log := GetRunIDLogger(ctx)
 	tokens := strings.Split(snapID, SnapshotIDSeparator)
 	if len(tokens) < 1 {
-		return "", "", fmt.Errorf("snapshot ID '%s' cannot be split into tokens", snapID)
+		return "", "", "", fmt.Errorf("snapshot ID '%s' cannot be split into tokens", snapID)
 	}
 
 	snapshotID := tokens[0]
-	var clusterName string
+	var clusterName, accessZone string
 	if len(tokens) > 1 {
 		clusterName = tokens[1]
+		accessZone = tokens[2]
 	}
 
 	log.Debugf("normalized snapshot ID '%s' parsed into snapshot ID '%s' and cluster name '%s'",
 		snapID, snapshotID, clusterName)
 
-	return snapshotID, clusterName, nil
+	return snapshotID, clusterName, accessZone, nil
 }
 
 // ParseNodeID parses NodeID to node name, node FQDN and IP address using pattern '^(.+)=#=#=(.+)=#=#=(.+)'
