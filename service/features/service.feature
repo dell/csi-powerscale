@@ -502,7 +502,7 @@ Feature: Isilon CSI interface
 
     Scenario: Call DeleteSnapshot
       Given a Isilon service
-      When I call DeleteSnapshot "48"
+      When I call DeleteSnapshot "48=_=_=cluster1=_=_=System"
       Then the error contains "failed to unexport volume directory '0' in access zone '' : 'EOF'"
 
     Scenario Outline: podmon enable change

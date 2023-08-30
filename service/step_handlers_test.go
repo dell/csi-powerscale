@@ -202,6 +202,7 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/namespace/ifs/.csi-k8s-12345678-tracking-dir", handleGetExistentVolumeFromSnapshotMetadata).Methods("GET").Queries("metadata", "")
 	isilonRouter.HandleFunc("/namespace/ifs/.csi-k8s-12345678-tracking-dir", handleGetExistentVolumeFromSnapshot).Methods("GET")
 	isilonRouter.HandleFunc("/namespace/ifs/.csi-k8s-12345678-tracking-dir/snapVol3", handleGetExistentVolumeFromSnapshot).Methods("GET")
+	isilonRouter.HandleFunc("/platform/1/zones/System", handleGetZoneByName).Methods("GET")
 	return isilonRouter
 }
 
@@ -212,6 +213,11 @@ func handleNewAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write([]byte("{\"latest\": \"5.1\"}"))
+}
+
+func handleGetZoneByName(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write(readFromFile("mock/snapshot/get_zone_by_name.txt"))
 }
 
 // handleExports implements GET /platform/2/protocols/nfs/exports
