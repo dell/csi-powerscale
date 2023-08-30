@@ -12,103 +12,8 @@
 # limitations under the License
 
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-DRIVERDIR="${SCRIPTDIR}/../"
 
-DRIVERVERSION="csi-isilon-2.8.0"
-
-while getopts ":h-:" optchar; do
-  case "${optchar}" in
-  -)
-    case "${OPTARG}" in
-    skip-verify)
-      VERIFY=0
-      ;;
-    skip-verify-node)
-      NODE_VERIFY=0
-      ;;
-    upgrade)
-      MODE="upgrade"
-      ;;
-      # NAMESPACE
-    version)
-      DRIVER_VERSION="${!OPTIND}"
-      OPTIND=$((OPTIND + 1))
-      ;;
-      # DRIVER IMAGE VERSION
-    namespace)
-      NS="${!OPTIND}"
-      if [[ -z ${NS} || ${NS} == "--skip-verify" ]]; then
-        NS=${DEFAULT_NS}
-      else
-        OPTIND=$((OPTIND + 1))
-      fi
-      ;;
-    namespace=*)
-      NS=${OPTARG#*=}
-      if [[ -z ${NS} ]]; then NS=${DEFAULT_NS}; fi
-      ;;
-      # RELEASE
-    release)
-      RELEASE="${!OPTIND}"
-      OPTIND=$((OPTIND + 1))
-      ;;
-    release=*)
-      RELEASE=${OPTARG#*=}
-      ;;
-       # helm chart version
-    helm-charts-version)
-      HELMCHARTVERSION="${!OPTIND}"
-      OPTIND=$((OPTIND + 1))
-      ;;
-      # VALUES
-    values)
-      VALUES="${!OPTIND}"
-      OPTIND=$((OPTIND + 1))
-      ;;
-    values=*)
-      VALUES=${OPTARG#*=}
-      ;;
-      # NODEUSER
-    node-verify-user)
-      NODEUSER="${!OPTIND}"
-      OPTIND=$((OPTIND + 1))
-      ;;
-    node-verify-user=*)
-      HODEUSER=${OPTARG#*=}
-      ;;
-    *)
-      decho "Unknown option --${OPTARG}"
-      decho "For help, run $PROG -h"
-      exit 1
-      ;;
-    esac
-    ;;
-  h)
-    usage
-    ;;
-  *)
-    decho "Unknown option -${OPTARG}"
-    decho "For help, run $PROG -h"
-    exit 1
-    ;;
-  esac
-done
-
-if [ -n "$HELMCHARTVERSION" ]; then
-  DRIVERVERSION=$HELMCHARTVERSION
-fi
-
-if [ ! -d "$DRIVERDIR/helm-charts" ]; then
-
-  if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
-    git clone --quiet -c advice.detachedHead=false -b $DRIVERVERSION https://github.com/dell/helm-charts
-  fi
-  mv helm-charts $DRIVERDIR
-else 
-  if [  -d "$SCRIPTDIR/helm-charts" ]; then
-    rm -rf $SCRIPTDIR/helm-charts
-  fi
-fi
+HELM_BRANCH="csi-isilon-2.8.0"
 DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
 DRIVER="csi-isilon"
 VERIFYSCRIPT="${SCRIPTDIR}/verify.sh"
@@ -388,9 +293,104 @@ function verify_kubernetes() {
 VERIFYOPTS=""
 ASSUMEYES="false"
 
+while getopts ":h-:" optchar; do
+  case "${optchar}" in
+  -)
+    case "${OPTARG}" in
+    skip-verify)
+      VERIFY=0
+      ;;
+    skip-verify-node)
+      NODE_VERIFY=0
+      ;;
+    upgrade)
+      MODE="upgrade"
+      ;;
+      # NAMESPACE
+    version)
+      DRIVER_VERSION="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
+      # DRIVER IMAGE VERSION
+    namespace)
+      NS="${!OPTIND}"
+      if [[ -z ${NS} || ${NS} == "--skip-verify" ]]; then
+        NS=${DEFAULT_NS}
+      else
+        OPTIND=$((OPTIND + 1))
+      fi
+      ;;
+    namespace=*)
+      NS=${OPTARG#*=}
+      if [[ -z ${NS} ]]; then NS=${DEFAULT_NS}; fi
+      ;;
+      # RELEASE
+    release)
+      RELEASE="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
+    release=*)
+      RELEASE=${OPTARG#*=}
+      ;;
+    # helm chart version
+    helm-charts-version)
+      HELMCHARTVERSION="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
+      # VALUES
+    values)
+      VALUES="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
+    values=*)
+      VALUES=${OPTARG#*=}
+      ;;
+      # NODEUSER
+    node-verify-user)
+      NODEUSER="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
+    node-verify-user=*)
+      HODEUSER=${OPTARG#*=}
+      ;;
+    *)
+      decho "Unknown option --${OPTARG}"
+      decho "For help, run $PROG -h"
+      exit 1
+      ;;
+    esac
+    ;;
+  h)
+    usage
+    ;;
+  *)
+    decho "Unknown option -${OPTARG}"
+    decho "For help, run $PROG -h"
+    exit 1
+    ;;
+  esac
+done
+
+
+DRIVERDIR="${SCRIPTDIR}/../"
+if [ -n "$HELMCHARTVERSION" ]; then
+  HELM_BRANCH=$HELMCHARTVERSION
+fi
+
+
+if [ ! -d "$DRIVERDIR/helm-charts" ]; then
+
+  if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
+    git clone --quiet -c advice.detachedHead=false -b $HELM_BRANCH https://github.com/dell/helm-charts
+  fi
+  mv helm-charts $DRIVERDIR
+else 
+  if [  -d "$SCRIPTDIR/helm-charts" ]; then
+    rm -rf $SCRIPTDIR/helm-charts
+  fi
+fi
+
 DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
-
-
 
 # by default the NAME of the helm release of the driver is the same as the driver name
 RELEASE=$(get_release_name "${DRIVER}")
