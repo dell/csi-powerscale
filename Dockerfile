@@ -12,7 +12,7 @@
 
 ARG GOPROXY
 
-FROM rockylinux:8
+FROM rockylinux:9
 ARG GOPROXY
 
 RUN yum install -y libaio libuuid numactl xfsprogs e4fsprogs nfs-utils
