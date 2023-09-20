@@ -129,8 +129,8 @@ github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.3.0 h1:yXocN5AwXzrJXG
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.3.0/go.mod h1:EWT6KIoauXYlcGiss60KwlnTwxFI6KCt3hklW0HZIOc=
 github.com/dell/gocsi v1.8.0 h1:0qsC/Ts6QeAWBBVaQvFrZYBXdoR7bmjrDUb3QpcMfHM=
 github.com/dell/gocsi v1.8.0/go.mod h1:X/8Ll8qqKAKCenmd1gPJMUvUmgY8cK0LiS8Pck12UaU=
-github.com/dell/gofsutil v1.13.0 h1:kAW+3YbO02GMPJTRy5H9hSsYYq4kip9gCAIffMFFOX4=
-github.com/dell/gofsutil v1.13.0/go.mod h1:UPRuS1blrPnfT2K3nWRrLHIosZsBznDglovA6DRMmUI=
+github.com/dell/gofsutil v1.13.1 h1:hu26rfykH0gvpSxPe5lTBVCHZA3m896/iO+2Ekz0U7A=
+github.com/dell/gofsutil v1.13.1/go.mod h1:UPRuS1blrPnfT2K3nWRrLHIosZsBznDglovA6DRMmUI=
 github.com/dell/goisilon v1.13.0 h1:d+7PWuFUJ/GxzcsP+eITVd7wmbwTmFGLlVaVYwzqu4g=
 github.com/dell/goisilon v1.13.0/go.mod h1:QRHAIdy9lev8BoJiCJYPd9xI8+Xr00tmrEs0B5N3mwI=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
