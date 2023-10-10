@@ -26,11 +26,14 @@ import (
 	"time"
 
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 
 	fPath "path"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/dell/csi-isilon/v2/common/k8sutils"
 	"github.com/dell/csi-isilon/v2/common/utils"
 	isi "github.com/dell/goisilon"
 	isiApi "github.com/dell/goisilon/api"
@@ -1985,6 +1988,21 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 
 	isiPath := isiConfig.IsiPath
 
+	c, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
+	if err != nil {
+		log.Error("Failed to create KubeClientSet, skipping isiPath checks", err.Error())
+	} else {
+		isiPathFromParams, err := s.validateIsiPath(ctx, c, volName)
+		if err != nil {
+			log.Error("Failed get isiPath", err.Error())
+		}
+
+		if isiPathFromParams != isiPath && isiPathFromParams != "" {
+			log.Debug("overriding isiPath with value from StorageClass", isiPathFromParams)
+			isiPath = isiPathFromParams
+		}
+	}
+
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
 		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, err.Error()))
 	}
@@ -2060,4 +2078,27 @@ func removeString(exportList []string, strToRemove string) []string {
 
 func (s *service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext.CreateVolumeGroupSnapshotRequest) (*vgsext.CreateVolumeGroupSnapshotResponse, error) {
 	panic("implement me")
+}
+
+func (s *service) validateIsiPath(ctx context.Context, c *kubernetes.Clientset, volName string) (string, error) {
+	pvc, err := c.CoreV1().PersistentVolumes().Get(ctx, volName, v1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("unable to get PersistentVolume: %w", err)
+	}
+
+	if pvc.Spec.StorageClassName == "" {
+		return "", nil
+	}
+
+	sc, err := c.StorageV1().StorageClasses().Get(ctx, pvc.Spec.StorageClassName, v1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("unable to get StorageClass: %w", err)
+	}
+
+	isiPath, ok := sc.Parameters[IsiPathParam]
+	if !ok {
+		return "", nil
+	}
+
+	return isiPath, nil
 }

@@ -455,6 +455,21 @@ func (s *service) NodeGetVolumeStats(
 
 	isiPath := isiConfig.IsiPath
 
+	c, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
+	if err != nil {
+		log.Error("Failed to create KubeClientSet, skipping isiPath checks", err.Error())
+	} else {
+		isiPathFromParams, err := s.validateIsiPath(ctx, c, volName)
+		if err != nil {
+			log.Error("Failed get isiPath", err.Error())
+		}
+
+		if isiPathFromParams != isiPath && isiPathFromParams != "" {
+			log.Debug("overriding isiPath with value from StorageClass", isiPathFromParams)
+			isiPath = isiPathFromParams
+		}
+	}
+
 	// Probe the node if required and make sure startup called
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
 		log.Error("nodeProbe failed with error :" + err.Error())
