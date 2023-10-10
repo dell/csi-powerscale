@@ -37,16 +37,16 @@ import (
 
 func (s *service) NodeExpandVolume(
 	context.Context,
-	*csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-
+	*csi.NodeExpandVolumeRequest,
+) (*csi.NodeExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
 func (s *service) NodeStageVolume(
 	ctx context.Context,
 	req *csi.NodeStageVolumeRequest) (
-	*csi.NodeStageVolumeResponse, error) {
-
+	*csi.NodeStageVolumeResponse, error,
+) {
 	// TODO - Need to have logic for staging path of export
 	s.logStatistics()
 
@@ -56,8 +56,8 @@ func (s *service) NodeStageVolume(
 func (s *service) NodeUnstageVolume(
 	ctx context.Context,
 	req *csi.NodeUnstageVolumeRequest) (
-	*csi.NodeUnstageVolumeResponse, error) {
-
+	*csi.NodeUnstageVolumeResponse, error,
+) {
 	// TODO - Need to have logic for staging path of export
 	s.logStatistics()
 
@@ -67,11 +67,11 @@ func (s *service) NodeUnstageVolume(
 func (s *service) NodePublishVolume(
 	ctx context.Context,
 	req *csi.NodePublishVolumeRequest) (
-	*csi.NodePublishVolumeResponse, error) {
-
+	*csi.NodePublishVolumeResponse, error,
+) {
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
-	//set noProbeOnStart to false so subsequent calls can lead to probe
+	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
 
 	volumeContext := req.GetVolumeContext()
@@ -164,12 +164,13 @@ func (s *service) NodePublishVolume(
 func (s *service) NodeUnpublishVolume(
 	ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest) (
-	*csi.NodeUnpublishVolumeResponse, error) {
+	*csi.NodeUnpublishVolumeResponse, error,
+) {
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
 
 	log.Debug("executing NodeUnpublishVolume")
-	//set noProbeOnStart to false so subsequent calls can lead to probe
+	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
 	volID := req.GetVolumeId()
 	if volID == "" {
@@ -250,7 +251,6 @@ func (s *service) NodeUnpublishVolume(
 }
 
 func (s *service) nodeProbe(ctx context.Context, isiConfig *IsilonClusterConfig) error {
-
 	// Fetch log handler
 	ctx, log, _ := GetRunIDLog(ctx)
 
@@ -283,8 +283,8 @@ func (s *service) nodeProbe(ctx context.Context, isiConfig *IsilonClusterConfig)
 func (s *service) NodeGetCapabilities(
 	ctx context.Context,
 	req *csi.NodeGetCapabilitiesRequest) (
-	*csi.NodeGetCapabilitiesResponse, error) {
-
+	*csi.NodeGetCapabilitiesResponse, error,
+) {
 	capabilities := []*csi.NodeServiceCapability{
 		{
 			Type: &csi.NodeServiceCapability_Rpc{
@@ -338,8 +338,8 @@ func (s *service) NodeGetCapabilities(
 func (s *service) NodeGetInfo(
 	ctx context.Context,
 	req *csi.NodeGetInfoRequest) (
-	*csi.NodeGetInfoResponse, error) {
-
+	*csi.NodeGetInfoResponse, error,
+) {
 	// Fetch log handler
 	ctx, log, _ := GetRunIDLog(ctx)
 
@@ -425,8 +425,8 @@ func (s *service) NodeGetInfo(
 }
 
 func (s *service) NodeGetVolumeStats(
-	ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-
+	ctx context.Context, req *csi.NodeGetVolumeStatsRequest,
+) (*csi.NodeGetVolumeStatsResponse, error) {
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
 
@@ -466,7 +466,7 @@ func (s *service) NodeGetVolumeStats(
 		message = fmt.Sprintf("volume %v does not exists at this path %v", volName, isiPath)
 	}
 
-	//check whether the original volume is mounted
+	// check whether the original volume is mounted
 	if !abnormal {
 		isMounted, err := isVolumeMounted(ctx, volName, volPath)
 		if !isMounted {
@@ -475,7 +475,7 @@ func (s *service) NodeGetVolumeStats(
 		}
 	}
 
-	//check whether volume path is accessible
+	// check whether volume path is accessible
 	if !abnormal {
 		_, err = os.ReadDir(volPath)
 		if err != nil {
@@ -501,7 +501,7 @@ func (s *service) NodeGetVolumeStats(
 		}, nil
 	}
 
-	//Get Volume stats metrics
+	// Get Volume stats metrics
 	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := k8sutils.GetStats(ctx, volPath)
 	if err != nil {
 		return &csi.NodeGetVolumeStatsResponse{
@@ -582,7 +582,6 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 		Secrets:          req.Secrets,
 		VolumeContext:    createEphemeralVolResp.Volume.VolumeContext,
 	})
-
 	if err != nil {
 		log.Error("Need to rollback because ControllerPublish ephemeral volume failed with error :" + err.Error())
 		if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
@@ -616,7 +615,7 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		log.Infof("path %s does not exists", filePath)
-		err = os.MkdirAll(filePath, 0750)
+		err = os.MkdirAll(filePath, 0o750)
 		if err != nil {
 			log.Error("Create directory in target path for ephemeral vol failed with error :" + err.Error())
 			if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
@@ -660,7 +659,8 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 
 func (s *service) ephemeralNodeUnpublish(
 	ctx context.Context,
-	req *csi.NodeUnpublishVolumeRequest) error {
+	req *csi.NodeUnpublishVolumeRequest,
+) error {
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
 

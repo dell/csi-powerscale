@@ -21,13 +21,13 @@ package interceptor
 import (
 	"context"
 	"fmt"
+	"sync"
+	"testing"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 
 	//      "github.com/dell/csi-isilon/v2/service/interceptor"
-	"sync"
-	"testing"
-	"time"
 
 	csictx "github.com/dell/gocsi/context"
 	"github.com/stretchr/testify/assert"
@@ -83,7 +83,6 @@ func TestNewCustomSerialLock(t *testing.T) {
 		_, err := serialLock(ctx, req2, nil, h)
 		wg.Wait()
 		return err
-
 	}
 	t.Run("NodeStage for same volume concurrent call", func(t *testing.T) {
 		err := runTest(&csi.NodeStageVolumeRequest{VolumeId: validBlockVolumeID},

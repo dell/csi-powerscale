@@ -56,7 +56,7 @@ const (
 	// KubeConfig of kubernetes cluster
 	KubeConfig = "KUBECONFIG"
 
-	//IsilonConfigFile isilon-creds file with credential info of isilon clusters
+	// IsilonConfigFile isilon-creds file with credential info of isilon clusters
 	IsilonConfigFile = "/isilon-configs/config"
 
 	// DefaultLogLevel for csi logs

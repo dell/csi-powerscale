@@ -66,7 +66,8 @@ func CreateKubeClientSet(kubeconfig string) (*kubernetes.Clientset, error) {
 
 // LeaderElection - Initialize leader election
 func LeaderElection(clientset *kubernetes.Clientset, lockName string, namespace string,
-	leaderElectionRenewDeadline, leaderElectionLeaseDuration, leaderElectionRetryPeriod time.Duration, runFunc func(ctx context.Context)) {
+	leaderElectionRenewDeadline, leaderElectionLeaseDuration, leaderElectionRetryPeriod time.Duration, runFunc func(ctx context.Context),
+) {
 	le := leaderelection.NewLeaderElection(clientset, lockName, runFunc)
 	le.WithNamespace(namespace)
 	le.WithLeaseDuration(leaderElectionLeaseDuration)

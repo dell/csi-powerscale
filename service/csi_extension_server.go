@@ -37,7 +37,7 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 		return rep, nil
 	}
 
-	//create the map of all the clusters with clustername as key
+	// create the map of all the clusters with clustername as key
 	systemIDs := make(map[string]bool)
 	systemID := req.GetArrayId()
 	if systemID == "" {
@@ -61,9 +61,9 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 			return rep, checkError
 		}
 
-		//Check for IOinProgress only when volumes IDs are present in the request as the field is required only in the latter case also to reduce number of calls to the API making it efficient
+		// Check for IOinProgress only when volumes IDs are present in the request as the field is required only in the latter case also to reduce number of calls to the API making it efficient
 		if len(req.GetVolumeIds()) > 0 {
-			//Get cluster config
+			// Get cluster config
 			isiConfig, err := s.getIsilonConfig(ctx, &systemID)
 			if err != nil {
 				log.Error("Failed to get Isilon config with error ", err.Error())
@@ -126,7 +126,7 @@ func (s *service) checkIfNodeIsConnected(ctx context.Context, arrayID string, no
 		return fmt.Errorf("failed to parse node ID")
 	}
 
-	//form url to call array on node
+	// form url to call array on node
 	url := "http://" + nodeIP + apiPort + arrayStatus + "/" + arrayID
 	connected, err := s.queryArrayStatus(ctx, url)
 	if err != nil {

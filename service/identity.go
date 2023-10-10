@@ -32,8 +32,8 @@ import (
 func (s *service) GetPluginInfo(
 	ctx context.Context,
 	req *csi.GetPluginInfoRequest) (
-	*csi.GetPluginInfoResponse, error) {
-
+	*csi.GetPluginInfoResponse, error,
+) {
 	return &csi.GetPluginInfoResponse{
 		Name:          constants.PluginName,
 		VendorVersion: core.SemVer,
@@ -44,8 +44,8 @@ func (s *service) GetPluginInfo(
 func (s *service) GetPluginCapabilities(
 	ctx context.Context,
 	req *csi.GetPluginCapabilitiesRequest) (
-	*csi.GetPluginCapabilitiesResponse, error) {
-
+	*csi.GetPluginCapabilitiesResponse, error,
+) {
 	var rep csi.GetPluginCapabilitiesResponse
 	if !strings.EqualFold(s.mode, "node") {
 		rep.Capabilities = []*csi.PluginCapability{
@@ -78,7 +78,8 @@ func (s *service) GetPluginCapabilities(
 func (s *service) Probe(
 	ctx context.Context,
 	req *csi.ProbeRequest) (
-	*csi.ProbeResponse, error) {
+	*csi.ProbeResponse, error,
+) {
 	ctx, log := GetLogger(ctx)
 	ready := new(wrappers.BoolValue)
 	ready.Value = true
@@ -99,7 +100,7 @@ func (s *service) Probe(
 }
 
 func (s *service) GetReplicationCapabilities(ctx context.Context, req *csiext.GetReplicationCapabilityRequest) (*csiext.GetReplicationCapabilityResponse, error) {
-	var rep = new(csiext.GetReplicationCapabilityResponse)
+	rep := new(csiext.GetReplicationCapabilityResponse)
 	if !strings.EqualFold(s.mode, "node") {
 		rep.Capabilities = []*csiext.ReplicationCapability{
 			{

@@ -96,7 +96,7 @@ func (s *service) startAPIService(ctx context.Context) {
 	pollingFrequencyInSeconds = setPollingFrequency(ctx)
 	setAPIPort(ctx)
 
-	//start methods based on mode
+	// start methods based on mode
 	if strings.EqualFold(s.mode, constants.ModeController) {
 		log.Info("controller mode, don't need to start apiRouter")
 		return
@@ -108,13 +108,13 @@ func (s *service) startAPIService(ctx context.Context) {
 // apiRouter serves http requests
 func (s *service) apiRouter(ctx context.Context) {
 	log.Infof("starting http server on port %s", apiPort)
-	//create a new router
+	// create a new router
 	router := mux.NewRouter()
-	//route to connectivity status
+	// route to connectivity status
 	router.HandleFunc(nodeStatus, nodeHealth).Methods("GET")
 	router.HandleFunc(arrayStatus, connectivityStatus).Methods("GET")
 	router.HandleFunc(arrayStatus+"/"+"{arrayId}", getArrayConnectivityStatus).Methods("GET")
-	//start http server to serve requests
+	// start http server to serve requests
 	server := &http.Server{
 		Addr:         apiPort,
 		Handler:      router,
@@ -133,14 +133,14 @@ func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 	log.Infof("GetArrayConnectivityStatus called for array %s \n", arrayID)
 	status, found := probeStatus.Load(arrayID)
 	if !found {
-		//specify status code
+		// specify status code
 		w.WriteHeader(http.StatusNotFound)
 		w.Header().Set("Content-Type", "application/json")
-		//update response writer
+		// update response writer
 		fmt.Fprintf(w, "array %s not found \n", arrayID)
 		return
 	}
-	//convert status struct to JSON
+	// convert status struct to JSON
 	jsonResponse, err := json.Marshal(status)
 	if err != nil {
 		log.Errorf("error %s during marshaling to json", err)
@@ -149,7 +149,7 @@ func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Infof("sending response %+v for array %s \n", status, arrayID)
-	//update response
+	// update response
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(jsonResponse)
 	if err != nil {
@@ -170,7 +170,7 @@ func connectivityStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	//convert struct to JSON
+	// convert struct to JSON
 	jsonResponse, err := MarshalSyncMapToJSON(probeStatus)
 	if err != nil {
 		log.Errorf("error %s during marshaling to json", err)
@@ -183,7 +183,6 @@ func connectivityStatus(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Errorf("unable to write response %s", err)
 	}
-
 }
 
 // startNodeToArrayConnectivityCheck starts connectivityTest as one goroutine for each cluster
@@ -192,7 +191,7 @@ func (s *service) startNodeToArrayConnectivityCheck(ctx context.Context) {
 	probeStatus = new(sync.Map)
 	isilonClusters := s.getIsilonClusters()
 	for _, cluster := range isilonClusters {
-		//start one goroutine for each cluster, so each cluster's nodeProbe is run concurrently
+		// start one goroutine for each cluster, so each cluster's nodeProbe is run concurrently
 		go s.testConnectivityAndUpdateStatus(ctx, cluster, timeout)
 	}
 	log.Infof("startNodeToArrayConnectivityCheck is running probes at pollingFrequency %d ", pollingFrequencyInSeconds/2)
@@ -205,12 +204,12 @@ func (s *service) testConnectivityAndUpdateStatus(ctx context.Context, cluster *
 		if err := recover(); err != nil {
 			log.Errorf("panic occurred in testConnectivityAndUpdateStatus:%s for clsuter %s", err, cluster)
 		}
-		//if panic occurs restart
+		// if panic occurs restart
 		go s.testConnectivityAndUpdateStatus(ctx, cluster, timeout)
 	}()
 	var status ArrayConnectivityStatus
 	for {
-		//add timeout to context
+		// add timeout to context
 		timeOutCtx, cancel := context.WithTimeout(ctx, timeout)
 		log.Debugf("Running probe for cluster %s at time %v \n", cluster.ClusterName, time.Now())
 		if existingStatus, ok := probeStatus.Load(cluster.ClusterName); !ok {
@@ -221,7 +220,7 @@ func (s *service) testConnectivityAndUpdateStatus(ctx context.Context, cluster *
 			}
 		}
 		log.Debugf("cluster %s , status is %+v", cluster.ClusterName, status)
-		//run nodeProbe to test connectivity
+		// run nodeProbe to test connectivity
 		err := s.nodeProbe(timeOutCtx, cluster)
 		if err == nil {
 			log.Debugf("Probe successful for %s", cluster.ClusterName)
@@ -233,7 +232,7 @@ func (s *service) testConnectivityAndUpdateStatus(ctx context.Context, cluster *
 		log.Debugf("cluster %s , storing status %+v", cluster.ClusterName, status)
 		probeStatus.Store(cluster.ClusterName, status)
 		cancel()
-		//sleep for half the pollingFrequency and run check again
+		// sleep for half the pollingFrequency and run check again
 		time.Sleep(time.Second * time.Duration(pollingFrequencyInSeconds/2))
 	}
 }
