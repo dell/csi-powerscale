@@ -52,6 +52,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // To maintain runid for Non debug mode. Note: CSI will not generate runid if CSI_DEBUG=false
@@ -111,6 +112,7 @@ type service struct {
 	statisticsCounter     int
 	isiClusters           *sync.Map
 	defaultIsiClusterName string
+	k8sclient             *kubernetes.Clientset
 }
 
 // IsilonClusters To unmarshal secret.yaml file
@@ -236,6 +238,10 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 	opts.IgnoreUnresolvableHosts = utils.ParseBooleanFromContext(ctx, constants.EnvIgnoreUnresolvableHosts)
 
 	s.opts = opts
+
+	if c, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath); err == nil {
+		s.k8sclient = c
+	}
 
 	return nil
 }
@@ -1051,4 +1057,31 @@ func (s *service) ProbeController(ctx context.Context,
 // WithRP appends Replication Prefix to provided string
 func (s *service) WithRP(key string) string {
 	return s.opts.replicationPrefix + "/" + key
+}
+
+func (s *service) validateIsiPath(ctx context.Context, volName string) (string, error) {
+	if s.k8sclient == nil {
+		return "", errors.New("no k8s clientset")
+	}
+
+	pvc, err := s.k8sclient.CoreV1().PersistentVolumes().Get(ctx, volName, v1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("unable to get PersistentVolume: %w", err)
+	}
+
+	if pvc.Spec.StorageClassName == "" {
+		return "", nil
+	}
+
+	sc, err := s.k8sclient.StorageV1().StorageClasses().Get(ctx, pvc.Spec.StorageClassName, v1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("unable to get StorageClass: %w", err)
+	}
+
+	isiPath, ok := sc.Parameters[IsiPathParam]
+	if !ok || isiPath == "" {
+		return "", nil
+	}
+
+	return isiPath, nil
 }
