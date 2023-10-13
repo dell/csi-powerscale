@@ -18,11 +18,12 @@ package service
 import (
 	"context"
 	"fmt"
-	apiv1 "github.com/dell/goisilon/api/v1"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
+
+	apiv1 "github.com/dell/goisilon/api/v1"
 
 	utils "github.com/dell/csi-isilon/v2/common/utils"
 	isi "github.com/dell/goisilon"
@@ -174,7 +175,7 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit
 		log.Debugf("Invalid softGracePrd value. Setting it to default.")
 		softGracePrdInt = 0
 	}
-	//converting soft limit from %ge to value
+	// converting soft limit from %ge to value
 	if softLimit != "" {
 		softi, err = strconv.ParseInt(softLimit, 10, 64)
 		if err != nil {
@@ -203,12 +204,12 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit
 			log.Debugf("SmartQuotas is enabled, but storage size is not requested, skip creating quotas for volume '%s'", volName)
 			return "", nil
 		}
-		//Check if soft and advisory < 100
+		// Check if soft and advisory < 100
 		if (softlimitInt >= sizeInBytes) || (advisoryLimitInt >= sizeInBytes) {
 			log.Warnf("Soft and advisory thresholds must be smaller than the hard threshold. Setting it to default for Volume '%s'", volName)
 			softlimitInt, advisoryLimitInt, softGracePrdInt = 0, 0, 0
 		}
-		//Check if Soft Grace period is set along with soft limit
+		// Check if Soft Grace period is set along with soft limit
 		if (softlimitInt != 0) && (softGracePrdInt == 0) {
 			log.Warnf("Soft Grace Period must be configured along with Soft threshold, Setting it to default for Volume '%s'", volName)
 			softlimitInt, softGracePrdInt = 0, 0
@@ -686,7 +687,7 @@ func (svc *isiService) RemoveExportClientByIDWithZone(ctx context.Context, expor
 	log.Debugf("RemoveExportClientByName client '%v'", clientsToRemove)
 
 	if err := svc.client.RemoveExportClientsByIDWithZone(ctx, exportID, accessZone, clientsToRemove, ignoreUnresolvableHosts); err != nil {
-		//Return success if export doesn't exist
+		// Return success if export doesn't exist
 		if notFoundErr, ok := err.(*api.JSONError); ok {
 			if notFoundErr.StatusCode == 404 {
 				log.Debugf("Export id '%v' does not exist", exportID)
@@ -816,7 +817,7 @@ func (svc *isiService) GetSnapshotNameFromIsiPath(ctx context.Context, snapshotI
 		return "", fmt.Errorf("invalid snapshot isilon path")
 	}
 	// Snapshot isi path format /<ifs>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
-	//Non System Access Zone /<ifs>/<csi_zone_base_path>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
+	// Non System Access Zone /<ifs>/<csi_zone_base_path>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
 	pathWithoutZonePath := strings.Trim(snapshotIsiPath, zonePath)
 	directories := strings.Split(pathWithoutZonePath, "/")
 	// If there is no snapshot name in snapshot isi path or if it is empty
@@ -833,18 +834,18 @@ func (svc *isiService) GetSnapshotIsiPathComponents(snapshotIsiPath, zonePath st
 	var isiPath string
 	var snapshotName string
 	// Snapshot isi path format /<ifs>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
-	//Non System Access Zone /<ifs>/<csi_zone_base_path>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
+	// Non System Access Zone /<ifs>/<csi_zone_base_path>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
 	dirs := strings.Split(snapshotIsiPath, "/")
 	srcVolName := dirs[len(dirs)-1]
-	//in case of non system access zone
+	// in case of non system access zone
 	if dirs[2] != ".snapshot" {
 		//.snapshot/snapshot_name/<volume path>
 		pathWithoutZonePath := strings.Split(snapshotIsiPath, zonePath)
 		directories := strings.Split(pathWithoutZonePath[1], "/")
 		snapshotName = directories[2]
-		//isi path is different than zone path
+		// isi path is different than zone path
 		if len(directories) > 3 {
-			//volume path without volume name and ifs prefix
+			// volume path without volume name and ifs prefix
 			remainIsiPath := strings.Join(directories[3:len(directories)-1], "/")
 			isiPath = path.Join("/", zonePath, remainIsiPath)
 		} else {

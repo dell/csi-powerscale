@@ -30,8 +30,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var singletonLog *logrus.Logger
-var once sync.Once
+var (
+	singletonLog *logrus.Logger
+	once         sync.Once
+)
 
 // LogConst represents string in context.WithValue
 type LogConst string
@@ -50,7 +52,7 @@ const (
 
 // Formatter implements logrus.Formatter interface.
 type Formatter struct {
-	//logrus.TextFormatter
+	// logrus.TextFormatter
 	// Timestamp format
 	TimestampFormat string
 	// Available standard keys: time, msg, lvl

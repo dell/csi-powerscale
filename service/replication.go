@@ -43,7 +43,8 @@ const (
 )
 
 func (s *service) CreateRemoteVolume(ctx context.Context,
-	req *csiext.CreateRemoteVolumeRequest) (*csiext.CreateRemoteVolumeResponse, error) {
+	req *csiext.CreateRemoteVolumeRequest,
+) (*csiext.CreateRemoteVolumeResponse, error) {
 	ctx, log, _ := GetRunIDLog(ctx)
 
 	volID := req.GetVolumeHandle()
@@ -208,7 +209,8 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 }
 
 func (s *service) CreateStorageProtectionGroup(ctx context.Context,
-	req *csiext.CreateStorageProtectionGroupRequest) (*csiext.CreateStorageProtectionGroupResponse, error) {
+	req *csiext.CreateStorageProtectionGroupRequest,
+) (*csiext.CreateStorageProtectionGroupResponse, error) {
 	ctx, log, _ := GetRunIDLog(ctx)
 
 	volID := req.GetVolumeHandle()
@@ -295,7 +297,8 @@ func (s *service) CreateStorageProtectionGroup(ctx context.Context,
 // There is no need to delete volume here, because a 'sync' event will take care of backend (remote) deletion.
 // Use this call to delete the NFS export for the (remote) directory which will be left out in case of no PVC/Pod on this side.
 func (s *service) DeleteLocalVolume(ctx context.Context,
-	req *csiext.DeleteLocalVolumeRequest) (*csiext.DeleteLocalVolumeResponse, error) {
+	req *csiext.DeleteLocalVolumeRequest,
+) (*csiext.DeleteLocalVolumeResponse, error) {
 	ctx, log, _ := GetRunIDLog(ctx)
 	volumeID := req.GetVolumeHandle()
 
@@ -348,8 +351,8 @@ func (s *service) DeleteLocalVolume(ctx context.Context,
 
 // DeleteStorageProtectionGroup deletes storage protection group
 func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
-	req *csiext.DeleteStorageProtectionGroupRequest) (*csiext.DeleteStorageProtectionGroupResponse, error) {
-
+	req *csiext.DeleteStorageProtectionGroupRequest,
+) (*csiext.DeleteStorageProtectionGroupResponse, error) {
 	ctx, log, _ := GetRunIDLog(ctx)
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
@@ -419,7 +422,7 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 			return nil, status.Errorf(codes.Internal, "Unknown error while deleting PP "+ppName, err.Error())
 		}
 		log.Info("Protection Policy deleted.")
-	} else { //policy does not exist or was not able to be retrieved
+	} else { // policy does not exist or was not able to be retrieved
 		if e, ok := err.(*isiApi.JSONError); ok {
 			if e.StatusCode == 404 {
 				log.Info("Policy PP" + ppName + " was not found. This may be the target-side in replication.")

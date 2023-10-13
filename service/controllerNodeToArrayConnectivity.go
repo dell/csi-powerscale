@@ -72,19 +72,19 @@ func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error
 		return false, err
 	}
 	log.Infof("API Response received is %+v\n", statusResponse)
-	//responseObject has last success and last attempt timestamp in Unix format
+	// responseObject has last success and last attempt timestamp in Unix format
 	timeDiff := statusResponse.LastAttempt - statusResponse.LastSuccess
 	tolerance := setPollingFrequency(ctx)
 	currTime := time.Now().Unix()
-	//checking if the status response is stale and connectivity test is still running
-	//since nodeProbe is run at frequency tolerance/2, ideally below check should never be true
+	// checking if the status response is stale and connectivity test is still running
+	// since nodeProbe is run at frequency tolerance/2, ideally below check should never be true
 	if (currTime - statusResponse.LastAttempt) > tolerance*2 {
 		log.Errorf("seems like connectivity test is not being run, current time is %d and last run was at %d", currTime, statusResponse.LastAttempt)
-		//considering connectivity is broken
+		// considering connectivity is broken
 		return false, nil
 	}
 	log.Debugf("last connectivity was  %d sec back, tolerance is %d sec", timeDiff, tolerance)
-	//give 2s leeway for tolerance check
+	// give 2s leeway for tolerance check
 	if timeDiff <= tolerance+2 {
 		return true, nil
 	}

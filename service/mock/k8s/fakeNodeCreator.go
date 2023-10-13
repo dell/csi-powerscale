@@ -136,7 +136,7 @@ func GetFakeNode() *v1.Node {
 			Annotations:                nil,
 			OwnerReferences:            nil,
 			Finalizers:                 nil,
-			//ClusterName:                "",
+			// ClusterName:                "",
 			ManagedFields: nil,
 		},
 		Spec:   v1.NodeSpec{},

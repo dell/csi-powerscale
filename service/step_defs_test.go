@@ -19,11 +19,6 @@ import (
 	context2 "context"
 	"errors"
 	"fmt"
-	"github.com/dell/csi-isilon/v2/common/constants"
-	"github.com/dell/csi-isilon/v2/common/utils"
-	"github.com/dell/csi-isilon/v2/service/mock/k8s"
-	csiext "github.com/dell/dell-csi-extensions/replication"
-	"google.golang.org/grpc"
 	"log"
 	"net"
 	"net/http/httptest"
@@ -32,6 +27,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/dell/csi-isilon/v2/common/utils"
+	"github.com/dell/csi-isilon/v2/service/mock/k8s"
+	csiext "github.com/dell/dell-csi-extensions/replication"
+	"google.golang.org/grpc"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
@@ -188,7 +189,7 @@ func (f *feature) aIsilonService() error {
 		}
 		log.Printf("server url: %s\n", f.server.URL)
 		clusterConfig.EndpointURL = f.server.URL
-		//f.service.opts.EndpointURL = f.server.URL
+		// f.service.opts.EndpointURL = f.server.URL
 	} else {
 		f.server = nil
 	}
@@ -448,10 +449,12 @@ func (f *feature) iSetPodmonEnable(value string) error {
 	os.Setenv(constants.EnvPodmonEnabled, value)
 	return nil
 }
+
 func (f *feature) iSetModeTo(value string) error {
 	os.Setenv(gocsi.EnvVarMode, value)
 	return nil
 }
+
 func (f *feature) iSetAPIPort(value string) error {
 	os.Setenv(constants.EnvPodmonAPIPORT, value)
 	return nil
@@ -643,7 +646,6 @@ func getTypicalNodeUnstageVolumeRequest(volID string) *csi.NodeUnstageVolumeRequ
 }
 
 func getAccessMode(accessType string) *csi.VolumeCapability_AccessMode {
-
 	accessMode := new(csi.VolumeCapability_AccessMode)
 	switch accessType {
 	case "single-writer":
@@ -750,7 +752,6 @@ func (f *feature) aValidDeleteVolumeResponseIsReturned() error {
 }
 
 func (f *feature) iInduceError(errtype string) error {
-
 	log.Printf("set induce error %s\n", errtype)
 	switch errtype {
 	case "InstancesError":
@@ -1541,7 +1542,7 @@ func (f *feature) aControllerPublishedVolume() error {
 	// Make the target directory if required
 	_, err = os.Stat(datadir)
 	if err != nil {
-		err = os.MkdirAll(datadir, 0777)
+		err = os.MkdirAll(datadir, 0o777)
 		if err != nil {
 			fmt.Printf("Couldn't make datadir: %s\n", datadir)
 		}
@@ -1738,7 +1739,7 @@ func (f *feature) iChangeTheTargetPath() error {
 	// Make the target directory if required
 	_, err := os.Stat(datadir2)
 	if err != nil {
-		err = os.MkdirAll(datadir2, 0777)
+		err = os.MkdirAll(datadir2, 0o777)
 		if err != nil {
 			fmt.Printf("Couldn't make datadir: %s\n", datadir2)
 		}
@@ -1772,7 +1773,6 @@ func (f *feature) iMarkRequestReadOnly() error {
 }
 
 func (f *feature) iCallControllerPublishVolume(volID string, accessMode string, nodeID string) error {
-
 	header := metadata.New(map[string]string{"csi.requestid": "1"})
 	ctx := metadata.NewIncomingContext(context.Background(), header)
 	req := f.publishVolumeRequest
@@ -1794,8 +1794,8 @@ func (f *feature) iCallControllerPublishVolume(volID string, accessMode string, 
 	f.publishVolumeRequest = nil
 	return nil
 }
-func (f *feature) iCallControllerGetVolume(volID string) error {
 
+func (f *feature) iCallControllerGetVolume(volID string) error {
 	header := metadata.New(map[string]string{"csi.requestid": "1"})
 	ctx := metadata.NewIncomingContext(context.Background(), header)
 
@@ -1811,7 +1811,7 @@ func (f *feature) iCallControllerGetVolume(volID string) error {
 		log.Printf("Controller GetVolume call failed: %s\n", f.err.Error())
 	}
 	if f.controllerGetVolumeResponse != nil {
-		//check message and abnormal state returned in NodeGetVolumeStatsResponse.VolumeCondition
+		// check message and abnormal state returned in NodeGetVolumeStatsResponse.VolumeCondition
 		if f.controllerGetVolumeResponse.Status.VolumeCondition.Abnormal == abnormal && strings.Contains(f.controllerGetVolumeResponse.Status.VolumeCondition.Message, message) {
 			fmt.Printf("controllerGetVolumeResponse Response VolumeCondition check passed\n")
 		} else {
@@ -1822,6 +1822,7 @@ func (f *feature) iCallControllerGetVolume(volID string) error {
 	f.controllerGetVolumeRequest = nil
 	return nil
 }
+
 func (f *feature) aValidControllerGetVolumeResponseIsReturned() error {
 	if f.err != nil {
 		return f.err
@@ -1833,7 +1834,6 @@ func (f *feature) aValidControllerGetVolumeResponseIsReturned() error {
 }
 
 func (f *feature) iCallNodeGetVolumeStats(volID string) error {
-
 	header := metadata.New(map[string]string{"csi.requestid": "1"})
 	ctx := metadata.NewIncomingContext(context.Background(), header)
 
@@ -1849,7 +1849,7 @@ func (f *feature) iCallNodeGetVolumeStats(volID string) error {
 	f.nodeGetVolumeStatsRequest = req
 	fmt.Printf("Calling NodeGetVolumeStats")
 
-	//assume no errors induced, so response should be okay, these values will change below if errors were induced
+	// assume no errors induced, so response should be okay, these values will change below if errors were induced
 	abnormal := false
 	message := ""
 
@@ -1858,7 +1858,7 @@ func (f *feature) iCallNodeGetVolumeStats(volID string) error {
 		log.Printf("Node GetVolumeStats call failed: %s\n", f.err.Error())
 	}
 	if f.nodeGetVolumeStatsResponse != nil {
-		//check message and abnormal state returned in NodeGetVolumeStatsResponse.VolumeCondition
+		// check message and abnormal state returned in NodeGetVolumeStatsResponse.VolumeCondition
 		if f.nodeGetVolumeStatsResponse.VolumeCondition.Abnormal == abnormal && strings.Contains(f.nodeGetVolumeStatsResponse.VolumeCondition.Message, message) {
 			fmt.Printf("NodeGetVolumeStats Response VolumeCondition check passed\n")
 		} else {
@@ -2049,7 +2049,6 @@ func (f *feature) aValidControllerExpandVolumeResponseIsReturned() error {
 func (f *feature) setVolumeContent(isSnapshotType bool, identity string) *csi.CreateVolumeRequest {
 	req := f.createVolumeRequest
 	if isSnapshotType {
-
 		req.VolumeContentSource = &csi.VolumeContentSource{
 			Type: &csi.VolumeContentSource_Snapshot{
 				Snapshot: &csi.VolumeContentSource_SnapshotSource{
@@ -2372,8 +2371,8 @@ func removeNodeLabels(host string) (result bool) {
 }
 
 func applyNodeLabel(host, label string) (result bool) {
-	//don't need to run actual kubernetes commands for UTs
-	//expect kubernetes commands to work
+	// don't need to run actual kubernetes commands for UTs
+	// expect kubernetes commands to work
 	mockStr := fmt.Sprintf("mocked call apply lable %s to %s", label, host)
 	k8s.WriteK8sValueToFile(k8s.K8sLabel, label)
 	fmt.Printf(mockStr)
@@ -2589,13 +2588,13 @@ func (f *feature) iCallInitServiceObject() error {
 }
 
 func (f *feature) iCallSetAllowedNetworks(envIP1 string) error {
-	var envIP = []string{envIP1}
+	envIP := []string{envIP1}
 	f.service.opts.allowedNetworks = envIP
 	return nil
 }
 
 func (f *feature) iCallSetAllowedNetworkswithmultiplenetworks(envIP1 string, envIP2 string) error {
-	var envIP = []string{envIP1, envIP2}
+	envIP := []string{envIP1, envIP2}
 	f.service.opts.allowedNetworks = envIP
 	return nil
 }
@@ -2610,6 +2609,7 @@ func (f *feature) iCallNodeGetInfowithinvalidnetworks() error {
 	}
 	return nil
 }
+
 func (f *feature) iSetRootClientEnabledTo(val string) error {
 	f.rootClientEnabled = val
 	return nil
@@ -2750,10 +2750,9 @@ func (f *feature) aValidCreateStorageProtectionGroupResponseIsReturned() error {
 }
 
 func deleteStorageProtectionGroupRequest(s *service, volume, systemName, clustername, vgname string) *csiext.DeleteStorageProtectionGroupRequest {
-
 	req := new(csiext.DeleteStorageProtectionGroupRequest)
 
-	//req.ProtectionGroupId = "cluster1" + "::" + "/ifs/data/csi-isilon" + volume
+	// req.ProtectionGroupId = "cluster1" + "::" + "/ifs/data/csi-isilon" + volume
 	req.ProtectionGroupId = volume
 	req.ProtectionGroupAttributes = map[string]string{
 		s.opts.replicationContextPrefix + systemName: clustername,
@@ -2791,6 +2790,7 @@ func (f *feature) iCallNodeGetInfoWithNoFQDN() error {
 	}
 	return nil
 }
+
 func getStorageProtectionGroupStatusRequest(s *service) *csiext.GetStorageProtectionGroupStatusRequest {
 	req := new(csiext.GetStorageProtectionGroupStatusRequest)
 	req.ProtectionGroupId = ""
@@ -3285,7 +3285,6 @@ func (f *feature) aValidGetReplicationCapabilitiesResponseIsReturned() error {
 }
 
 func (f *feature) iCallValidateVolumeHostConnectivity() error {
-
 	header := metadata.New(map[string]string{"csi.requestid": "1"})
 	ctx := metadata.NewIncomingContext(context.Background(), header)
 
@@ -3416,6 +3415,7 @@ func (f *feature) iCallGetSnapshotNameFromIsiPathWith(exportPath string) error {
 	}
 	return nil
 }
+
 func (f *feature) iCallGetSnapshotIsiPathComponents() error {
 	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
 	_, _, _ = clusterConfig.isiSvc.GetSnapshotIsiPathComponents("/ifs/.snapshot/data/csiislon", "/ifs")
@@ -3676,13 +3676,12 @@ func (f *feature) getControllerPublishVolumeRequestOnSnapshot(accessType, nodeID
 		attributes[RootClientEnabledParam] = f.rootClientEnabled
 	}
 	attributes[ExportPathParam] = path
-	//ExportPathParam
+	// ExportPathParam
 	req.VolumeContext = attributes
 	return req
 }
 
 func (f *feature) iCallQueryArrayStatus(apiPort string) error {
-
 	// Calling http mock server
 	MockK8sAPI()
 	ctx := context2.Background()
