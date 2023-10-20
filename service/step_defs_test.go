@@ -213,10 +213,49 @@ func (f *feature) enableQuota() error {
 	return nil
 }
 
+type mockConn struct{}
+
+func (*mockConn) Read(b []byte) (n int, err error) {
+	return 0, nil
+}
+
+func (*mockConn) Write(b []byte) (n int, err error) {
+	return 0, nil
+}
+
+func (*mockConn) Close() error {
+	return nil
+}
+
+func (*mockConn) LocalAddr() net.Addr {
+	return nil
+}
+
+func (*mockConn) RemoteAddr() net.Addr {
+	return nil
+}
+
+func (*mockConn) SetDeadline(t time.Time) error {
+	return nil
+}
+
+func (*mockConn) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+func (*mockConn) SetWriteDeadline(t time.Time) error {
+	return nil
+}
+
 func (f *feature) getService() *service {
 	testControllerHasNoConnection = false
 	testNodeHasNoConnection = false
 	svc := new(service)
+	svc.makeDialer = func(_ net.Dialer) func(context.Context, string, string) (net.Conn, error) {
+		return func(_ context.Context, _, _ string) (net.Conn, error) {
+			return &mockConn{}, nil
+		}
+	}
 	var opts Opts
 
 	opts.AccessZone = "System"
@@ -262,7 +301,7 @@ func (f *feature) getService() *service {
 	svc.RegisterAdditionalServers(server)
 	f.service = svc
 	f.service.nodeID, _ = os.Hostname()
-	f.service.nodeIP = "127.0.0.1"
+	f.service.givenNodeIP = "127.0.0.1"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -2400,6 +2439,11 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	testControllerHasNoConnection = false
 	testNodeHasNoConnection = false
 	svc := new(service)
+	svc.makeDialer = func(_ net.Dialer) func(context.Context, string, string) (net.Conn, error) {
+		return func(_ context.Context, _, _ string) (net.Conn, error) {
+			return &mockConn{}, nil
+		}
+	}
 	var opts Opts
 
 	opts.AccessZone = "System"
@@ -2448,7 +2492,7 @@ func (f *feature) getServiceWithParamsForCustomTopology(user, mode string, apply
 	f.service = svc
 	f.service.nodeID = host
 	// TODO - IP has to be updated before release
-	f.service.nodeIP = "127.0.0.1"
+	f.service.givenNodeIP = "127.0.0.1"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -2459,6 +2503,11 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	testControllerHasNoConnection = false
 	testNodeHasNoConnection = false
 	svc := new(service)
+	svc.makeDialer = func(_ net.Dialer) func(context.Context, string, string) (net.Conn, error) {
+		return func(_ context.Context, _, _ string) (net.Conn, error) {
+			return &mockConn{}, nil
+		}
+	}
 	var opts Opts
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
@@ -2489,7 +2538,7 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 	svc.mode = mode
 	f.service = svc
 	f.service.nodeID, _ = os.Hostname()
-	f.service.nodeIP = "127.0.0.1"
+	f.service.givenNodeIP = "127.0.0.1"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -2500,6 +2549,11 @@ func (f *feature) getServiceWithsessionauth() *service {
 	testControllerHasNoConnection = false
 	testNodeHasNoConnection = false
 	svc := new(service)
+	svc.makeDialer = func(_ net.Dialer) func(context.Context, string, string) (net.Conn, error) {
+		return func(_ context.Context, _, _ string) (net.Conn, error) {
+			return &mockConn{}, nil
+		}
+	}
 	var opts Opts
 	opts.AccessZone = "System"
 	opts.Path = "/ifs/data/csi-isilon"
@@ -2530,7 +2584,7 @@ func (f *feature) getServiceWithsessionauth() *service {
 	svc.mode = "controller"
 	f.service = svc
 	f.service.nodeID, _ = os.Hostname()
-	f.service.nodeIP = "127.0.0.1"
+	f.service.givenNodeIP = "127.0.0.1"
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
@@ -2782,7 +2836,7 @@ func (f *feature) aValidDeleteStorageProtectionGroupResponseIsReturned() error {
 
 func (f *feature) iCallNodeGetInfoWithNoFQDN() error {
 	req := new(csi.NodeGetInfoRequest)
-	f.service.nodeIP = "192.0.2.0"
+	f.service.givenNodeIP = "192.0.2.0"
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
 	if f.err != nil {
 		log.Printf("NodeGetInfo call failed: %s\n", f.err.Error())

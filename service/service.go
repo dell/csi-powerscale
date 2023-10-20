@@ -39,6 +39,7 @@ import (
 	"github.com/dell/csi-isilon/v2/common/constants"
 	"github.com/dell/csi-isilon/v2/common/utils"
 	"github.com/dell/csi-isilon/v2/core"
+	csiutils "github.com/dell/csi-isilon/v2/csi-utils"
 	commonext "github.com/dell/dell-csi-extensions/common"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 	csiext "github.com/dell/dell-csi-extensions/replication"
@@ -102,17 +103,20 @@ type Opts struct {
 	IgnoreUnresolvableHosts   bool
 	replicationContextPrefix  string
 	replicationPrefix         string
+	connectivityTestTimeout   time.Duration
 }
 
 type service struct {
 	opts                  Opts
 	mode                  string
 	nodeID                string
+	givenNodeIP           string
 	nodeIP                string
 	statisticsCounter     int
 	isiClusters           *sync.Map
 	defaultIsiClusterName string
 	k8sclient             *kubernetes.Clientset
+	makeDialer            func(net.Dialer) func(context.Context, string, string) (net.Conn, error)
 }
 
 // IsilonClusters To unmarshal secret.yaml file
@@ -147,7 +151,11 @@ func (s IsilonClusterConfig) String() string {
 
 // New returns a new Service.
 func New() Service {
-	return &service{}
+	return &service{
+		makeDialer: func(template net.Dialer) func(context.Context, string, string) (net.Conn, error) {
+			return template.DialContext
+		},
+	}
 }
 
 func (s *service) initializeServiceOpts(ctx context.Context) error {
@@ -155,7 +163,9 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 	// Get the SP's operating mode.
 	s.mode = csictx.Getenv(ctx, gocsi.EnvVarMode)
 
-	opts := Opts{}
+	opts := Opts{
+		connectivityTestTimeout: time.Second * 5,
+	}
 
 	if port, ok := csictx.LookupEnv(ctx, constants.EnvPort); ok {
 		opts.Port = port
@@ -196,7 +206,7 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 	}
 
 	if nodeIPEnv, ok := csictx.LookupEnv(ctx, constants.EnvNodeIP); ok {
-		s.nodeIP = nodeIPEnv
+		s.givenNodeIP = nodeIPEnv
 	}
 
 	if kubeConfigPath, ok := csictx.LookupEnv(ctx, constants.EnvKubeConfigPath); ok {
@@ -236,6 +246,13 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 	opts.CustomTopologyEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvCustomTopologyEnabled)
 	opts.IsHealthMonitorEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvIsHealthMonitorEnabled)
 	opts.IgnoreUnresolvableHosts = utils.ParseBooleanFromContext(ctx, constants.EnvIgnoreUnresolvableHosts)
+
+	connectivityTestTimeout, err := utils.ParseDurationFromContext(ctx, constants.EnvConnectivityTestTimeout)
+	if err != nil {
+		log.Warnf("connectivityTestTimeout defaults to %v; error was %s", opts.connectivityTestTimeout, err.Error())
+	} else {
+		opts.connectivityTestTimeout = connectivityTestTimeout
+	}
 
 	s.opts = opts
 
@@ -396,7 +413,7 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 
 	customTopologyFound := false
 	if s.opts.CustomTopologyEnabled {
-		labels, err := s.GetNodeLabels()
+		labels, err := s.GetNodeLabels(clientCtx)
 		if err != nil {
 			return nil, err
 		}
@@ -843,11 +860,102 @@ func (s *service) GetCSINodeID(ctx context.Context) (string, error) {
 // GetCSINodeIP gets the IP of the CSI node
 func (s *service) GetCSINodeIP(ctx context.Context) (string, error) {
 	// if the node ip has already been initialized, return it
+	if s.givenNodeIP != "" {
+		return s.givenNodeIP, nil
+	}
+	// node IP couldn't be read from env variable while initializing service, return with error
+	return "", errors.New("cannot get node IP")
+}
+
+// findEligibleClientIP() tries to connect to the endpoint and get the client IP address
+func (s *service) findEligibleClientIP(ctx context.Context, candidates map[string][]*net.TCPAddr) net.IP {
+	ctx, log, _ := GetRunIDLog(ctx)
+	isiClusters := s.getIsilonClusters()
+
+	for network, candsForNetwork := range candidates {
+		log.Infof("Going to conduct a connectivity test for network %s", network)
+		var wg sync.WaitGroup
+		resultMap := make(map[*net.TCPAddr][]bool)
+		for _, cand := range candsForNetwork {
+			// For each cluster, conduct the connection test
+			resultsForIP := make([]bool, len(isiClusters))
+			resultMap[cand] = resultsForIP
+			for i, cluster := range isiClusters {
+				wg.Add(1)
+				go func(cand *net.TCPAddr, result *bool, isiConfig *IsilonClusterConfig) {
+					defer wg.Done()
+					hostPortPair := fmt.Sprintf("%s:%s", isiConfig.Endpoint, isiConfig.EndpointPort)
+					log.Debugf("Connectivity test: connecting to cluster %s (%s)", isiConfig.ClusterName, hostPortPair)
+					conn, err := s.makeDialer(net.Dialer{
+						LocalAddr: cand,
+						Timeout:   s.opts.connectivityTestTimeout,
+					})(ctx, "tcp", hostPortPair)
+					if err != nil {
+						log.Infof("Connectivity test: could not connect to %s from %s (error: %s)", hostPortPair, cand.IP, err)
+						return
+					}
+					conn.Close()
+					*result = true
+				}(cand, &resultsForIP[i], cluster)
+			}
+		}
+		wg.Wait()
+		for _, cand := range candsForNetwork {
+			resultsForIP := resultMap[cand]
+			allSuccessful := true
+			for i := range isiClusters {
+				if !resultsForIP[i] {
+					allSuccessful = false
+					break
+				}
+			}
+			if allSuccessful {
+				log.Infof("Connectivity test: client IP candidate %s is eligible", cand.IP)
+				return cand.IP
+			}
+		}
+		log.Infof("Connectivity test: client IPs in the network %s are not eligible; moving to the next network", network)
+	}
+	return nil
+}
+
+// GetNodeIP gets the IP of the CSI node for use in communication with the clusters
+func (s *service) GetNodeIP(ctx context.Context) (string, error) {
+	// Return the cached value if available
 	if s.nodeIP != "" {
 		return s.nodeIP, nil
 	}
-	// node id couldn't be read from env variable while initializing service, return with error
-	return "", errors.New("cannot get node IP")
+
+	// Fetch log handler
+	ctx, log, _ := GetRunIDLog(ctx)
+
+	var nodeIP string
+
+	// When valid list of allowedNetworks is being given as part of values.yaml, we need
+	// to fetch first IP from matching network
+	if len(s.opts.allowedNetworks) > 0 {
+		log.Debugf("Fetching IP address of custom network for NFS I/O traffic")
+		candidates, err := csiutils.GetNFSClientIPCandidates(s.opts.allowedNetworks)
+		if err != nil {
+			log.Error("Failed to find IP address corresponding to the allowed network with error", err.Error())
+			return "", fmt.Errorf("cannot get nodeIP: %w", err)
+		}
+		addr := s.findEligibleClientIP(ctx, candidates)
+		if addr == nil {
+			log.Error("Failed to find an eligible IP address with the allowed networks: %", strings.Join(s.opts.allowedNetworks, ", "))
+			return "", errors.New("failed to find an eligible IP address with the allowed networks")
+		}
+		nodeIP = addr.String()
+	} else {
+		var err error
+		nodeIP, err = s.GetCSINodeIP(ctx)
+		if err != nil {
+			return "", err
+		}
+	}
+	s.nodeIP = nodeIP
+
+	return nodeIP, nil
 }
 
 func (s *service) getVolByName(ctx context.Context, isiPath, volName string, isiConfig *IsilonClusterConfig) (isi.Volume, error) {
@@ -1010,7 +1118,7 @@ func (s *service) getIsilonConfig(ctx context.Context, clusterName *string) (*Is
 	return isiConfig, nil
 }
 
-func (s *service) GetNodeLabels() (map[string]string, error) {
+func (s *service) GetNodeLabels(ctx context.Context) (map[string]string, error) {
 	log := utils.GetLogger()
 	k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
 	if err != nil {
@@ -1018,7 +1126,7 @@ func (s *service) GetNodeLabels() (map[string]string, error) {
 		return nil, err
 	}
 	// access the API to fetch node object
-	node, err := k8sclientset.CoreV1().Nodes().Get(context.TODO(), s.nodeID, v1.GetOptions{})
+	node, err := k8sclientset.CoreV1().Nodes().Get(ctx, s.nodeID, v1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

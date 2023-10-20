@@ -28,7 +28,6 @@ import (
 	"github.com/dell/csi-isilon/v2/common/constants"
 	"github.com/dell/csi-isilon/v2/common/k8sutils"
 	"github.com/dell/csi-isilon/v2/common/utils"
-	csiutils "github.com/dell/csi-isilon/v2/csi-utils"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
@@ -152,9 +151,14 @@ func (s *service) NodePublishVolume(
 		"TargetPath":  req.GetTargetPath(),
 		"AzServiceIP": azServiceIP,
 	}
+	clientIP, err := s.GetNodeIP(ctx)
+	if err != nil {
+		log.Errorf("failed to get node IP: %s", err.Error())
+		return nil, err
+	}
 	// TODO: Replace logrus with log
 	logrus.WithFields(f).Info("Calling publishVolume")
-	if err := publishVolume(ctx, req, isiConfig.isiSvc.GetNFSExportURLForPath(azServiceIP, path)); err != nil {
+	if err := publishVolume(ctx, req, isiConfig.isiSvc.GetNFSExportURLForPath(azServiceIP, path), clientIP); err != nil {
 		return nil, err
 	}
 
@@ -392,7 +396,7 @@ func (s *service) NodeGetInfo(
 	// Check for node label 'max-isilon-volumes-per-node'. If present set 'MaxVolumesPerNode' to this value.
 	// If node label is not present, set 'MaxVolumesPerNode' to default value i.e., 0
 	var maxIsilonVolumesPerNode int64
-	labels, err := s.GetNodeLabels()
+	labels, err := s.GetNodeLabels(ctx)
 	if err != nil {
 		log.Error("failed to get Node Labels with error", err.Error())
 		return nil, err
@@ -728,20 +732,9 @@ func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
 	// Fetch log handler
 	ctx, log, _ := GetRunIDLog(ctx)
 
-	// When valid list of allowedNetworks is being given as part of values.yaml, we need
-	// to fetch first IP from matching network
-	if len(s.opts.allowedNetworks) > 0 {
-		log.Debugf("Fetching IP address of custom network for NFS I/O traffic")
-		nodeIP, err = csiutils.GetNFSClientIP(s.opts.allowedNetworks)
-		if err != nil {
-			log.Error("Failed to find IP address corresponding to the allowed network with error", err.Error())
-			return "", err
-		}
-	} else {
-		nodeIP, err = s.GetCSINodeIP(ctx)
-		if (err) != nil {
-			return "", err
-		}
+	nodeIP, err = s.GetNodeIP(ctx)
+	if (err) != nil {
+		return "", err
 	}
 
 	nodeFQDN, err := utils.GetFQDNByIP(ctx, nodeIP)
