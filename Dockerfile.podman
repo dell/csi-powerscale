@@ -24,10 +24,11 @@ WORKDIR /go/src/
 RUN CGO_ENABLED=0 \
     make build
 
-FROM registry.access.redhat.com/ubi9/ubi AS ubi-micro-build
-RUN mkdir -p /mnt/rootfs
-RUN yum install --installroot /mnt/rootfs --releasever 9 --setopt install_weak_deps=false --nodocs -y libaio libuuid numactl xfsprogs e4fsprogs nfs-utils; yum clean all
-RUN rm -rf /mnt/rootfs/var/cache/*
+FROM almalinux:9 AS alma-dnf
+RUN mkdir -p /mnt/rootfs && \
+    dnf install --installroot /mnt/rootfs --setopt install_weak_deps=false --releasever 9 --nodocs -y libaio libuuid numactl xfsprogs e4fsprogs nfs-utils && \
+    dnf --installroot /mnt/rootfs clean all && \
+    rm -rf /mnt/rootfs/var/cache/*
 
 # Stage to build the driver image
 FROM $BASEIMAGE AS final
@@ -36,7 +37,7 @@ FROM $BASEIMAGE AS final
 COPY --from=builder /go/src/csi-isilon /
 
 # copy in all images
-COPY --from=ubi-micro-build /mnt/rootfs/ /
+COPY --from=alma-dnf /mnt/rootfs/ /
 
 ENTRYPOINT ["/csi-isilon"]
 
