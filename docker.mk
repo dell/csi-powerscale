@@ -9,10 +9,6 @@ docker-build-image-push:
 	docker push "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
 
 podman-build:
-	@echo "Base Image is set to: $(BASEIMAGE)"
-	@echo "Adding Driver dependencies to $(BASEIMAGE)"
-	bash ./buildubimicro.sh $(BASEIMAGE)
-	@echo "Base image build: SUCCESS" $(eval BASEIMAGE=localhost/csipowerscale-ubimicro:latest)
 	@echo "Building: $(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
 	$(BUILDER) build -t "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)" -f Dockerfile.podman --target $(BUILDSTAGE) --build-arg GOPROXY=$(GOPROXY) --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOVERSION=$(GOVERSION) .
 
