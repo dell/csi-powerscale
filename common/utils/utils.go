@@ -20,6 +20,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"os"
+	"path"
+	"regexp"
+	"strconv"
+	"strings"
+
 	"github.com/Showmax/go-fqdn"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/v2/common/constants"
@@ -29,12 +36,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gopkg.in/yaml.v3"
-	"net"
-	"os"
-	"path"
-	"regexp"
-	"strconv"
-	"strings"
 )
 
 // ParseBooleanFromContext parses an environment variable into a boolean value. If an error is encountered, default is set to false, and error is logged
@@ -126,7 +127,6 @@ func RemoveExistingCSISockFile() error {
 
 // GetNewUUID generates a UUID
 func GetNewUUID() (string, error) {
-
 	log := GetLogger()
 	id, err := uuid.NewUUID()
 	if err != nil {
@@ -193,7 +193,6 @@ var DummyHostNodeID = "localhost=#=#=localhost=#=#=127.0.0.1"
 
 // GetQuotaIDWithCSITag formats a given quota id with the CSI tag, e.g. AABpAQEAAAAAAAAAAAAAQA0AAAAAAAAA -> CSI_QUOTA_ID:AABpAQEAAAAAAAAAAAAAQA0AAAAAAAAA
 func GetQuotaIDWithCSITag(quotaID string) string {
-
 	if quotaID == "" {
 		return ""
 	}
@@ -250,7 +249,6 @@ func GetOwnFQDN() (string, error) {
 
 // IsStringInSlice checks if a string is an element of a string slice
 func IsStringInSlice(str string, list []string) bool {
-
 	for _, b := range list {
 		if b == str {
 			return true
@@ -262,7 +260,6 @@ func IsStringInSlice(str string, list []string) bool {
 
 // IsStringInSlices checks if a string is an element of a any of the string slices
 func IsStringInSlices(str string, list ...[]string) bool {
-
 	for _, strs := range list {
 		if IsStringInSlice(str, strs) {
 			return true
@@ -274,7 +271,6 @@ func IsStringInSlices(str string, list ...[]string) bool {
 
 // RemoveStringFromSlice returns a slice that is a copy of the input "list" slice with the input "str" string removed
 func RemoveStringFromSlice(str string, list []string) []string {
-
 	result := make([]string, 0)
 
 	for _, v := range list {
@@ -288,11 +284,9 @@ func RemoveStringFromSlice(str string, list []string) []string {
 
 // RemoveStringsFromSlice generates a slice that is a copy of the input "list" slice with elements from the input "strs" slice removed
 func RemoveStringsFromSlice(filters []string, list []string) []string {
-
 	result := make([]string, 0)
 
 	for _, str := range list {
-
 		if !IsStringInSlice(str, filters) {
 			result = append(result, str)
 		}
@@ -303,7 +297,6 @@ func RemoveStringsFromSlice(filters []string, list []string) []string {
 
 // GetAccessMode extracts the access mode from the given *csi.ControllerPublishVolumeRequest instance
 func GetAccessMode(req *csi.ControllerPublishVolumeRequest) (*csi.VolumeCapability_AccessMode_Mode, error) {
-
 	vc := req.GetVolumeCapability()
 	if vc == nil {
 		return nil, status.Error(codes.InvalidArgument,

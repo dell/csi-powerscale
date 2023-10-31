@@ -178,7 +178,7 @@ func (f *feature) createVolume(req *csi.CreateVolumeRequest) (*csi.CreateVolumeR
 	// Retry loop to deal with Isilon API being overwhelmed
 	for i := 0; i < f.maxRetryCount; i++ {
 		volResp, err = client.CreateVolume(ctx, req)
-		//f.vol = volResp.Volume
+		// f.vol = volResp.Volume
 		if err == nil || !strings.Contains(err.Error(), "Insufficient resources") {
 			// no need for retry
 			break
@@ -379,7 +379,7 @@ func (f *feature) verifySize(name string) error {
 	ctx := context.Background()
 	var quota *apiv1.IsiQuota
 	isiClient, err = createIsilonClient()
-	var enabled, _ = strconv.ParseBool(os.Getenv(constants.EnvQuotaEnabled))
+	enabled, _ := strconv.ParseBool(os.Getenv(constants.EnvQuotaEnabled))
 	path := utils.GetPathForVolume(f.isiPath, name)
 	quota, err = isiClient.GetQuotaWithPath(ctx, path)
 	fmt.Printf("Quota is: '%v'\n", quota)
@@ -407,7 +407,7 @@ func (f *feature) verifySize(name string) error {
 }
 
 func (f *feature) thereIsNotAQuota(name string) error {
-	//var quota *apiv1.IsiQuota
+	// var quota *apiv1.IsiQuota
 	ctx := context.Background()
 	path := utils.GetPathForVolume(f.isiPath, name)
 	quota, err := isiClient.GetQuotaWithPath(ctx, path)
@@ -641,7 +641,7 @@ func (f *feature) checkIsilonClientExistsForOneExport(nodeIP string, exportID in
 }
 
 func (f *feature) checkIsilonClientExists(node string) error {
-	var nodeIP = os.Getenv(node)
+	nodeIP := os.Getenv(node)
 	fmt.Printf("nodeIP is: '%s'\n", nodeIP)
 	err = f.checkIsilonClientExistsForOneExport(nodeIP, f.exportID, f.accssZone)
 	if err != nil {
@@ -716,7 +716,7 @@ func (f *feature) checkIsilonClientNotExistsForOneExport(nodeIP string, exportID
 }
 
 func (f *feature) checkIsilonClientNotExists(node string) error {
-	var nodeIP = os.Getenv(node)
+	nodeIP := os.Getenv(node)
 	fmt.Printf("nodeIP is: '%s'", nodeIP)
 	err = f.checkIsilonClientNotExistsForOneExport(nodeIP, f.exportID, f.accssZone)
 
@@ -731,7 +731,7 @@ func getDataDirName(path string) string {
 	dataDirName := "/tmp/" + path
 	fmt.Printf("Checking mount path '%s'\n", dataDirName)
 	var fileMode os.FileMode
-	fileMode = 0777
+	fileMode = 0o777
 	err := os.Mkdir(dataDirName, fileMode)
 	if err != nil && !os.IsExist(err) {
 		fmt.Printf("'%s': '%s'\n", dataDirName, err)
@@ -885,7 +885,7 @@ func (f *feature) verifyPublishedVolumeWithAccess(access, path string) error {
 	}
 	if access == "single-writer" || access == "multi-writer" {
 		dir := dataDirName + "/test"
-		var err = os.Mkdir(dir, 0777)
+		err := os.Mkdir(dir, 0o777)
 		// var err2 = os.Remove(dir)
 		if err == nil {
 			fmt.Printf("mounted successfully, could write it\n")
@@ -1312,7 +1312,7 @@ func (f *feature) checkIsilonClientsExist(nVols int) error {
 		volName := fmt.Sprintf("scale%d", i)
 		volId := f.volNameID[volName]
 		_, exportID, accessZone, _, _ := utils.ParseNormalizedVolumeID(ctx, volId)
-		var nodeIP = os.Getenv("X_CSI_NODE_NAME")
+		nodeIP := os.Getenv("X_CSI_NODE_NAME")
 		err := f.checkIsilonClientExistsForOneExport(nodeIP, exportID, accessZone)
 		if err != nil {
 			panic(fmt.Sprintf("check Isilon clients exist unsuccessfully\n"))
@@ -1328,7 +1328,7 @@ func (f *feature) checkIsilonClientsNotExist(nVols int) error {
 		volName := fmt.Sprintf("scale%d", i)
 		volID := f.volNameID[volName]
 		_, exportID, accessZone, _, _ := utils.ParseNormalizedVolumeID(ctx, volID)
-		var nodeIP = os.Getenv("X_CSI_NODE_NAME")
+		nodeIP := os.Getenv("X_CSI_NODE_NAME")
 		err := f.checkIsilonClientNotExistsForOneExport(nodeIP, exportID, accessZone)
 		if err != nil {
 			panic(fmt.Sprintf("check Isilon clients not exist unsuccessfully\n"))
@@ -1343,7 +1343,7 @@ func (f *feature) iNodePublishVolumesInParallel(nVols int) error {
 		dataDirName := fmt.Sprintf("/tmp/datadir%d", i)
 		fmt.Printf("Checking %s\n", dataDirName)
 		var fileMode os.FileMode
-		fileMode = 0777
+		fileMode = 0o777
 		err := os.Mkdir(dataDirName, fileMode)
 		if err != nil && !os.IsExist(err) {
 			fmt.Printf("%s: %s\n", dataDirName, err)

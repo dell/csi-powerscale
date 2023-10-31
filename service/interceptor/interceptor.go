@@ -29,7 +29,8 @@ import (
 type rewriteRequestIDInterceptor struct{}
 
 func (r *rewriteRequestIDInterceptor) handleServer(ctx context.Context, req interface{},
-	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+) (interface{}, error) {
 	// Retrieve the gRPC metadata from the incoming context.
 	md, mdOK := metadata.FromIncomingContext(ctx)
 
@@ -147,7 +148,8 @@ func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
 const pending = "pending"
 
 func (i *interceptor) nodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest,
-	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (res interface{}, resErr error) {
+	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+) (res interface{}, resErr error) {
 	lock, err := i.opts.locker.GetLockWithID(ctx, req.VolumeId)
 	if err != nil {
 		return nil, err
@@ -166,7 +168,8 @@ func (i *interceptor) nodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 }
 
 func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest,
-	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (res interface{}, resErr error) {
+	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+) (res interface{}, resErr error) {
 	lock, err := i.opts.locker.GetLockWithID(ctx, req.VolumeId)
 	if err != nil {
 		return nil, err
@@ -183,8 +186,8 @@ func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 }
 
 func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeRequest,
-	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (res interface{}, resErr error) {
-
+	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+) (res interface{}, resErr error) {
 	lock, err := i.opts.locker.GetLockWithID(ctx, req.Name)
 	if err != nil {
 		return nil, err

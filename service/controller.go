@@ -150,7 +150,6 @@ func (rpo RPOEnum) ToInt() (int, error) {
 // validateVolSize uses the CapacityRange range params to determine what size
 // volume to create. Returned size is in bytes
 func validateVolSize(cr *csi.CapacityRange) (int64, error) {
-
 	minSize := cr.GetRequiredBytes()
 
 	if minSize < 0 {
@@ -167,7 +166,6 @@ func validateVolSize(cr *csi.CapacityRange) (int64, error) {
 }
 
 func readQuotaLimitParams(params map[string]string) (softlimit, advisorylimit, softgraceprd string) {
-
 	// Setting Soft Limit
 	softLimit := SoftLimitParamDefault
 	if _, ok := params[SoftLimitParam]; ok {
@@ -213,7 +211,8 @@ func readQuotaLimitParams(params map[string]string) (softlimit, advisorylimit, s
 func (s *service) CreateVolume(
 	ctx context.Context,
 	req *csi.CreateVolumeRequest) (
-	*csi.CreateVolumeResponse, error) {
+	*csi.CreateVolumeResponse, error,
+) {
 	var (
 		accessZone                        string
 		isiPath                           string
@@ -253,7 +252,7 @@ func (s *service) CreateVolume(
 
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
-	//set noProbeOnStart to false so subsequent calls can lead to probe
+	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
@@ -348,12 +347,12 @@ func (s *service) CreateVolume(
 		rootClientEnabled = RootClientEnabledParamDefault
 	}
 
-	//Reading quota limit parameters
+	// Reading quota limit parameters
 	softLimit, advisoryLimit, softGracePrd = readQuotaLimitParams(params)
 	log.Infof("Limit parameters considered for quota creation SoftLimit: '%s' , AdvisoryLimit: '%s',SoftGracePrd: '%s'", softLimit, advisoryLimit, softGracePrd)
 
-	//CSI specific metada for authorization
-	var headerMetadata = addMetaData(params)
+	// CSI specific metada for authorization
+	headerMetadata := addMetaData(params)
 
 	// check volume content source in the request
 	isROVolumeFromSnapshot = false
@@ -597,7 +596,7 @@ func (s *service) CreateVolume(
 		// create quota
 		if quotaID, err = isiConfig.isiSvc.CreateQuota(ctx, path, req.GetName(), softLimit, advisoryLimit, softGracePrd, sizeInBytes, s.opts.QuotaEnabled); err != nil {
 			log.Errorf("error creating quota ('%s', '%d' bytes), abort, also roll back by deleting the newly created volume: '%v'", req.GetName(), sizeInBytes, err)
-			//roll back, delete the newly created volume
+			// roll back, delete the newly created volume
 			if err = isiConfig.isiSvc.DeleteVolume(ctx, isiPath, req.GetName()); err != nil {
 				return nil, fmt.Errorf("rollback (deleting volume '%s') failed with error : '%v'", req.GetName(), err)
 			}
@@ -629,7 +628,6 @@ func (s *service) CreateVolume(
 			return nil, err
 		}
 	} else {
-
 		if exportID, err = isiConfig.isiSvc.ExportVolumeWithZone(ctx, isiPath, req.GetName(), accessZone, utils.GetQuotaIDWithCSITag(quotaID)); err == nil && exportID != 0 {
 			// get the export and retry if not found to ensure the export has been created
 			for i := 0; i < MaxRetries; i++ {
@@ -662,7 +660,8 @@ func (s *service) CreateVolume(
 }
 
 func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *IsilonClusterConfig,
-	isiPath, normalizedSnapshotID, dstVolumeName string, sizeInBytes int64, accessZone string) error {
+	isiPath, normalizedSnapshotID, dstVolumeName string, sizeInBytes int64, accessZone string,
+) error {
 	var snapshotSrc isi.Snapshot
 	var err error
 
@@ -714,7 +713,8 @@ func (s *service) createVolumeFromSource(
 	isiPath string,
 	contentSource *csi.VolumeContentSource,
 	req *csi.CreateVolumeRequest,
-	sizeInBytes int64, accessZone string) error {
+	sizeInBytes int64, accessZone string,
+) error {
 	if contentSnapshot := contentSource.GetSnapshot(); contentSnapshot != nil {
 		// create volume from source snapshot
 		if err := s.createVolumeFromSnapshot(ctx, isiConfig, isiPath, contentSnapshot.GetSnapshotId(), req.GetName(), sizeInBytes, accessZone); err != nil {
@@ -792,11 +792,12 @@ func (s *service) getCSIVolume(ctx context.Context, exportID int, volName, path,
 func (s *service) DeleteVolume(
 	ctx context.Context,
 	req *csi.DeleteVolumeRequest) (
-	*csi.DeleteVolumeResponse, error) {
+	*csi.DeleteVolumeResponse, error,
+) {
 	// TODO more checks need to be done, e.g. if access mode is VolumeCapability_AccessMode_MULTI_NODE_XXX, then other nodes might still be using this volume, thus the delete should be skipped
 	// Fetch log handler
 	ctx, log, _ := GetRunIDLog(ctx)
-	//set noProbeOnStart to false so subsequent calls can lead to probe
+	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
 
 	// validate request
@@ -909,13 +910,14 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteVolume(
 	volName string,
 	accessZone string,
 	export isi.Export,
-	isiConfig *IsilonClusterConfig) error {
+	isiConfig *IsilonClusterConfig,
+) error {
 	exportPath := (*export.Paths)[0]
 
 	// Fetch log handler
 	ctx, log, _ := GetRunIDLog(ctx)
 
-	//Get Zone Path
+	// Get Zone Path
 	zone, err := isiConfig.isiSvc.GetZoneByName(ctx, accessZone)
 	if err != nil {
 		return err
@@ -987,7 +989,8 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteVolume(
 
 func (s *service) ControllerExpandVolume(
 	ctx context.Context,
-	req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	req *csi.ControllerExpandVolumeRequest,
+) (*csi.ControllerExpandVolumeResponse, error) {
 	// Fetch log handler
 	ctx, log, _ := GetRunIDLog(ctx)
 
@@ -1054,7 +1057,8 @@ func (s *service) getAddClientFunc(rootClientEnabled bool, isiConfig *IsilonClus
 func (s *service) ControllerPublishVolume(
 	ctx context.Context,
 	req *csi.ControllerPublishVolumeRequest) (
-	*csi.ControllerPublishVolumeResponse, error) {
+	*csi.ControllerPublishVolumeResponse, error,
+) {
 	var (
 		accessZone             string
 		exportPath             string
@@ -1064,7 +1068,7 @@ func (s *service) ControllerPublishVolume(
 
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
-	//set noProbeOnStart to false so subsequent calls can lead to probe
+	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
 
 	volumeContext := req.GetVolumeContext()
@@ -1178,7 +1182,7 @@ func (s *service) ControllerPublishVolume(
 			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
-		//since read-only has higher privileges than root-clients, add to root-clients in exports on powerscale if root client enabled is set to true
+		// since read-only has higher privileges than root-clients, add to root-clients in exports on powerscale if root client enabled is set to true
 		if rootClientEnabled && isROVolumeFromSnapshot {
 			log.Info("ROVolumeFromSnapshot & rootClientEnabled is set to true, add to root clients")
 			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportRootClientByIDWithZone)
@@ -1219,7 +1223,8 @@ func (s *service) ControllerPublishVolume(
 func (s *service) ValidateVolumeCapabilities(
 	ctx context.Context,
 	req *csi.ValidateVolumeCapabilitiesRequest) (
-	*csi.ValidateVolumeCapabilitiesResponse, error) {
+	*csi.ValidateVolumeCapabilitiesResponse, error,
+) {
 	var (
 		exportPath string
 		isiPath    string
@@ -1279,7 +1284,8 @@ func (s *service) ValidateVolumeCapabilities(
 }
 
 func (s *service) ListVolumes(ctx context.Context,
-	req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
+	req *csi.ListVolumesRequest,
+) (*csi.ListVolumesResponse, error) {
 	// TODO The below implementation(commented code) doesn't work for multi-cluster.
 	// Add multi-cluster support by considering both MaxEntries and StartingToken(if specified) attributes.
 	/*
@@ -1350,18 +1356,19 @@ func (s *service) ListVolumes(ctx context.Context,
 }
 
 func (s *service) ListSnapshots(context.Context,
-	*csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
+	*csi.ListSnapshotsRequest,
+) (*csi.ListSnapshotsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
 func (s *service) ControllerUnpublishVolume(
 	ctx context.Context,
 	req *csi.ControllerUnpublishVolumeRequest) (
-	*csi.ControllerUnpublishVolumeResponse, error) {
-
+	*csi.ControllerUnpublishVolumeResponse, error,
+) {
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
-	//set noProbeOnStart to false so subsequent calls can lead to probe
+	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
 
 	if req.VolumeId == "" {
@@ -1413,8 +1420,8 @@ func (s *service) ControllerUnpublishVolume(
 func (s *service) GetCapacity(
 	ctx context.Context,
 	req *csi.GetCapacityRequest) (
-	*csi.GetCapacityResponse, error) {
-
+	*csi.GetCapacityResponse, error,
+) {
 	var clusterName string
 	params := req.GetParameters()
 
@@ -1443,7 +1450,7 @@ func (s *service) GetCapacity(
 		return nil, err
 	}
 
-	//pass the key(s) to rest api
+	// pass the key(s) to rest api
 	keyArray := []string{"ifs.bytes.avail"}
 
 	stat, err := isiConfig.isiSvc.GetStatistics(ctx, keyArray)
@@ -1463,8 +1470,8 @@ func (s *service) GetCapacity(
 func (s *service) ControllerGetCapabilities(
 	ctx context.Context,
 	req *csi.ControllerGetCapabilitiesRequest) (
-	*csi.ControllerGetCapabilitiesResponse, error) {
-
+	*csi.ControllerGetCapabilitiesResponse, error,
+) {
 	capabilities := []*csi.ControllerServiceCapability{
 		{
 			Type: &csi.ControllerServiceCapability_Rpc{
@@ -1592,8 +1599,8 @@ func (s *service) controllerProbe(ctx context.Context, clusterConfig *IsilonClus
 func (s *service) CreateSnapshot(
 	ctx context.Context,
 	req *csi.CreateSnapshotRequest) (
-	*csi.CreateSnapshotResponse, error) {
-
+	*csi.CreateSnapshotResponse, error,
+) {
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
 
@@ -1673,8 +1680,8 @@ func (s *service) CreateSnapshot(
 // validateCreateSnapshotRequest validate the input params in CreateSnapshotRequest
 func (s *service) validateCreateSnapshotRequest(
 	ctx context.Context,
-	req *csi.CreateSnapshotRequest, isiPath string, isiConfig *IsilonClusterConfig) (string, string, error) {
-
+	req *csi.CreateSnapshotRequest, isiPath string, isiConfig *IsilonClusterConfig,
+) (string, string, error) {
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
 
@@ -1726,8 +1733,8 @@ func (s *service) getCSISnapshot(snapshotID string, sourceVolumeID string, creat
 func (s *service) DeleteSnapshot(
 	ctx context.Context,
 	req *csi.DeleteSnapshotRequest) (
-	*csi.DeleteSnapshotResponse, error) {
-
+	*csi.DeleteSnapshotResponse, error,
+) {
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
 	log.Infof("DeleteSnapshot started")
@@ -1820,12 +1827,12 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteSnapshot(
 	snapshotIsiPath,
 	accessZone string,
 	deleteSnapshot *bool,
-	isiConfig *IsilonClusterConfig) error {
-
+	isiConfig *IsilonClusterConfig,
+) error {
 	// Fetch log handler
 	ctx, log, _ := GetRunIDLog(ctx)
 
-	//get Zone details
+	// get Zone details
 	zone, err := isiConfig.isiSvc.GetZoneByName(ctx, accessZone)
 	if err != nil {
 		return err
@@ -1869,8 +1876,8 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteSnapshot(
 // Validate volume capabilities
 func validateVolumeCaps(
 	vcs []*csi.VolumeCapability,
-	vol isi.Volume) (bool, string) {
-
+	vol isi.Volume,
+) (bool, string) {
 	var (
 		supported = true
 		reason    string
@@ -1932,7 +1939,7 @@ func checkValidAccessTypes(vcs []*csi.VolumeCapability) bool {
 
 func addMetaData(params map[string]string) map[string]string {
 	// CSI specific metadata header for authorization
-	var headerMetadata = make(map[string]string)
+	headerMetadata := make(map[string]string)
 	if _, ok := params[csiPersistentVolumeName]; ok {
 		headerMetadata[headerPersistentVolumeName] = params[csiPersistentVolumeName]
 	}
@@ -1946,9 +1953,10 @@ func addMetaData(params map[string]string) map[string]string {
 	}
 	return headerMetadata
 }
-func (s *service) ControllerGetVolume(ctx context.Context,
-	req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
 
+func (s *service) ControllerGetVolume(ctx context.Context,
+	req *csi.ControllerGetVolumeRequest,
+) (*csi.ControllerGetVolumeResponse, error) {
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
 
@@ -1977,17 +1985,27 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 
 	isiPath := isiConfig.IsiPath
 
+	isiPathFromParams, err := s.validateIsiPath(ctx, volName)
+	if err != nil {
+		log.Error("Failed get isiPath", err.Error())
+	}
+
+	if isiPathFromParams != isiPath && isiPathFromParams != "" {
+		log.Debug("overriding isiPath with value from StorageClass", isiPathFromParams)
+		isiPath = isiPathFromParams
+	}
+
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
 		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, err.Error()))
 	}
 
-	//check if volume exists
+	// check if volume exists
 	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, volName, "") {
 		abnormal = true
 		message = fmt.Sprintf("volume does not exists at this path %v", isiPath)
 	}
 
-	//Fetch volume details
+	// Fetch volume details
 	if !abnormal {
 		volume, err = isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)
 		if err != nil {
@@ -2008,7 +2026,7 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 		}, nil
 	}
 
-	//Fetch export clients list
+	// Fetch export clients list
 	exports, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
 	if err != nil {
 		return &csi.ControllerGetVolumeResponse{
@@ -2025,7 +2043,7 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 		}, nil
 	}
 
-	//remove localhost from the clients
+	// remove localhost from the clients
 	exportList := removeString(*exports.Clients, "localhost")
 	return &csi.ControllerGetVolumeResponse{
 		Volume: &csi.Volume{

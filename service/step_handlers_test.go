@@ -111,10 +111,12 @@ var (
 )
 
 // This file contains HTTP handlers for mocking to the Isilon OneFS REST API.
-var isilonRouter http.Handler
-var testControllerHasNoConnection bool
-var testNodeHasNoConnection bool
-var once sync.Once
+var (
+	isilonRouter                  http.Handler
+	testControllerHasNoConnection bool
+	testNodeHasNoConnection       bool
+	once                          sync.Once
+)
 
 // getFileHandler returns an http.Handler that
 func getHandler() http.Handler {
@@ -1059,7 +1061,7 @@ func handleGetReportsByPolicy(w http.ResponseWriter, r *http.Request) {
 // handleGetExistentSnapshotVolume implements GET /namespace/ifs/data/csi-isilon/childZone/.csi-existent_snapshot_name_4-tracking-dir/volume1
 func handleGetExistentSnapshotVolume(w http.ResponseWriter, r *http.Request) {
 	// response body is true
-	//w.Write([]byte("true"))
+	// w.Write([]byte("true"))
 	return
 }
 
@@ -1129,7 +1131,7 @@ func MockK8sAPI() {
 		http.HandleFunc("/api/v1/nodes/", noderesponse)
 		time.Sleep(15)
 
-		//http://127.0.0.1:36443/array-status/cluster1
+		// http://127.0.0.1:36443/array-status/cluster1
 		http.HandleFunc("/array-status/cluster1/", apiResponse)
 		go func() {
 			fmt.Println("started mock server")
@@ -1140,7 +1142,6 @@ func MockK8sAPI() {
 }
 
 func noderesponse(w http.ResponseWriter, req *http.Request) {
-
 	log.Printf("request in noderesponse -> %+v", req)
 	param1 := req.URL.Query().Get("nodeId")
 	fakeNode := k8s.GetFakeNode()
@@ -1156,7 +1157,6 @@ func noderesponse(w http.ResponseWriter, req *http.Request) {
 }
 
 func apiResponse(w http.ResponseWriter, req *http.Request) {
-
 	var statusResponse ArrayConnectivityStatus
 	// Validating LastAttempt flag
 	if stepHandlersErrors.ModifyLastAttempt {
@@ -1175,5 +1175,4 @@ func apiResponse(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 	w.Write(fn)
 	w.WriteHeader(http.StatusOK)
-
 }

@@ -17,11 +17,11 @@ package service
 */
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"os"
+	"strings"
 	"time"
 
-	"strings"
+	"github.com/sirupsen/logrus"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/gofsutil"
@@ -34,8 +34,8 @@ import (
 func publishVolume(
 	ctx context.Context,
 	req *csi.NodePublishVolumeRequest,
-	nfsExportURL string) error {
-
+	nfsExportURL string,
+) error {
 	// Fetch log handler
 	ctx, log := GetLogger(ctx)
 
@@ -95,20 +95,20 @@ func publishVolume(
 	if len(mnts) != 0 {
 		for _, m := range mnts {
 			// check for idempotency
-			//same volume
+			// same volume
 			if m.Device == nfsExportURL {
 				if m.Path == target {
-					//as per specs, T1=T2, P1=P2 - return OK
+					// as per specs, T1=T2, P1=P2 - return OK
 					if contains(m.Opts, rwOption) {
 						logrus.WithFields(f).Debug(
 							"mount already in place with same options")
 						return nil
 					}
-					//T1=T2, P1!=P2 - return AlreadyExists
+					// T1=T2, P1!=P2 - return AlreadyExists
 					logrus.WithFields(f).Error("Mount point already in use by device with different options")
 					return status.Error(codes.AlreadyExists, "Mount point already in use by device with different options")
 				}
-				//T1!=T2, P1==P2 || P1 != P2 - return FailedPrecondition for single node
+				// T1!=T2, P1==P2 || P1 != P2 - return FailedPrecondition for single node
 				if accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER ||
 					accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY ||
 					accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER {
@@ -121,9 +121,9 @@ func publishVolume(
 
 	log.Infof("The mountOptions being used for mount are: %s", mntOptions)
 	if err := gofsutil.Mount(context.Background(), nfsExportURL, target, "nfs", mntOptions...); err != nil {
-		var count = 0
-		var errmsg = err.Error()
-		//Both substring validation is for NFSv3 and NFSv4 errors resp.
+		count := 0
+		errmsg := err.Error()
+		// Both substring validation is for NFSv3 and NFSv4 errors resp.
 		for (strings.Contains(strings.ToLower(errmsg), "access denied by server while mounting") || (strings.Contains(strings.ToLower(errmsg), "no such file or directory"))) && count < 5 {
 			time.Sleep(2 * time.Second)
 			log.Infof("Mount re-trial attempt-%d", count)
@@ -146,8 +146,8 @@ func publishVolume(
 // unpublishVolume removes the mount to the target path
 func unpublishVolume(
 	ctx context.Context,
-	req *csi.NodeUnpublishVolumeRequest, filterStr string) error {
-
+	req *csi.NodeUnpublishVolumeRequest, filterStr string,
+) error {
 	// Fetch log handler
 	ctx, log := GetLogger(ctx)
 
@@ -180,7 +180,7 @@ func mkdir(ctx context.Context, path string) (bool, error) {
 	// Fetch log handler
 	st, err := os.Stat(path)
 	if os.IsNotExist(err) {
-		if err := os.Mkdir(path, 0750); err != nil {
+		if err := os.Mkdir(path, 0o750); err != nil {
 			logrus.WithField("dir", path).WithError(
 				err).Error("Unable to create dir")
 			return false, err
@@ -204,7 +204,6 @@ func contains(list []string, item string) bool {
 }
 
 func isVolumeMounted(ctx context.Context, filterStr string, target string) (bool, error) {
-
 	// Fetch log handler
 	ctx, log := GetLogger(ctx)
 

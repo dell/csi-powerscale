@@ -52,11 +52,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // To maintain runid for Non debug mode. Note: CSI will not generate runid if CSI_DEBUG=false
-var runid int64
-var isilonConfigFile string
+var (
+	runid            int64
+	isilonConfigFile string
+)
 
 // DriverConfigParamsFile is the name of the input driver config params file
 var DriverConfigParamsFile string
@@ -109,6 +112,7 @@ type service struct {
 	statisticsCounter     int
 	isiClusters           *sync.Map
 	defaultIsiClusterName string
+	k8sclient             *kubernetes.Clientset
 }
 
 // IsilonClusters To unmarshal secret.yaml file
@@ -235,12 +239,17 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 
 	s.opts = opts
 
+	if c, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath); err == nil {
+		s.k8sclient = c
+	}
+
 	return nil
 }
 
 // ValidateCreateVolumeRequest validates the CreateVolumeRequest parameter for a CreateVolume operation
 func (s *service) ValidateCreateVolumeRequest(
-	req *csi.CreateVolumeRequest) (int64, error) {
+	req *csi.CreateVolumeRequest,
+) (int64, error) {
 	cr := req.GetCapacityRange()
 	sizeInBytes, err := validateVolSize(cr)
 	if err != nil {
@@ -273,8 +282,8 @@ func isVolumeTypeBlock(vcs []*csi.VolumeCapability) bool {
 
 // ValidateDeleteVolumeRequest validates the DeleteVolumeRequest parameter for a DeleteVolume operation
 func (s *service) ValidateDeleteVolumeRequest(ctx context.Context,
-	req *csi.DeleteVolumeRequest) error {
-
+	req *csi.DeleteVolumeRequest,
+) error {
 	if req.GetVolumeId() == "" {
 		return status.Error(codes.InvalidArgument,
 			"no volume id is provided by the DeleteVolumeRequest instance")
@@ -310,7 +319,6 @@ func (s *service) probeAllClusters(ctx context.Context) error {
 }
 
 func (s *service) probe(ctx context.Context, clusterConfig *IsilonClusterConfig) error {
-
 	ctx, log := GetLogger(ctx)
 	log.Debugf("calling probe for cluster '%s'", clusterConfig.ClusterName)
 	// Do a controller probe
@@ -342,7 +350,6 @@ func (s *service) probe(ctx context.Context, clusterConfig *IsilonClusterConfig)
 }
 
 func (s *service) probeOnStart(ctx context.Context) error {
-
 	ctx, log := GetLogger(ctx)
 	if noProbeOnStart {
 		log.Debugf("noProbeOnStart is true , skip probe")
@@ -364,7 +371,6 @@ func (s *service) setNoProbeOnStart(ctx context.Context) {
 }
 
 func (s *service) autoProbe(ctx context.Context, isiConfig *IsilonClusterConfig) error {
-
 	ctx, log := GetLogger(ctx)
 	if isiConfig.isiSvc != nil {
 		log.Debug("isiSvc already initialized, skip probing")
@@ -449,7 +455,6 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 		*isiConfig.IgnoreUnresolvableHosts,
 		s.opts.isiAuthType,
 	)
-
 	if err != nil {
 		log.Errorf("init client failed for isilon cluster '%s': '%s'", isiConfig.ClusterName, err.Error())
 		return nil, err
@@ -485,7 +490,6 @@ func (s *service) validateOptsParameters(clusterConfig *IsilonClusterConfig) err
 }
 
 func (s *service) logServiceStats() {
-
 	fields := map[string]interface{}{
 		"path":                      s.opts.Path,
 		"skipCertificateValidation": s.opts.SkipCertificateValidation,
@@ -499,7 +503,8 @@ func (s *service) logServiceStats() {
 }
 
 func (s *service) BeforeServe(
-	ctx context.Context, sp *gocsi.StoragePlugin, lis net.Listener) error {
+	ctx context.Context, sp *gocsi.StoragePlugin, lis net.Listener,
+) error {
 	log := utils.GetLogger()
 
 	if err := s.initializeServiceOpts(ctx); err != nil {
@@ -566,7 +571,7 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 				}
 				if event.Has(fsnotify.Create) && event.Name == parentFolder+"/..data" {
 					log.Infof("**************** Cluster config file modified. Updating cluster config details: %s****************", event.Name)
-					//set noProbeOnStart to false so subsequent calls can lead to probe
+					// set noProbeOnStart to false so subsequent calls can lead to probe
 					noProbeOnStart = false
 					err := s.syncIsilonConfigs(ctx)
 					if err != nil {
@@ -846,7 +851,6 @@ func (s *service) GetCSINodeIP(ctx context.Context) (string, error) {
 }
 
 func (s *service) getVolByName(ctx context.Context, isiPath, volName string, isiConfig *IsilonClusterConfig) (isi.Volume, error) {
-
 	// The `GetVolume` API returns a slice of volumes, but when only passing
 	// in a volume ID, the response will be just the one volume
 	vol, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)
@@ -858,7 +862,6 @@ func (s *service) getVolByName(ctx context.Context, isiPath, volName string, isi
 
 // Provide periodic logging of statistics like goroutines and memory
 func (s *service) logStatistics() {
-
 	if s.statisticsCounter = s.statisticsCounter + 1; (s.statisticsCounter % 100) == 0 {
 		goroutines := runtime.NumGoroutine()
 		memstats := new(runtime.MemStats)
@@ -1026,7 +1029,8 @@ func (s *service) GetNodeLabels() (map[string]string, error) {
 
 func (s *service) ProbeController(ctx context.Context,
 	req *commonext.ProbeControllerRequest) (
-	*commonext.ProbeControllerResponse, error) {
+	*commonext.ProbeControllerResponse, error,
+) {
 	ctx, log := GetLogger(ctx)
 
 	if !strings.EqualFold(s.mode, "node") {
@@ -1053,4 +1057,31 @@ func (s *service) ProbeController(ctx context.Context,
 // WithRP appends Replication Prefix to provided string
 func (s *service) WithRP(key string) string {
 	return s.opts.replicationPrefix + "/" + key
+}
+
+func (s *service) validateIsiPath(ctx context.Context, volName string) (string, error) {
+	if s.k8sclient == nil {
+		return "", errors.New("no k8s clientset")
+	}
+
+	pvc, err := s.k8sclient.CoreV1().PersistentVolumes().Get(ctx, volName, v1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("unable to get PersistentVolume: %w", err)
+	}
+
+	if pvc.Spec.StorageClassName == "" {
+		return "", nil
+	}
+
+	sc, err := s.k8sclient.StorageV1().StorageClasses().Get(ctx, pvc.Spec.StorageClassName, v1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("unable to get StorageClass: %w", err)
+	}
+
+	isiPath, ok := sc.Parameters[IsiPathParam]
+	if !ok || isiPath == "" {
+		return "", nil
+	}
+
+	return isiPath, nil
 }
