@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2023 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -16,7 +16,9 @@ package service
  limitations under the License.
 */
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 	"time"
@@ -177,21 +179,27 @@ func unpublishVolume(
 // mkdir creates the directory specified by path if needed.
 // return pair is a bool flag of whether dir was created, and an error
 func mkdir(ctx context.Context, path string) (bool, error) {
-	// Fetch log handler
+	_, log := GetLogger(ctx)
 	st, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		if err := os.Mkdir(path, 0o750); err != nil {
-			logrus.WithField("dir", path).WithError(
-				err).Error("Unable to create dir")
-			return false, err
+	if err == nil {
+		if !st.IsDir() {
+			return false, fmt.Errorf("existing path is not a directory")
 		}
-		logrus.WithField("path", path).Debug("created directory")
-		return true, nil
+		return false, nil
 	}
-	if !st.IsDir() {
-		return false, fmt.Errorf("existing path is not a directory")
+	if !errors.Is(err, fs.ErrNotExist) {
+		log.WithField("dir", path).WithError(err).Error("Unable to stat dir")
+		return false, err
 	}
-	return false, nil
+
+	// Case when there is error and the error is fs.ErrNotExists.
+	if err := os.MkdirAll(path, 0o750); err != nil {
+		log.WithField("dir", path).WithError(err).Error("Unable to create dir")
+		return false, err
+	}
+
+	log.WithField("path", path).Debug("created directory")
+	return true, nil
 }
 
 func contains(list []string, item string) bool {
