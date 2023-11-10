@@ -8,10 +8,11 @@ docker-build-image-push:
 	@echo "Pushing: $(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
 	docker push "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
 
-podman-build:
-	@echo "Base Image is set to: $(BASEIMAGE)"
-	@echo "Adding Driver dependencies to $(BASEIMAGE)"
-	bash ./buildubimicro.sh $(BASEIMAGE)
+podman-build: download-csm-common
+	$(eval include csm-common.mk)
+	@echo "Base Image is set to: $(DEFAULT_BASEIMAGE)"
+	@echo "Adding Driver dependencies to $(DEFAULT_BASEIMAGE)"
+	bash ./buildubimicro.sh $(DEFAULT_BASEIMAGE)
 	@echo "Base image build: SUCCESS" $(eval BASEIMAGE=localhost/csipowerscale-ubimicro:latest)
 	@echo "Building: $(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
 	$(BUILDER) build -t "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)" -f Dockerfile.podman --target $(BUILDSTAGE) --build-arg GOPROXY=$(GOPROXY) --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOVERSION=$(GOVERSION) .
@@ -23,3 +24,6 @@ podman-build-image-push:
 version:
 	@echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) BUILD ${BUILD} TYPE ${TYPE} RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
 	@echo "Target Version: $(VERSION)"
+
+download-csm-common:
+	curl -O -L https://raw.githubusercontent.com/dell/csm/main/config/csm-common.mk
