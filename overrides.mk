@@ -15,8 +15,6 @@
 #
 
 # DEFAULT values
-# ubi9/ubi-micro:9.2-13
-DEFAULT_BASEIMAGE="registry.access.redhat.com/ubi9/ubi-micro@sha256:630cf7bdef807f048cadfe7180d6c27eb3aaa99323ffc3628811da230ed3322a"
 DEFAULT_GOVERSION="1.21"
 DEFAULT_REGISTRY=""
 DEFAULT_IMAGENAME="isilon"
@@ -26,11 +24,6 @@ BUILD_TIMESTAMP := $(shell date +%Y%m%d%H%M%S)
 endif
 DEFAULT_IMAGETAG=$(BUILD_TIMESTAMP)
 DEFAULT_GOPROXY=""
-
-# set the BASEIMAGE if needed
-ifeq ($(BASEIMAGE),)
-export BASEIMAGE="$(DEFAULT_BASEIMAGE)"
-endif
 
 # set the GOVERSION if needed
 ifeq ($(GOVERSION),)
@@ -76,8 +69,6 @@ overrides-help:
 	@echo
 	@echo "GOVERSION  - The version of Go to build with, default is: $(DEFAULT_GOVERSION)"
 	@echo "             Current setting is: $(GOVERSION)"
-	@echo "BASEIMAGE  - The base container image to build from, default is: $(DEFAULT_BASEIMAGE)"
-	@echo "             Current setting is: $(BASEIMAGE)"
 	@echo "REGISTRY   - The registry to push images to, default is: $(DEFAULT_REGISTRY)"
 	@echo "             Current setting is: $(REGISTRY)"
 	@echo "IMAGENAME  - The image name to be built, defaut is: $(DEFAULT_IMAGENAME)"
