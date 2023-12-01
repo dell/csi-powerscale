@@ -48,7 +48,7 @@ echo === Finished
 
 echo === Linting...
 (command -v golint >/dev/null 2>&1 \
-    || GO111MODULE=off GOINSECURE=golang.org go get -u golang.org/x/lint/golint) \
+    || go install golang.org/x/lint/golint@latest) \
     && golint --set_exit_status ./service/... ./common/...
 LINT_RETURN_CODE=$?
 echo === Finished
