@@ -8,14 +8,14 @@ require (
 	github.com/akutz/gournal v0.5.0
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/cucumber/godog v0.10.0
-	github.com/dell/csi-metadata-retriever v1.5.0
-	github.com/dell/dell-csi-extensions/common v1.2.0
-	github.com/dell/dell-csi-extensions/podmon v1.2.0
-	github.com/dell/dell-csi-extensions/replication v1.5.0
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.3.0
-	github.com/dell/gocsi v1.8.0
-	github.com/dell/gofsutil v1.13.1
-	github.com/dell/goisilon v1.13.0
+	github.com/dell/csi-metadata-retriever v1.6.0
+	github.com/dell/dell-csi-extensions/common v1.3.0
+	github.com/dell/dell-csi-extensions/podmon v1.3.0
+	github.com/dell/dell-csi-extensions/replication v1.6.0
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.4.0
+	github.com/dell/gocsi v1.9.0
+	github.com/dell/gofsutil v1.14.0
+	github.com/dell/goisilon v1.14.0
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/golang/protobuf v1.5.3
 	github.com/google/uuid v1.3.1
