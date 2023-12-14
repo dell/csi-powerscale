@@ -2,7 +2,7 @@
 
 ## Description
 
-The `csi-offline-bundle.sh` script can be used to create a package usable for offline installation of the Dell EMC CSI Storage Providers, via Helm. 
+The `csi-offline-bundle.sh` script can be used to create a package for offline installation of Dell CSI storage providers for deployment via Helm.
 
 This includes the following drivers:
 * [PowerFlex](https://github.com/dell/csi-vxflexos)
@@ -11,7 +11,7 @@ This includes the following drivers:
 * [PowerStore](https://github.com/dell/csi-powerstore)
 * [Unity](https://github.com/dell/csi-unity)
 
-the `csm-offline-bundle.sh` script can be used to create a package usable for offline installation of the Dell EMC CSI Storage Providers, via the CSM Operator.
+The `csm-offline-bundle.sh` script can be used to create a package for offline installation of Dell CSI storage providers for deployment via the CSM Operator.
 * [Dell CSM Operator](https://github.com/dell/csm-operator)
 
 ## Dependencies
@@ -45,7 +45,7 @@ To perform an offline installation of a driver or the Operator, the following st
 This needs to be performed on a linux system with access to the internet as a git repo will need to be cloned, and container images pulled from public registries.
 
 The build an offline bundle, the following steps are needed:
-1. Perform a `git clone` of the desired repository. For a helm based install, the specific driver repo should be cloned. For an Operator based deployment, the Dell CSM Operator repo should be cloned
+1. Perform a `git clone` of the desired repository. For a Helm based install, the specific driver repo should be cloned. For an Operator based deployment, the Dell CSM Operator repo should be cloned
 2. Run the offline bundle script with an argument of `-c` in order to create an offline bundle
   - For Helm installs, the `csi-offline-bundle.sh` script will be found in the `dell-csi-helm-installer` directory
   - For Operator installs, the `csm-offline-bundle.sh` script will be found in the `scripts` directory

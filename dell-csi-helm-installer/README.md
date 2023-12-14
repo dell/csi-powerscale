@@ -19,7 +19,7 @@ Installing any of the Dell EMC CSI Drivers requires a few utilities to be instal
 | Dependency    | Usage  |
 | ------------- | ----- |
 | `kubectl`     | Kubectl is used to validate that the Kubernetes system meets the requirements of the driver. |
-| `helm`        | Helm v3 is used as the deployment tool for Charts. See, [Install HELM 3](https://helm.sh/docs/intro/install/) for instructions to install HELM 3. |
+| `helm`        | Helm v3 is used as the deployment tool for Charts. See, [Install Helm 3](https://helm.sh/docs/intro/install/) for instructions to install Helm 3. |
 | `sshpass`     | sshpass is used to check certain pre-requisities in worker nodes (in chosen drivers). |
 
 
