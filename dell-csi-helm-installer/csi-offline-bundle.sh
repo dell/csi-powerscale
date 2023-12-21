@@ -315,7 +315,7 @@ if [ "${MODE}" == "helm" ]; then
     "${REPODIR}/LICENSE"
   )
 else
-  DRIVERNAME="dell-csi-operator"
+  DRIVERNAME="dell-csm-operator"
   DISTBASE="${REPODIR}"
   DRIVERDIR="${DRIVERNAME}-bundle"
   DISTDIR="${DISTBASE}/${DRIVERDIR}"
