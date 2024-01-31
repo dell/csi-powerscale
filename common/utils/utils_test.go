@@ -81,6 +81,45 @@ func TestParseNormalizedVolumeID(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
+func TestParseNormalizedSnapshotID(t *testing.T) {
+	ctx := context.Background()
+
+	// snapID with id only
+	snapID, clusterName, accessZone, err := ParseNormalizedSnapshotID(ctx, "12345")
+	assert.Equal(t, "12345", snapID)
+	assert.Equal(t, "", clusterName)
+	assert.Equal(t, "", accessZone)
+	assert.Nil(t, err)
+
+	// snapID with id and cluster
+	snapID, clusterName, accessZone, err = ParseNormalizedSnapshotID(ctx, "12345=_=_=cluster1")
+	assert.Equal(t, "12345", snapID)
+	assert.Equal(t, "cluster1", clusterName)
+	assert.Equal(t, "", accessZone)
+	assert.Nil(t, err)
+
+	// snapID with id, cluster and zone
+	snapID, clusterName, accessZone, err = ParseNormalizedSnapshotID(ctx, "12345=_=_=cluster1=_=_=zone1")
+	assert.Equal(t, "12345", snapID)
+	assert.Equal(t, "cluster1", clusterName)
+	assert.Equal(t, "zone1", accessZone)
+	assert.Nil(t, err)
+
+	// snapID with id, cluster, zone and additional suffix
+	snapID, clusterName, accessZone, err = ParseNormalizedSnapshotID(ctx, "12345=_=_=cluster1=_=_=zone1=_=_=suffix")
+	assert.Equal(t, "12345", snapID)
+	assert.Equal(t, "cluster1", clusterName)
+	assert.Equal(t, "zone1", accessZone)
+	assert.Nil(t, err)
+
+	// empty snapID
+	snapID, clusterName, accessZone, err = ParseNormalizedSnapshotID(ctx, "")
+	assert.Equal(t, "", snapID)
+	assert.Equal(t, "", clusterName)
+	assert.Equal(t, "", accessZone)
+	assert.NotNil(t, err)
+}
+
 func TestGetPathForVolume(t *testing.T) {
 	isiPath := "/ifs/data"
 	volName := "k8s-123456"
