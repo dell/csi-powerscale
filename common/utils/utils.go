@@ -393,8 +393,8 @@ func ParseNormalizedSnapshotID(ctx context.Context, snapID string) (string, stri
 		accessZone = ""
 	}
 
-	log.Debugf("normalized snapshot ID '%s' parsed into snapshot ID '%s' and cluster name '%s'",
-		snapID, snapshotID, clusterName)
+	log.Debugf("normalized snapshot ID '%s' parsed into snapshot ID '%s', cluster name '%s' and access zone '%s'",
+		snapID, snapshotID, clusterName, accessZone)
 
 	return snapshotID, clusterName, accessZone, nil
 }
