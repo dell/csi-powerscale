@@ -380,7 +380,7 @@ func ParseNormalizedSnapshotID(ctx context.Context, snapID string) (string, stri
 	log := GetRunIDLogger(ctx)
 	tokens := strings.Split(snapID, SnapshotIDSeparator)
 	if len(tokens) < 1 || snapID == "" {
-		return "", "", "", fmt.Errorf("snapshot ID '%s' cannot be split into tokens", snapID)
+		return "", "", "", fmt.Errorf("snapshot ID cannot be split into tokens")
 	}
 
 	snapshotID := tokens[0]

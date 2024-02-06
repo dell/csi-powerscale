@@ -18,6 +18,7 @@ limitations under the License.
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -83,41 +84,56 @@ func TestParseNormalizedVolumeID(t *testing.T) {
 
 func TestParseNormalizedSnapshotID(t *testing.T) {
 	ctx := context.Background()
-
-	// snapID with id only
-	snapID, clusterName, accessZone, err := ParseNormalizedSnapshotID(ctx, "12345")
-	assert.Equal(t, "12345", snapID)
-	assert.Equal(t, "", clusterName)
-	assert.Equal(t, "", accessZone)
-	assert.Nil(t, err)
-
-	// snapID with id and cluster
-	snapID, clusterName, accessZone, err = ParseNormalizedSnapshotID(ctx, "12345=_=_=cluster1")
-	assert.Equal(t, "12345", snapID)
-	assert.Equal(t, "cluster1", clusterName)
-	assert.Equal(t, "", accessZone)
-	assert.Nil(t, err)
-
-	// snapID with id, cluster and zone
-	snapID, clusterName, accessZone, err = ParseNormalizedSnapshotID(ctx, "12345=_=_=cluster1=_=_=zone1")
-	assert.Equal(t, "12345", snapID)
-	assert.Equal(t, "cluster1", clusterName)
-	assert.Equal(t, "zone1", accessZone)
-	assert.Nil(t, err)
-
-	// snapID with id, cluster, zone and additional suffix
-	snapID, clusterName, accessZone, err = ParseNormalizedSnapshotID(ctx, "12345=_=_=cluster1=_=_=zone1=_=_=suffix")
-	assert.Equal(t, "12345", snapID)
-	assert.Equal(t, "cluster1", clusterName)
-	assert.Equal(t, "zone1", accessZone)
-	assert.Nil(t, err)
-
-	// empty snapID
-	snapID, clusterName, accessZone, err = ParseNormalizedSnapshotID(ctx, "")
-	assert.Equal(t, "", snapID)
-	assert.Equal(t, "", clusterName)
-	assert.Equal(t, "", accessZone)
-	assert.NotNil(t, err)
+	testCases := []struct {
+		input           string
+		expectedSnapID  string
+		expectedCluster string
+		expectedZone    string
+		expectedErr     error
+	}{
+		{
+			input:           "12345",
+			expectedSnapID:  "12345",
+			expectedCluster: "",
+			expectedZone:    "",
+			expectedErr:     nil,
+		},
+		{
+			input:           "12345=_=_=cluster1",
+			expectedSnapID:  "12345",
+			expectedCluster: "cluster1",
+			expectedZone:    "",
+			expectedErr:     nil,
+		},
+		{
+			input:           "12345=_=_=cluster1=_=_=zone1",
+			expectedSnapID:  "12345",
+			expectedCluster: "cluster1",
+			expectedZone:    "zone1",
+			expectedErr:     nil,
+		},
+		{
+			input:           "12345=_=_=cluster1=_=_=zone1=_=_=suffix",
+			expectedSnapID:  "12345",
+			expectedCluster: "cluster1",
+			expectedZone:    "zone1",
+			expectedErr:     nil,
+		},
+		{
+			input:           "",
+			expectedSnapID:  "",
+			expectedCluster: "",
+			expectedZone:    "",
+			expectedErr:     errors.New("snapshot ID cannot be split into tokens"),
+		},
+	}
+	for _, tc := range testCases {
+		snapID, clusterName, accessZone, err := ParseNormalizedSnapshotID(ctx, tc.input)
+		assert.Equal(t, tc.expectedSnapID, snapID)
+		assert.Equal(t, tc.expectedCluster, clusterName)
+		assert.Equal(t, tc.expectedZone, accessZone)
+		assert.Equal(t, tc.expectedErr, err)
+	}
 }
 
 func TestGetPathForVolume(t *testing.T) {
