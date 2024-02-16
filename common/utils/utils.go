@@ -379,19 +379,22 @@ func GetNormalizedSnapshotID(ctx context.Context, snapshotID, clusterName, acces
 func ParseNormalizedSnapshotID(ctx context.Context, snapID string) (string, string, string, error) {
 	log := GetRunIDLogger(ctx)
 	tokens := strings.Split(snapID, SnapshotIDSeparator)
-	if len(tokens) < 1 {
-		return "", "", "", fmt.Errorf("snapshot ID '%s' cannot be split into tokens", snapID)
+	if len(tokens) < 1 || snapID == "" {
+		return "", "", "", fmt.Errorf("snapshot ID cannot be split into tokens")
 	}
 
 	snapshotID := tokens[0]
 	var clusterName, accessZone string
-	if len(tokens) > 1 {
+	if len(tokens) > 2 {
 		clusterName = tokens[1]
 		accessZone = tokens[2]
+	} else if len(tokens) > 1 {
+		clusterName = tokens[1]
+		accessZone = ""
 	}
 
-	log.Debugf("normalized snapshot ID '%s' parsed into snapshot ID '%s' and cluster name '%s'",
-		snapID, snapshotID, clusterName)
+	log.Debugf("normalized snapshot ID '%s' parsed into snapshot ID '%s', cluster name '%s' and access zone '%s'",
+		snapID, snapshotID, clusterName, accessZone)
 
 	return snapshotID, clusterName, accessZone, nil
 }
