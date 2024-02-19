@@ -41,9 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: "1.21"
+        uses: actions/setup-go@v5
       - name: Checkout the code
         uses: actions/checkout@v4
       - name: Vendor packages
@@ -52,4 +50,4 @@ jobs:
       - name: Test
         env:
           GOPROXY: "https://proxy.golang.org"
-        run: cd service; go clean -cache; go test -v .
+        run: cd service; go clean -cache; go test -v ./...
