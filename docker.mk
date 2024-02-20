@@ -15,7 +15,8 @@ podman-build: download-csm-common
 	bash ./buildubimicro.sh $(DEFAULT_BASEIMAGE)
 	@echo "Base image build: SUCCESS" $(eval BASEIMAGE=localhost/csipowerscale-ubimicro:latest)
 	@echo "Building: $(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
-	$(BUILDER) build -t "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)" -f Dockerfile.podman --target $(BUILDSTAGE) --build-arg GOPROXY=$(GOPROXY) --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOVERSION=$(GOVERSION) .
+	@echo "Using Golang Image $(DEFAULT_GOIMAGE)"
+	$(BUILDER) build -t "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)" -f Dockerfile.podman --target $(BUILDSTAGE) --build-arg GOPROXY=$(GOPROXY) --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) .
 
 podman-build-image-push:
 	@echo "Pushing: $(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
