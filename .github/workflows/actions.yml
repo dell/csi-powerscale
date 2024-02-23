@@ -22,7 +22,7 @@ jobs:
       - name: Checkout the code
         uses: actions/checkout@v4
       - name: Run gosec to check for security vulnerabilities
-        uses: dell/common-github-actions/gosec-runner@downgoversion
+        uses: dell/common-github-actions/gosec-runner@main
         with:
           directories: "./..."
   malware_security_scan:
