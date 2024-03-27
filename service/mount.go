@@ -37,6 +37,7 @@ func publishVolume(
 	ctx context.Context,
 	req *csi.NodePublishVolumeRequest,
 	nfsExportURL string,
+	clientIP string,
 ) error {
 	// Fetch log handler
 	ctx, log := GetLogger(ctx)
@@ -79,6 +80,8 @@ func publishVolume(
 	}
 
 	mntOptions = append(mntOptions, rwOption)
+
+	mntOptions = append(mntOptions, fmt.Sprintf("clientaddr=%s", clientIP))
 
 	f := logrus.Fields{
 		"ID":         req.VolumeId,

@@ -23,22 +23,22 @@ import (
 	"github.com/dell/csi-isilon/v2/common/utils"
 )
 
-// GetNFSClientIP is used to fetch IP address from networks on which NFS traffic is allowed
-func GetNFSClientIP(allowedNetworks []string) (string, error) {
-	var nodeIP string
+// GetNFSClientIPCandidates lists up the possible IP addresses from networks on which NFS traffic is allowed
+func GetNFSClientIPCandidates(allowedNetworks []string) (map[string][]*net.TCPAddr, error) {
 	log := utils.GetLogger()
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		log.Errorf("Encountered error while fetching system IP addresses: %+v\n", err.Error())
-		return "", err
+		return nil, err
 	}
 
 	// Populate map to optimize the algorithm for O(n)
-	networks := make(map[string]bool)
+	networks := make(map[string][]*net.TCPAddr)
 	for _, cnet := range allowedNetworks {
-		networks[cnet] = false
+		networks[cnet] = make([]*net.TCPAddr, 0, len(addrs))
 	}
 
+	found := false
 	for _, a := range addrs {
 		switch v := a.(type) {
 		case *net.IPNet:
@@ -50,19 +50,20 @@ func GetNFSClientIP(allowedNetworks []string) (string, error) {
 					continue
 				}
 
-				if _, ok := networks[cnet.String()]; ok {
+				cnetStr := cnet.String()
+				if network, ok := networks[cnetStr]; ok {
 					log.Infof("Found IP address: %s", ip)
-					nodeIP = ip.String()
-					return nodeIP, nil
+					networks[cnetStr] = append(network, &net.TCPAddr{IP: ip})
+					found = true
 				}
 			}
 		}
 	}
 
 	// If a valid IP address matching allowedNetworks is not found return error
-	if nodeIP == "" {
-		return "", fmt.Errorf("no valid IP address found matching against allowedNetworks %v", allowedNetworks)
+	if !found {
+		return nil, fmt.Errorf("no valid IP address found matching against allowedNetworks %v", allowedNetworks)
 	}
 
-	return nodeIP, nil
+	return networks, nil
 }

@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Showmax/go-fqdn"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -89,6 +90,18 @@ func ParseInt64FromContext(ctx context.Context, key string) (int64, error) {
 			return 0, fmt.Errorf("invalid int64 value '%v' specified for '%s'", val, key)
 		}
 		return i, nil
+	}
+	return 0, nil
+}
+
+// ParseDurationFromContext parses an environment variable into an time.Duration value.
+func ParseDurationFromContext(ctx context.Context, key string) (time.Duration, error) {
+	if val, ok := csictx.LookupEnv(ctx, key); ok {
+		d, err := time.ParseDuration(val)
+		if err != nil {
+			return 0, fmt.Errorf("invalid duration value '%v' specified for '%s'", val, key)
+		}
+		return d, nil
 	}
 	return 0, nil
 }

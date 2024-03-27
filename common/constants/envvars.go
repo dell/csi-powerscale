@@ -105,4 +105,7 @@ const (
 
 	// EnvMetadataRetrieverEndpoint specifies the endpoint address for csi-metadata-retriever sidecar
 	EnvMetadataRetrieverEndpoint = "CSI_RETRIEVER_ENDPOINT"
+
+	// EnvConnectivityTestTimeout specifies the timeout value for connectivity test against the clusters
+	EnvConnectivityTestTimeout = "X_CSI_CONNECTIVITY_TEST_TIMEOUT"
 )
