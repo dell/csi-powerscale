@@ -53,11 +53,11 @@ Both the Controller and the Node portions of the driver can only be run on nodes
 
 ## Driver Installation
 
-Please consult the [Installation Guide](https://dell.github.io/csm-docs/docs/csidriver/installation)
+Please consult the [Installation Guide](https://dell.github.io/csm-docs/docs/deployment/) to install the driver via various methods.
 
 ## Using driver
 
-Please refer to the section `Testing Drivers` in the [Documentation](https://dell.github.io/csm-docs/docs/csidriver/installation/test/) for more info.
+Please refer to the section `Testing Drivers` in the [Documentation](https://dell.github.io/csm-docs/docs/csidriver/test/) for more info.
 
 ## Documentation
 
