@@ -43,8 +43,8 @@ func (s *service) NodeExpandVolume(
 }
 
 func (s *service) NodeStageVolume(
-	ctx context.Context,
-	req *csi.NodeStageVolumeRequest) (
+	_ context.Context,
+	_ *csi.NodeStageVolumeRequest) (
 	*csi.NodeStageVolumeResponse, error,
 ) {
 	// TODO - Need to have logic for staging path of export
@@ -54,8 +54,8 @@ func (s *service) NodeStageVolume(
 }
 
 func (s *service) NodeUnstageVolume(
-	ctx context.Context,
-	req *csi.NodeUnstageVolumeRequest) (
+	_ context.Context,
+	_ *csi.NodeUnstageVolumeRequest) (
 	*csi.NodeUnstageVolumeResponse, error,
 ) {
 	// TODO - Need to have logic for staging path of export
@@ -281,8 +281,8 @@ func (s *service) nodeProbe(ctx context.Context, isiConfig *IsilonClusterConfig)
 }
 
 func (s *service) NodeGetCapabilities(
-	ctx context.Context,
-	req *csi.NodeGetCapabilitiesRequest) (
+	_ context.Context,
+	_ *csi.NodeGetCapabilitiesRequest) (
 	*csi.NodeGetCapabilitiesResponse, error,
 ) {
 	capabilities := []*csi.NodeServiceCapability{
@@ -337,7 +337,7 @@ func (s *service) NodeGetCapabilities(
 // NodeGetInfo RPC call returns NodeId and AccessibleTopology as part of NodeGetInfoResponse
 func (s *service) NodeGetInfo(
 	ctx context.Context,
-	req *csi.NodeGetInfoRequest) (
+	_ *csi.NodeGetInfoRequest) (
 	*csi.NodeGetInfoResponse, error,
 ) {
 	// Fetch log handler
@@ -612,7 +612,6 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 		Secrets:          req.Secrets,
 		VolumeContext:    createEphemeralVolResp.Volume.VolumeContext,
 	})
-
 	if err != nil {
 		log.Error("Need to rollback because NodePublish ephemeral volume failed with error :" + err.Error())
 		if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
@@ -655,12 +654,11 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 	}()
 	_, err2 := f.WriteString(createEphemeralVolResp.Volume.VolumeId)
 	if err2 != nil {
-		log.Error("Writing to id file in target path for ephemeral vol failed with error :" + err.Error())
+		log.Error("Writing to id file in target path for ephemeral vol failed with error :" + err2.Error())
 		if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
-			log.Error("Rollback failed with error :" + err.Error())
-			return nil, err
+			log.Error("Rollback failed with error :" + rollbackError.Error())
 		}
-		return nil, err
+		return nil, err2
 	}
 	log.Infof("Ephemeral Node Publish was successful...")
 
