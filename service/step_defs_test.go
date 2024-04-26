@@ -2672,7 +2672,7 @@ func (f *feature) aValidCreateRemoteVolumeResponseIsReturned() error {
 	return nil
 }
 
-func getDeleteLocalVolumeRequest(s *service) *csiext.DeleteLocalVolumeRequest {
+func getDeleteLocalVolumeRequest(_ *service) *csiext.DeleteLocalVolumeRequest {
 	req := new(csiext.DeleteLocalVolumeRequest)
 	req.VolumeHandle = "volume1=_=_=19=_=_=System=_=_=cluster1"
 	return req
@@ -2688,7 +2688,7 @@ func (f *feature) iCallDeleteLocalVolume() error {
 	return nil
 }
 
-func getDeleteLocalVolumeRequestWithParams(s *service, volhandle string) *csiext.DeleteLocalVolumeRequest {
+func getDeleteLocalVolumeRequestWithParams(_ *service, volhandle string) *csiext.DeleteLocalVolumeRequest {
 	req := new(csiext.DeleteLocalVolumeRequest)
 	req.VolumeHandle = volhandle
 	return req
@@ -2723,7 +2723,7 @@ func (f *feature) iCallCreateStorageProtectionGroup() error {
 	return nil
 }
 
-func getCreateStorageProtectionGroupRequestWithParams(s *service, volhand string, keyreplremsys string) *csiext.CreateStorageProtectionGroupRequest {
+func getCreateStorageProtectionGroupRequestWithParams(_ *service, volhand string, keyreplremsys string) *csiext.CreateStorageProtectionGroupRequest {
 	req := new(csiext.CreateStorageProtectionGroupRequest)
 	req.VolumeHandle = volhand
 	parameters := make(map[string]string)
@@ -3388,7 +3388,7 @@ func (f *feature) iCallDynamicLogChange(file string) error {
 	return nil
 }
 
-func (f *feature) aValidDynamicLogChangeOccurs(file, expectedLevel string) error {
+func (f *feature) aValidDynamicLogChangeOccurs(_, expectedLevel string) error {
 	log.Printf("level after change: %s", utils.GetCurrentLogLevel())
 	if utils.GetCurrentLogLevel().String() != expectedLevel {
 		err := fmt.Errorf("level was expected to be %s, but was %s instead", expectedLevel, utils.GetCurrentLogLevel().String())

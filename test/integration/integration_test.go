@@ -120,7 +120,7 @@ func removeNodeLabels(host string) (result bool) {
 		fmt.Printf("Label is: %s:%s\n", lkey, lval)
 		if strings.HasPrefix(lkey, constants.PluginName+"/") && lval == constants.PluginName {
 			fmt.Printf("Topology label %s:%s available on node", lkey, lval)
-			cmd := exec.Command("/bin/bash", "-c", "kubectl label nodes "+host+" "+lkey+"-")
+			cmd := exec.Command("/bin/bash", "-c", "kubectl label nodes "+host+" "+lkey+"-") // #nosec G204
 			err := cmd.Run()
 			if err != nil {
 				fmt.Printf("Error encountered while removing label from node %s: %s", host, err)
@@ -132,7 +132,7 @@ func removeNodeLabels(host string) (result bool) {
 }
 
 func applyNodeLabel(host, endpoint string) (result bool) {
-	cmd := exec.Command("kubectl", "label", "nodes", host, "csi-isilon.dellemc.com/"+endpoint+"=csi-isilon.dellemc.com")
+	cmd := exec.Command("kubectl", "label", "nodes", host, "csi-isilon.dellemc.com/"+endpoint+"=csi-isilon.dellemc.com") // #nosec G204
 
 	err := cmd.Run()
 	if err != nil {

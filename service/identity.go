@@ -30,8 +30,8 @@ import (
 )
 
 func (s *service) GetPluginInfo(
-	ctx context.Context,
-	req *csi.GetPluginInfoRequest) (
+	_ context.Context,
+	_ *csi.GetPluginInfoRequest) (
 	*csi.GetPluginInfoResponse, error,
 ) {
 	return &csi.GetPluginInfoResponse{
@@ -42,8 +42,8 @@ func (s *service) GetPluginInfo(
 }
 
 func (s *service) GetPluginCapabilities(
-	ctx context.Context,
-	req *csi.GetPluginCapabilitiesRequest) (
+	_ context.Context,
+	_ *csi.GetPluginCapabilitiesRequest) (
 	*csi.GetPluginCapabilitiesResponse, error,
 ) {
 	var rep csi.GetPluginCapabilitiesResponse
@@ -77,7 +77,7 @@ func (s *service) GetPluginCapabilities(
 
 func (s *service) Probe(
 	ctx context.Context,
-	req *csi.ProbeRequest) (
+	_ *csi.ProbeRequest) (
 	*csi.ProbeResponse, error,
 ) {
 	ctx, log := GetLogger(ctx)
@@ -99,7 +99,7 @@ func (s *service) Probe(
 	return rep, nil
 }
 
-func (s *service) GetReplicationCapabilities(ctx context.Context, req *csiext.GetReplicationCapabilityRequest) (*csiext.GetReplicationCapabilityResponse, error) {
+func (s *service) GetReplicationCapabilities(_ context.Context, _ *csiext.GetReplicationCapabilityRequest) (*csiext.GetReplicationCapabilityResponse, error) {
 	rep := new(csiext.GetReplicationCapabilityResponse)
 	if !strings.EqualFold(s.mode, "node") {
 		rep.Capabilities = []*csiext.ReplicationCapability{

@@ -700,7 +700,7 @@ func failover(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIs
 	return nil
 }
 
-func failoverUnplanned(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
+func failoverUnplanned(ctx context.Context, localIsiConfig *IsilonClusterConfig, _ *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
 	log.Info("Running unplanned failover action")
 	// With unplanned failover -- do minimum requests, we will ensure mirrored policy is created in further reprotect call
 	// We can't use remote config (source site) because we need to assume it's down
@@ -901,7 +901,7 @@ func failbackDiscardRemote(ctx context.Context, localIsiConfig *IsilonClusterCon
 	return nil
 }
 
-func synchronize(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
+func synchronize(ctx context.Context, localIsiConfig *IsilonClusterConfig, _ *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
 	log.Info("Running sync action")
 	// get all running
 	// if running - wait for it and succeed
@@ -916,7 +916,7 @@ func synchronize(ctx context.Context, localIsiConfig *IsilonClusterConfig, remot
 	return nil
 }
 
-func suspend(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
+func suspend(ctx context.Context, localIsiConfig *IsilonClusterConfig, _ *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
 	log.Info("Running suspend action")
 
 	ppName := strings.ReplaceAll(vgName, ".", "-")
@@ -936,7 +936,7 @@ func suspend(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsi
 	return nil
 }
 
-func resume(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
+func resume(ctx context.Context, localIsiConfig *IsilonClusterConfig, _ *IsilonClusterConfig, vgName string, log *logrus.Entry) error {
 	log.Info("Running resume action")
 
 	ppName := strings.ReplaceAll(vgName, ".", "-")

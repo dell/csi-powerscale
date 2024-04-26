@@ -41,7 +41,7 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 	systemIDs := make(map[string]bool)
 	systemID := req.GetArrayId()
 	if systemID == "" {
-		foundOne := s.getArrayIdsFromVolumes(ctx, systemIDs, req.GetVolumeIds())
+		foundOne := s.getArrayIDsFromVolumes(ctx, systemIDs, req.GetVolumeIds())
 		if !foundOne {
 			systemID = s.defaultIsiClusterName
 			systemIDs[systemID] = true
@@ -89,12 +89,12 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 	return rep, nil
 }
 
-func (s *service) getArrayIdsFromVolumes(ctx context.Context, systemIDs map[string]bool, requestVolumeIds []string) bool {
+func (s *service) getArrayIDsFromVolumes(ctx context.Context, systemIDs map[string]bool, requestVolumeIDs []string) bool {
 	ctx, log, _ := GetRunIDLog(ctx)
 	var err error
 	var systemID string
 	var foundAtLeastOne bool
-	for _, volumeID := range requestVolumeIds {
+	for _, volumeID := range requestVolumeIDs {
 		// Extract clusterName from the volume ID (if any volumes in the request)
 		if _, _, _, systemID, err = utils.ParseNormalizedVolumeID(ctx, volumeID); err != nil {
 			log.Warnf("Error getting Cluster Name for %s - %s", volumeID, err.Error())
