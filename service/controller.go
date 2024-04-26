@@ -647,11 +647,11 @@ func (s *service) CreateVolume(
 			}
 		} else {
 			// clear quota and delete volume since the export cannot be created
-			if error := isiConfig.isiSvc.ClearQuotaByID(ctx, quotaID); error != nil {
-				log.Infof("Clear Quota returned error '%s'", error)
+			if err := isiConfig.isiSvc.ClearQuotaByID(ctx, quotaID); err != nil {
+				log.Infof("Clear Quota returned error '%s'", err)
 			}
-			if error := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, req.GetName()); error != nil {
-				log.Infof("Delete volume in CreateVolume returned error '%s'", error)
+			if err := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, req.GetName()); err != nil {
+				log.Infof("Delete volume in CreateVolume returned error '%s'", err)
 			}
 			return nil, err
 		}
@@ -924,10 +924,6 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteVolume(
 	}
 	// Delete the snapshot tracking directory entry for this volume
 	isiPath, snapshotName, _ := isiConfig.isiSvc.GetSnapshotIsiPathComponents(exportPath, zone.Path)
-
-	if err != nil {
-		return err
-	}
 	log.Debugf("snapshot name associated with volume '%s' is '%s'", volName, snapshotName)
 
 	// Populate names for snapshot's tracking dir, snapshot tracking dir entry for this volume
@@ -1283,8 +1279,8 @@ func (s *service) ValidateVolumeCapabilities(
 	return resp, nil
 }
 
-func (s *service) ListVolumes(ctx context.Context,
-	req *csi.ListVolumesRequest,
+func (s *service) ListVolumes(_ context.Context,
+	_ *csi.ListVolumesRequest,
 ) (*csi.ListVolumesResponse, error) {
 	// TODO The below implementation(commented code) doesn't work for multi-cluster.
 	// Add multi-cluster support by considering both MaxEntries and StartingToken(if specified) attributes.
@@ -1468,8 +1464,8 @@ func (s *service) GetCapacity(
 }
 
 func (s *service) ControllerGetCapabilities(
-	ctx context.Context,
-	req *csi.ControllerGetCapabilitiesRequest) (
+	_ context.Context,
+	_ *csi.ControllerGetCapabilitiesRequest) (
 	*csi.ControllerGetCapabilitiesResponse, error,
 ) {
 	capabilities := []*csi.ControllerServiceCapability{
@@ -1775,15 +1771,13 @@ func (s *service) DeleteSnapshot(
 				return &csi.DeleteSnapshotResponse{}, nil
 			}
 			// Internal server error if the error is not about "not found"
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "cannot check the existence of the snapshot: '%s'", err.Error()))
-			}
-		} else {
-			if jsonError.StatusCode == 404 {
-				return &csi.DeleteSnapshotResponse{}, nil
-			}
 			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "cannot check the existence of the snapshot: '%s'", err.Error()))
 		}
+
+		if jsonError.StatusCode == 404 {
+			return &csi.DeleteSnapshotResponse{}, nil
+		}
+		return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "cannot check the existence of the snapshot: '%s'", err.Error()))
 	}
 
 	// Get snapshot path
@@ -1876,7 +1870,7 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteSnapshot(
 // Validate volume capabilities
 func validateVolumeCaps(
 	vcs []*csi.VolumeCapability,
-	vol isi.Volume,
+	_ isi.Volume,
 ) (bool, string) {
 	var (
 		supported = true
@@ -2068,6 +2062,6 @@ func removeString(exportList []string, strToRemove string) []string {
 	return exportList
 }
 
-func (s *service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext.CreateVolumeGroupSnapshotRequest) (*vgsext.CreateVolumeGroupSnapshotResponse, error) {
+func (s *service) CreateVolumeGroupSnapshot(_ context.Context, _ *vgsext.CreateVolumeGroupSnapshotRequest) (*vgsext.CreateVolumeGroupSnapshotResponse, error) {
 	panic("implement me")
 }

@@ -503,7 +503,7 @@ func (s *service) logServiceStats() {
 }
 
 func (s *service) BeforeServe(
-	ctx context.Context, sp *gocsi.StoragePlugin, lis net.Listener,
+	ctx context.Context, _ *gocsi.StoragePlugin, _ net.Listener,
 ) error {
 	log := utils.GetLogger()
 
@@ -530,7 +530,7 @@ func (s *service) BeforeServe(
 
 	// Watch for changes to driver config params file
 	vc.WatchConfig()
-	vc.OnConfigChange(func(e fsnotify.Event) {
+	vc.OnConfigChange(func(_ fsnotify.Event) {
 		log.Infof("Driver config params file changed")
 		if err := s.updateDriverConfigParams(ctx, vc); err != nil {
 			log.Warn(err)
@@ -630,7 +630,7 @@ func (s *service) syncIsilonConfigs(ctx context.Context) error {
 		}
 
 		// Update the isiClusters sync.Map
-		s.isiClusters.Range(func(key interface{}, value interface{}) bool {
+		s.isiClusters.Range(func(key interface{}, _ interface{}) bool {
 			s.isiClusters.Delete(key)
 			return true
 		})
@@ -780,7 +780,7 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 	return newIsiClusters, defaultIsiClusterName, nil
 }
 
-func handler(key, value interface{}) bool {
+func handler(_, value interface{}) bool {
 	_, log := GetLogger(context.Background())
 	log.Debugf(value.(*IsilonClusterConfig).String())
 	return true
@@ -797,7 +797,7 @@ func (s *service) getIsilonClusterConfig(clusterName string) *IsilonClusterConfi
 // Returns details of all isilon clusters
 func (s *service) getIsilonClusters() []*IsilonClusterConfig {
 	list := make([]*IsilonClusterConfig, 0)
-	s.isiClusters.Range(func(key interface{}, value interface{}) bool {
+	s.isiClusters.Range(func(_ interface{}, value interface{}) bool {
 		list = append(list, value.(*IsilonClusterConfig))
 		return true
 	})
@@ -831,7 +831,7 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 }
 
 // GetCSINodeID gets the id of the CSI node which regards the node name as node id
-func (s *service) GetCSINodeID(ctx context.Context) (string, error) {
+func (s *service) GetCSINodeID(_ context.Context) (string, error) {
 	// if the node id has already been initialized, return it
 	if s.nodeID != "" {
 		return s.nodeID, nil
@@ -841,7 +841,7 @@ func (s *service) GetCSINodeID(ctx context.Context) (string, error) {
 }
 
 // GetCSINodeIP gets the IP of the CSI node
-func (s *service) GetCSINodeIP(ctx context.Context) (string, error) {
+func (s *service) GetCSINodeIP(_ context.Context) (string, error) {
 	// if the node ip has already been initialized, return it
 	if s.nodeIP != "" {
 		return s.nodeIP, nil
@@ -1028,7 +1028,7 @@ func (s *service) GetNodeLabels() (map[string]string, error) {
 }
 
 func (s *service) ProbeController(ctx context.Context,
-	req *commonext.ProbeControllerRequest) (
+	_ *commonext.ProbeControllerRequest) (
 	*commonext.ProbeControllerResponse, error,
 ) {
 	ctx, log := GetLogger(ctx)

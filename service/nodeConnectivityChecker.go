@@ -106,7 +106,7 @@ func (s *service) startAPIService(ctx context.Context) {
 }
 
 // apiRouter serves http requests
-func (s *service) apiRouter(ctx context.Context) {
+func (s *service) apiRouter(_ context.Context) {
 	log.Infof("starting http server on port %s", apiPort)
 	// create a new router
 	router := mux.NewRouter()
@@ -158,14 +158,14 @@ func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // nodeHealth states if node is up
-func nodeHealth(w http.ResponseWriter, r *http.Request) {
+func nodeHealth(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, "node is up and running \n")
 }
 
 // connectivityStatus Returns array connectivity status
-func connectivityStatus(w http.ResponseWriter, r *http.Request) {
+func connectivityStatus(w http.ResponseWriter, _ *http.Request) {
 	log.Infof("connectivityStatus called, urr status is %v \n", probeStatus)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
