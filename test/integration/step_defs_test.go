@@ -303,8 +303,8 @@ func (f *feature) thereIsNoDirectory(name string) error {
 	isiClient, err = createIsilonClient()
 	_, err = isiClient.GetVolumeWithIsiPath(ctx, f.isiPath, "", name)
 	if err == nil {
-		f.addError(fmt.Errorf("there should not be a directory '%s'\n", name))
-		panic(fmt.Sprintf("there should not be a directory '%s'\n", name))
+		f.addError(fmt.Errorf("there should not be a directory '%s'", name))
+		panic(fmt.Sprintf("there should not be a directory '%s'", name))
 	}
 	return nil
 }
@@ -491,7 +491,7 @@ func (f *feature) iCallControllerUnpublishVolume(nodeIDEnvVar string) error {
 	return nil
 }
 
-func (f *feature) controllerUnpublishVolume(id string, nodeIDEnvVar string) error {
+func (f *feature) controllerUnpublishVolume(id string, _ string) error {
 	req := new(csi.ControllerUnpublishVolumeRequest)
 	req.VolumeId = id
 	req.NodeId = os.Getenv("X_CSI_NODE_NAME")
@@ -591,21 +591,21 @@ func (f *feature) checkNodeExistsForOneExport(am *csi.VolumeCapability_AccessMod
 		if utils.IsStringInSlice(nodeIP, *export.Clients) && !utils.IsStringInSlice(nodeIP, *export.ReadWriteClients) && !utils.IsStringInSlice(nodeIP, *export.ReadOnlyClients) && !utils.IsStringInSlice(nodeIP, *export.RootClients) {
 			break
 		} else {
-			err := fmt.Errorf("the location of nodeIP '%s' is wrong\n", nodeIP)
+			err := fmt.Errorf("the location of nodeIP '%s' is wrong", nodeIP)
 			return err
 		}
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
 		if utils.IsStringInSlice(nodeIP, *export.ReadOnlyClients) && !utils.IsStringInSlice(nodeIP, *export.ReadWriteClients) && !utils.IsStringInSlice(nodeIP, *export.Clients) && !utils.IsStringInSlice(nodeIP, *export.RootClients) {
 			break
 		} else {
-			err := fmt.Errorf("the location of nodeIP '%s' is wrong\n", nodeIP)
+			err := fmt.Errorf("the location of nodeIP '%s' is wrong", nodeIP)
 			return err
 		}
 	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
 		if len(*export.Clients) == 2 && utils.IsStringInSlice(nodeIP, *export.Clients) && !utils.IsStringInSlice(nodeIP, *export.ReadWriteClients) && !utils.IsStringInSlice(nodeIP, *export.ReadOnlyClients) && !utils.IsStringInSlice(nodeIP, *export.RootClients) {
 			break
 		} else {
-			err := fmt.Errorf("the location of nodeIP '%s' is wrong\n", nodeIP)
+			err := fmt.Errorf("the location of nodeIP '%s' is wrong", nodeIP)
 			return err
 		}
 	default:
@@ -700,14 +700,14 @@ func (f *feature) checkIsilonClientNotExistsForOneExport(nodeIP string, exportID
 		isNodeIPInClientFields := utils.IsStringInSlices(clientIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 		isNodeFqdnInClientFields := utils.IsStringInSlices(fqdn, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 		if isNodeIPInClientFields || isNodeFqdnInClientFields {
-			err := fmt.Errorf("clientFQDN '%s' or clientIP '%s' still exists\n", fqdn, clientIP)
+			err := fmt.Errorf("clientFQDN '%s' or clientIP '%s' still exists", fqdn, clientIP)
 			fmt.Print(err)
 			return err
 		}
 	} else {
 		isNodeIPInClientFields := utils.IsStringInSlices(clientIP, *export.Clients, *export.ReadOnlyClients, *export.ReadWriteClients, *export.RootClients)
 		if isNodeIPInClientFields {
-			err := fmt.Errorf("clientIP '%s' still exists\n", clientIP)
+			err := fmt.Errorf("clientIP '%s' still exists", clientIP)
 			fmt.Print(err)
 			return err
 		}
@@ -719,7 +719,6 @@ func (f *feature) checkIsilonClientNotExists(node string) error {
 	nodeIP := os.Getenv(node)
 	fmt.Printf("nodeIP is: '%s'", nodeIP)
 	err = f.checkIsilonClientNotExistsForOneExport(nodeIP, f.exportID, f.accssZone)
-
 	if err != nil {
 		f.addError(err)
 		panic(fmt.Sprintf("check Isilon client not exists unsuccessfully\n"))
@@ -869,7 +868,7 @@ func (f *feature) verifyPublishedVolumeWithAccess(access, path string) error {
 	}
 	var cmd *exec.Cmd
 	dataDirName := getDataDirName(path)
-	cmd = exec.Command("/bin/sh", "-c", "mount | grep "+dataDirName)
+	cmd = exec.Command("/bin/sh", "-c", "mount | grep "+dataDirName) // #nosec G204
 	stdout, err := cmd.CombinedOutput()
 	if err != nil {
 		return err
@@ -878,7 +877,7 @@ func (f *feature) verifyPublishedVolumeWithAccess(access, path string) error {
 	if !strings.Contains(string(stdout), dataDirName) {
 		return errors.New("Mount failed")
 	}
-	cmd = exec.Command("/bin/sh", "-c", "cd "+dataDirName)
+	cmd = exec.Command("/bin/sh", "-c", "cd "+dataDirName) // #nosec G204
 	stdout, err = cmd.CombinedOutput()
 	if err != nil {
 		panic(fmt.Sprintf("verify published volume with access '%s' unsuccessfully\n", access))
@@ -886,29 +885,27 @@ func (f *feature) verifyPublishedVolumeWithAccess(access, path string) error {
 	if access == "single-writer" || access == "multi-writer" {
 		dir := dataDirName + "/test"
 		err := os.Mkdir(dir, 0o777)
-		// var err2 = os.Remove(dir)
 		if err == nil {
 			fmt.Printf("mounted successfully, could write it\n")
 			return nil
-		} else {
-			panic(fmt.Sprintf("although mounted successfully, could not write it, error is: '%s'\n", err.Error()))
 		}
+		panic(fmt.Sprintf("although mounted successfully, could not write it, error is: '%s'\n", err.Error()))
+
 	} else if access == "multi-reader" {
 		fmt.Printf("mounted successfully, could read it\n")
 		return nil
-	} else {
-		panic(fmt.Sprintf("unknown accessMode\n"))
 	}
+	panic(fmt.Sprintf("unknown accessMode\n"))
 }
 
-func (f *feature) verifyNotPublishedVolumeWithAccess(access, path string) error {
+func (f *feature) verifyNotPublishedVolumeWithAccess(_, path string) error {
 	if len(f.errs) > 0 {
 		fmt.Printf("Not verifying not published volume because of previous error")
 		return nil
 	}
 	var cmd *exec.Cmd
 	dataDirName := getDataDirName(path)
-	cmd = exec.Command("/bin/sh", "-c", "mount | grep "+dataDirName)
+	cmd = exec.Command("/bin/sh", "-c", "mount | grep "+dataDirName) // #nosec G204
 	stdout, _ := cmd.CombinedOutput()
 	fmt.Printf("'%s'\n", stdout)
 	if len(stdout) == 0 {
@@ -1310,8 +1307,8 @@ func (f *feature) checkIsilonClientsExist(nVols int) error {
 	ctx, _, _ = service.GetRunIDLog(ctx)
 	for i := 0; i < nVols; i++ {
 		volName := fmt.Sprintf("scale%d", i)
-		volId := f.volNameID[volName]
-		_, exportID, accessZone, _, _ := utils.ParseNormalizedVolumeID(ctx, volId)
+		volID := f.volNameID[volName]
+		_, exportID, accessZone, _, _ := utils.ParseNormalizedVolumeID(ctx, volID)
 		nodeIP := os.Getenv("X_CSI_NODE_NAME")
 		err := f.checkIsilonClientExistsForOneExport(nodeIP, exportID, accessZone)
 		if err != nil {

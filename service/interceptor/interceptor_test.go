@@ -42,7 +42,7 @@ const (
 )
 
 func getSleepHandler(millisec int) grpc.UnaryHandler {
-	return func(ctx context.Context, req interface{}) (interface{}, error) {
+	return func(_ context.Context, _ interface{}) (interface{}, error) {
 		fmt.Println("start sleep")
 		time.Sleep(time.Duration(millisec) * time.Millisecond)
 		fmt.Println("stop sleep")

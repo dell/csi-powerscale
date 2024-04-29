@@ -15,10 +15,11 @@ package service
  See the License for the specific language governing permissions and
  limitations under the License.
 */
+
 import (
 	"fmt"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" // #nosec G108
 	"os"
 	"testing"
 
@@ -29,7 +30,7 @@ import (
 func TestMain(m *testing.M) {
 	status := 0
 
-	go http.ListenAndServe("localhost:6060", nil)
+	go http.ListenAndServe("localhost:6060", nil) // #nosec G114
 	fmt.Printf("starting godog...\n")
 
 	configFile := "mock/secret/secret.yaml"

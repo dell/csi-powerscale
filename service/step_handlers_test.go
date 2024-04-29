@@ -209,7 +209,7 @@ func getRouter() http.Handler {
 }
 
 // handleNewApi implements GET /platform/latest
-func handleNewAPI(w http.ResponseWriter, r *http.Request) {
+func handleNewAPI(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -217,13 +217,13 @@ func handleNewAPI(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("{\"latest\": \"5.1\"}"))
 }
 
-func handleGetZoneByName(w http.ResponseWriter, r *http.Request) {
+func handleGetZoneByName(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write(readFromFile("mock/snapshot/get_zone_by_name.txt"))
 }
 
 // handleExports implements GET /platform/2/protocols/nfs/exports
-func handleGetExports(w http.ResponseWriter, r *http.Request) {
+func handleGetExports(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -236,7 +236,7 @@ func handleGetExports(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleCreateExport implements POST /platform/2/protocols/nfs/exports
-func handleCreateExport(w http.ResponseWriter, r *http.Request) {
+func handleCreateExport(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -249,7 +249,7 @@ func handleCreateExport(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetClusterConfig implements GET /platform/3/cluster/config/
-func handleGetClusterConfig(w http.ResponseWriter, r *http.Request) {
+func handleGetClusterConfig(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection || testNodeHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -259,7 +259,7 @@ func handleGetClusterConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleExportUpdate implements PUT /platform/2/protocols/nfs/exports
-func handleExportUpdate(w http.ResponseWriter, r *http.Request) {
+func handleExportUpdate(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -278,7 +278,7 @@ func readFromFile(relativeFilePath string) []byte {
 }
 
 // handleGetVolume implements GET /namespace/ifs/data/csi-isilon/volume1
-func handleGetVolumeWithoutMetadata(w http.ResponseWriter, r *http.Request) {
+func handleGetVolumeWithoutMetadata(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -292,7 +292,7 @@ func handleGetVolumeWithoutMetadata(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetExportByID implements GET /platform/2/protocols/nfs/exports/{id}
-func handleGetExportByID(w http.ResponseWriter, r *http.Request) {
+func handleGetExportByID(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -310,7 +310,7 @@ func handleGetExportByID(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleVolumeCreation implements PUT /namespace/volume1
-func handleVolumeCreation(w http.ResponseWriter, r *http.Request) {
+func handleVolumeCreation(w http.ResponseWriter, _ *http.Request) {
 	if stepHandlersErrors.InstancesError {
 		writeError(w, "Error retrieving Volume", http.StatusRequestTimeout, codes.Internal)
 		return
@@ -323,7 +323,7 @@ func handleVolumeCreation(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetExistentVolumeMetadata implements GET /namespace/ifs/data/csi-isilon/volume1?metadata
-func handleGetExistentVolumeMetadata(w http.ResponseWriter, r *http.Request) {
+func handleGetExistentVolumeMetadata(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -332,7 +332,7 @@ func handleGetExistentVolumeMetadata(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetVolume implements GET /namespace/ifs/data/csi-isilon/volume1?metadata
-func handleGetVolume(w http.ResponseWriter, r *http.Request) {
+func handleGetVolume(w http.ResponseWriter, _ *http.Request) {
 	if stepHandlersErrors.VolInstanceError {
 		writeError(w, "Error retrieving Volume", http.StatusRequestTimeout, codes.Internal)
 		return
@@ -345,7 +345,7 @@ func handleGetVolume(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetExistentVolume implements GET /namespace/ifs/data/csi-isilon/volume2?metadata
-func handleGetExistentVolume(w http.ResponseWriter, r *http.Request) {
+func handleGetExistentVolume(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -356,7 +356,7 @@ func handleGetExistentVolume(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetQuotaLicense implements GET /platform/5/quota/license
-func handleGetQuotaLicense(w http.ResponseWriter, r *http.Request) {
+func handleGetQuotaLicense(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -367,7 +367,7 @@ func handleGetQuotaLicense(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleCreateQuota implements POST /platform/1/quota/quotas
-func handleCreateQuota(w http.ResponseWriter, r *http.Request) {
+func handleCreateQuota(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -381,7 +381,7 @@ func handleCreateQuota(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDeleteQuotaByID implements DELETE /platform/1/quota/quotas/AABpAQEAAAAAAAAAAAAAQA0AAAAAAAAA
-func handleDeleteQuotaByID(w http.ResponseWriter, r *http.Request) {
+func handleDeleteQuotaByID(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -401,7 +401,7 @@ func handleDeleteQuotaByID(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetQuota implements GET /platform/1/quota/quotas/WACnAAEAAAAAAAAAAAAAQBUPAAAAAAAA
-func handleGetQuotaByID(w http.ResponseWriter, r *http.Request) {
+func handleGetQuotaByID(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -415,7 +415,7 @@ func handleGetQuotaByID(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetQuota implements GET /platform/1/quota/quotas?path=/ifs/data/csi-isilon/volume1/
-func handleGetQuotaByPath(w http.ResponseWriter, r *http.Request) {
+func handleGetQuotaByPath(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -429,7 +429,7 @@ func handleGetQuotaByPath(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUpdateQuotaByID implements PUT /platform/1/quota/quotas/AABpAQEAAAAAAAAAAAAAQA0AAAAAAAAA
-func handleUpdateQuotaByID(w http.ResponseWriter, r *http.Request) {
+func handleUpdateQuotaByID(w http.ResponseWriter, _ *http.Request) {
 	if stepHandlersErrors.UpdateQuotaError {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -441,7 +441,7 @@ func handleUpdateQuotaByID(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUnexportPath implements DELETE /platform/2/protocols/nfs/exports/43?zone=System
-func handleUnexportPath(w http.ResponseWriter, r *http.Request) {
+func handleUnexportPath(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -456,7 +456,7 @@ func handleUnexportPath(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDeleteVolume implements DELETE /namespace/ifs/data/csi-isilon/volume2?recursive=true
-func handleDeleteVolume(w http.ResponseWriter, r *http.Request) {
+func handleDeleteVolume(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -471,7 +471,7 @@ func handleDeleteVolume(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleModifyExport implements GET /platform/2/protocols/nfs/exports/{id}
-func handleModifyExport(w http.ResponseWriter, r *http.Request) {
+func handleModifyExport(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -482,7 +482,7 @@ func handleModifyExport(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(""))
 }
 
-func handleIOInProgress(w http.ResponseWriter, r *http.Request) {
+func handleIOInProgress(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection || testNodeHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -492,7 +492,7 @@ func handleIOInProgress(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleStatistics implements GET /platform/3/statistics
-func handleStatistics(w http.ResponseWriter, r *http.Request) {
+func handleStatistics(w http.ResponseWriter, _ *http.Request) {
 	if stepHandlersErrors.InstancesError {
 		writeError(w, "Error retrieving Statistics", http.StatusRequestTimeout, codes.Internal)
 		return
@@ -513,7 +513,7 @@ func handleStatistics(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetExportWithPathAndZone GET /platform/2/protocols/nfs/exports?path=/ifs/data/csi-isilon/volume1&zone=System
-func handleGetExportWithPathAndZone(w http.ResponseWriter, r *http.Request) {
+func handleGetExportWithPathAndZone(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -545,7 +545,7 @@ func handleGetExportWithPathAndZone(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleExportGetId implements GET /platform/2/protocols/nfs/exports?limit=2
-func handleGetExportsWithLimit(w http.ResponseWriter, r *http.Request) {
+func handleGetExportsWithLimit(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -558,7 +558,7 @@ func handleGetExportsWithLimit(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleExportGetId implements GET /platform/2/protocols/nfs/exports?resume=1-1-MAAA1
-func handleGetExportsWithResume(w http.ResponseWriter, r *http.Request) {
+func handleGetExportsWithResume(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -622,7 +622,7 @@ func handleDeleteSnapshot(w http.ResponseWriter, r *http.Request) {
 }
 
 // Write an error code to the response writer
-func writeError(w http.ResponseWriter, message string, httpStatus int, errorCode codes.Code) {
+func writeError(w http.ResponseWriter, message string, httpStatus int, _ codes.Code) {
 	w.WriteHeader(httpStatus)
 	resp := isiapi.JSONError{StatusCode: 200, Err: []isiapi.Error{{Code: "", Field: "", Message: ""}}}
 	resp.Err[0].Message = message
@@ -635,7 +635,7 @@ func writeError(w http.ResponseWriter, message string, httpStatus int, errorCode
 }
 
 // handleCreateSnapshot implements POST /platform/1/snapshot/snapshots/
-func handleCreateSnapshot(w http.ResponseWriter, r *http.Request) {
+func handleCreateSnapshot(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -648,7 +648,7 @@ func handleCreateSnapshot(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetNonexistentSnapshot implements GET /platform/1/snapshot/snapshots/create_snapshot_name/
-func handleGetNonexistentSnapshot(w http.ResponseWriter, r *http.Request) {
+func handleGetNonexistentSnapshot(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -675,7 +675,7 @@ func handleGetExistentSnapshot(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetExistentCompatibleSnapshot implements GET /platform/1/snapshot/snapshots/existent_comp_snapshot_name/
-func handleGetExistentCompatibleSnapshot(w http.ResponseWriter, r *http.Request) {
+func handleGetExistentCompatibleSnapshot(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -685,7 +685,7 @@ func handleGetExistentCompatibleSnapshot(w http.ResponseWriter, r *http.Request)
 
 // handleCopySnapshot implements PUT /namespace/ifs/data/csi-isilon/volume1?merge=True
 // X-Isi-Ifs-Copy-Source: /namespace/ifs/.snapshot/existent_snapshot_name/data/csi-isilon/nfs_1
-func handleCopySnapshot(w http.ResponseWriter, r *http.Request) {
+func handleCopySnapshot(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -695,7 +695,7 @@ func handleCopySnapshot(w http.ResponseWriter, r *http.Request) {
 
 // handleCopyVolume implements PUT /namespace/ifs/data/csi-isilon/volume1?merge=True
 // X-Isi-Ifs-Copy-Source: /namespace/ifs/data/csi-isilon/volume2
-func handleCopyVolume(w http.ResponseWriter, r *http.Request) {
+func handleCopyVolume(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -704,7 +704,7 @@ func handleCopyVolume(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetSnapshotSize implements GET /namespace/ifs/.snapshot/{snapshot_name}/data/csi-isilon/{volume_id}?detail=size&max-depth=-1
-func handleGetSnapshotSize(w http.ResponseWriter, r *http.Request) {
+func handleGetSnapshotSize(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -714,7 +714,7 @@ func handleGetSnapshotSize(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetVolumeSize implements GET /namespace/ifs/data/csi-isilon/{volume_id}?detail=size&max-depth=-1
-func handleGetVolumeSize(w http.ResponseWriter, r *http.Request) {
+func handleGetVolumeSize(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -723,7 +723,7 @@ func handleGetVolumeSize(w http.ResponseWriter, r *http.Request) {
 	w.Write(readFromFile("mock/volume/get_volume_size.txt"))
 }
 
-func handleGetPoliciesByName(w http.ResponseWriter, r *http.Request) {
+func handleGetPoliciesByName(w http.ResponseWriter, _ *http.Request) {
 	if stepHandlersErrors.Reprotect {
 		defer func() {
 			stepHandlersErrors.reprotectCount++
@@ -798,7 +798,7 @@ func handleGetPoliciesByName(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleGetJobs(w http.ResponseWriter, r *http.Request) {
+func handleGetJobs(w http.ResponseWriter, _ *http.Request) {
 	if stepHandlersErrors.GetJobsInternalError {
 		writeError(w, "", http.StatusInternalServerError, codes.Internal)
 		return
@@ -820,7 +820,7 @@ func handleGetJobs(w http.ResponseWriter, r *http.Request) {
 	w.Write(readFromFile("mock/jobs/empty.json"))
 }
 
-func handleSyncJob(w http.ResponseWriter, r *http.Request) {
+func handleSyncJob(w http.ResponseWriter, _ *http.Request) {
 	if stepHandlersErrors.GetJobsInternalError {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -835,7 +835,7 @@ func handleSyncJob(w http.ResponseWriter, r *http.Request) {
 	w.Write(readFromFile("mock/jobs/created.json"))
 }
 
-func handleGetTargetPoliciesByName(w http.ResponseWriter, r *http.Request) {
+func handleGetTargetPoliciesByName(w http.ResponseWriter, _ *http.Request) {
 	if stepHandlersErrors.GetTargetPolicyInternalError {
 		writeError(w, "", http.StatusInternalServerError, codes.Internal)
 		return
@@ -976,7 +976,7 @@ func handleGetTargetPoliciesByName(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleCreatePolicy(w http.ResponseWriter, r *http.Request) {
+func handleCreatePolicy(w http.ResponseWriter, _ *http.Request) {
 	if stepHandlersErrors.CreatePolicyError {
 		writeError(w, "", http.StatusNotFound, codes.Internal)
 		return
@@ -985,7 +985,7 @@ func handleCreatePolicy(w http.ResponseWriter, r *http.Request) {
 	w.Write(readFromFile("mock/policy/get_policies.txt"))
 }
 
-func handleUpdatePolicy(w http.ResponseWriter, r *http.Request) {
+func handleUpdatePolicy(w http.ResponseWriter, _ *http.Request) {
 	if stepHandlersErrors.UpdatePolicyError {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -1005,7 +1005,7 @@ func handleUpdatePolicy(w http.ResponseWriter, r *http.Request) {
 	w.Write(readFromFile("mock/policy/get_policies2.txt"))
 }
 
-func handleBreakAssociation(w http.ResponseWriter, r *http.Request) {
+func handleBreakAssociation(w http.ResponseWriter, _ *http.Request) {
 	if stepHandlersErrors.DeletePolicyError {
 		writeError(w, "", http.StatusNotFound, codes.Internal)
 		// return
@@ -1015,11 +1015,11 @@ func handleBreakAssociation(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(""))
 }
 
-func handleAllowWrites(w http.ResponseWriter, r *http.Request) {
+func handleAllowWrites(w http.ResponseWriter, _ *http.Request) {
 	w.Write(readFromFile("mock/policy/get_target_policies2.txt"))
 }
 
-func handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
+func handleDeletePolicy(w http.ResponseWriter, _ *http.Request) {
 	if stepHandlersErrors.DeletePolicyError {
 		writeError(w, "", http.StatusNotFound, codes.Internal)
 		return
@@ -1039,7 +1039,7 @@ func handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetReportsByPolicy implements GET /platform/11/sync/reports/?policy_name=csi-prov-test-19743d82-192-168-111-25-Five_Minutes&sort=end_time&reports_per_policy=1"
-func handleGetReportsByPolicy(w http.ResponseWriter, r *http.Request) {
+func handleGetReportsByPolicy(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -1059,14 +1059,14 @@ func handleGetReportsByPolicy(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetExistentSnapshotVolume implements GET /namespace/ifs/data/csi-isilon/childZone/.csi-existent_snapshot_name_4-tracking-dir/volume1
-func handleGetExistentSnapshotVolume(w http.ResponseWriter, r *http.Request) {
+func handleGetExistentSnapshotVolume(_ http.ResponseWriter, _ *http.Request) {
 	// response body is true
 	// w.Write([]byte("true"))
 	return
 }
 
 // handleCreateVolumeFromSnapshot implements PUT /namespace/ifs/data/csi-isilon/childZone/.csi-existent_snapshot_name_4-tracking-dir
-func handleCreateVolumeFromSnapshot(w http.ResponseWriter, r *http.Request) {
+func handleCreateVolumeFromSnapshot(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -1074,7 +1074,7 @@ func handleCreateVolumeFromSnapshot(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetSnapshotExportWithPathAndZone GET /platform/2/protocols/nfs/exports/?path=/ifs/.snapshot/existent_snapshot_name_4/data/csi-isilon/childZone/nfs_4&zone=System
-func handleGetSnapshotExportWithPathAndZone(w http.ResponseWriter, r *http.Request) {
+func handleGetSnapshotExportWithPathAndZone(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -1087,7 +1087,7 @@ func handleGetSnapshotExportWithPathAndZone(w http.ResponseWriter, r *http.Reque
 }
 
 // handleGetSnapshotExportByID implements GET /platform/2/protocols/nfs/exports/47
-func handleGetSnapshotExportByID(w http.ResponseWriter, r *http.Request) {
+func handleGetSnapshotExportByID(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -1105,7 +1105,7 @@ func handleGetSnapshotExportByID(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetExistentVolumeFromSnapshot implements GET namespace/ifs/.csi-k8s-12345678-tracking-dir
-func handleGetExistentVolumeFromSnapshot(w http.ResponseWriter, r *http.Request) {
+func handleGetExistentVolumeFromSnapshot(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -1115,7 +1115,7 @@ func handleGetExistentVolumeFromSnapshot(w http.ResponseWriter, r *http.Request)
 }
 
 // handleGetExistentVolumeFromSnapshotMetadata implements GET /namespace/ifs/.csi-k8s-12345678-tracking-dir?metadata
-func handleGetExistentVolumeFromSnapshotMetadata(w http.ResponseWriter, r *http.Request) {
+func handleGetExistentVolumeFromSnapshotMetadata(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
@@ -1135,7 +1135,7 @@ func MockK8sAPI() {
 		http.HandleFunc("/array-status/cluster1/", apiResponse)
 		go func() {
 			fmt.Println("started mock server")
-			http.ListenAndServe(":36443", nil)
+			http.ListenAndServe(":36443", nil) // #nosec G114
 		}()
 	})
 	fmt.Println("mocking k8s api done")
@@ -1156,7 +1156,7 @@ func noderesponse(w http.ResponseWriter, req *http.Request) {
 	w.Write(fn)
 }
 
-func apiResponse(w http.ResponseWriter, req *http.Request) {
+func apiResponse(w http.ResponseWriter, _ *http.Request) {
 	var statusResponse ArrayConnectivityStatus
 	// Validating LastAttempt flag
 	if stepHandlersErrors.ModifyLastAttempt {
