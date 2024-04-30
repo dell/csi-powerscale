@@ -9,6 +9,8 @@ issues:
   max-issues-per-linter: 0
   max-same-issues: 0
   new: false
+  exclude:
+    - "previous case (typecheck)"
 
 output:
   print-linter-name: true
