@@ -34,10 +34,10 @@ import (
 	"github.com/dell/csi-isilon/v2/common/utils"
 	isi "github.com/dell/goisilon"
 	isiApi "github.com/dell/goisilon/api"
-	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // RPOEnum represents valid rpo values
@@ -1711,7 +1711,7 @@ func (s *service) getCreateSnapshotResponse(ctx context.Context, snapshotID stri
 }
 
 func (s *service) getCSISnapshot(snapshotID string, sourceVolumeID string, creationTime, sizeInBytes int64) *csi.Snapshot {
-	ts := &timestamp.Timestamp{
+	ts := &timestamppb.Timestamp{
 		Seconds: creationTime,
 	}
 

@@ -30,9 +30,9 @@ import (
 
 	"github.com/akutz/gournal"
 	"github.com/dell/csi-isilon/v2/common/k8sutils"
-	"github.com/golang/protobuf/ptypes/wrappers"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"gopkg.in/yaml.v3"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
@@ -1041,7 +1041,7 @@ func (s *service) ProbeController(ctx context.Context,
 		}
 	}
 
-	ready := new(wrappers.BoolValue)
+	ready := new(wrapperspb.BoolValue)
 	ready.Value = true
 	rep := new(commonext.ProbeControllerResponse)
 	rep.Ready = ready
