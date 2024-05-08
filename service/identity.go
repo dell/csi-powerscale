@@ -21,12 +21,12 @@ import (
 	"strings"
 
 	"golang.org/x/net/context"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/v2/common/constants"
 	"github.com/dell/csi-isilon/v2/core"
 	csiext "github.com/dell/dell-csi-extensions/replication"
-	wrappers "github.com/golang/protobuf/ptypes/wrappers"
 )
 
 func (s *service) GetPluginInfo(
@@ -81,7 +81,7 @@ func (s *service) Probe(
 	*csi.ProbeResponse, error,
 ) {
 	ctx, log := GetLogger(ctx)
-	ready := new(wrappers.BoolValue)
+	ready := new(wrapperspb.BoolValue)
 	ready.Value = true
 	rep := new(csi.ProbeResponse)
 	rep.Ready = ready
