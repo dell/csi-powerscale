@@ -208,6 +208,7 @@ function verify_k8s_versions() {
   if [[ ${V} > ${MAX} ]]; then
     error=1
     found_warning "Kubernetes version ${V} is newer than the version that has been tested. Latest tested version is: ${MAX}"
+    found_warning "To ensure the driver is fully supported run cert-csi and make sure all tests pass. More details: https://dell.github.io/csm-docs/docs/cert-csi/"
   fi
   check_error error
 
