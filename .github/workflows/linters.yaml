@@ -24,7 +24,7 @@ jobs:
         run: |
           go mod vendor
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v5
         with:
           version: latest
           skip-cache: true
