@@ -13,7 +13,7 @@
 
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-HELM_BRANCH="csi-isilon-2.8.0"
+HELM_BRANCH="csi-isilon-2.10.0"
 DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
 DRIVER="csi-isilon"
 VERIFYSCRIPT="${SCRIPTDIR}/verify.sh"
