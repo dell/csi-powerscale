@@ -5,6 +5,7 @@
 The `csi-offline-bundle.sh` script can be used to create a package for the offline installation of Dell CSI storage providers for deployment via Helm.
 
 This includes the following drivers:
+
 * [PowerFlex](https://github.com/dell/csi-vxflexos)
 * [PowerMax](https://github.com/dell/csi-powermax)
 * [PowerScale](https://github.com/dell/csi-powerscale)
@@ -12,11 +13,13 @@ This includes the following drivers:
 * [Unity](https://github.com/dell/csi-unity)
 
 The `csm-offline-bundle.sh` script can be used to create a package for the offline installation of Dell CSI storage providers for deployment via the CSM Operator.
+
 * [Dell CSM Operator](https://github.com/dell/csm-operator)
 
 ## Dependencies
 
 Multiple linux based systems may be required to create and process an offline bundle for use.
+
 * One linux based system, with internet access, will be used to create the bundle. This involved the user cloning a git repository hosted on github.com and then invoking a script that utilizes `docker` or `podman` to pull and save container images to file.
 * One linux based system, with access to an image registry, to invoke a script that uses `docker` or `podman` to restore container images from file and push them to a registry
 
@@ -28,14 +31,15 @@ Preparing an offline bundle requires the following utilities:
 | --------------------- | ----- |
 | `docker` or `podman`  | `docker` or `podman` will be used to pull images from public image registries, tag them, and push them to a private registry.  |
 |                       | One of these will be required on both the system building the offline bundle as well as the system preparing for installation. |
-|                       | Tested version(s) are `docker` 19.03+ and `podman` 1.6.4+
-| `git`                 | `git` will be used to manually clone one of the above repos in order to create and offline bundle.
-|                       | This is only needed on the system preparing the offline bundle.
-|                       | Tested version(s) are `git` 1.8+ but any version should work.
+|                       | Tested version(s) are `docker` 19.03+ and `podman` 1.6.4+  |
+| `git`                 | `git` will be used to manually clone one of the above repos in order to create and offline bundle.  |
+|                       | This is only needed on the system preparing the offline bundle.  |
+|                       | Tested version(s) are `git` 1.8+ but any version should work.  |
 
 ## Workflow
 
 To perform an offline installation of a driver or the Operator, the following steps should be performed:
+
 1. Build an offline bundle
 2. Unpacking an offline bundle and preparing for installation
 3. Perform either a Helm installation or Operator installation
@@ -45,27 +49,33 @@ To perform an offline installation of a driver or the Operator, the following st
 This needs to be performed on a linux system with access to the internet as a git repo will need to be cloned, and container images pulled from public registries.
 
 The build an offline bundle, the following steps are needed:
+
 1. Perform a `git clone` of the desired repository. For a Helm based install, the specific driver repo should be cloned. For an Operator based deployment, the Dell CSM Operator repo should be cloned
 2. Run the offline bundle script with an argument of `-c` in order to create an offline bundle
-  - For Helm installs, the `csi-offline-bundle.sh` script will be found in the `dell-csi-helm-installer` directory
-  - For Operator installs, the `csm-offline-bundle.sh` script will be found in the `scripts` directory
+
+* For Helm installs, the `csi-offline-bundle.sh` script will be found in the `dell-csi-helm-installer` directory
+* For Operator installs, the `csm-offline-bundle.sh` script will be found in the `scripts` directory
 
 The script will perform the following steps:
-  - Determine required images by parsing either the driver Helm charts (if run from a cloned CSI Driver git repository) or the Dell CSM Operator configuration files (if run from a clone of the Dell CSM Operator repository)
-  - Perform an image `pull` of each image required
-  - Save all required images to a file by running `docker save` or `podman save`
-  - Build a `tar.gz` file containing the images as well as files required to installer the driver and/or Operator
+
+* Determine required images by parsing either the driver Helm charts (if run from a cloned CSI Driver git repository) or the Dell CSM Operator configuration files (if run from a clone of the Dell CSM Operator repository)
+* Perform an image `pull` of each image required
+* Save all required images to a file by running `docker save` or `podman save`
+* Build a `tar.gz` file containing the images as well as files required to installer the driver and/or Operator
 
 The resulting offline bundle file can be copied to another machine, if necessary, to gain access to the desired image registry.
 
 For example, here is the output of a request to build an offline bundle for the Dell CSM Operator:
+
 ```
 [user@anothersystem /home/user]# git clone https://github.com/dell/csm-operator.git
 
 ```
+
 ```
 [user@anothersystem /home/user]# cd csm-operator
 ```
+
 ```
 [user@system /home/user/csm-operator]# bash scripts/csm-offline-bundle.sh -c
 
@@ -78,7 +88,7 @@ For example, here is the output of a request to build an offline bundle for the 
 *
 * Pulling and saving container images
 
-   dellemc/csi-isilon:v2.8.0
+   dellemc/csi-isilon:v2.10.1
    dellemc/csi-metadata-retriever:v1.6.0
    dellemc/csipowermax-reverseproxy:v2.6.0
    dellemc/csi-powermax:v2.9.0
@@ -140,18 +150,20 @@ Offline bundle file is: /root/csm-operator/dell-csm-operator-bundle.tar.gz
 This needs to be performed on a linux system with access to an image registry that will host container images. If the registry requires `login`, that should be done before proceeding.
 
 To prepare for driver or Operator installation, the following steps need to be performed:
+
 1. Copy the offline bundle file to a system with access to an image registry available to your Kubernetes/OpenShift cluster
 2. Expand the bundle file by running `tar xvfz <filename>`
 3. Run the `csm-offline-bundle.sh` script and supply the `-p` option as well as the path to the internal registry with the `-r` option
 
 The script will then perform the following steps:
-  - Load the required container images into the local system
-  - Tag the images according to the user supplied registry information
-  - Push the newly tagged images to the registry
-  - Modify the Helm charts or Operator configuration to refer to the newly tagged/pushed images
 
+* Load the required container images into the local system
+* Tag the images according to the user supplied registry information
+* Push the newly tagged images to the registry
+* Modify the Helm charts or Operator configuration to refer to the newly tagged/pushed images
 
 An example of preparing the bundle for installation:
+
 ```
 [user@anothersystem /tmp]# tar xvfz dell-csm-operator-bundle.tar.gz
 dell-csm-operator-bundle/
@@ -166,9 +178,11 @@ dell-csm-operator-bundle/deploy/olm/operator_community.yaml
 dell-csm-operator-bundle/README.md
 dell-csm-operator-bundle/LICENSE
 ```
+
 ```
 [user@anothersystem /tmp]# cd dell-csm-operator-bundle
 ```
+
 ```
 [user@anothersystem /tmp/dell-csm-operator-bundle]# bash scripts/csm-offline-bundle.sh -p -r localregistry:5000/dell-csm-operator/
 Preparing a offline bundle for installation
