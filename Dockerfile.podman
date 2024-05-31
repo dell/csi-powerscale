@@ -35,7 +35,7 @@ LABEL vendor="Dell Inc." \
       name="csi-isilon" \
       summary="CSI Driver for Dell EMC PowerScale" \
       description="CSI Driver for provisioning persistent storage from Dell EMC PowerScale" \
-      version="2.10.1" \
+      version="2.11.0" \
       license="Apache-2.0"
 
 COPY ./licenses /licenses

@@ -88,7 +88,7 @@ For example, here is the output of a request to build an offline bundle for the 
 *
 * Pulling and saving container images
 
-   dellemc/csi-isilon:v2.10.1
+   dellemc/csi-isilon:v2.11.0
    dellemc/csi-metadata-retriever:v1.6.0
    dellemc/csipowermax-reverseproxy:v2.6.0
    dellemc/csi-powermax:v2.9.0
