@@ -1103,6 +1103,7 @@ func (s *service) ControllerPublishVolume(
 			utils.GetMessageWithRunID(runID, "volume ID is required"))
 	}
 
+	log.Info("got volume ID:", volID)
 	volName, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, volID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "failed to parse volume ID '%s', error : '%v'", volID, err))
