@@ -97,6 +97,7 @@ type interceptor struct {
 
 // NewCustomSerialLock creates new unary interceptor that locks gRPC requests
 func NewCustomSerialLock() grpc.UnaryServerInterceptor {
+	log.Info("calling NewCustomSerialLock")
 	locker := &lockProvider{
 		volIDLocks:   map[string]gosync.TryLocker{},
 		volNameLocks: map[string]gosync.TryLocker{},
@@ -111,12 +112,15 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 	handle := func(ctx xctx.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		switch t := req.(type) {
 		case *csi.CreateVolumeRequest:
+			log.Info("calling CreateVolumeRequest condition")
 			return i.createVolume(ctx, t, info, handler)
 		case *csi.NodeStageVolumeRequest:
+			log.Info("calling NodeStageVolumeRequest condition")
 			return i.nodeStageVolume(ctx, t, info, handler)
 		case *csi.NodeUnstageVolumeRequest:
 			return i.nodeUnstageVolume(ctx, t, info, handler)
 		default:
+			log.Info("calling default condition")
 			return gocsiSerializer(ctx, req, info, handler)
 		}
 	}
