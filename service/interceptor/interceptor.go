@@ -48,6 +48,7 @@ func (r *rewriteRequestIDInterceptor) handleServer(ctx context.Context, req inte
 
 // NewRewriteRequestIDInterceptor creates new unary interceptor that rewrites request IDs
 func NewRewriteRequestIDInterceptor() grpc.UnaryServerInterceptor {
+	log.Info("calling NewRewriteRequestIDInterceptor")
 	interceptor := &rewriteRequestIDInterceptor{}
 	return interceptor.handleServer
 }
@@ -61,6 +62,8 @@ type lockProvider struct {
 
 func (i *lockProvider) GetLockWithID(_ context.Context, id string) (gosync.TryLocker, error) {
 	i.volIDLocksL.Lock()
+	log.Info("calling GetLockWithID")
+	defer log.Info("calling end GetLockWithID")
 	defer i.volIDLocksL.Unlock()
 
 	lock := i.volIDLocks[id]
@@ -74,6 +77,8 @@ func (i *lockProvider) GetLockWithID(_ context.Context, id string) (gosync.TryLo
 
 func (i *lockProvider) GetLockWithName(_ context.Context, name string) (gosync.TryLocker, error) {
 	i.volNameLocksL.Lock()
+	log.Info("calling GetLockWithName")
+	defer log.Info("calling end GetLockWithName")
 	defer i.volNameLocksL.Unlock()
 
 	lock := i.volNameLocks[name]
