@@ -48,7 +48,7 @@ func (r *rewriteRequestIDInterceptor) handleServer(ctx context.Context, req inte
 
 // NewRewriteRequestIDInterceptor creates new unary interceptor that rewrites request IDs
 func NewRewriteRequestIDInterceptor() grpc.UnaryServerInterceptor {
-	log.Info("calling NewRewriteRequestIDInterceptor")
+	log.Info("Chiman: calling NewRewriteRequestIDInterceptor")
 	interceptor := &rewriteRequestIDInterceptor{}
 	return interceptor.handleServer
 }
@@ -62,8 +62,8 @@ type lockProvider struct {
 
 func (i *lockProvider) GetLockWithID(_ context.Context, id string) (gosync.TryLocker, error) {
 	i.volIDLocksL.Lock()
-	log.Info("calling GetLockWithID")
-	defer log.Info("calling end GetLockWithID")
+	log.Info("Chiman: calling GetLockWithID")
+	defer log.Info("Chiman: calling end GetLockWithID")
 	defer i.volIDLocksL.Unlock()
 
 	lock := i.volIDLocks[id]
@@ -77,8 +77,8 @@ func (i *lockProvider) GetLockWithID(_ context.Context, id string) (gosync.TryLo
 
 func (i *lockProvider) GetLockWithName(_ context.Context, name string) (gosync.TryLocker, error) {
 	i.volNameLocksL.Lock()
-	log.Info("calling GetLockWithName")
-	defer log.Info("calling end GetLockWithName")
+	log.Info("Chiman: calling GetLockWithName")
+	defer log.Info("Chiman: calling end GetLockWithName")
 	defer i.volNameLocksL.Unlock()
 
 	lock := i.volNameLocks[name]
@@ -102,7 +102,7 @@ type interceptor struct {
 
 // NewCustomSerialLock creates new unary interceptor that locks gRPC requests
 func NewCustomSerialLock() grpc.UnaryServerInterceptor {
-	log.Info("calling NewCustomSerialLock")
+	log.Info("Chiman: calling NewCustomSerialLock")
 	locker := &lockProvider{
 		volIDLocks:   map[string]gosync.TryLocker{},
 		volNameLocks: map[string]gosync.TryLocker{},
@@ -117,15 +117,15 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 	handle := func(ctx xctx.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		switch t := req.(type) {
 		case *csi.CreateVolumeRequest:
-			log.Info("calling CreateVolumeRequest condition")
+			log.Info("Chiman: calling CreateVolumeRequest condition")
 			return i.createVolume(ctx, t, info, handler)
 		case *csi.NodeStageVolumeRequest:
-			log.Info("calling NodeStageVolumeRequest condition")
+			log.Info("Chiman: calling NodeStageVolumeRequest condition")
 			return i.nodeStageVolume(ctx, t, info, handler)
 		case *csi.NodeUnstageVolumeRequest:
 			return i.nodeUnstageVolume(ctx, t, info, handler)
 		default:
-			log.Info("calling default condition")
+			log.Info("Chiman: request type", t, "calling default condition")
 			return gocsiSerializer(ctx, req, info, handler)
 		}
 	}
