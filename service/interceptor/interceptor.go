@@ -48,7 +48,6 @@ func (r *rewriteRequestIDInterceptor) handleServer(ctx context.Context, req inte
 
 // NewRewriteRequestIDInterceptor creates new unary interceptor that rewrites request IDs
 func NewRewriteRequestIDInterceptor() grpc.UnaryServerInterceptor {
-	log.Info("Chiman: calling NewRewriteRequestIDInterceptor")
 	interceptor := &rewriteRequestIDInterceptor{}
 	return interceptor.handleServer
 }
@@ -102,7 +101,6 @@ type interceptor struct {
 
 // NewCustomSerialLock creates new unary interceptor that locks gRPC requests
 func NewCustomSerialLock() grpc.UnaryServerInterceptor {
-	log.Info("Chiman: calling NewCustomSerialLock")
 	locker := &lockProvider{
 		volIDLocks:   map[string]gosync.TryLocker{},
 		volNameLocks: map[string]gosync.TryLocker{},
@@ -117,10 +115,8 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 	handle := func(ctx xctx.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		switch t := req.(type) {
 		case *csi.CreateVolumeRequest:
-			log.Info("Chiman: calling CreateVolumeRequest condition")
 			return i.createVolume(ctx, t, info, handler)
 		case *csi.NodeStageVolumeRequest:
-			log.Info("Chiman: calling NodeStageVolumeRequest condition")
 			return i.nodeStageVolume(ctx, t, info, handler)
 		case *csi.NodeUnstageVolumeRequest:
 			return i.nodeUnstageVolume(ctx, t, info, handler)
