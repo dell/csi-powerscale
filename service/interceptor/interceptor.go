@@ -121,8 +121,9 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 		case *csi.NodeUnstageVolumeRequest:
 			return i.nodeUnstageVolume(ctx, t, info, handler)
 		case *csi.ControllerPublishVolumeRequest:
-			log.Info("Chiman: request type", t, "calling ControllerPublishVolumeRequest condition")
 			return i.controllerPublishVolume(ctx, t, info, handler)
+		case *csi.ControllerUnpublishVolumeRequest:
+			return i.controllerUnpublishVolume(ctx, t, info, handler)
 		default:
 			log.Info("Chiman: request type", t, "calling default condition")
 			return gocsiSerializer(ctx, req, info, handler)
@@ -237,6 +238,13 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 }
 
 func (i *interceptor) controllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest,
+	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+) (res interface{}, resErr error) {
+	log.Info("Chiman: request type", req, "this method")
+	return handler(ctx, req)
+}
+
+func (i *interceptor) controllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
 	log.Info("Chiman: request type", req, "this method")
