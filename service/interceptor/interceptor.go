@@ -114,16 +114,16 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 
 	handle := func(ctx xctx.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		switch t := req.(type) {
+		case *csi.ControllerPublishVolumeRequest:
+			return i.controllerPublishVolume(ctx, t, info, handler)
+		case *csi.ControllerUnpublishVolumeRequest:
+			return i.controllerUnpublishVolume(ctx, t, info, handler)
 		case *csi.CreateVolumeRequest:
 			return i.createVolume(ctx, t, info, handler)
 		case *csi.NodeStageVolumeRequest:
 			return i.nodeStageVolume(ctx, t, info, handler)
 		case *csi.NodeUnstageVolumeRequest:
 			return i.nodeUnstageVolume(ctx, t, info, handler)
-		case *csi.ControllerPublishVolumeRequest:
-			return i.controllerPublishVolume(ctx, t, info, handler)
-		case *csi.ControllerUnpublishVolumeRequest:
-			return i.controllerUnpublishVolume(ctx, t, info, handler)
 		default:
 			log.Info("Chiman: request type", t, "calling default condition")
 			return gocsiSerializer(ctx, req, info, handler)
@@ -159,38 +159,12 @@ const pending = "pending"
 func (i *interceptor) nodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
-	lock, err := i.opts.locker.GetLockWithID(ctx, req.VolumeId)
-	if err != nil {
-		return nil, err
-	}
-
-	if closer, ok := lock.(io.Closer); ok {
-		defer closer.Close() // #nosec G307
-	}
-
-	if !lock.TryLock(i.opts.timeout) {
-		return nil, status.Error(codes.Aborted, pending)
-	}
-	defer lock.Unlock()
-
 	return handler(ctx, req)
 }
 
 func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
-	lock, err := i.opts.locker.GetLockWithID(ctx, req.VolumeId)
-	if err != nil {
-		return nil, err
-	}
-	if closer, ok := lock.(io.Closer); ok {
-		defer closer.Close() // #nosec G307
-	}
-	if !lock.TryLock(i.opts.timeout) {
-		return nil, status.Error(codes.Aborted, pending)
-	}
-	defer lock.Unlock()
-
 	return handler(ctx, req)
 }
 
