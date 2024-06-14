@@ -26,6 +26,8 @@ import (
 	"github.com/kubernetes-csi/csi-lib-utils/metrics"
 )
 
+const pending = "pending"
+
 type rewriteRequestIDInterceptor struct{}
 
 func (r *rewriteRequestIDInterceptor) handleServer(ctx context.Context, req interface{},
@@ -154,17 +156,17 @@ func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
 	}
 }
 
-const pending = "pending"
-
-func (i *interceptor) nodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest,
+func (i *interceptor) controllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
+	log.Info("Chiman: request type", req, "this method")
 	return handler(ctx, req)
 }
 
-func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest,
+func (i *interceptor) controllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
+	log.Info("Chiman: request type", req, "this method")
 	return handler(ctx, req)
 }
 
@@ -211,16 +213,14 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 	return handler(ctx, req)
 }
 
-func (i *interceptor) controllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest,
+func (i *interceptor) nodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
-	log.Info("Chiman: request type", req, "this method")
 	return handler(ctx, req)
 }
 
-func (i *interceptor) controllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest,
+func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
-	log.Info("Chiman: request type", req, "this method")
 	return handler(ctx, req)
 }
