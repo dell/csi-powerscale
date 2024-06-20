@@ -191,6 +191,18 @@ function verify_k8s_versions() {
   local MIN=${1}
   local MAX=${2}
   local V="${kMajorVersion}.${kMinorVersion}"
+
+  # check non supported version (k8s alpha/beta)
+  if [ -n "${kNonGAVersion}" ]; then
+    echo "Installing on an unreleased version of Kubernetes : "${kNonGAVersion}". Acknowledge and proceed with installation? (y/n)"
+    read -n 1 -p "Press 'y' to continue or any other key to exit: " CONT
+    decho
+      if [ "${CONT}" != "Y" -a "${CONT}" != "y" ]; then
+        decho "quitting at user request"
+        exit 2
+      fi
+   fi
+
   # check minimum
   log arrow
   log smart_step "Verifying minimum Kubernetes version" "small"
