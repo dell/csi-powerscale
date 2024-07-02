@@ -4,15 +4,15 @@ metadata:
   name: nginx-pv-pod
 spec:
   containers:
-  - name: task-pv-container
-    image: nginx
-    ports:
-    - containerPort: 80
-      name: "http-server"
-    volumeMounts:
-    - mountPath: "/usr/share/nginx/html"
-      name: task-pv-storage
+    - name: task-pv-container
+      image: nginx
+      ports:
+        - containerPort: 80
+          name: "http-server"
+      volumeMounts:
+        - mountPath: "/usr/share/nginx/html"
+          name: task-pv-storage
   volumes:
-  - name: task-pv-storage
-    persistentVolumeClaim:
-      claimName: test-pvc
+    - name: task-pv-storage
+      persistentVolumeClaim:
+        claimName: test-pvc

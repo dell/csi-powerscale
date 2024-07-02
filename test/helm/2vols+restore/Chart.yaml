@@ -4,6 +4,6 @@ appVersion: 1.0.0
 description: |
   Tests Isilon CSI deployments.
 keywords:
-- isilon-csi
-- storage
+  - isilon-csi
+  - storage
 engine: gotpl

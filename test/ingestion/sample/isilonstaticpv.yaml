@@ -13,9 +13,9 @@ spec:
   csi:
     driver: csi-isilon.dellemc.com
     volumeAttributes:
-        Path: "/ifs/data/csi/isilonvol"
-        Name: "isilonvol"
-        AzServiceIP: 'XX.XX.XX.XX'
+      Path: "/ifs/data/csi/isilonvol"
+      Name: "isilonvol"
+      AzServiceIP: "XX.XX.XX.XX"
     volumeHandle: isilonvol=_=_=652=_=_=System=_=_=cluster
   claimRef:
     name: isilonstaticpvc

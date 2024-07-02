@@ -9,7 +9,7 @@ metadata:
 #    pvcSoftGracePrd : "85400"
 spec:
   accessModes:
-  - ReadWriteOnce
+    - ReadWriteOnce
   resources:
     requests:
       storage: 5Gi
