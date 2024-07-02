@@ -2,10 +2,10 @@ kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: pvc-from-pvc
-  namespace: default 
+  namespace: default
 spec:
   accessModes:
-  - ReadWriteMany
+    - ReadWriteMany
   volumeMode: Filesystem
   resources:
     requests:
