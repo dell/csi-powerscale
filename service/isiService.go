@@ -83,33 +83,36 @@ func (svc *isiService) CreateSnapshot(ctx context.Context, path, snapshotName st
 	return snapshot, nil
 }
 
-func (svc *isiService) CreateVolume(ctx context.Context, isiPath, volName, isiVolumePathPermissions string) error {
+// ALIK
+func (svc *isiService) CreateVolume(ctx context.Context, isiPath, volName, isiVolumePathPermissions string) (isi.Volume, error) {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
 	log.Debugf("begin to create volume '%s'", volName)
 
-	if _, err := svc.client.CreateVolumeWithIsipath(ctx, isiPath, volName, isiVolumePathPermissions); err != nil {
+	newVomlume, err := svc.client.CreateVolumeWithIsipath(ctx, isiPath, volName, isiVolumePathPermissions)
+	if err != nil {
 		log.Errorf("create volume failed, '%s'", err.Error())
-		return err
+		return nil, err
 	}
 
-	return nil
+	return newVomlume, nil
 }
 
-func (svc *isiService) CreateVolumeWithMetaData(ctx context.Context, isiPath, volName, isiVolumePathPermissions string, metadata map[string]string) error {
+func (svc *isiService) CreateVolumeWithMetaData(ctx context.Context, isiPath, volName, isiVolumePathPermissions string, metadata map[string]string) (isi.Volume, error) {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
 	log.Debugf("begin to create volume '%s'", volName)
 	log.Debugf("header metadata '%v'", metadata)
 
-	if _, err := svc.client.CreateVolumeWithIsipathMetaData(ctx, isiPath, volName, isiVolumePathPermissions, metadata); err != nil {
+	newVolume, err := svc.client.CreateVolumeWithIsipathMetaData(ctx, isiPath, volName, isiVolumePathPermissions, metadata)
+	if err != nil {
 		log.Errorf("create volume failed, '%s'", err.Error())
-		return err
+		return nil, err
 	}
 
-	return nil
+	return newVolume, nil
 }
 
 func (svc *isiService) GetExports(ctx context.Context) (isi.ExportList, error) {
