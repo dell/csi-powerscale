@@ -15,7 +15,7 @@ require (
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.5.1
 	github.com/dell/gocsi v1.10.1
 	github.com/dell/gofsutil v1.15.0
-	github.com/dell/goisilon v1.15.1
+	github.com/dell/goisilon v1.16.1-0.20240710191322-ca555cd15b7f
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
@@ -33,8 +33,8 @@ require (
 )
 
 require (
-	github.com/PuerkitoBio/goquery v1.8.1 // indirect
-	github.com/andybalholm/cascadia v1.3.1 // indirect
+	github.com/PuerkitoBio/goquery v1.9.2 // indirect
+	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect

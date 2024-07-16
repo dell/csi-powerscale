@@ -90,13 +90,13 @@ func (svc *isiService) CreateVolume(ctx context.Context, isiPath, volName, isiVo
 
 	log.Debugf("begin to create volume '%s'", volName)
 
-	newVomlume, err := svc.client.CreateVolumeWithIsipath(ctx, isiPath, volName, isiVolumePathPermissions)
+	newVolume, err := svc.client.CreateVolumeWithIsipath(ctx, isiPath, volName, isiVolumePathPermissions)
 	if err != nil {
 		log.Errorf("create volume failed, '%s'", err.Error())
 		return nil, err
 	}
-
-	return newVomlume, nil
+	log.Debugf("create volume %v", newVolume)
+	return newVolume, nil
 }
 
 func (svc *isiService) CreateVolumeWithMetaData(ctx context.Context, isiPath, volName, isiVolumePathPermissions string, metadata map[string]string) (isi.Volume, error) {
@@ -111,7 +111,7 @@ func (svc *isiService) CreateVolumeWithMetaData(ctx context.Context, isiPath, vo
 		log.Errorf("create volume failed, '%s'", err.Error())
 		return nil, err
 	}
-
+	log.Debugf("create volume %v", newVolume)
 	return newVolume, nil
 }
 
@@ -411,6 +411,14 @@ func (svc *isiService) GetVolume(ctx context.Context, isiPath, volID, volName st
 	}
 
 	return vol, nil
+}
+
+func (svc *isiService) GetVolumes(ctx context.Context) ([]isi.Volume, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+	log.Debugf("get all volumes")
+
+	return svc.client.GetVolumes(ctx)
 }
 
 func (svc *isiService) GetVolumeSize(ctx context.Context, isiPath, name string) int64 {
