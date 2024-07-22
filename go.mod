@@ -14,8 +14,8 @@ require (
 	github.com/dell/dell-csi-extensions/replication v1.8.0
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.6.0
 	github.com/dell/gocsi v1.11.0
-	github.com/dell/gofsutil v1.16.0
-	github.com/dell/goisilon v1.16.0
+	github.com/dell/gofsutil v1.16.1
+	github.com/dell/goisilon v1.16.1
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
