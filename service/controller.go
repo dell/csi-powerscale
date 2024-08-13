@@ -564,23 +564,21 @@ func (s *service) CreateVolume(
 			exportID = 0
 		}
 	}
-	// ALIK
+
 	// create volume (directory) with ACL 0777
 	if !isROVolumeFromSnapshot {
 		if len(headerMetadata) == 0 {
-			log.Debugf("create volume without header metadata '%s'", req.GetName())
 			_, err = isiConfig.isiSvc.CreateVolume(ctx, isiPath, req.GetName(), volumePathPermissions)
 			if err != nil {
 				return nil, err
 			}
 			log.Debugf("created volume without header metadata '%s'", req.GetName())
 		} else {
-			log.Debugf("create volume with header metadata '%s' has been resolved to '%v'", req.GetName(), headerMetadata)
 			_, err = isiConfig.isiSvc.CreateVolumeWithMetaData(ctx, isiPath, req.GetName(), volumePathPermissions, headerMetadata)
 			if err != nil {
 				return nil, err
 			}
-			log.Debugf("createted volume with header metadata '%s' has been resolved to '%v'", req.GetName(), headerMetadata)
+			log.Debugf("created volume with header metadata '%s' has been resolved to '%v'", req.GetName(), headerMetadata)
 		}
 	}
 
@@ -597,17 +595,13 @@ func (s *service) CreateVolume(
 		}
 	}
 
-	// generate new path
-	arrVolumeName := req.GetName()
-	newPath := utils.GetPathForVolume(isiPath, arrVolumeName)
-	log.Debugf("new path is '%s'", newPath)
-	log.Debugf("new volume name is '%s'", arrVolumeName)
+	volumeName := req.GetName()
 	if !foundVol && !isROVolumeFromSnapshot {
 		// create quota
-		if quotaID, err = isiConfig.isiSvc.CreateQuota(ctx, newPath, arrVolumeName, softLimit, advisoryLimit, softGracePrd, sizeInBytes, s.opts.QuotaEnabled); err != nil {
+		if quotaID, err = isiConfig.isiSvc.CreateQuota(ctx, path, volumeName, softLimit, advisoryLimit, softGracePrd, sizeInBytes, s.opts.QuotaEnabled); err != nil {
 			log.Errorf("error creating quota ('%s', '%d' bytes), abort, also roll back by deleting the newly created volume: '%v'", req.GetName(), sizeInBytes, err)
 			// roll back, delete the newly created volume
-			if err = isiConfig.isiSvc.DeleteVolume(ctx, isiPath, arrVolumeName); err != nil {
+			if err = isiConfig.isiSvc.DeleteVolume(ctx, isiPath, volumeName); err != nil {
 				return nil, fmt.Errorf("rollback (deleting volume '%s') failed with error : '%v'", req.GetName(), err)
 			}
 			return nil, fmt.Errorf("error creating quota ('%s', '%d' bytes), abort, also succesfully rolled back by deleting the newly created volume", req.GetName(), sizeInBytes)
@@ -628,8 +622,16 @@ func (s *service) CreateVolume(
 							log.Debugf("Error while adding dummy localhost entry to export '%d'", exportID)
 						}
 					}
+					// return the createVolume response with actual array volume name
+					exportPath := path
+					if export.Paths != nil {
+						exportPath = (*export.Paths)[0]
+						pathToken := strings.Split(exportPath, "/")
+						volumeName = pathToken[len(pathToken)-1]
+						log.Debugf("volume name at array '%s' and export path: %s", volumeName, exportPath)
+					}
 					// return the response
-					return s.getCreateVolumeResponse(ctx, exportID, req.GetName(), path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
+					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
 				}
 				time.Sleep(RetrySleepTime)
 				log.Printf("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
@@ -638,7 +640,7 @@ func (s *service) CreateVolume(
 			return nil, err
 		}
 	} else {
-		if exportID, err = isiConfig.isiSvc.ExportVolumeWithZone(ctx, isiPath, arrVolumeName, accessZone, utils.GetQuotaIDWithCSITag(quotaID)); err == nil && exportID != 0 {
+		if exportID, err = isiConfig.isiSvc.ExportVolumeWithZone(ctx, isiPath, volumeName, accessZone, utils.GetQuotaIDWithCSITag(quotaID)); err == nil && exportID != 0 {
 			// get the export and retry if not found to ensure the export has been created
 			for i := 0; i < MaxRetries; i++ {
 				if export, _ := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone); export != nil {
@@ -649,18 +651,16 @@ func (s *service) CreateVolume(
 							log.Debugf("Error while adding dummy localhost entry to export '%d'", exportID)
 						}
 					}
-					// return the response
-					//ALIK
-					var exportPath string
+					// return the createVolume response with actual array volume name
+					exportPath := path
 					if export.Paths != nil {
 						exportPath = (*export.Paths)[0]
 						pathToken := strings.Split(exportPath, "/")
-						arrVolumeName = pathToken[len(pathToken)-1]
-						path = exportPath
-						log.Debugf("ARRAY volume volume returned '%s' export path: %s", arrVolumeName, exportPath)
+						volumeName = pathToken[len(pathToken)-1]
+						log.Debugf("volume name at array '%s' and export path: %s", volumeName, exportPath)
 					}
 
-					return s.getCreateVolumeResponse(ctx, exportID, arrVolumeName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
+					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
 				}
 				time.Sleep(RetrySleepTime)
 				log.Printf("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)

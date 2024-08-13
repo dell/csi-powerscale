@@ -83,7 +83,6 @@ func (svc *isiService) CreateSnapshot(ctx context.Context, path, snapshotName st
 	return snapshot, nil
 }
 
-// ALIK
 func (svc *isiService) CreateVolume(ctx context.Context, isiPath, volName, isiVolumePathPermissions string) (isi.Volume, error) {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
@@ -411,14 +410,6 @@ func (svc *isiService) GetVolume(ctx context.Context, isiPath, volID, volName st
 	}
 
 	return vol, nil
-}
-
-func (svc *isiService) GetVolumes(ctx context.Context) ([]isi.Volume, error) {
-	// Fetch log handler
-	log := utils.GetRunIDLogger(ctx)
-	log.Debugf("get all volumes")
-
-	return svc.client.GetVolumes(ctx)
 }
 
 func (svc *isiService) GetVolumeSize(ctx context.Context, isiPath, name string) int64 {
