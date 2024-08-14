@@ -1134,8 +1134,8 @@ func (s *service) ControllerPublishVolume(
 		}
 	} else {
 		isiPath = utils.GetIsiPathFromExportPath(exportPath)
-		_, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)
-		if err != nil {
+		vol, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)
+		if err != nil || vol.Name == "" {
 			return nil, status.Errorf(codes.Internal,
 				utils.GetMessageWithRunID(runID, "failure checking volume status before controller publish: '%s'",
 					err.Error()))
