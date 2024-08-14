@@ -699,7 +699,7 @@ func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *Isilo
 	if size > sizeInBytes {
 		return fmt.Errorf("specified size '%d' is smaller than source snapshot size '%d'", sizeInBytes, size)
 	}
-	if _, err := isiConfig.isiSvc.CopySnapshot(ctx, isiPath, snapshotSourceVolumeIsiPath, snapshotSrc.Id, dstVolumeName, accessZone); err != nil {
+	if _, err = isiConfig.isiSvc.CopySnapshot(ctx, isiPath, snapshotSourceVolumeIsiPath, snapshotSrc.Id, dstVolumeName, accessZone); err != nil {
 		return fmt.Errorf("failed to copy snapshot id '%s', error '%s'", srcSnapshotID, err.Error())
 	}
 
@@ -718,7 +718,8 @@ func (s *service) createVolumeFromVolume(ctx context.Context, isiConfig *IsilonC
 		if _, err = isiConfig.isiSvc.CopyVolume(ctx, isiPath, srcVolumeName, dstVolumeName); err != nil {
 			return fmt.Errorf("failed to copy volume name '%s', error '%v'", srcVolumeName, err)
 		}
-		return nil
+	} else {
+		return fmt.Errorf("failed to get volume name '%s', error '%v'", srcVolumeName, err)
 	}
 
 	return nil
