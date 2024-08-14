@@ -492,7 +492,7 @@ func (s *service) CreateVolume(
 	foundVol = false
 	if isROVolumeFromSnapshot {
 		if isReplication {
-			return nil, errors.New("Unable to create replication volume from snapshot")
+			return nil, errors.New("unable to create replication volume from snapshot")
 		}
 		path = snapshotIsiPath
 		snapshotSrc, err := isiConfig.isiSvc.GetSnapshot(ctx, sourceSnapshotID)
@@ -541,7 +541,7 @@ func (s *service) CreateVolume(
 		var errMsg string
 		if err == nil {
 			if foundVol {
-				return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "the export may not be ready yet and the path is '"+path+"'"))
+				return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "the export may not be ready yet and the path is %s", path))
 			}
 		} else {
 			// internal error
@@ -678,7 +678,7 @@ func (s *service) CreateVolume(
 			return nil, err
 		}
 	}
-	return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "the export id '"+strconv.Itoa(exportID)+"' and path '"+path+"' may not be ready yet after retrying"))
+	return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "the export id %d and the path %s may not be ready yet after retrying", exportID, path))
 }
 
 func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *IsilonClusterConfig,
@@ -1134,14 +1134,14 @@ func (s *service) ControllerPublishVolume(
 	if isROVolumeFromSnapshot {
 		log.Info("Volume source is snapshot")
 		if export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, exportPath, accessZone); err != nil || export == nil {
-			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "error retrieving export for '%s'", exportPath))
+			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "error retrieving export for %s", exportPath))
 		}
 	} else {
 		isiPath = utils.GetIsiPathFromExportPath(exportPath)
 		vol, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)
 		if err != nil || vol.Name == "" {
 			return nil, status.Errorf(codes.Internal,
-				utils.GetMessageWithRunID(runID, "failure checking volume status before controller publish: '%s'",
+				utils.GetMessageWithRunID(runID, "failure checking volume status before controller publish: %s",
 					err.Error()))
 		}
 	}
@@ -1216,8 +1216,7 @@ func (s *service) ControllerPublishVolume(
 		}
 		if isiConfig.isiSvc.OtherClientsAlreadyAdded(ctx, exportID, accessZone, nodeID) {
 			return nil, status.Errorf(codes.FailedPrecondition, utils.GetMessageWithRunID(runID,
-				"export '%d' in access zone '%s' already has other clients added to it, and the access mode is "+
-					"%s, thus the request fails", exportID, accessZone, am.Mode))
+				"export %d in access zone %s already has other clients added to it, and the access mode is %s thus the request fails", exportID, accessZone, am.Mode))
 		}
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
@@ -1228,12 +1227,12 @@ func (s *service) ControllerPublishVolume(
 			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
 	default:
-		return nil, status.Errorf(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "unsupported access mode: '%s'", am.String()))
+		return nil, status.Errorf(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "unsupported access mode: %s", am.String()))
 	}
 
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID,
-			"internal error occurred when attempting to add client ip '%s' to export '%d', error : '%v'", nodeID, exportID, err))
+			"internal error occurred when attempting to add client ip %s to export %d, error : %v", nodeID, exportID, err))
 	}
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
@@ -1281,8 +1280,7 @@ func (s *service) ValidateVolumeCapabilities(
 	vol, err := s.getVolByName(ctx, isiPath, volName, isiConfig)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal,
-			utils.GetMessageWithRunID(runID, "failure checking volume status for capabilities: '%s'",
-				err.Error()))
+			utils.GetMessageWithRunID(runID, "failure checking volume status for capabilities: %s", err.Error()))
 	}
 
 	vcs := req.GetVolumeCapabilities()
@@ -1395,7 +1393,7 @@ func (s *service) ControllerUnpublishVolume(
 
 	_, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.VolumeId)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "failed to parse volume ID '%s', error : '%s'", req.VolumeId, err.Error()))
+		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "failed to parse volume ID %s error : %s", req.VolumeId, err.Error()))
 	}
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
@@ -1409,7 +1407,7 @@ func (s *service) ControllerUnpublishVolume(
 
 	// auto probe
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, err.Error()))
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "error %s", err.Error()))
 	}
 
 	nodeID := req.GetNodeId()
