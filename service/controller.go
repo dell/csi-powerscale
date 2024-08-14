@@ -622,11 +622,13 @@ func (s *service) CreateVolume(
 					}
 					// return the createVolume response with actual array volume name
 					exportPath := path
-					if export.Paths != nil {
-						exportPath = (*export.Paths)[0]
-						pathToken := strings.Split(exportPath, "/")
-						volumeName = pathToken[len(pathToken)-1]
-						log.Debugf("volume name at array '%s' and export path: %s", volumeName, exportPath)
+					if export != nil && export.Paths != nil {
+						if len(*export.Paths) > 0 {
+							exportPath = (*export.Paths)[0]
+							pathToken := strings.Split(exportPath, "/")
+							volumeName = pathToken[len(pathToken)-1]
+							log.Debugf("volume name at array '%s' and export path: %s", volumeName, exportPath)
+						}
 					}
 					// return the response
 					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
@@ -651,11 +653,13 @@ func (s *service) CreateVolume(
 					}
 					// return the createVolume response with actual array volume name
 					exportPath := path
-					if export.Paths != nil {
-						exportPath = (*export.Paths)[0]
-						pathToken := strings.Split(exportPath, "/")
-						volumeName = pathToken[len(pathToken)-1]
-						log.Debugf("volume name at array '%s' and export path: %s", volumeName, exportPath)
+					if export != nil && export.Paths != nil {
+						if len(*export.Paths) > 0 {
+							exportPath = (*export.Paths)[0]
+							pathToken := strings.Split(exportPath, "/")
+							volumeName = pathToken[len(pathToken)-1]
+							log.Debugf("volume name at array '%s' and export path: %s", volumeName, exportPath)
+						}
 					}
 
 					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
