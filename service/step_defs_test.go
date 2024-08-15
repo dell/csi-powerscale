@@ -2366,7 +2366,7 @@ func (f *feature) aIsilonServiceWithParamsForCustomTopologyNoLabel(user, mode st
 func removeNodeLabels(host string) (result bool) {
 	mockStr := fmt.Sprintf("mocked call to remove labels on %s ", host)
 	k8s.DeleteK8sValuesFile()
-	fmt.Printf(mockStr)
+	fmt.Print(mockStr)
 	return true
 }
 
@@ -2375,7 +2375,7 @@ func applyNodeLabel(host, label string) (result bool) {
 	// expect kubernetes commands to work
 	mockStr := fmt.Sprintf("mocked call apply lable %s to %s", label, host)
 	k8s.WriteK8sValueToFile(k8s.K8sLabel, label)
-	fmt.Printf(mockStr)
+	fmt.Print(mockStr)
 
 	return true
 }

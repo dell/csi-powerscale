@@ -103,7 +103,7 @@ func GetFakeNode() *v1.Node {
 		hostname = "fake-host"
 		log.Errorf("setting hostname as %s as call to get hostname failed", hostname)
 	}
-	log.Printf(hostname)
+	log.Print(hostname)
 	labelMap := make(map[string]string)
 	labelMap["beta.kubernetes.io/arch"] = "amd64"
 	labelMap["beta.kubernetes.io/os"] = "linux"

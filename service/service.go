@@ -782,7 +782,7 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 
 func handler(_, value interface{}) bool {
 	_, log := GetLogger(context.Background())
-	log.Debugf(value.(*IsilonClusterConfig).String())
+	log.Debug(value.(*IsilonClusterConfig).String())
 	return true
 }
 
