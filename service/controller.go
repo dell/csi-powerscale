@@ -1420,8 +1420,7 @@ func (s *service) ControllerUnpublishVolume(
 				return nil, delErr
 			}
 		} else {
-			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "error encountered when"+
-				" trying to remove client '%s' from export '%d' with access zone '%s' on cluster '%s', error %s", nodeID, exportID, accessZone, clusterName, err.Error()))
+			return nil, status.Errorf(codes.Internal, " runid=%s error encountered when trying to remove client '%s' from export '%d' with access zone '%s' on cluster '%s', error %s", runID, nodeID, exportID, accessZone, clusterName, err.Error())
 		}
 	}
 
@@ -1466,10 +1465,10 @@ func (s *service) GetCapacity(
 
 	stat, err := isiConfig.isiSvc.GetStatistics(ctx, keyArray)
 	if err != nil || len(stat.StatsList) < 1 {
-		return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "Could not retrieve capacity. Error '%s'", err.Error()))
+		return nil, status.Errorf(codes.Internal, " runid=%s Could not retrieve capacity. Error '%s'", runID, err.Error())
 	}
 	if stat.StatsList[0].Error != "" {
-		return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID("Could not retrieve capacity. Data returned error '%s'", stat.StatsList[0].Error))
+		return nil, status.Errorf(codes.Internal, "runid=%s Could not retrieve capacity. Data returned error '%s'", runID, stat.StatsList[0].Error)
 	}
 	remainingCapInBytes := stat.StatsList[0].Value
 
@@ -1619,7 +1618,7 @@ func (s *service) CreateSnapshot(
 	// parse the input volume id and fetch it's components
 	_, _, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
 	if err != nil {
-		return nil, status.Error(codes.NotFound, utils.GetMessageWithRunID(runID, err.Error()))
+		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
 	}
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
@@ -1633,7 +1632,7 @@ func (s *service) CreateSnapshot(
 
 	// auto probe
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, err.Error()))
+		return nil, status.Errorf(codes.FailedPrecondition, " runid=%s %s", runID, err.Error())
 	}
 
 	// validate request and get details of the request
@@ -1658,7 +1657,7 @@ func (s *service) CreateSnapshot(
 
 	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, err.Error()))
+		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
 	}
 
 	log.Infof("snapshot name is '%s' and source volume ID is '%s' access Zone is '%s'", snapshotName, srcVolumeID, accessZone)
@@ -1679,7 +1678,7 @@ func (s *service) CreateSnapshot(
 	// create new snapshot for source direcory
 	path := utils.GetPathForVolume(isiPath, srcVolumeID)
 	if snapshotNew, err = isiConfig.isiSvc.CreateSnapshot(ctx, path, snapshotName); err != nil {
-		return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, err.Error()))
+		return nil, status.Errorf(codes.Internal, " runid=%s %s", runID, err.Error())
 	}
 	_, _ = isiConfig.isiSvc.GetSnapshot(ctx, snapshotName)
 
@@ -1698,7 +1697,7 @@ func (s *service) validateCreateSnapshotRequest(
 
 	srcVolumeID, _, _, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
 	if err != nil {
-		return "", "", status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, err.Error()))
+		return "", "", status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
 	}
 
 	ctx, log = setClusterContext(ctx, clusterName)
@@ -1750,7 +1749,7 @@ func (s *service) DeleteSnapshot(
 	ctx, log, runID := GetRunIDLog(ctx)
 	log.Infof("DeleteSnapshot started")
 	if req.GetSnapshotId() == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "snapshot id to be deleted is required"))
+		return nil, status.Errorf(codes.FailedPrecondition, " runid=%s snapshot id to be deleted is required", runID)
 	}
 	// parse the input snapshot id and fetch it's components
 	snapshotID, clusterName, accessZone, err := utils.ParseNormalizedSnapshotID(ctx, req.GetSnapshotId())
