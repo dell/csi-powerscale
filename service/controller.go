@@ -1275,8 +1275,7 @@ func (s *service) ValidateVolumeCapabilities(
 
 	vol, err := s.getVolByName(ctx, isiPath, volName, isiConfig)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal,
-			utils.GetMessageWithRunID(runID, "failure checking volume status for capabilities: %s", err.Error()))
+		return nil, status.Errorf(codes.Internal, " runid=%s failure checking volume status for capabilities: %s", runID, err.Error())
 	}
 
 	vcs := req.GetVolumeCapabilities()
@@ -1384,7 +1383,7 @@ func (s *service) ControllerUnpublishVolume(
 	noProbeOnStart = false
 
 	if req.VolumeId == "" {
-		return nil, status.Errorf(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "ControllerUnpublishVolumeRequest.VolumeId is empty"))
+		return nil, status.Errorf(codes.InvalidArgument, " runid=%s ControllerUnpublishVolumeRequest.VolumeId is empty", runID)
 	}
 
 	_, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.VolumeId)
