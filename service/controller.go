@@ -1772,7 +1772,7 @@ func (s *service) DeleteSnapshot(
 
 	id, err := strconv.ParseInt(snapshotID, 10, 64)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "cannot convert snapshot to integer: '%s'", err.Error()))
+		return nil, status.Errorf(codes.Internal, " runid=%s cannot convert snapshot to integer: '%s'", runID, err.Error())
 	}
 	snapshot, err := isiConfig.isiSvc.GetSnapshot(ctx, snapshotID)
 	// Idempotency check
@@ -1785,13 +1785,13 @@ func (s *service) DeleteSnapshot(
 				return &csi.DeleteSnapshotResponse{}, nil
 			}
 			// Internal server error if the error is not about "not found"
-			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "cannot check the existence of the snapshot: '%s'", err.Error()))
+			return nil, status.Errorf(codes.Internal, " runid=%s cannot check the existence of the snapshot: '%s'", runID, err.Error())
 		}
 
 		if jsonError.StatusCode == 404 {
 			return &csi.DeleteSnapshotResponse{}, nil
 		}
-		return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "cannot check the existence of the snapshot: '%s'", err.Error()))
+		return nil, status.Errorf(codes.Internal, " runid=%s cannot check the existence of the snapshot: '%s'", runID, err.Error())
 	}
 
 	// Get snapshot path
@@ -1799,7 +1799,7 @@ func (s *service) DeleteSnapshot(
 	log.Infof("Snapshot source volume isiPath is '%s'", snapshotSourceVolumeIsiPath)
 	snapshotIsiPath, err := isiConfig.isiSvc.GetSnapshotIsiPath(ctx, snapshotSourceVolumeIsiPath, snapshotID, accessZone)
 	if err != nil {
-		return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, err.Error()))
+		return nil, status.Errorf(codes.Internal, " runid%s error %s", runID, err.Error())
 	}
 	log.Debugf("The Isilon directory path of snapshot is= %v", snapshotIsiPath)
 
@@ -1822,7 +1822,7 @@ func (s *service) DeleteSnapshot(
 	if deleteSnapshot {
 		err = isiConfig.isiSvc.DeleteSnapshot(ctx, id, "")
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "error deleting snapshot: '%s'", err.Error()))
+			return nil, status.Errorf(codes.Internal, " runid=%s error deleting snapshot: '%s'", runID, err.Error())
 		}
 	}
 	log.Infof("Snapshot with id '%s' deleted", snapshotID)
@@ -1979,7 +1979,7 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 
 	volName, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, volID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, err.Error()))
+		return nil, status.Errorf(codes.InvalidArgument, " runid=%s error %s", runID, err.Error())
 	}
 
 	ctx, log = setClusterContext(ctx, clusterName)
@@ -2004,7 +2004,7 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 	}
 
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, err.Error()))
+		return nil, status.Errorf(codes.FailedPrecondition, " runid=%s error %s", runID, err.Error())
 	}
 
 	// check if volume exists
