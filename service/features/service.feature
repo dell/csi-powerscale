@@ -27,13 +27,13 @@ Feature: Isilon CSI interface
       Given a Isilon service
       When I render Isilon service unreachable
       And I call Probe
-      Then an invalid ProbeResponse is returned  
+      Then an invalid ProbeResponse is returned
 
     Scenario: Identity Probe bad call with empty password for OneFS REST connection
       Given a Isilon service
       When I set empty password for Isilon service
       And I call Probe
-      Then an invalid ProbeResponse is returned  
+      Then an invalid ProbeResponse is returned
 
     Scenario: Call ControllerGetCapabilities with health monitor feature enabled
       Given a Isilon service
@@ -97,7 +97,7 @@ Feature: Isilon CSI interface
 
      Examples:
      | induced               | errormsg                                                           |
-     | "StatsError"          | "runid=Could not retrieve capacity. Data returned error"         |
+     | "StatsError"          | "Could not retrieve capacity. Data returned error"         |
      | "InstancesError"      | "runid=1 Could not retrieve capacity. Error 'Error retrieving Statistics'" |
      | "none"                | "none"                                                             |
 
@@ -151,7 +151,7 @@ Feature: Isilon CSI interface
       Given a Isilon service
       When I call Probe
       And I induce error "OmitAccessMode"
-      And I call ControllerPublishVolume with "" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1" 
+      And I call ControllerPublishVolume with "" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
       Then the error contains "access mode is required"
 
     Scenario: ControllerPublishVolume good scenario
@@ -199,7 +199,7 @@ Feature: Isilon CSI interface
       When I call Probe
       And I call ControllerUnpublishVolume with name "volume2=_=_=43=_=_=System" and access type "single-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
       Then a valid ControllerUnpublishVolumeResponse is returned
-    
+
     Scenario Outline: ControllerUnpublishVolume bad calls
       Given a Isilon service
       When I call Probe
@@ -265,7 +265,7 @@ Feature: Isilon CSI interface
     Scenario: Identify initialize real isilon service bad call
       When I call initialize real isilon service
       Then the error contains "node ID is required"
-    
+
     Scenario Outline: Calling isilon service with parameters and induced error
       Given I induce error <serviceErr>
       And a Isilon service with params <user> <mode>
@@ -289,7 +289,7 @@ Feature: Isilon CSI interface
       Given a Isilon service
       When I call logStatistics <times> times
       Then the error contains <errormsg>
-      
+
     Examples:
       | times    | errormsg     |
       | 100      | "none"       |
@@ -317,12 +317,12 @@ Feature: Isilon CSI interface
       When I set noProbeOnStart to "false"
       When I call BeforeServe
       Then the error contains "probe of all isilon clusters failed"
-      
+
     Scenario: Calling unimplemented functions
       Given a Isilon service
       When I call unimplemented functions
       Then the error contains "Unimplemented"
-    
+
     Scenario: Calling autoProbe with not enabled
       Given I induce error "noIsiService"
       And I induce error "autoProbeNotEnabled"
@@ -335,7 +335,7 @@ Feature: Isilon CSI interface
       And a Isilon service with params "blah" "controller"
       When I call autoProbe
       Then the error contains "none"
-    
+
     Scenario: Calling functions with autoProbe failed
       Given a Isilon service
       And I induce error "autoProbeFailed"
@@ -390,30 +390,30 @@ Feature: Isilon CSI interface
       When I call Probe
       And I call ControllerGetVolume with name "volume2=_=_=43=_=_=System=_=_=cluster2"
       Then the error contains "failed to get cluster config details for clusterName: 'cluster2'"
-  
+
     Scenario: Calling functions with autoProbe failed
       Given a Isilon service
       And I induce error "autoProbeFailed"
       And I call ControllerGetVolume with name "volume2=_=_=43=_=_=System=_=_=cluster1"
       Then the error contains "auto probe is not enabled"
-  
+
     Scenario: ControllerGetVolume volume does not exist scenario
       Given a Isilon service
       And I call ControllerGetVolume with name "volume2=_=_=43"
       Then the error contains "cannot be split into tokens"
-  
+
     Scenario: ControllerGetVolume volume does not exist scenario
       Given a Isilon service
       When I call Probe
       And I call ControllerGetVolume with name "volume3=_=_=43=_=_=System=_=_=cluster1"
       Then a valid ControllerGetVolumeResponse is returned
-  
+
     Scenario: Calling functions with autoProbe failed
       Given a Isilon service
       And I induce error "autoProbeFailed"
       And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1"
       Then the error contains "auto probe is not enabled"
-  
+
     Scenario: NodeGetVolumeStats volume does not exist scenario
       Given a Isilon service
       When I call Probe
@@ -432,7 +432,7 @@ Feature: Isilon CSI interface
       When I call Probe
       And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1"
       Then a NodeGetVolumeResponse is returned
-      
+
     Scenario: NodeGetVolumeStats volume does not exist at path scenario
       Given a Isilon service
       When I call Probe
@@ -455,23 +455,23 @@ Feature: Isilon CSI interface
       And I call NodePublishVolume
       And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1"
       Then a NodeGetVolumeResponse is returned
- 
+
     Scenario: Identity GetReplicationCapabilities call
       Given a Isilon service
       When I call GetReplicationCapabilities
       Then a valid GetReplicationCapabilitiesResponse is returned
-  
+
     Scenario: Call Isilon Service with custom topology
       Given a Isilon service with custom topology "blah" "controller"
       When I call Probe
       Then the error contains "probe of all isilon clusters failed"
-  
+
     Scenario: Call ProbeController
       Given a Isilon service
       When I call Probe
       And I call ProbeController
       Then the error contains "none"
-  
+
     Scenario Outline: Dynamic log config change
       Given a Isilon service
       When I call DynamicLogChange <file>
@@ -543,7 +543,7 @@ Feature: Isilon CSI interface
     Given a Isilon service with params "" "controller"
     And I call ProbeController
     Then the error contains "probe of all isilon clusters failed"
-  
+
   Scenario: ControllerGetVolume export does not exist scenario
     Given a Isilon service
     When I call Probe

@@ -1468,7 +1468,7 @@ func (s *service) GetCapacity(
 		return nil, status.Errorf(codes.Internal, " runid=%s Could not retrieve capacity. Error '%s'", runID, err.Error())
 	}
 	if stat.StatsList[0].Error != "" {
-		return nil, status.Errorf(codes.Internal, "runid=%s Could not retrieve capacity. Data returned error '%s'", runID, stat.StatsList[0].Error)
+		return nil, status.Errorf(codes.Internal, " runid=%s Could not retrieve capacity. Data returned error '%s'", runID, stat.StatsList[0].Error)
 	}
 	remainingCapInBytes := stat.StatsList[0].Value
 
