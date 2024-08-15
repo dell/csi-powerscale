@@ -600,7 +600,7 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 
 	currentClient, err := getClientToUseForNodeID(ctx, clusterToNodeIDMap, clusterName, nodeID)
 	if err != nil {
-		log.Debugf(err.Error())
+		log.Debug(err.Error())
 		clientToUse = clientFQDN
 	} else {
 		clientToUse = currentClient
