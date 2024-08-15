@@ -1134,13 +1134,15 @@ func (s *service) ControllerPublishVolume(
 	if isROVolumeFromSnapshot {
 		log.Info("Volume source is snapshot")
 		if export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, exportPath, accessZone); err != nil || export == nil {
-			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "error retrieving export for %s", exportPath))
+			errMsg := fmt.Sprintf(" runid=%s error retrieving export for %s", runID, exportPath)
+			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, errMsg))
 		}
 	} else {
 		isiPath = utils.GetIsiPathFromExportPath(exportPath)
 		vol, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)
 		if err != nil || vol.Name == "" {
-			return nil, status.Errorf(codes.Internal, fmt.Sprintf(" runid=%s failure checking volume status before controller publish: %s", runID, err.Error()))
+			errMsg := fmt.Sprintf(" runid=%s failure checking volume status before controller publish: %s", runID, err.Error())
+			return nil, status.Errorf(codes.Internal, errMsg)
 			//utils.GetMessageWithRunID(runID, "failure checking volume status before controller publish: %s", err.Error()))
 
 		}
