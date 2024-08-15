@@ -1190,7 +1190,7 @@ func (s *service) ControllerPublishVolume(
 		}
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
-			isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
 
 		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
@@ -1217,7 +1217,7 @@ func (s *service) ControllerPublishVolume(
 		}
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
-			isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
 		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
 		if err == nil && rootClientEnabled {
