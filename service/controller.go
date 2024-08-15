@@ -1134,17 +1134,13 @@ func (s *service) ControllerPublishVolume(
 	if isROVolumeFromSnapshot {
 		log.Info("Volume source is snapshot")
 		if export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, exportPath, accessZone); err != nil || export == nil {
-			//errMsg := fmt.Sprintf(" runid=%s error retrieving export for %s", runID, exportPath)
 			return nil, status.Errorf(codes.Internal, " runid=%s error retrieving export for %s", runID, exportPath)
 		}
 	} else {
 		isiPath = utils.GetIsiPathFromExportPath(exportPath)
 		vol, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)
 		if err != nil || vol.Name == "" {
-			//errMsg := fmt.Sprintf(" runid=%s failure checking volume status before controller publish: %v", runID, err)
 			return nil, status.Errorf(codes.Internal, " runid=%s failure checking volume status before controller publish: %v", runID, err)
-			//utils.GetMessageWithRunID(runID, "failure checking volume status before controller publish: %s", err.Error()))
-
 		}
 	}
 
@@ -1194,7 +1190,7 @@ func (s *service) ControllerPublishVolume(
 		}
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
 
 		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
@@ -1217,24 +1213,22 @@ func (s *service) ControllerPublishVolume(
 			break
 		}
 		if isiConfig.isiSvc.OtherClientsAlreadyAdded(ctx, exportID, accessZone, nodeID) {
-			return nil, status.Errorf(codes.FailedPrecondition, utils.GetMessageWithRunID(runID,
-				"export %d in access zone %s already has other clients added to it, and the access mode is %s thus the request fails", exportID, accessZone, am.Mode))
+			return nil, status.Errorf(codes.FailedPrecondition, " runid=%s export %d in access zone %s already has other clients added to it, and the access mode is %s thus the request fails", runID, exportID, accessZone, am.Mode)
 		}
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
 		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
 		if err == nil && rootClientEnabled {
 			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
 		}
 	default:
-		return nil, status.Errorf(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "unsupported access mode: %s", am.String()))
+		return nil, status.Errorf(codes.InvalidArgument, " runid=%s unsupported access mode: %s", runID, am.String())
 	}
 
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID,
-			"internal error occurred when attempting to add client ip %s to export %d, error : %v", nodeID, exportID, err))
+		return nil, status.Errorf(codes.Internal, " runid=%s internal error occurred when attempting to add client ip %s to export %d, error : %v", runID, nodeID, exportID, err)
 	}
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
