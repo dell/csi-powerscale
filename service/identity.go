@@ -17,7 +17,6 @@ package service
 */
 
 import (
-	"fmt"
 	"strings"
 
 	"golang.org/x/net/context"
@@ -95,7 +94,7 @@ func (s *service) Probe(
 		rep.Ready.Value = false
 		return rep, err
 	}
-	log.Debugf(fmt.Sprintf("Probe returning: %v", rep.Ready.GetValue()))
+	log.Debugf("Probe returning: %v", rep.Ready.GetValue())
 	return rep, nil
 }
 
