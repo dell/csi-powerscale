@@ -93,7 +93,6 @@ func (svc *isiService) CreateVolume(ctx context.Context, isiPath, volName, isiVo
 		log.Errorf("create volume failed, '%s'", err.Error())
 		return err
 	}
-
 	return nil
 }
 
@@ -108,7 +107,6 @@ func (svc *isiService) CreateVolumeWithMetaData(ctx context.Context, isiPath, vo
 		log.Errorf("create volume failed, '%s'", err.Error())
 		return err
 	}
-
 	return nil
 }
 
