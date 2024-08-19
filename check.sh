@@ -47,9 +47,10 @@ VET_RETURN_CODE=$?
 echo === Finished
 
 echo === Linting...
-(command -v golint >/dev/null 2>&1 \
-    || go install golang.org/x/lint/golint@latest) \
-    && golint --set_exit_status ./service/... ./common/...
+GOOS=linux CGO_ENABLED=0
+(command -v golangci-lint >/dev/null 2>&1 \
+    || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.60.1) \
+    && golangci-lint run ./service/... ./common/...
 LINT_RETURN_CODE=$?
 echo === Finished
 
