@@ -97,7 +97,7 @@ Feature: Isilon CSI interface
 
      Examples:
      | induced               | errormsg                                                           |
-     | "StatsError"          | "runid=Could not retrieve capacity. Data returned error"         |
+     | "StatsError"          | "runid=1 Could not retrieve capacity. Data returned error"         |
      | "InstancesError"      | "runid=1 Could not retrieve capacity. Error 'Error retrieving Statistics'" |
      | "none"                | "none"                                                             |
 
