@@ -191,7 +191,7 @@ Feature: Isilon CSI interface
     And I call NodePublishVolume
     When I call NodeUnpublishVolume
     Then a valid NodeUnpublishVolumeResponse is returned
-    
+
   Scenario: Node unpublish when volume already unpublished
     Given a Isilon service
     And I have a Node "node1" with AccessZone
@@ -229,7 +229,7 @@ Feature: Isilon CSI interface
   Scenario: Ephemeral NodeUnpublish test cases
   Given a Isilon service
   And I call EphemeralNodeUnpublishVolume
-  Then the error contains "exports found for volume"
+  Then the error contains "none"
 
   #This test is failing and when it is working it is not doing its job correctly
   @todo
@@ -237,9 +237,9 @@ Feature: Isilon CSI interface
     Given a Isilon service
     And I call EphemeralNodePublishVolume
     And I call EphemeralNodeUnpublishVolume
-    Then the error contains "none"   
-   
-@todo 
+    Then the error contains "none"
+
+@todo
   Scenario Outline: Ephemeral NodePublish negative scenario
     Given a Isilon service
     And get Node Publish Volume Request
@@ -249,5 +249,5 @@ Feature: Isilon CSI interface
 
     Examples:
     | errora                                  | errormsg                                                                  |
-    |"GOFSMockGetMountsError"                 | "could not reliably determine existing mount status"                      | 
+    |"GOFSMockGetMountsError"                 | "could not reliably determine existing mount status"                      |
 

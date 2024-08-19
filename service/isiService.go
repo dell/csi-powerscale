@@ -93,7 +93,6 @@ func (svc *isiService) CreateVolume(ctx context.Context, isiPath, volName, isiVo
 		log.Errorf("create volume failed, '%s'", err.Error())
 		return err
 	}
-
 	return nil
 }
 
@@ -108,7 +107,6 @@ func (svc *isiService) CreateVolumeWithMetaData(ctx context.Context, isiPath, vo
 		log.Errorf("create volume failed, '%s'", err.Error())
 		return err
 	}
-
 	return nil
 }
 
@@ -602,7 +600,7 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 
 	currentClient, err := getClientToUseForNodeID(ctx, clusterToNodeIDMap, clusterName, nodeID)
 	if err != nil {
-		log.Debugf(err.Error())
+		log.Debug(err.Error())
 		clientToUse = clientFQDN
 	} else {
 		clientToUse = currentClient
