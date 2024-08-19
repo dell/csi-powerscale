@@ -525,7 +525,7 @@ func (s *service) ExecuteAction(ctx context.Context, req *csiext.ExecuteActionRe
 	}
 
 	if err := actionFunc(ctx, isiConfig, remoteIsiConfig, vgName, log.WithFields(fields)); err != nil {
-		return nil, status.Errorf(codes.Unknown, err.Error()) // Error while executing action, shouldn't be retried.
+		return nil, status.Error(codes.Unknown, err.Error()) // Error while executing action, shouldn't be retried.
 	}
 
 	statusResp, err := s.GetStorageProtectionGroupStatus(ctx, &csiext.GetStorageProtectionGroupStatusRequest{
@@ -648,7 +648,7 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 				// do not update isSource
 			},
 		}
-		return resp, status.Errorf(codes.Internal, errMsg)
+		return resp, status.Error(codes.Internal, errMsg)
 	}
 
 	log.Info("Trying to get replication direction")

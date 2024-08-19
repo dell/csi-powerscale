@@ -121,7 +121,7 @@ func (s *service) NodePublishVolume(
 	if isROVolumeFromSnapshot {
 		log.Info("Volume source is snapshot")
 		if export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, path, accessZone); err != nil || export == nil {
-			return nil, status.Errorf(codes.Internal, utils.GetMessageWithRunID(runID, "error retrieving export for '%s'", path))
+			return nil, status.Errorf(codes.Internal, " runid=%s error retrieving export for '%s'", runID, path)
 		}
 	} else {
 		// Parse the target path and empty volume name to get the volume
