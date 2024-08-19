@@ -232,7 +232,7 @@ REPODIR="$( dirname "${SCRIPTDIR}" )"
 
 DRIVERVERSION="csi-isilon-2.11.0"
 
-while getopts "cpr:h" opt; do
+while getopts "cprv:h" opt; do
   case $opt in
     c)
       CREATE="true"
