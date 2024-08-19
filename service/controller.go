@@ -1471,7 +1471,7 @@ func (s *service) GetCapacity(
 
 	stat, err := isiConfig.isiSvc.GetStatistics(ctx, keyArray)
 	if err != nil || len(stat.StatsList) < 1 {
-		return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "Could not retrieve capacity. Error %s", err.Error()))
+		return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "Could not retrieve capacity. %s", err.Error()))
 	}
 	if stat.StatsList[0].Error != "" {
 		return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "Could not retrieve capacity. Data returned error %s", stat.StatsList[0].Error))
