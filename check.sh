@@ -47,7 +47,6 @@ VET_RETURN_CODE=$?
 echo === Finished
 
 echo === Linting...
-GOOS=linux CGO_ENABLED=0
 (command -v golangci-lint >/dev/null 2>&1 \
     || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.60.1) \
     && golangci-lint run ./service/... ./common/...
