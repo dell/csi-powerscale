@@ -76,7 +76,7 @@ func (s *service) NodePublishVolume(
 
 	volumeContext := req.GetVolumeContext()
 	if volumeContext == nil {
-		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunIDf(runID, "VolumeContext is nil, skip NodePublishVolume"))
+		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "VolumeContext is nil, skip NodePublishVolume"))
 	}
 	utils.LogMap(ctx, "VolumeContext", volumeContext)
 
@@ -110,18 +110,18 @@ func (s *service) NodePublishVolume(
 	path := volumeContext["Path"]
 
 	if path == "" {
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunIDf(runID, "no entry keyed by 'Path' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no entry keyed by 'Path' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
 	}
 	volName := volumeContext["Name"]
 	if volName == "" {
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunIDf(runID, "no entry keyed by 'Name' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no entry keyed by 'Name' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
 	}
 	accessZone := volumeContext["AccessZone"]
 	isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(path, accessZone)
 	if isROVolumeFromSnapshot {
 		log.Info("Volume source is snapshot")
 		if export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, path, accessZone); err != nil || export == nil {
-			return nil, status.Error(codes.Internal, utils.GetMessageWithRunIDf(runID, "error retrieving export for '%s'", path))
+			return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "error retrieving export for '%s'", path))
 		}
 	} else {
 		// Parse the target path and empty volume name to get the volume
@@ -174,7 +174,7 @@ func (s *service) NodeUnpublishVolume(
 	noProbeOnStart = false
 	volID := req.GetVolumeId()
 	if volID == "" {
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunIDf(runID, "no VolumeID found in request"))
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no VolumeID found in request"))
 	}
 	log.Infof("The volume ID fetched from NodeUnPublish req is %s", volID)
 
@@ -435,11 +435,11 @@ func (s *service) NodeGetVolumeStats(
 
 	volID := req.GetVolumeId()
 	if volID == "" {
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunIDf(runID, "no VolumeID found in request"))
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no VolumeID found in request"))
 	}
 	volPath := req.GetVolumePath()
 	if volPath == "" {
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunIDf(runID, "no Volume Path found in request"))
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no Volume Path found in request"))
 	}
 
 	volName, _, _, clusterName, _ := utils.ParseNormalizedVolumeID(ctx, volID)
@@ -676,7 +676,7 @@ func (s *service) ephemeralNodeUnpublish(
 	volumeID := req.GetVolumeId()
 	log.Infof("The volID is %s", volumeID)
 	if volumeID == "" {
-		return status.Error(codes.InvalidArgument, utils.GetMessageWithRunIDf(runID, "volume ID is required"))
+		return status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "volume ID is required"))
 	}
 
 	nodeID, nodeIDErr := s.getPowerScaleNodeID(ctx)

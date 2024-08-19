@@ -457,12 +457,7 @@ func GetVolumeNameFromExportPath(exportPath string) string {
 }
 
 // GetMessageWithRunID returns message with runID information
-func GetMessageWithRunID(runid string, format string) string {
-	return fmt.Sprintf(" runid=%s %s", runid, format)
-}
-
-// GetMessageWithRunIDf formats according to a format specifier and returns message with runID information
-func GetMessageWithRunIDf(runid string, format string, args ...interface{}) string {
+func GetMessageWithRunID(runid string, format string, args ...interface{}) string {
 	str := fmt.Sprintf(format, args...)
-	return GetMessageWithRunID(runid, str)
+	return fmt.Sprintf(" runid=%s %s", runid, str)
 }
