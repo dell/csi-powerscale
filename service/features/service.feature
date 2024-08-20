@@ -97,8 +97,8 @@ Feature: Isilon CSI interface
 
      Examples:
      | induced               | errormsg                                                           |
-     | "StatsError"          | "Could not retrieve capacity. Data returned error"         |
-     | "InstancesError"      | "runid=1 Could not retrieve capacity. Error 'Error retrieving Statistics'" |
+     | "StatsError"          | "runid=1 Could not retrieve capacity. Data returned error"         |
+     | "InstancesError"      | "runid=1 Could not retrieve capacity. Error retrieving Statistics" |
      | "none"                | "none"                                                             |
 
     Scenario: Call NodeGetInfo
