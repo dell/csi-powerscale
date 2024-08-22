@@ -40,7 +40,6 @@ func New() gocsi.StoragePluginProvider {
 	maxStreams := grpc.MaxConcurrentStreams(8)
 	serverOptions := make([]grpc.ServerOption, 1)
 	serverOptions[0] = maxStreams
-	log.Info("Chiman: created new storage plugin provider")
 	svc := service.New()
 
 	interList := []grpc.UnaryServerInterceptor{

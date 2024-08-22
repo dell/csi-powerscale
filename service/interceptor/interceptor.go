@@ -63,8 +63,6 @@ type lockProvider struct {
 
 func (i *lockProvider) GetLockWithID(_ context.Context, id string) (gosync.TryLocker, error) {
 	i.volIDLocksL.Lock()
-	log.Info("Chiman: calling GetLockWithID")
-	defer log.Info("Chiman: calling end GetLockWithID")
 	defer i.volIDLocksL.Unlock()
 
 	lock := i.volIDLocks[id]
@@ -78,8 +76,6 @@ func (i *lockProvider) GetLockWithID(_ context.Context, id string) (gosync.TryLo
 
 func (i *lockProvider) GetLockWithName(_ context.Context, name string) (gosync.TryLocker, error) {
 	i.volNameLocksL.Lock()
-	log.Info("Chiman: calling GetLockWithName")
-	defer log.Info("Chiman: calling end GetLockWithName")
 	defer i.volNameLocksL.Unlock()
 
 	lock := i.volNameLocks[name]
@@ -127,7 +123,6 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 		case *csi.NodeUnstageVolumeRequest:
 			return i.nodeUnstageVolume(ctx, t, info, handler)
 		default:
-			log.Info("Chiman: request type", t, "calling default condition")
 			return gocsiSerializer(ctx, req, info, handler)
 		}
 	}
@@ -159,14 +154,12 @@ func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
 func (i *interceptor) controllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
-	log.Info("Chiman: request type", req, "this method")
 	return handler(ctx, req)
 }
 
 func (i *interceptor) controllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
-	log.Info("Chiman: request type", req, "this method")
 	return handler(ctx, req)
 }
 
