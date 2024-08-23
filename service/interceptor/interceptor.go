@@ -118,12 +118,12 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 			return i.controllerUnpublishVolume(ctx, t, info, handler)
 		case *csi.CreateVolumeRequest:
 			return i.createVolume(ctx, t, info, handler)
+		case *csi.DeleteVolumeRequest:
+			return i.deleteVolume(ctx, t, info, handler)
 		case *csi.NodeStageVolumeRequest:
 			return i.nodeStageVolume(ctx, t, info, handler)
 		case *csi.NodeUnstageVolumeRequest:
 			return i.nodeUnstageVolume(ctx, t, info, handler)
-		case *csi.DeleteVolumeRequest:
-			return i.deleteVolume(ctx, t, info, handler)
 		case *csi.NodePublishVolumeRequest:
 			return i.nodePublishVolume(ctx, t, info, handler)
 		case *csi.NodeUnpublishVolumeRequest:

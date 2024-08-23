@@ -84,9 +84,65 @@ func TestNewCustomSerialLock(t *testing.T) {
 		wg.Wait()
 		return err
 	}
+
+	t.Run("ControllerPublishVolume for same volume concurrent call", func(t *testing.T) {
+		err := runTest(&csi.ControllerPublishVolumeRequest{VolumeId: validBlockVolumeID},
+			&csi.ControllerPublishVolumeRequest{VolumeId: validBlockVolumeID})
+		assert.Nil(t, err)
+	})
+
+	t.Run("ControllerPublishVolume for different volumes", func(t *testing.T) {
+		err := runTest(&csi.ControllerPublishVolumeRequest{VolumeId: validBlockVolumeID},
+			&csi.ControllerPublishVolumeRequest{VolumeId: validNfsVolumeID})
+		assert.Nil(t, err)
+	})
+
+	t.Run("ControllerUnpublishVolume for same volume concurrent call", func(t *testing.T) {
+		err := runTest(&csi.ControllerUnpublishVolumeRequest{VolumeId: validBlockVolumeID},
+			&csi.ControllerUnpublishVolumeRequest{VolumeId: validBlockVolumeID})
+		assert.Nil(t, err)
+	})
+
+	t.Run("ControllerUnpublishVolume for different volumes", func(t *testing.T) {
+		err := runTest(&csi.ControllerUnpublishVolumeRequest{VolumeId: validBlockVolumeID},
+			&csi.ControllerUnpublishVolumeRequest{VolumeId: validNfsVolumeID})
+		assert.Nil(t, err)
+	})
+
+	t.Run("CreateVolume for same volume concurrent call", func(t *testing.T) {
+		err := runTest(&csi.CreateVolumeRequest{Name: validBlockVolumeID},
+			&csi.CreateVolumeRequest{Name: validBlockVolumeID})
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "pending")
+	})
+
+	t.Run("CreateVolume for different volumes", func(t *testing.T) {
+		err := runTest(&csi.CreateVolumeRequest{Name: validBlockVolumeID},
+			&csi.CreateVolumeRequest{Name: validNfsVolumeID})
+		assert.Nil(t, err)
+	})
+
+	t.Run("DeleteVolume for same volume concurrent call", func(t *testing.T) {
+		err := runTest(&csi.DeleteVolumeRequest{VolumeId: validBlockVolumeID},
+			&csi.DeleteVolumeRequest{VolumeId: validBlockVolumeID})
+		assert.Nil(t, err)
+	})
+
+	t.Run("DeleteVolume for different volumes", func(t *testing.T) {
+		err := runTest(&csi.DeleteVolumeRequest{VolumeId: validBlockVolumeID},
+			&csi.DeleteVolumeRequest{VolumeId: validNfsVolumeID})
+		assert.Nil(t, err)
+	})
+
 	t.Run("NodeStage for same volume concurrent call", func(t *testing.T) {
 		err := runTest(&csi.NodeStageVolumeRequest{VolumeId: validBlockVolumeID},
 			&csi.NodeStageVolumeRequest{VolumeId: validBlockVolumeID})
+		assert.Nil(t, err)
+	})
+
+	t.Run("NodeStage for different volumes", func(t *testing.T) {
+		err := runTest(&csi.NodeStageVolumeRequest{VolumeId: validBlockVolumeID},
+			&csi.NodeStageVolumeRequest{VolumeId: validNfsVolumeID})
 		assert.Nil(t, err)
 	})
 
@@ -102,12 +158,6 @@ func TestNewCustomSerialLock(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
-	t.Run("NodeStage for different volumes", func(t *testing.T) {
-		err := runTest(&csi.NodeStageVolumeRequest{VolumeId: validBlockVolumeID},
-			&csi.NodeStageVolumeRequest{VolumeId: validNfsVolumeID})
-		assert.Nil(t, err)
-	})
-
 	t.Run("NodePublish for same volume concurrent call", func(t *testing.T) {
 		err := runTest(&csi.NodePublishVolumeRequest{VolumeId: validBlockVolumeID},
 			&csi.NodePublishVolumeRequest{VolumeId: validBlockVolumeID})
@@ -120,15 +170,16 @@ func TestNewCustomSerialLock(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
-	t.Run("CreateVolume for same volume concurrent call", func(t *testing.T) {
-		err := runTest(&csi.CreateVolumeRequest{Name: validBlockVolumeID},
-			&csi.CreateVolumeRequest{Name: validBlockVolumeID})
-		assert.NotNil(t, err)
-		assert.Contains(t, err.Error(), "pending")
-	})
-	t.Run("CreateVolume for different volumes", func(t *testing.T) {
-		err := runTest(&csi.CreateVolumeRequest{Name: validBlockVolumeID},
-			&csi.CreateVolumeRequest{Name: validNfsVolumeID})
+	t.Run("NodeUnpublishVolume for same volume concurrent call", func(t *testing.T) {
+		err := runTest(&csi.NodeUnpublishVolumeRequest{VolumeId: validBlockVolumeID},
+			&csi.NodeUnpublishVolumeRequest{VolumeId: validBlockVolumeID})
 		assert.Nil(t, err)
 	})
+
+	t.Run("NodeUnpublishVolume for different volumes", func(t *testing.T) {
+		err := runTest(&csi.NodeUnpublishVolumeRequest{VolumeId: validBlockVolumeID},
+			&csi.NodeUnpublishVolumeRequest{VolumeId: validNfsVolumeID})
+		assert.Nil(t, err)
+	})
+
 }
