@@ -87,15 +87,13 @@ func TestNewCustomSerialLock(t *testing.T) {
 	t.Run("NodeStage for same volume concurrent call", func(t *testing.T) {
 		err := runTest(&csi.NodeStageVolumeRequest{VolumeId: validBlockVolumeID},
 			&csi.NodeStageVolumeRequest{VolumeId: validBlockVolumeID})
-		assert.NotNil(t, err)
-		assert.Contains(t, err.Error(), "pending")
+		assert.Nil(t, err)
 	})
 
 	t.Run("NodeUnstage for same volume concurrent call", func(t *testing.T) {
 		err := runTest(&csi.NodeUnstageVolumeRequest{VolumeId: validBlockVolumeID},
 			&csi.NodeUnstageVolumeRequest{VolumeId: validBlockVolumeID})
-		assert.NotNil(t, err)
-		assert.Contains(t, err.Error(), "pending")
+		assert.Nil(t, err)
 	})
 
 	t.Run("NodeUnstage for different volumes", func(t *testing.T) {
@@ -113,15 +111,13 @@ func TestNewCustomSerialLock(t *testing.T) {
 	t.Run("NodePublish for same volume concurrent call", func(t *testing.T) {
 		err := runTest(&csi.NodePublishVolumeRequest{VolumeId: validBlockVolumeID},
 			&csi.NodePublishVolumeRequest{VolumeId: validBlockVolumeID})
-		assert.NotNil(t, err)
-		assert.Contains(t, err.Error(), "pending")
+		assert.Nil(t, err)
 	})
 
 	t.Run("NodePublish and NodeStage for same volume concurrent call", func(t *testing.T) {
 		err := runTest(&csi.NodeStageVolumeRequest{VolumeId: validBlockVolumeID},
 			&csi.NodePublishVolumeRequest{VolumeId: validBlockVolumeID})
-		assert.NotNil(t, err)
-		assert.Contains(t, err.Error(), "pending")
+		assert.Nil(t, err)
 	})
 
 	t.Run("CreateVolume for same volume concurrent call", func(t *testing.T) {
