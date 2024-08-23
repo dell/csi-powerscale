@@ -181,5 +181,4 @@ func TestNewCustomSerialLock(t *testing.T) {
 			&csi.NodeUnpublishVolumeRequest{VolumeId: validNfsVolumeID})
 		assert.Nil(t, err)
 	})
-
 }

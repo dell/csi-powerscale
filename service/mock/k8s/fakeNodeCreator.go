@@ -24,7 +24,7 @@ const K8sLabel = "label"
 func WriteK8sValueToFile(inputType, value string) {
 	DeleteK8sValuesFile()
 	log.Printf("writing k8s values input=%s, value=%s", inputType, value)
-	pwd, err := os.Getwd()
+	pwd, _ := os.Getwd()
 	log.Printf("cwd is path is %s", pwd)
 	file, err := os.Create(K8sValueFile)
 	if err != nil {
@@ -55,7 +55,7 @@ func DeleteK8sValuesFile() bool {
 		log.Errorf("unable get abs path of file for deletion - %s", err)
 	}
 	log.Infof("abs path for deletion is %s", abspath)
-	pwd, err := os.Getwd()
+	pwd, _ := os.Getwd()
 	log.Infof("cwd for deletion is %s", pwd)
 	err = os.Remove(K8sValueFile)
 	if err != nil {
@@ -74,7 +74,7 @@ func readAppliedLabels() (string, string) {
 		log.Errorf("unable to get abs path of filei to read due to - %s", err)
 	}
 	log.Infof("abs path to read is is %s", abspath)
-	pwd, err := os.Getwd()
+	pwd, _ := os.Getwd()
 	log.Infof("cwd while reading is path is %s", pwd)
 	content, err := os.ReadFile(K8sValueFile)
 	if err != nil {
@@ -113,7 +113,7 @@ func GetFakeNode() *v1.Node {
 	label, value := readAppliedLabels()
 	if label != "" {
 		fmt.Printf("wrote %s=%s\n", label, value)
-		labelStr := fmt.Sprintf("%s", label)
+		labelStr := label
 		val := "" + value + ""
 		labelMap[labelStr] = val
 	}
