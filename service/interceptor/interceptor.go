@@ -122,6 +122,12 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 			return i.nodeStageVolume(ctx, t, info, handler)
 		case *csi.NodeUnstageVolumeRequest:
 			return i.nodeUnstageVolume(ctx, t, info, handler)
+		case *csi.DeleteVolumeRequest:
+			return i.deleteVolume(ctx, t, info, handler)
+		case *csi.NodePublishVolumeRequest:
+			return i.nodePublishVolume(ctx, t, info, handler)
+		case *csi.NodeUnpublishVolumeRequest:
+			return i.nodeUnpublishVolume(ctx, t, info, handler)
 		default:
 			return gocsiSerializer(ctx, req, info, handler)
 		}
@@ -213,6 +219,24 @@ func (i *interceptor) nodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 }
 
 func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest,
+	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+) (res interface{}, resErr error) {
+	return handler(ctx, req)
+}
+
+func (i *interceptor) deleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest,
+	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+) (res interface{}, resErr error) {
+	return handler(ctx, req)
+}
+
+func (i *interceptor) nodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest,
+	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+) (res interface{}, resErr error) {
+	return handler(ctx, req)
+}
+
+func (i *interceptor) nodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
 	return handler(ctx, req)
