@@ -157,18 +157,24 @@ func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
 	}
 }
 
+// controllerPublishVolume returns a new server-side, gRPC interceptor
+// that provides serial access to volume resources for the ControllerPublishVolume RPC
 func (i *interceptor) controllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
 	return handler(ctx, req)
 }
 
+// controllerUnpublishVolume returns a new server-side, gRPC interceptor
+// that provides serial access to volume resources for the ControllerUnpublishVolume RPC
 func (i *interceptor) controllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
 	return handler(ctx, req)
 }
 
+// createVolume returns a new server-side, gRPC interceptor
+// that provides serial access to volume resources for the CreateVolume RPC
 func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
@@ -212,30 +218,40 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 	return handler(ctx, req)
 }
 
+// nodeStageVolume returns a new server-side, gRPC interceptor
+// that provides serial access to volume resources for the NodeStageVolume RPC
 func (i *interceptor) nodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
 	return handler(ctx, req)
 }
 
+// nodeUnstageVolume returns a new server-side, gRPC interceptor
+// that provides serial access to volume resources for the NodeUnstageVolume RPC
 func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
 	return handler(ctx, req)
 }
 
+// deleteVolume returns a new server-side, gRPC interceptor
+// that provides serial access to volume resources for the DeleteVolume RPC
 func (i *interceptor) deleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
 	return handler(ctx, req)
 }
 
+// nodePublishVolume returns a new server-side, gRPC interceptor
+// that provides serial access to volume resources for the NodePublishVolume RPC
 func (i *interceptor) nodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
 	return handler(ctx, req)
 }
 
+// nodeUnpublishVolume returns a new server-side, gRPC interceptor
+// that provides serial access to volume resources for the NodeUnpublishVolume RPC
 func (i *interceptor) nodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
