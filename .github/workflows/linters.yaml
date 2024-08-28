@@ -28,3 +28,4 @@ jobs:
         with:
           version: latest
           skip-cache: true
+          args: --out-format=colored-line-number
