@@ -28,3 +28,6 @@ jobs:
         with:
           version: latest
           skip-cache: true
+        output:
+          formats:
+            - format: colored-line-number
