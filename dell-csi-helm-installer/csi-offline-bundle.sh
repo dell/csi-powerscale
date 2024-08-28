@@ -63,6 +63,7 @@ run_command() {
 # build_image_manifest
 # builds a manifest of all the images referred to by the helm chart
 build_image_manifest() {
+  local REGEX_COMMENTS="(#.*)"
   local REGEX="([-_./:A-Za-z0-9]{3,}):([-_.A-Za-z0-9]{1,})"
 
   status "Building image manifest file"
@@ -82,7 +83,7 @@ build_image_manifest() {
       # - search all files in a diectory looking for strings that make $REGEX
       # - exclude anything with double '//'' as that is a URL and not an image name
       # - make sure at least one '/' is found
-      find "${D}" -type f -exec egrep -oh "${REGEX}" {} \; | egrep -v '//' | egrep '/' >> "${IMAGEMANIFEST}.tmp"
+      find "${D}" -type f -exec egrep -v "${REGEX_COMMENTS}" {} \; | egrep -oh "${REGEX}"| egrep -v '//' | egrep '/' >> "${IMAGEMANIFEST}.tmp"
     fi
   done
 
