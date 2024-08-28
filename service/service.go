@@ -230,7 +230,7 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 
 	opts.QuotaEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvQuotaEnabled)
 	opts.SkipCertificateValidation = utils.ParseBooleanFromContext(ctx, constants.EnvSkipCertificateValidation)
-	opts.isiAuthType = uint8(utils.ParseUintFromContext(ctx, constants.EnvIsiAuthType))
+	opts.isiAuthType = uint8(utils.ParseUintFromContext(ctx, constants.EnvIsiAuthType)) // #nosec G115 -- This is a false positive
 	opts.AutoProbe = utils.ParseBooleanFromContext(ctx, constants.EnvAutoProbe)
 	opts.Verbose = utils.ParseUintFromContext(ctx, constants.EnvVerbose)
 	opts.CustomTopologyEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvCustomTopologyEnabled)

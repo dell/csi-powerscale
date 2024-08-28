@@ -1936,7 +1936,7 @@ func (f *feature) iCallListVolumesWithMaxEntriesStartingToken(arg1 int, arg2 str
 	if arg2 == "invalid" {
 		stepHandlersErrors.StartingTokenInvalidError = true
 	}
-	req.MaxEntries = int32(arg1)
+	req.MaxEntries = int32(arg1) // #nosec G115 -- This is a false positive
 	req.StartingToken = arg2
 	f.listVolumesResponse, f.err = f.service.ListVolumes(context.Background(), req)
 	if f.err != nil {
