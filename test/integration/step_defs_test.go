@@ -257,7 +257,7 @@ func createIsilonClient() (*isi.Client, error) {
 		os.Getenv(constants.EnvPath),
 		os.Getenv(constants.DefaultIsiVolumePathPermissions),
 		ignoreUnresolvableHosts,
-		uint8(utils.ParseUintFromContext(ctx, constants.EnvIsiAuthType)))
+		uint8(utils.ParseUintFromContext(ctx, constants.EnvIsiAuthType))) // #nosec G115 -- This is a false positive
 	if err != nil {
 		fmt.Printf("error creating isilon client: '%s'\n", err.Error())
 	}
@@ -423,7 +423,7 @@ func (f *feature) iCallListVolumesWithMaxEntriesStartingToken(arg1 int, arg2 str
 	ctx := context.Background()
 	req := new(csi.ListVolumesRequest)
 	var resp *csi.ListVolumesResponse
-	req.MaxEntries = int32(arg1)
+	req.MaxEntries = int32(arg1) // #nosec G115 -- This is a false positive
 	req.StartingToken = arg2
 	f.listVolumesRequest = req
 	// Retry loop to deal with ISILON API being overwhelmed
