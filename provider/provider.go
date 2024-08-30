@@ -40,7 +40,6 @@ func New() gocsi.StoragePluginProvider {
 	maxStreams := grpc.MaxConcurrentStreams(8)
 	serverOptions := make([]grpc.ServerOption, 1)
 	serverOptions[0] = maxStreams
-
 	svc := service.New()
 
 	interList := []grpc.UnaryServerInterceptor{
