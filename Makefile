@@ -44,6 +44,10 @@ build: dependencies check
 podman-build:
 	make -f docker.mk podman-build
 
+# Generates the docker container without using cache(but does not push)
+podman-build-no-cache:
+	make -f docker.mk podman-build-no-cache
+
 dev-build: build
 	make -f docker.mk docker-build
 	
