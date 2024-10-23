@@ -36,7 +36,7 @@ status() {
   echo
   echo "*"
   echo "* $@"
-  echo 
+  echo
 }
 
 # run_command
@@ -88,7 +88,7 @@ build_image_manifest() {
   done
 
   # Forming this only for drivers supporting standalone helm charts
-  if [ ! -z ${DRIVERREPO} ]; then 
+  if [ ! -z ${DRIVERREPO} ]; then
    echo "${DRIVERREPO}/${DRIVERNAME}\:${DRIVERVERSIONVALUESYAML}"
    echo "${DRIVERREPO}/${DRIVERNAME}:${DRIVERVERSIONVALUESYAML}" >> "${IMAGEMANIFEST}.tmp"
   fi
@@ -117,7 +117,7 @@ archive_images() {
       fi
   done < "${IMAGEMANIFEST}"
 
-} 
+}
 
 # restore_images
 # load the images from an archive into the local registry
@@ -273,7 +273,7 @@ if [ ! -d "$REPODIR/helm-charts" ]; then
     git clone --quiet -c advice.detachedHead=false -b $DRIVERVERSION https://github.com/dell/helm-charts
   fi
   mv helm-charts $REPODIR
-else 
+else
   if [  -d "$SCRIPTDIR/helm-charts" ]; then
     rm -rf $SCRIPTDIR/helm-charts
   fi
@@ -362,7 +362,7 @@ if [ "${REGISTRY: -1}" != "/" ]; then
 fi
 
 # figure out if we should use docker or podman, preferring docker
-DOCKER=$(which docker 2>/dev/null || which podman 2>/dev/null)   
+DOCKER=$(which docker 2>/dev/null || which podman 2>/dev/null)
 if [ "${DOCKER}" == "" ]; then
   echo "Unable to find either docker or podman in $PATH"
   exit 1

@@ -88,21 +88,21 @@ For example, here is the output of a request to build an offline bundle for the 
 *
 * Pulling and saving container images
 
-   dell/container-storage-modules/csi-isilon:v2.12.0
-   dell/container-storage-modules/csi-metadata-retriever:v1.6.0
-   dell/container-storage-modules/csipowermax-reverseproxy:v2.6.0
-   dell/container-storage-modules/csi-powermax:v2.9.0
-   dell/container-storage-modules/csi-powerstore:v2.9.0
-   dell/container-storage-modules/csi-unity:v2.8.0
-   dell/container-storage-modules/csi-vxflexos:v2.9.0
-   dell/container-storage-modules/csm-authorization-sidecar:v1.9.0
-   dell/container-storage-modules/csm-metrics-powerflex:v1.5.0
-   dell/container-storage-modules/csm-metrics-powerscale:v1.2.0
-   dell/container-storage-modules/csm-topology:v1.5.0
-   dell/container-storage-modules/dell-csi-replicator:v1.7.0
-   dell/container-storage-modules/dell-replication-controller:v1.7.0
-   qdell/container-storage-modules/sdc:4.5
-   dell/container-storage-modules/dell-csm-operator:v1.3.0
+   quay.io/dell/container-storage-modules/csi-isilon:v2.12.0
+   quay.io/dell/container-storage-modules/csi-metadata-retriever:v1.6.0
+   quay.io/dell/container-storage-modules/csipowermax-reverseproxy:v2.6.0
+   quay.io/dell/container-storage-modules/csi-powermax:v2.9.0
+   quay.io/dell/container-storage-modules/csi-powerstore:v2.9.0
+   quay.io/dell/container-storage-modules/csi-unity:v2.8.0
+   quay.io/dell/container-storage-modules/csi-vxflexos:v2.9.0
+   quay.io/dell/container-storage-modules/csm-authorization-sidecar:v1.9.0
+   quay.io/dell/container-storage-modules/csm-metrics-powerflex:v1.5.0
+   quay.io/dell/container-storage-modules/csm-metrics-powerscale:v1.2.0
+   quay.io/dell/container-storage-modules/csm-topology:v1.5.0
+   quay.io/dell/container-storage-modules/dell-csi-replicator:v1.7.0
+   quay.io/dell/container-storage-modules/dell-replication-controller:v1.7.0
+   quay.io/dell/container-storage-modules/sdc:4.5
+   quay.io/dell/container-storage-modules/dell-csm-operator:v1.3.0
    gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
    nginxinc/nginx-unprivileged:1.20
    otel/opentelemetry-collector:0.42.0
@@ -210,8 +210,8 @@ Loaded image: registry.k8s.io/sig-storage/csi-snapshotter:v6.3.2
 *
 * Preparing files within /root/dell-csm-operator-bundle
 
-   changing: dell/container-storage-modules/csi-isilon:v2.9.0 -> localregistry:5000/dell-csm-operator/csi-isilon:v2.9.0
-   changing: dell/container-storage-modules/csi-metadata-retriever:v1.6.0 -> localregistry:5000/dell-csm-operator/csi-metadata-retriever:v1.6.0
+   changing: quay.io/dell/container-storage-modules/csi-isilon:v2.9.0 -> localregistry:5000/dell-csm-operator/csi-isilon:v2.9.0
+   changing: quay.io/dell/container-storage-modules/csi-metadata-retriever:v1.6.0 -> localregistry:5000/dell-csm-operator/csi-metadata-retriever:v1.6.0
    ...
    ...
    changing: registry.k8s.io/sig-storage/csi-resizer:v1.9.2 -> localregistry:5000/dell-csm-operator/csi-resizer:v1.9.2
