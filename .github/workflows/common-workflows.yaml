@@ -1,0 +1,17 @@
+name: Common Workflows
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches: [main]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+
+  # golang static analysis checks
+  go-static-analysis:
+    uses: dell/common-github-actions/.github/workflows/go-static-analysis.yaml@main
+    name: Golang Validation
+
+  common:
+    name: Quality Checks
+    uses: dell/common-github-actions/.github/workflows/go-common.yml@main
