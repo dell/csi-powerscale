@@ -12,8 +12,8 @@ metadata:
 spec:
     serviceName: "isilontest"
     selector:
-        matchLabels:
-          app: isilontest
+      matchLabels:
+        app: isilontest
     template:
       metadata:
         labels:
