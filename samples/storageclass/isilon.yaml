@@ -27,7 +27,7 @@ parameters:
   # AdvisoryLimit: "50"
   # Parameter to set soft limit to quota
   # Optional: true
-  # Default Behaviour: Limit not set  
+  # Default Behaviour: Limit not set
   # SoftLimit: "80"
   # Parameter which must be mentioned along with Soft Limit
   # Soft Limit can be exceeded until the grace period
@@ -35,12 +35,12 @@ parameters:
   # Default Behaviour : Limit not set
   # SoftGracePrd: "86400"
 
-   # The permissions for isi volume directory path
-   # This value overrides the isiVolumePathPermissions attribute of corresponding cluster config in secret, if present
-   # Allowed values: valid octal mode number
-   # Default value: "0777"
-   # Examples: "0777", "777", "0755"
-   # IsiVolumePathPermissions: "0777"
+  # The permissions for isi volume directory path
+  # This value overrides the isiVolumePathPermissions attribute of corresponding cluster config in secret, if present
+  # Allowed values: valid octal mode number
+  # Default value: "0777"
+  # Examples: "0777", "777", "0755"
+  # IsiVolumePathPermissions: "0777"
 
   # AccessZone groupnet service IP. Update AzServiceIP if different than endpoint.
   # Optional: true
