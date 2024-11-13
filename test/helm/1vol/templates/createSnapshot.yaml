@@ -6,4 +6,4 @@ metadata:
 spec:
  volumeSnapshotClassName: isilon-snapclass
  source:
-   persistentVolumeClaimName: pvol0
+  persistentVolumeClaimName: pvol0
