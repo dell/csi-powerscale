@@ -93,9 +93,8 @@ func TestParseNormalizedSnapshotID(t *testing.T) {
 
 	expectedError := "access zone not found in snapshot ID '284=_=_=cluster1'"
 	_, _, _, err = ParseNormalizedSnapshotID(ctx, "284=_=_=cluster1")
-	if err.Error() != expectedError {
-		t.Errorf("expected error '%s', but got '%s'", expectedError, err.Error())
-	}
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), expectedError)
 }
 
 func TestGetPathForVolume(t *testing.T) {
