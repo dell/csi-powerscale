@@ -16,24 +16,24 @@ spec:
             app: isilontest
     template:
         metadata:
-          labels:
-            app: isilontest
+            labels:
+                app: isilontest
     spec:
         serviceAccount: isilontest
         hostNetwork: true
         containers:
-          - name: test
-            image: docker.io/centos:latest
-            command: [ "/bin/sleep", "3600" ]
-            volumeMounts:
-              - mountPath: "/data0"
-                name: pvol0
-              - mountPath: "/data1"
-                name: pvol1
+            - name: test
+              image: docker.io/centos:latest
+              command: [ "/bin/sleep", "3600" ]
+              volumeMounts:
+                  - mountPath: "/data0"
+                    name: pvol0
+                  - mountPath: "/data1"
+                    name: pvol1
         volumes:
-          - name: pvol0
-            persistentVolumeClaim:
-              claimName: pvol0
-          - name: pvol1
-            persistentVolumeClaim:
-              claimName: pvol1
+            - name: pvol0
+              persistentVolumeClaim:
+                  claimName: pvol0
+            - name: pvol1
+              persistentVolumeClaim:
+                  claimName: pvol1
