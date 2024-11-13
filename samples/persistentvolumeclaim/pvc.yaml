@@ -2,7 +2,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: test-pvc
-#Uncomment below 4 lines to set quota limit parameters
+# Uncomment below 4 lines to set quota limit parameters
 #  labels:
 #    pvcSoftLimit: "10"
 #    pvcAdvisoryLimit: "50"
@@ -14,3 +14,4 @@ spec:
     requests:
       storage: 5Gi
   storageClassName: isilon
+  
