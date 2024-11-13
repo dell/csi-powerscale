@@ -22,13 +22,19 @@ parameters:
   IsiPath: /ifs/data/csi
 
   #Parameter to set Advisory Limit to quota
+
   #Optional: true
+
   #Default Behaviour : Limit not set
+
   #AdvisoryLimit: "50"
 
   #Parameter to set soft limit to quota
+
   #Optional: true
+
   #Default Behaviour: Limit not set
+  
   #SoftLimit: "80"
 
   #Parameter which must be mentioned along with Soft Limit
