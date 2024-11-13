@@ -81,6 +81,23 @@ func TestParseNormalizedVolumeID(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
+func TestParseNormalizedSnapshotID(t *testing.T) {
+	ctx := context.Background()
+
+	snapshotID, clusterName, accessZone, err := ParseNormalizedSnapshotID(ctx, "284=_=_=cluster1=_=_=System")
+
+	assert.Equal(t, "284", snapshotID)
+	assert.Equal(t, "cluster1", clusterName)
+	assert.Equal(t, "System", accessZone)
+	assert.Nil(t, err)
+
+	expectedError := "access zone not found in snapshot ID '284=_=_=cluster1'"
+	_, _, _, err = ParseNormalizedSnapshotID(ctx, "284=_=_=cluster1")
+	if err.Error() != expectedError {
+		t.Errorf("expected error '%s', but got '%s'", expectedError, err.Error())
+	}
+}
+
 func TestGetPathForVolume(t *testing.T) {
 	isiPath := "/ifs/data"
 	volName := "k8s-123456"
