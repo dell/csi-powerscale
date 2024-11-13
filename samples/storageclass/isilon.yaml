@@ -21,32 +21,31 @@ parameters:
   # Examples: /ifs/data/csi, /ifs/engineering
   IsiPath: /ifs/data/csi
 
-   #Parameter to set Advisory Limit to quota
-   #Optional: true
-   #Default Behaviour : Limit not set
-   #AdvisoryLimit: "50"
-   #Parameter to set soft limit to quota
-   #Optional: true
-   #Default Behaviour: Limit not set  
-   #SoftLimit: "80"
-
-  #Parameter which must be mentioned along with Soft Limit
-  #Soft Limit can be exceeded until the grace period
-  #Optional: true
-  #Default Behaviour : Limit not set
-  #SoftGracePrd: "86400"
+  # Parameter to set Advisory Limit to quota
+  # Optional: true
+  # Default Behaviour : Limit not set
+  # AdvisoryLimit: "50"
+  # Parameter to set soft limit to quota
+  # Optional: true
+  # Default Behaviour: Limit not set  
+  # SoftLimit: "80"
+  # Parameter which must be mentioned along with Soft Limit
+  # Soft Limit can be exceeded until the grace period
+  # Optional: true
+  # Default Behaviour : Limit not set
+  # SoftGracePrd: "86400"
 
    # The permissions for isi volume directory path
    # This value overrides the isiVolumePathPermissions attribute of corresponding cluster config in secret, if present
    # Allowed values: valid octal mode number
    # Default value: "0777"
    # Examples: "0777", "777", "0755"
-   #IsiVolumePathPermissions: "0777"
+   # IsiVolumePathPermissions: "0777"
 
   # AccessZone groupnet service IP. Update AzServiceIP if different than endpoint.
   # Optional: true
   # Default value: endpoint of the cluster ClusterName
-  #AzServiceIP : 192.168.2.1
+  # AzServiceIP : 192.168.2.1
 
   # When a PVC is being created, this parameter determines, when a node mounts the PVC,
   # whether to add the k8s node to the "Root clients" field or "Clients" field of the NFS export
@@ -62,12 +61,12 @@ parameters:
   # If this parameter is not specified, then default cluster config in isilon-creds secret
   # will be considered if available.
   # Optional: true
-  #ClusterName: <cluster_name>
+  # ClusterName: <cluster_name>
 
   # Sets the filesystem type which will be used to format the new volume
   # Optional: true
   # Default value: None
-  #csi.storage.k8s.io/fstype: "nfs"
+  # csi.storage.k8s.io/fstype: "nfs"
 
 # volumeBindingMode controls when volume binding and dynamic provisioning should occur.
 # Allowed values:
@@ -81,7 +80,7 @@ volumeBindingMode: Immediate
 # allowedTopologies helps scheduling pods on worker nodes which match all of below expressions.
 # If enableCustomTopology is set to true in helm values.yaml, then do not specify allowedTopologies
 # Change all instances of <ISILON_IP> to the IP of the PowerScale OneFS API server
-#allowedTopologies:
+# allowedTopologies:
 #  - matchLabelExpressions:
 #      - key: csi-isilon.dellemc.com/<ISILON_IP>
 #        values:
@@ -89,4 +88,4 @@ volumeBindingMode: Immediate
 
 # specify additional mount options for when a Persistent Volume is being mounted on a node.
 # To mount volume with NFSv4, specify mount option vers=4. Make sure NFSv4 is enabled on the Isilon Cluster
-#mountOptions: ["<mountOption1>", "<mountOption2>", ..., "<mountOptionN>"]
+# mountOptions: ["<mountOption1>", "<mountOption2>", ..., "<mountOptionN>"]
