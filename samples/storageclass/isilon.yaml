@@ -6,6 +6,7 @@ provisioner: csi-isilon.dellemc.com
 reclaimPolicy: Delete
 allowVolumeExpansion: true
 parameters:
+
   # The name of the access zone a volume can be created in
   # Optional: true
   # Default value: default value specified in values.yaml
@@ -77,6 +78,7 @@ parameters:
 #   until a Pod using the PersistentVolumeClaim is created
 # Default value: Immediate
 volumeBindingMode: Immediate
+
 # allowedTopologies helps scheduling pods on worker nodes which match all of below expressions.
 # If enableCustomTopology is set to true in helm values.yaml, then do not specify allowedTopologies
 # Change all instances of <ISILON_IP> to the IP of the PowerScale OneFS API server
