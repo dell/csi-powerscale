@@ -13,12 +13,12 @@ spec:
     serviceName: "isilontest"
     selector:
         matchLabels:
-          app: isilontest
+            app: isilontest
     template:
-      metadata:
-        labels:
-          app: isilontest
-      spec:
+        metadata:
+          labels:
+            app: isilontest
+    spec:
         serviceAccount: isilontest
         hostNetwork: true
         containers:
