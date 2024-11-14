@@ -9,8 +9,7 @@ spec:
       image: docker.io/centos:latest
       command: [ "/bin/sleep", "3600" ]
       volumeMounts:
-        - name: workdir
-          mountPath: "/data0"
+        - mountPath: "/data0"
           name: pvol0
   volumes:
     - name: pvol0
