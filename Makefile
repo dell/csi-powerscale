@@ -37,7 +37,7 @@ format:
 	@gofmt -w -s .
 
 # Build the driver locally
-build: dependencies check
+build: dependencies
 	GOOS=linux CGO_ENABLED=0 go build
 
 # Generates the docker container (but does not push)
