@@ -338,8 +338,6 @@ func (s *service) CreateVolume(
 		if err != nil {
 			log.WithField(RootClientEnabledParam, val).Debugf(
 				"invalid boolean value for '%s', defaulting to 'false'", RootClientEnabledParam)
-
-			rootClientEnabled = RootClientEnabledParamDefault
 		}
 		rootClientEnabled = val
 	} else {
@@ -549,7 +547,6 @@ func (s *service) CreateVolume(
 		}
 		log.Errorf("error retrieving export ID for '%s', set it to 0. error : '%s'.\n", req.GetName(), errMsg)
 		log.Errorf("request parameters: the path is '%s', and the access zone is '%s'.", path, accessZone)
-		exportID = 0
 	} else {
 		exportID = export.ID
 		log.Debugf("id of the corresponding nfs export of existing volume '%s' has been resolved to '%d'", req.GetName(), exportID)
@@ -561,7 +558,6 @@ func (s *service) CreateVolume(
 			if err = isiConfig.isiSvc.UnexportByIDWithZone(ctx, exportID, accessZone); err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
-			exportID = 0
 		}
 	}
 
