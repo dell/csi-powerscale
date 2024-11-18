@@ -30,7 +30,13 @@ import (
 func TestMain(m *testing.M) {
 	status := 0
 
-	go http.ListenAndServe("localhost:6060", nil) // #nosec G114
+	go func() {
+		err := http.ListenAndServe("localhost:6060", nil)
+		if err != nil {
+			fmt.Printf("error listeninf on port 6060: %s\n", err.Error())
+		}
+	}()
+
 	fmt.Printf("starting godog...\n")
 
 	configFile := "mock/secret/secret.yaml"

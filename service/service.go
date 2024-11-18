@@ -538,7 +538,13 @@ func (s *service) BeforeServe(
 	})
 
 	// Dynamically load the config
-	go s.loadIsilonConfigs(ctx, isilonConfigFile)
+	go func() {
+		err := s.syncIsilonConfigs(ctx)
+		if err != nil {
+			log.Warn("Failed to load IsilonConfigs: ", err)
+		}
+	}()
+
 	go s.startAPIService(ctx)
 
 	return s.probeOnStart(ctx)
