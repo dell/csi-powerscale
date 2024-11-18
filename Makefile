@@ -10,7 +10,6 @@ help:
 	@echo "The following targets are commonly used:"
 	@echo
 	@echo "build            - Builds the code locally"
-	@echo "check            - Runs the suite of code checking tools: lint, format, etc"
 	@echo "clean            - Cleans the local build"
 	@echo "docker           - Builds the code within a golang container and then creates the driver image"
 	@echo "integration-test - Runs the integration tests. Requires access to an array"
@@ -29,9 +28,6 @@ clean:
 dependencies:
 	go generate
 	go run core/semver/semver.go -f mk >semver.mk
-
-check:
-	@./check.sh
 
 format:
 	@gofmt -w -s .
