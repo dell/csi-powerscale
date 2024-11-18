@@ -214,12 +214,24 @@ func handleNewAPI(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return
 	}
-	w.Write([]byte("{\"latest\": \"5.1\"}"))
+
+	go func() {
+		_, err := w.Write([]byte("{\"latest\": \"5.1\"}"))
+		if err != nil {
+			fmt.Printf("error returned from handleNewAPI: %s\n", err.Error())
+		}
+	}()
+
 }
 
 func handleGetZoneByName(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write(readFromFile("mock/snapshot/get_zone_by_name.txt"))
+	go func() {
+		_, err := w.Write(readFromFile("mock/snapshot/get_zone_by_name.txt"))
+		if err != nil {
+			fmt.Printf("error returned from handleGetZoneByName: %s\n", err.Error())
+		}
+	}()
 }
 
 // handleExports implements GET /platform/2/protocols/nfs/exports
@@ -232,7 +244,12 @@ func handleGetExports(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	w.Write(readFromFile("mock/export/get_all_exports_including_volume2.txt"))
+	go func() {
+		_, err := w.Write(readFromFile("mock/export/get_all_exports_including_volume2.txt"))
+		if err != nil {
+			fmt.Printf("error returned from handleGetExports: %s\n", err.Error())
+		}
+	}()
 }
 
 // handleCreateExport implements POST /platform/2/protocols/nfs/exports
@@ -245,7 +262,12 @@ func handleCreateExport(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	w.Write(readFromFile("mock/export/create_export_557.txt"))
+	go func() {
+		_, err := w.Write(readFromFile("mock/export/create_export_557.txt"))
+		if err != nil {
+			fmt.Printf("error returned from handleCreateExport: %s\n", err.Error())
+		}
+	}()
 }
 
 // handleGetClusterConfig implements GET /platform/3/cluster/config/
@@ -1129,13 +1151,17 @@ func MockK8sAPI() {
 	once.Do(func() {
 		fmt.Println("create mock server only once")
 		http.HandleFunc("/api/v1/nodes/", noderesponse)
-		time.Sleep(15)
+		time.Sleep(15 * time.Second)
 
 		// http://127.0.0.1:36443/array-status/cluster1
 		http.HandleFunc("/array-status/cluster1/", apiResponse)
 		go func() {
 			fmt.Println("started mock server")
-			http.ListenAndServe(":36443", nil) // #nosec G114
+			err := http.ListenAndServe(":36443", nil) // #nosec G114
+			if err != nil {
+				fmt.Printf("Error starting mock server: %s", err)
+				os.Exit(1)
+			}
 		}()
 	})
 	fmt.Println("mocking k8s api done")

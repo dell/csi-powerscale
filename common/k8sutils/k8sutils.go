@@ -31,11 +31,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-type leaderElection interface {
-	Run() error
-	WithNamespace(namespace string)
-}
-
 // CreateKubeClientSet - Returns kubeclient set
 func CreateKubeClientSet(kubeconfig string) (*kubernetes.Clientset, error) {
 	var clientset *kubernetes.Clientset
