@@ -41,7 +41,7 @@ func (r *rewriteRequestIDInterceptor) handleServer(ctx context.Context, req inte
 		ID, IDOK := md[csictx.RequestIDKey]
 		if IDOK {
 			newIDValue := fmt.Sprintf("%s-%s", csictx.RequestIDKey, ID[0])
-			ctx = context.WithValue(ctx, interface{}(csictx.RequestIDKey), newIDValue)
+			ctx = context.WithValue(ctx, interface{}(ID[0]), newIDValue)
 		}
 	}
 

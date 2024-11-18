@@ -33,7 +33,7 @@ func TestMain(m *testing.M) {
 	go func() {
 		err := http.ListenAndServe("localhost:6060", nil)
 		if err != nil {
-			fmt.Printf("error listeninf on port 6060: %s\n", err.Error())
+			fmt.Printf("error listening on port 6060: %s\n", err.Error())
 		}
 	}()
 

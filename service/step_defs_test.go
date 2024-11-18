@@ -2100,7 +2100,12 @@ func (f *feature) iCallCreateVolumeFromVolume(srcVolumeName, name string) error 
 }
 
 func (f *feature) iCallInitializeRealIsilonService() error {
-	f.service.initializeServiceOpts(context.Background())
+	go func() {
+		err := f.service.initializeServiceOpts(context.Background())
+		if err != nil {
+			fmt.Printf("error initalizing server opts: %s\n", err.Error())
+		}
+	}()
 	return nil
 }
 
@@ -3383,7 +3388,12 @@ func (f *feature) iCallDynamicLogChange(file string) error {
 	log.Printf("level before change: %s", utils.GetCurrentLogLevel())
 	DriverConfigParamsFile = "mock/loglevel/" + file
 	log.Printf("wait for config change %s", DriverConfigParamsFile)
-	f.iCallBeforeServe()
+	go func() {
+		err := f.iCallBeforeServe()
+		if err != nil {
+			fmt.Printf("error returned from iCallBeforeServe: %s\n", err.Error())
+		}
+	}()
 	time.Sleep(10 * time.Second)
 	return nil
 }
@@ -3396,7 +3406,12 @@ func (f *feature) aValidDynamicLogChangeOccurs(_, expectedLevel string) error {
 	}
 	log.Printf("Reverting log changes made")
 	DriverConfigParamsFile = "mock/loglevel/logConfig.yaml"
-	f.iCallBeforeServe()
+	go func() {
+		err := f.iCallBeforeServe()
+		if err != nil {
+			fmt.Printf("error returned from iCallBeforeServe: %s\n", err.Error())
+		}
+	}()
 	time.Sleep(10 * time.Second)
 	return nil
 }
