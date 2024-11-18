@@ -1193,6 +1193,9 @@ func (s *service) ControllerPublishVolume(
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
 			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			if err != nil {
+				log.Errorf("adding export ID %d to access zone %s: %s", exportID, accessZone, err.Error())
+			}
 		}
 
 		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
@@ -1221,6 +1224,9 @@ func (s *service) ControllerPublishVolume(
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, utils.DummyHostNodeID) {
 			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, utils.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			if err != nil {
+				log.Errorf("adding export ID %d to access zone %s: %s", exportID, accessZone, err.Error())
+			}
 		}
 		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
 		if err == nil && rootClientEnabled {
@@ -1670,7 +1676,12 @@ func (s *service) CreateSnapshot(
 	// check if snapshot already exists
 	var snapshotByName isi.Snapshot
 	log.Infof("check for existence of snapshot '%s'", snapshotName)
-	if snapshotByName, err = isiConfig.isiSvc.GetSnapshot(ctx, snapshotName); snapshotByName != nil {
+	snapshotByName, err = isiConfig.isiSvc.GetSnapshot(ctx, snapshotName)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "getting snapshot %s runid=%s %s", snapshotName, runID, err.Error())
+	}
+
+	if snapshotByName != nil {
 		if path.Base(snapshotByName.Path) == srcVolumeID {
 			// return the existent snapshot
 			return s.getCreateSnapshotResponse(ctx, strconv.FormatInt(snapshotByName.Id, 10), req.GetSourceVolumeId(), snapshotByName.Created, isiConfig.isiSvc.GetSnapshotSize(ctx, isiPath, snapshotName, accessZone), clusterName, accessZone), nil
@@ -1699,14 +1710,14 @@ func (s *service) validateCreateSnapshotRequest(
 	req *csi.CreateSnapshotRequest, isiPath string, isiConfig *IsilonClusterConfig,
 ) (string, string, error) {
 	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
+	ctx, _, runID := GetRunIDLog(ctx)
 
 	srcVolumeID, _, _, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
 	if err != nil {
 		return "", "", status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
+	ctx, log := setClusterContext(ctx, clusterName)
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", srcVolumeID) {
@@ -1972,7 +1983,7 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 	req *csi.ControllerGetVolumeRequest,
 ) (*csi.ControllerGetVolumeResponse, error) {
 	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
+	ctx, _, runID := GetRunIDLog(ctx)
 
 	abnormal := false
 	message := ""
@@ -1988,7 +1999,7 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 		return nil, status.Errorf(codes.InvalidArgument, " runid=%s error %s", runID, err.Error())
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
+	ctx, log := setClusterContext(ctx, clusterName)
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)

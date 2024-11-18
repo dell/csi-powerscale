@@ -70,7 +70,7 @@ func (s *service) NodePublishVolume(
 	*csi.NodePublishVolumeResponse, error,
 ) {
 	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
+	ctx, _, runID := GetRunIDLog(ctx)
 	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
 
@@ -95,7 +95,7 @@ func (s *service) NodePublishVolume(
 		return nil, err
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
+	ctx, log := setClusterContext(ctx, clusterName)
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	// Probe the node if required and make sure startup called
