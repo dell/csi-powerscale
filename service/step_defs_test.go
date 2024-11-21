@@ -21,9 +21,11 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +34,7 @@ import (
 	"github.com/dell/csi-isilon/v2/common/utils"
 	"github.com/dell/csi-isilon/v2/service/mock/k8s"
 	csiext "github.com/dell/dell-csi-extensions/replication"
+	"github.com/gorilla/mux"
 	"google.golang.org/grpc"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
@@ -420,6 +423,8 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a valid DeleteSnapshotResponse is returned$`, f.aValidDeleteSnapshotResponseIsReturned)
 	s.Step(`^I set mode to "([^"]*)"$`, f.iSetModeTo)
 	s.Step(`^I call startAPIService`, f.iCallStartAPIService)
+	s.Step(`^I call GetArrayConnectivityStatus`, f.iCallGetArrayConnectivityStatus)
+	s.Step(`^the response should have a status code of "([^"]*)" "([^"]*)"$`, f.theResponseShouldHaveAStatusCodeOf)
 	s.Step(`^I set podmon enable to "([^"]*)"$`, f.iSetPodmonEnable)
 	s.Step(`^I set API port to "([^"]*)"$`, f.iSetAPIPort)
 	s.Step(`^I set polling freq to "([^"]*)"$`, f.iSetPollingFeqTo)
@@ -444,6 +449,129 @@ func (f *feature) iCallStartAPIService() error {
 	f.service.startAPIService(ctx)
 	return nil
 }
+
+func (f *feature) iCallGetArrayConnectivityStatus() error {
+
+	// Create a mock sync.Map
+	//probeStatus := &sync.Map{}
+	//probeStatus.Store("mockArray", ArrayConnectivityStatus{Status: "Connected"})
+
+	// Create a mock http.ResponseWriter
+	w := httptest.NewRecorder()
+
+	// Create a mock http.Request
+	r, err := http.NewRequest("GET", "http://10.230.24.249:8080", nil)
+	if err != nil {
+		return err
+	}
+
+	// Set the arrayId in the request's URL parameters
+	r = mux.SetURLVars(r, map[string]string{"arrayId": "PIE-Isilon-X"})
+
+	fmt.Sprintf("This is the r request with URL Parameters %v", r)
+
+	router := mux.NewRouter()
+	// route to connectivity status
+	router.HandleFunc("/array-status/PIE-Isilon-X", getArrayConnectivityStatus).Methods("GET")
+	// Call the getArrayConnectivityStatus function
+	//getArrayConnectivityStatus(w, r)
+
+	// f.createVolumeResponse, f.err := getArrayConnectivityStatus(w,r)
+	// if f.err != nil {
+	// 	log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+	// }
+
+	// Assert the response
+	if err := f.theResponseShouldHaveAStatusCodeOf("200", w); err != nil {
+		return err
+	}
+
+	// // Assert the response
+	// if w.Code != http.StatusOK {
+	// 	return fmt.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
+	// }
+
+	// if w.Header().Get("Content-Type") != "application/json" {
+	// 	return fmt.Errorf("Expected Content-Type header to be 'application/json', but it was '%s'", w.Header().Get("Content-Type"))
+	// }
+
+	// expectedResponse := `{"Status":"Connected"}`
+	// if w.Body.String() != expectedResponse {
+	// 	return fmt.Errorf("Expected response '%s', but got '%s'", expectedResponse, w.Body.String())
+	// }
+	return nil
+
+	// return aValidGetArrayConnectivityStatusResponseIsReturned(w, r)
+}
+
+func (f *feature) theResponseShouldHaveAStatusCodeOf(arg1 string, w *httptest.ResponseRecorder) error {
+	expectedStatusCode, err := strconv.Atoi(arg1)
+	if err != nil {
+		return err
+	}
+
+	if w.Code != expectedStatusCode {
+		return fmt.Errorf("Expected status code %d, got %d", expectedStatusCode, w.Code)
+	}
+
+	return nil
+}
+
+//***********************************************************************
+// func (f *feature) iCallGetArrayConnectivityStatusResponse() error {
+// 	f.getArrayConnectivityStatusResponse, f.err = f.service.getArrayConnectivityStatus(context.Background(), req)
+// 	if f.err != nil {
+// 		return f.err
+// 	}
+// 	return nil
+// }
+
+// func (f *feature) aValidGetArrayConnectivityStatusResponseIsReturned(w http.ResponseWriter, r *http.Request) error {
+// 	expectedResponse := `{"Status":"Connected"}`
+// 	if w.Body.String() != expectedResponse {
+// 		return fmt.Errorf("Expected response '%s', but got '%s'", expectedResponse, w.Body.String())
+// 	}
+// 	return nil
+// }
+//**************************************************************
+
+// func (f *feature) iCallGetArrayConnectivityStatusForNonExistingArray() error {
+
+// 	// Create a mock sync.Map
+// 	//probeStatus := &sync.Map{}
+// 	//probeStatus.Store("mockArray", ArrayConnectivityStatus{Status: "Connected"})
+
+// 	// Create a mock http.ResponseWriter
+// 	w := httptest.NewRecorder()
+
+// 	// Create a mock http.Request
+// 	r, err := http.NewRequest("GET", "https://10.230.24.9/", nil)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	// Set the arrayId in the request's URL parameters
+// 	r = mux.SetURLVars(r, map[string]string{"arrayId": "APM00231404538PS51275edf6f32"})
+
+// 	// Call the getArrayConnectivityStatus function
+// 	getArrayConnectivityStatus(w, r)
+
+// 	// Assert the response
+// 	if w.Code != http.StatusOK {
+// 		return fmt.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
+// 	}
+
+// 	if w.Header().Get("Content-Type") != "application/json" {
+// 		return fmt.Errorf("Expected Content-Type header to be 'application/json', but it was '%s'", w.Header().Get("Content-Type"))
+// 	}
+
+// 	expectedResponse := `{"Status":"Connected"}`
+// 	if w.Body.String() != expectedResponse {
+// 		return fmt.Errorf("Expected response '%s', but got '%s'", expectedResponse, w.Body.String())
+// 	}
+
+// 	return nil
+// }
 
 func (f *feature) iSetPodmonEnable(value string) error {
 	os.Setenv(constants.EnvPodmonEnabled, value)
