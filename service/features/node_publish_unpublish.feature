@@ -182,6 +182,20 @@ Feature: Isilon CSI interface
     | "mount"      | "multiple-writer"              | "none"                                       |
     | "block"      | "multiple-reader"              | "Invalid access type"                        |
 
+  Scenario Outline: Node publish volume with missing fields in request
+    Given a Isilon service
+    And I have a Node "node1" with AccessZone
+    And a controller published volume
+    And a capability with voltype <voltype> access <access>
+    And get Node Publish Volume Request with no volume context
+    When I call Probe
+    And I call NodePublishVolume
+    Then the error contains <errormsg>
+
+    Examples:
+    | voltype      | access                         | errormsg                                     |
+    | "mount"      | "single-reader"                | "VolumeContext is nil"                       |
+
 @nodeUnpublish
 @v1.0.0
   Scenario: Identity node unpublish good call

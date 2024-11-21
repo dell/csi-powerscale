@@ -13,12 +13,6 @@ Feature: Isilon CSI interface
       When I call GetPluginCapabilities
       Then a valid GetPluginCapabilitiesResponse is returned
 
-@WIP
-    Scenario: Get connectivity status for existing array
-      Given a Isilon service
-      When I call GetArrayConnectivityStatus
-      Then the response should have a status code of "200"
-
     Scenario: Identity Probe good call
       Given a Isilon service
       When I call Probe
