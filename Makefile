@@ -62,6 +62,9 @@ dev-build-image-push: dev-build
 unit-test:
 	( cd service; go clean -cache; go test -v -coverprofile=c.out ./... )
 
+coverage:
+	cd service; go tool cover -html=c.out -o coverage.html
+
 # Linux only; populate env.sh with the hardware parameters
 integration-test:
 	( cd test/integration; sh run.sh )
