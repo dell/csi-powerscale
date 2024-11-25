@@ -1322,11 +1322,11 @@ func (f *feature) aValidNodeGetCapabilitiesResponseIsReturned() error {
 				return fmt.Errorf("Received unexpected capability: %v", rpcType)
 			}
 		}
-		if f.service.opts.IsHealthMonitorEnabled && count != 4 {
+		if f.service.opts.IsHealthMonitorEnabled && count != 3 {
 			// Set default value
 			f.service.opts.IsHealthMonitorEnabled = false
 			return errors.New("Did not retrieve all the expected capabilities")
-		} else if !f.service.opts.IsHealthMonitorEnabled && count != 2 {
+		} else if !f.service.opts.IsHealthMonitorEnabled && count != 1 {
 			return errors.New("Did not retrieve all the expected capabilities")
 		}
 		// Set default value
