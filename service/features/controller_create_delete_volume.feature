@@ -108,21 +108,34 @@ Feature: Isilon CSI interface
       When I call CreateVolumeRequestWithReplicationParams <vgPrefix> <rpo> <remoteSystemName>
       Then the error contains <errormsg>
       Examples:
-      |  vgPrefix           | rpo               | remoteSystemName | errormsg                                                   |
-      | ""                  | "Five_Minutes"    | "cluster1"       | "replication enabled but no volume group prefix specified" |
-      | "volumeGroupPrefix" | ""                | "cluster1"       | "replication enabled but no RPO specified"                 |
-      | "volumeGroupPrefix" | "Fifty_Minutes"   | "cluster1"       | "invalid rpo value"                                        |
-      | "volumeGroupPrefix" | "Thirty_Minutes"  | ""               | "replication enabled but no remote system specified"       |
+      |  vgPrefix           | rpo             | remoteSystemName | errormsg                                                   |
+      | ""                  | "Five_Minutes"  | "cluster1"       | "replication enabled but no volume group prefix specified" |
+      | "volumeGroupPrefix" | ""              | "cluster1"       | "replication enabled but no RPO specified"                 |
+      | "volumeGroupPrefix" | "Fifty_Minutes" | "cluster1"       | "invalid rpo value"                                        |
+      | "volumeGroupPrefix" | "Five_Minutes"  | ""               | "replication enabled but no remote system specified"       |
 
     Scenario Outline: Create Volume with Replication Enabled and induced errors
       Given a Isilon service
       And I induce error <induced>
-      When I call CreateVolumeRequestWithReplicationParams "volumeGroupPrefix" <rpo> "cluster1"
+      When I call CreateVolumeRequestWithReplicationParams "volumeGroupPrefix" "Five_Minutes" "cluster1"
       Then the error contains <errormsg>
       Examples:
-      | induced                  | rpo               | errormsg                                   |
-      | "GetPolicyInternalError" | "Fifteen_Minutes" | "can't ensure protection policy exists"    |
-      | "GetPolicyNotFoundError" | "Six_Hours"       | "policy job couldn't reach FINISHED state" |
+      | induced                  | errormsg                                   |
+      | "GetPolicyInternalError" | "can't ensure protection policy exists"    |
+      | "GetPolicyNotFoundError" | "policy job couldn't reach FINISHED state" |
+
+    Scenario Outline: Create Volume with Replication Enabled to cover different RPO values
+      Given a Isilon service
+      When I call CreateVolumeRequestWithReplicationParams "volumeGroupPrefix" <rpo> ""
+      Then the error contains "replication enabled but no remote system specified"
+      Examples:
+      | rpo               |
+      | "Fifteen_Minutes" |
+      | "Thirty_Minutes"  |
+      | "One_Hour"        |
+      | "Six_Hours"       |
+      | "Twelve_Hours"    |
+      | "One_Day"         |
 
 @deleteVolume
 @v1.0.0
