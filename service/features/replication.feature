@@ -125,6 +125,17 @@ Feature: Isilon CSI interface
       | ""                                                    | "systemName"      | "cluster1"  | "vgname" | "Error: Can't obtain valid isiPath from PG"                        |
       | "cluster1::/ifs/badData/csi-isilon/volumeNonexistent" | "systemName"      | "cluster1"  | "vgname" | "none"                                                             |
 
+  Scenario Outline: Delete storage protection group with induced errors
+    Given a Isilon service
+    And I induce error <induced>
+    When I call StorageProtectionGroupDelete "cluster1::/ifs/data/csi-isilon/volume1" and "systemName" and "cluster1" and "vgname"
+    Then the error contains <errormsg>
+    Examples:
+      | induced                   | errormsg                              |
+      | "GetPolicyInternalError"  | "Unknown error while retrieving PP"   |
+      | "DeletePolicyError"       | "Unknown error while deleting PP"     |
+      | "GetJobsInternalError"    | "none"                                |
+
   Scenario Outline: Get storage protection group status with parameters
     Given a Isilon service
     When I call Probe

@@ -253,7 +253,7 @@ func TestCreateVolume(t *testing.T) {
 	}
 
 	// Create a new UnaryHandler
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(_ context.Context, _ interface{}) (interface{}, error) {
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
 				VolumeId: "test-volume-id",
@@ -284,7 +284,7 @@ func TestCreateVolume(t *testing.T) {
 type mockMetadataSidecarClient struct{}
 
 // GetPVCLabels is a mock implementation of the GetPVCLabels method
-func (c *mockMetadataSidecarClient) GetPVCLabels(ctx context.Context, req *retriever.GetPVCLabelsRequest) (*retriever.GetPVCLabelsResponse, error) {
+func (c *mockMetadataSidecarClient) GetPVCLabels(_ context.Context, _ *retriever.GetPVCLabelsRequest) (*retriever.GetPVCLabelsResponse, error) {
 	return &retriever.GetPVCLabelsResponse{
 		Parameters: map[string]string{
 			"test-key": "test-value",
