@@ -5,7 +5,7 @@ metadata:
   namespace: test
 spec:
   accessModes:
-  - ReadOnlyMany
+    - ReadOnlyMany
   volumeMode: Filesystem
   resources:
     requests:

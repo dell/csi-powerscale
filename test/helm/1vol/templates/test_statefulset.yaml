@@ -13,22 +13,22 @@ spec:
     serviceName: "isilontest"
     selector:
         matchLabels:
-          app: isilontest
+            app: isilontest
     template:
-      metadata:
-        labels:
-          app: isilontest
-      spec:
+        metadata:
+            labels:
+                app: isilontest
+    spec:
         serviceAccount: isilontest
         hostNetwork: true
         containers:
-          - name: test
-            image: docker.io/centos:latest
-            command: [ "/bin/sleep", "3600" ]
-            volumeMounts:
-              - mountPath: "/data0"
-                name: pvol0
-        volumes:
-          - name: pvol0
-            persistentVolumeClaim:
-              claimName: pvol0
+            - name: test
+              image: docker.io/centos:latest
+              command: [ "/bin/sleep", "3600" ]
+              volumeMounts:
+                  - mountPath: "/data0"
+                    name: pvol0
+    volumes:
+        - name: pvol0
+          persistentVolumeClaim:
+          claimName: pvol0
