@@ -81,7 +81,6 @@ func TestGetLockWithName(t *testing.T) {
 		}
 
 		lock, err := lockProvider.GetLockWithName(ctx, "name")
-
 		if err != nil {
 			t.Errorf("Expected nil error, got %v", err)
 		}
@@ -97,7 +96,6 @@ func TestGetLockWithName(t *testing.T) {
 		}
 
 		lock, err := lockProvider.GetLockWithName(ctx, "name")
-
 		if err != nil {
 			t.Errorf("Expected nil error, got %v", err)
 		}
@@ -308,4 +306,3 @@ func (c *mockMetadataSidecarClient) GetPVCLabels(_ context.Context, _ *retriever
 		},
 	}, nil
 }
- 
