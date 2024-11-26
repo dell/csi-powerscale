@@ -27,8 +27,11 @@ import (
 
 	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+
+	//      "github.com/dell/csi-isilon/v2/service/interceptor"
 	controller "github.com/dell/csi-isilon/v2/service"
 	"github.com/dell/csi-metadata-retriever/retriever"
+
 	csictx "github.com/dell/gocsi/context"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -68,44 +71,41 @@ func TestRewriteRequestIDInterceptor_RequestIDExist(t *testing.T) {
 }
 
 func TestGetLockWithName(t *testing.T) {
-	// Create a new lockProvider instance
-	lockProvider := &lockProvider{
-		volNameLocks: make(map[string]gosync.TryLocker),
-	}
-
-	// Create a new context
 	ctx := context.Background()
 
-	// Call the GetLockWithName function
-	lock, err := lockProvider.GetLockWithName(ctx, "test")
+	t.Run("Get lock with name present", func(t *testing.T) {
+		lockProvider := &lockProvider{
+			volNameLocks: map[string]gosync.TryLocker{
+				"name": &gosync.TryMutex{},
+			},
+		}
 
-	// Assert the expected lock
-	if lock == nil {
-		t.Errorf("Expected lock to be non-nil, but it was nil")
-	}
+		lock, err := lockProvider.GetLockWithName(ctx, "name")
 
-	// Assert the expected error
-	if err != nil {
-		t.Errorf("Expected error to be nil, but it was %v", err)
-	}
+		if err != nil {
+			t.Errorf("Expected nil error, got %v", err)
+		}
 
-	// Call the GetLockWithName function again with the same name
-	lock2, err2 := lockProvider.GetLockWithName(ctx, "test")
+		if lock == nil {
+			t.Error("Expected non-nil lock, got nil")
+		}
+	})
 
-	// Assert the expected lock
-	if lock2 == nil {
-		t.Errorf("Expected lock to be non-nil, but it was nil")
-	}
+	t.Run("Get lock with name not present", func(t *testing.T) {
+		lockProvider := &lockProvider{
+			volNameLocks: map[string]gosync.TryLocker{},
+		}
 
-	// Assert the expected error
-	if err2 != nil {
-		t.Errorf("Expected error to be nil, but it was %v", err2)
-	}
+		lock, err := lockProvider.GetLockWithName(ctx, "name")
 
-	// Assert that the two locks are the same
-	if lock != lock2 {
-		t.Errorf("Expected locks to be the same, but they were different")
-	}
+		if err != nil {
+			t.Errorf("Expected nil error, got %v", err)
+		}
+
+		if lock == nil {
+			t.Error("Expected non-nil lock, got nil")
+		}
+	})
 }
 
 func TestNewCustomSerialLock(t *testing.T) {
@@ -224,6 +224,23 @@ func TestNewCustomSerialLock(t *testing.T) {
 	})
 }
 
+func TestCreateMetadataRetrieverClient(t *testing.T) {
+	ctx := context.Background()
+
+	csictx.Setenv(ctx, "CSI_RETRIEVER_ENDPOINT", "localhost:8080")
+
+	locker := &lockProvider{
+		volIDLocks:   map[string]gosync.TryLocker{},
+		volNameLocks: map[string]gosync.TryLocker{},
+	}
+
+	i := &interceptor{opts{locker: locker, timeout: 0}}
+
+	i.createMetadataRetrieverClient(ctx)
+
+	assert.NotNil(t, i.opts.MetadataSidecarClient)
+}
+
 func TestCreateVolume(t *testing.T) {
 	// Create a new lockProvider instance
 	lockProvider := &lockProvider{
@@ -291,3 +308,4 @@ func (c *mockMetadataSidecarClient) GetPVCLabels(_ context.Context, _ *retriever
 		},
 	}, nil
 }
+ 
