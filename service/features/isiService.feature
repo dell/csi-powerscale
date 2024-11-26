@@ -14,6 +14,7 @@ Feature: Isilon CSI interface
       | "60"      | "80"          | "85600"      | 53687091
       | "110"     | "80"          | "85600"      | 53687091
       | "-1"      | "-1"          | "85600"      | 53687091
+      | "ab"      | "-1"          | "85600"      | 53687091
 
     Scenario: Calling get export with no result
       Given a Isilon service
