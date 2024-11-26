@@ -286,14 +286,6 @@ func (s *service) NodeGetCapabilities(
 	*csi.NodeGetCapabilitiesResponse, error,
 ) {
 	capabilities := []*csi.NodeServiceCapability{
-		// TODO - Need to return this capability when Stage/Unstage volume logic is implemented
-		/*{
-			Type: &csi.NodeServiceCapability_Rpc{
-				Rpc: &csi.NodeServiceCapability_RPC{
-					Type: csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
-				},
-			},
-		},*/
 		{
 			Type: &csi.NodeServiceCapability_Rpc{
 				Rpc: &csi.NodeServiceCapability_RPC{
@@ -301,14 +293,6 @@ func (s *service) NodeGetCapabilities(
 				},
 			},
 		},
-		// TODO - Need to return this capability when expand volume logic is implemented
-		/*{
-			Type: &csi.NodeServiceCapability_Rpc{
-				Rpc: &csi.NodeServiceCapability_RPC{
-					Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
-				},
-			},
-		},*/
 	}
 
 	healthMonitorCapabilities := []*csi.NodeServiceCapability{
