@@ -25,10 +25,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-
-	//      "github.com/dell/csi-isilon/v2/service/interceptor"
-
+	controller "github.com/dell/csi-isilon/v2/service"
+	"github.com/dell/csi-metadata-retriever/retriever"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -65,6 +65,47 @@ func TestRewriteRequestIDInterceptor_RequestIDExist(t *testing.T) {
 
 	assert.Equal(t, ok, true)
 	assert.Equal(t, requestID, fmt.Sprintf("%s-%s", csictx.RequestIDKey, testID))
+}
+
+func TestGetLockWithName(t *testing.T) {
+	// Create a new lockProvider instance
+	lockProvider := &lockProvider{
+		volNameLocks: make(map[string]gosync.TryLocker),
+	}
+
+	// Create a new context
+	ctx := context.Background()
+
+	// Call the GetLockWithName function
+	lock, err := lockProvider.GetLockWithName(ctx, "test")
+
+	// Assert the expected lock
+	if lock == nil {
+		t.Errorf("Expected lock to be non-nil, but it was nil")
+	}
+
+	// Assert the expected error
+	if err != nil {
+		t.Errorf("Expected error to be nil, but it was %v", err)
+	}
+
+	// Call the GetLockWithName function again with the same name
+	lock2, err2 := lockProvider.GetLockWithName(ctx, "test")
+
+	// Assert the expected lock
+	if lock2 == nil {
+		t.Errorf("Expected lock to be non-nil, but it was nil")
+	}
+
+	// Assert the expected error
+	if err2 != nil {
+		t.Errorf("Expected error to be nil, but it was %v", err2)
+	}
+
+	// Assert that the two locks are the same
+	if lock != lock2 {
+		t.Errorf("Expected locks to be the same, but they were different")
+	}
 }
 
 func TestNewCustomSerialLock(t *testing.T) {
@@ -181,4 +222,72 @@ func TestNewCustomSerialLock(t *testing.T) {
 			&csi.NodeUnpublishVolumeRequest{VolumeId: validNfsVolumeID})
 		assert.Nil(t, err)
 	})
+}
+
+func TestCreateVolume(t *testing.T) {
+	// Create a new lockProvider instance
+	lockProvider := &lockProvider{
+		volIDLocks:   make(map[string]gosync.TryLocker),
+		volNameLocks: make(map[string]gosync.TryLocker),
+	}
+
+	// Create a new interceptor instance
+	i := &interceptor{
+		opts: opts{
+			locker:                lockProvider,
+			MetadataSidecarClient: &mockMetadataSidecarClient{},
+			timeout:               time.Second,
+		},
+	}
+
+	// Create a new context
+	ctx := context.Background()
+
+	// Create a new CreateVolumeRequest
+	req := &csi.CreateVolumeRequest{
+		Name: "test-volume",
+		Parameters: map[string]string{
+			controller.KeyCSIPVCName:      "test-pvc",
+			controller.KeyCSIPVCNamespace: "test-namespace",
+		},
+	}
+
+	// Create a new UnaryHandler
+	handler := func(_ context.Context, _ interface{}) (interface{}, error) {
+		return &csi.CreateVolumeResponse{
+			Volume: &csi.Volume{
+				VolumeId: "test-volume-id",
+			},
+		}, nil
+	}
+
+	// Call the createVolume function
+	res, err := i.createVolume(ctx, req, nil, handler)
+
+	// Assert the expected response
+	if res == nil {
+		t.Errorf("Expected non-nil response, but it was nil")
+	}
+
+	// Assert the expected error
+	if err != nil {
+		t.Errorf("Expected no error, but got %v", err)
+	}
+
+	// Assert the expected volume ID
+	if res.(*csi.CreateVolumeResponse).Volume.VolumeId != "test-volume-id" {
+		t.Errorf("Expected volume ID to be %s, but it was %s", "test-volume-id", res.(*csi.CreateVolumeResponse).Volume.VolumeId)
+	}
+}
+
+// mockMetadataSidecarClient is a mock implementation of the retriever.MetadataRetrieverClient interface
+type mockMetadataSidecarClient struct{}
+
+// GetPVCLabels is a mock implementation of the GetPVCLabels method
+func (c *mockMetadataSidecarClient) GetPVCLabels(_ context.Context, _ *retriever.GetPVCLabelsRequest) (*retriever.GetPVCLabelsResponse, error) {
+	return &retriever.GetPVCLabelsResponse{
+		Parameters: map[string]string{
+			"test-key": "test-value",
+		},
+	}, nil
 }

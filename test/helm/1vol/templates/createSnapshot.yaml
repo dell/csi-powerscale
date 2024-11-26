@@ -4,7 +4,6 @@ metadata:
  name: pvol0-snap1
  namespace: test
 spec:
-  volumeSnapshotClassName: isilon-snapclass
-  source:
-    persistentVolumeClaimName: pvol0
-
+ volumeSnapshotClassName: isilon-snapclass
+ source:
+  persistentVolumeClaimName: pvol0

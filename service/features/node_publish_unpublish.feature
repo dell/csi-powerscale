@@ -182,6 +182,35 @@ Feature: Isilon CSI interface
     | "mount"      | "multiple-writer"              | "none"                                       |
     | "block"      | "multiple-reader"              | "Invalid access type"                        |
 
+  Scenario Outline: Node publish volume with no volume context in request
+    Given a Isilon service
+    And I have a Node "node1" with AccessZone
+    And a controller published volume
+    And a capability with voltype <voltype> access <access>
+    And get Node Publish Volume Request with no volume context
+    When I call Probe
+    And I call NodePublishVolume
+    Then the error contains <errormsg>
+
+    Examples:
+    | voltype      | access                         | errormsg                                     |
+    | "mount"      | "single-reader"                | "VolumeContext is nil"                       |
+
+  Scenario Outline: Node publish volume with missing inputs in volume context request
+    Given a Isilon service
+    And I have a Node "node1" with AccessZone
+    And a controller published volume
+    And a capability with voltype <voltype> access <access>
+    And get Node Publish Volume Request with Volume Name <volname> and path <path>
+    When I call Probe
+    And I call NodePublishVolume
+    Then the error contains <errormsg>
+
+    Examples:
+    | voltype      | access              | volname        | path                      | errormsg                                             |
+    | "mount"      | "single-reader"     | "volume1"      | ""                        | "no entry keyed by 'Path' found in VolumeContext"    |
+    | "mount"      | "single-reader"     | ""             | "/ifs/.snapshot/snappath" | "no entry keyed by 'Name' found in VolumeContext "   |
+
 @nodeUnpublish
 @v1.0.0
   Scenario: Identity node unpublish good call

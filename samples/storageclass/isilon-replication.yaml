@@ -94,12 +94,12 @@ parameters:
   # Allowed values: valid octal mode number
   # Default value: "0777"
   # Examples: "0777", "777", "0755"
-  #IsiVolumePathPermissions: "0777"
+  # IsiVolumePathPermissions: "0777"
 
   # AccessZone groupnet service IP. Update AzServiceIP if different than endpoint.
   # Optional: true
   # Default value: endpoint of the cluster ClusterName
-  #AzServiceIP : 192.168.2.1
+  # AzServiceIP : 192.168.2.1
 
   # When a PVC is being created, this parameter determines, when a node mounts the PVC,
   # whether to add the k8s node to the "Root clients" field or "Clients" field of the NFS export
@@ -128,11 +128,11 @@ volumeBindingMode: Immediate
 # allowedTopologies helps scheduling pods on worker nodes which match all of below expressions.
 # If enableCustomTopology is set to true in helm values.yaml, then do not specify allowedTopologies
 # Change all instances of <ISILON_IP> to the IP of the PowerScale OneFS API server
-#allowedTopologies:
+# allowedTopologies:
 #  - matchLabelExpressions:
 #      - key: csi-isilon.dellemc.com/<ISILON_IP>
 #        values:
 #          - csi-isilon.dellemc.com
 
 # specify additional mount options for when a Persistent Volume is being mounted on a node.
-#mountOptions: ["<mountOption1>", "<mountOption2>", ..., "<mountOptionN>"]
+# mountOptions: ["<mountOption1>", "<mountOption2>", ..., "<mountOptionN>"]
