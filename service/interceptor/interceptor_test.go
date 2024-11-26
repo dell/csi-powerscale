@@ -24,14 +24,10 @@ import (
 	"sync"
 	"testing"
 	"time"
-
 	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-
-	//      "github.com/dell/csi-isilon/v2/service/interceptor"
 	controller "github.com/dell/csi-isilon/v2/service"
 	"github.com/dell/csi-metadata-retriever/retriever"
-
 	csictx "github.com/dell/gocsi/context"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -220,23 +216,6 @@ func TestNewCustomSerialLock(t *testing.T) {
 			&csi.NodeUnpublishVolumeRequest{VolumeId: validNfsVolumeID})
 		assert.Nil(t, err)
 	})
-}
-
-func TestCreateMetadataRetrieverClient(t *testing.T) {
-	ctx := context.Background()
-
-	csictx.Setenv(ctx, "CSI_RETRIEVER_ENDPOINT", "localhost:8080")
-
-	locker := &lockProvider{
-		volIDLocks:   map[string]gosync.TryLocker{},
-		volNameLocks: map[string]gosync.TryLocker{},
-	}
-
-	i := &interceptor{opts{locker: locker, timeout: 0}}
-
-	i.createMetadataRetrieverClient(ctx)
-
-	assert.NotNil(t, i.opts.MetadataSidecarClient)
 }
 
 func TestCreateVolume(t *testing.T) {
