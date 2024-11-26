@@ -219,6 +219,23 @@ func TestNewCustomSerialLock(t *testing.T) {
 	})
 }
 
+func TestCreateMetadataRetrieverClient(t *testing.T) {
+	ctx := context.Background()
+
+	csictx.Setenv(ctx, "CSI_RETRIEVER_ENDPOINT", "localhost:8080")
+
+	locker := &lockProvider{
+		volIDLocks:   map[string]gosync.TryLocker{},
+		volNameLocks: map[string]gosync.TryLocker{},
+	}
+
+	i := &interceptor{opts{locker: locker, timeout: 0}}
+
+	i.createMetadataRetrieverClient(ctx)
+
+	assert.NotNil(t, i.opts.MetadataSidecarClient)
+}
+
 func TestCreateVolume(t *testing.T) {
 	// Create a new lockProvider instance
 	lockProvider := &lockProvider{
