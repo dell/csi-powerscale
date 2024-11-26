@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2023 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2024 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -335,6 +335,7 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^get Node Publish Volume Request$`, f.getNodePublishVolumeRequest)
 	s.Step(`^get Node Publish Volume Request with Volume Name "([^"]*)"$`, f.getNodePublishVolumeRequestwithVolumeName)
 	s.Step(`^get Node Publish Volume Request with Volume Name "([^"]*)" and path "([^"]*)"$`, f.getNodePublishVolumeRequestwithVolumeNameandPath)
+	s.Step(`^get Node Publish Volume Request with no volume context$`, f.getNodePublishVolumeRequestWithNoVolumeContext)
 	s.Step(`^I change the target path$`, f.iChangeTheTargetPath)
 	s.Step(`^I mark request read only$`, f.iMarkRequestReadOnly)
 	s.Step(`^I call NodeStageVolume with name "([^"]*)" and access type "([^"]*)"$`, f.iCallNodeStageVolume)
@@ -1678,7 +1679,11 @@ func (f *feature) getNodePublishVolumeRequest() error {
 
 func (f *feature) getNodePublishVolumeRequestwithVolumeNameandPath(volName string, path string) error {
 	req := new(csi.NodePublishVolumeRequest)
-	req.VolumeId = volName
+	if volName != "" {
+		req.VolumeId = volName
+	} else {
+		req.VolumeId = Volume1
+	}
 	req.Readonly = true
 	req.VolumeCapability = f.capability
 	mount := f.capability.GetMount()
@@ -1686,7 +1691,7 @@ func (f *feature) getNodePublishVolumeRequestwithVolumeNameandPath(volName strin
 		req.TargetPath = datadir
 	}
 	attributes := map[string]string{
-		"Name":       req.VolumeId,
+		"Name":       volName,
 		"AccessZone": "",
 		"Path":       path,
 	}
@@ -1712,6 +1717,20 @@ func (f *feature) getNodePublishVolumeRequestwithVolumeName(volName string) erro
 		"Path":       f.service.opts.Path + "/" + req.VolumeId,
 	}
 	req.VolumeContext = attributes
+
+	f.nodePublishVolumeRequest = req
+	return nil
+}
+
+func (f *feature) getNodePublishVolumeRequestWithNoVolumeContext() error {
+	req := new(csi.NodePublishVolumeRequest)
+	req.VolumeId = Volume1
+	req.Readonly = false
+	req.VolumeCapability = f.capability
+	mount := f.capability.GetMount()
+	if mount != nil {
+		req.TargetPath = datadir
+	}
 
 	f.nodePublishVolumeRequest = req
 	return nil

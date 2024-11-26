@@ -124,6 +124,19 @@ Feature: Isilon CSI interface
       | "GetPolicyInternalError" | "can't ensure protection policy exists"    |
       | "GetPolicyNotFoundError" | "policy job couldn't reach FINISHED state" |
 
+    Scenario Outline: Create Volume with Replication Enabled to cover different RPO values
+      Given a Isilon service
+      When I call CreateVolumeRequestWithReplicationParams "volumeGroupPrefix" <rpo> ""
+      Then the error contains "replication enabled but no remote system specified"
+      Examples:
+      | rpo               |
+      | "Fifteen_Minutes" |
+      | "Thirty_Minutes"  |
+      | "One_Hour"        |
+      | "Six_Hours"       |
+      | "Twelve_Hours"    |
+      | "One_Day"         |
+
 @deleteVolume
 @v1.0.0
     Scenario: Delete volume good scenario with quota enabled

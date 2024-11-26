@@ -387,7 +387,11 @@ func ParseNormalizedSnapshotID(ctx context.Context, snapID string) (string, stri
 	var clusterName, accessZone string
 	if len(tokens) > 1 {
 		clusterName = tokens[1]
-		accessZone = tokens[2]
+		if len(tokens) > 2 {
+			accessZone = tokens[2]
+		} else {
+			return "", "", "", fmt.Errorf("access zone not found in snapshot ID '%s'", snapID)
+		}
 	}
 
 	log.Debugf("normalized snapshot ID '%s' parsed into snapshot ID '%s' and cluster name '%s'",

@@ -25,10 +25,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-
-	//      "github.com/dell/csi-isilon/v2/service/interceptor"
-
+	controller "github.com/dell/csi-isilon/v2/service"
+	"github.com/dell/csi-metadata-retriever/retriever"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -65,6 +65,42 @@ func TestRewriteRequestIDInterceptor_RequestIDExist(t *testing.T) {
 
 	assert.Equal(t, ok, true)
 	assert.Equal(t, requestID, fmt.Sprintf("%s-%s", csictx.RequestIDKey, testID))
+}
+
+func TestGetLockWithName(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Get lock with name present", func(t *testing.T) {
+		lockProvider := &lockProvider{
+			volNameLocks: map[string]gosync.TryLocker{
+				"name": &gosync.TryMutex{},
+			},
+		}
+
+		lock, err := lockProvider.GetLockWithName(ctx, "name")
+		if err != nil {
+			t.Errorf("Expected nil error, got %v", err)
+		}
+
+		if lock == nil {
+			t.Error("Expected non-nil lock, got nil")
+		}
+	})
+
+	t.Run("Get lock with name not present", func(t *testing.T) {
+		lockProvider := &lockProvider{
+			volNameLocks: map[string]gosync.TryLocker{},
+		}
+
+		lock, err := lockProvider.GetLockWithName(ctx, "name")
+		if err != nil {
+			t.Errorf("Expected nil error, got %v", err)
+		}
+
+		if lock == nil {
+			t.Error("Expected non-nil lock, got nil")
+		}
+	})
 }
 
 func TestNewCustomSerialLock(t *testing.T) {
@@ -181,4 +217,89 @@ func TestNewCustomSerialLock(t *testing.T) {
 			&csi.NodeUnpublishVolumeRequest{VolumeId: validNfsVolumeID})
 		assert.Nil(t, err)
 	})
+}
+
+func TestCreateMetadataRetrieverClient(t *testing.T) {
+	ctx := context.Background()
+
+	csictx.Setenv(ctx, "CSI_RETRIEVER_ENDPOINT", "localhost:8080")
+
+	locker := &lockProvider{
+		volIDLocks:   map[string]gosync.TryLocker{},
+		volNameLocks: map[string]gosync.TryLocker{},
+	}
+
+	i := &interceptor{opts{locker: locker, timeout: 0}}
+
+	i.createMetadataRetrieverClient(ctx)
+
+	assert.NotNil(t, i.opts.MetadataSidecarClient)
+}
+
+func TestCreateVolume(t *testing.T) {
+	// Create a new lockProvider instance
+	lockProvider := &lockProvider{
+		volIDLocks:   make(map[string]gosync.TryLocker),
+		volNameLocks: make(map[string]gosync.TryLocker),
+	}
+
+	// Create a new interceptor instance
+	i := &interceptor{
+		opts: opts{
+			locker:                lockProvider,
+			MetadataSidecarClient: &mockMetadataSidecarClient{},
+			timeout:               time.Second,
+		},
+	}
+
+	// Create a new context
+	ctx := context.Background()
+
+	// Create a new CreateVolumeRequest
+	req := &csi.CreateVolumeRequest{
+		Name: "test-volume",
+		Parameters: map[string]string{
+			controller.KeyCSIPVCName:      "test-pvc",
+			controller.KeyCSIPVCNamespace: "test-namespace",
+		},
+	}
+
+	// Create a new UnaryHandler
+	handler := func(_ context.Context, _ interface{}) (interface{}, error) {
+		return &csi.CreateVolumeResponse{
+			Volume: &csi.Volume{
+				VolumeId: "test-volume-id",
+			},
+		}, nil
+	}
+
+	// Call the createVolume function
+	res, err := i.createVolume(ctx, req, nil, handler)
+
+	// Assert the expected response
+	if res == nil {
+		t.Errorf("Expected non-nil response, but it was nil")
+	}
+
+	// Assert the expected error
+	if err != nil {
+		t.Errorf("Expected no error, but got %v", err)
+	}
+
+	// Assert the expected volume ID
+	if res.(*csi.CreateVolumeResponse).Volume.VolumeId != "test-volume-id" {
+		t.Errorf("Expected volume ID to be %s, but it was %s", "test-volume-id", res.(*csi.CreateVolumeResponse).Volume.VolumeId)
+	}
+}
+
+// mockMetadataSidecarClient is a mock implementation of the retriever.MetadataRetrieverClient interface
+type mockMetadataSidecarClient struct{}
+
+// GetPVCLabels is a mock implementation of the GetPVCLabels method
+func (c *mockMetadataSidecarClient) GetPVCLabels(_ context.Context, _ *retriever.GetPVCLabelsRequest) (*retriever.GetPVCLabelsResponse, error) {
+	return &retriever.GetPVCLabelsResponse{
+		Parameters: map[string]string{
+			"test-key": "test-value",
+		},
+	}, nil
 }
