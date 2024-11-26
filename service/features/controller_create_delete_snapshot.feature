@@ -57,7 +57,6 @@ Feature: Isilon CSI interface
 
 @deleteSnapshot
 @v1.0.0
-@todo
   Scenario Outline: Delete snapshot with various induced error use cases from examples
     Given a Isilon service
     When I call Probe
@@ -68,8 +67,6 @@ Feature: Isilon CSI interface
     Examples:
     | induced                 | errormsg                                        |
     | "GetSnapshotError"      | "cannot check the existence of the snapshot"    |
-    | "DeleteSnapshotError"   | "error deleting snapshot"                      |
-  
 
   Scenario Outline: Controller delete snapshot various use cases from examples
     Given a Isilon service
@@ -78,11 +75,12 @@ Feature: Isilon CSI interface
     Then the error contains <errormsg>
 
     Examples:
-    | snapshotId   | errormsg                                 |
-    | "34=_=_=cluster2=_=_=System" | "failed to get cluster config details for clusterName: 'cluster2'"                                   |
-    | ""           | "snapshot id to be deleted is required"  |
-    | "404"        | "none"                                   |
-    | "str"        | "cannot convert snapshot to integer"     |
+    | snapshotId                   | errormsg                                                            |
+    | "34=_=_=cluster2=_=_=System" | "failed to get cluster config details for clusterName: 'cluster2'"  |
+    | ""                           | "snapshot id to be deleted is required"                             |
+    | "34=_=_=cluster2"            | "access zone not found in snapshot ID"                              |
+    | "404"                        | "none"                                                              |
+    | "str"                        | "cannot convert snapshot to integer"                                |
 
   Scenario: Calling Snapshot create and delete functionality
     Given a Isilon service

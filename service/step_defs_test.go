@@ -1679,7 +1679,11 @@ func (f *feature) getNodePublishVolumeRequest() error {
 
 func (f *feature) getNodePublishVolumeRequestwithVolumeNameandPath(volName string, path string) error {
 	req := new(csi.NodePublishVolumeRequest)
-	req.VolumeId = volName
+	if volName != "" {
+		req.VolumeId = volName
+	} else {
+		req.VolumeId = Volume1
+	}
 	req.Readonly = true
 	req.VolumeCapability = f.capability
 	mount := f.capability.GetMount()
@@ -1687,25 +1691,11 @@ func (f *feature) getNodePublishVolumeRequestwithVolumeNameandPath(volName strin
 		req.TargetPath = datadir
 	}
 	attributes := map[string]string{
-		"Name":       req.VolumeId,
+		"Name":       volName,
 		"AccessZone": "",
 		"Path":       path,
 	}
 	req.VolumeContext = attributes
-
-	f.nodePublishVolumeRequest = req
-	return nil
-}
-
-func (f *feature) getNodePublishVolumeRequestWithNoVolumeContext() error {
-	req := new(csi.NodePublishVolumeRequest)
-	req.VolumeId = Volume1
-	req.Readonly = false
-	req.VolumeCapability = f.capability
-	mount := f.capability.GetMount()
-	if mount != nil {
-		req.TargetPath = datadir
-	}
 
 	f.nodePublishVolumeRequest = req
 	return nil
@@ -1727,6 +1717,20 @@ func (f *feature) getNodePublishVolumeRequestwithVolumeName(volName string) erro
 		"Path":       f.service.opts.Path + "/" + req.VolumeId,
 	}
 	req.VolumeContext = attributes
+
+	f.nodePublishVolumeRequest = req
+	return nil
+}
+
+func (f *feature) getNodePublishVolumeRequestWithNoVolumeContext() error {
+	req := new(csi.NodePublishVolumeRequest)
+	req.VolumeId = Volume1
+	req.Readonly = false
+	req.VolumeCapability = f.capability
+	mount := f.capability.GetMount()
+	if mount != nil {
+		req.TargetPath = datadir
+	}
 
 	f.nodePublishVolumeRequest = req
 	return nil

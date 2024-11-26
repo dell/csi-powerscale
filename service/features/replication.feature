@@ -229,6 +229,7 @@ Feature: Isilon CSI interface
       | induced                  | errormsg                                                 |
       | "GetPolicyInternalError" | "failover: encountered error when trying to sync policy" |
       | "GetJobsInternalError"   | "failover: encountered error when trying to sync policy" |
+      | "GetSpgErrors"           | "failover: can't disable local policy"                   |
 
   Scenario Outline: Execute action unplanned failover
     Given a Isilon service
