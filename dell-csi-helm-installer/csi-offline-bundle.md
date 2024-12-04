@@ -88,7 +88,7 @@ For example, here is the output of a request to build an offline bundle for the 
 *
 * Pulling and saving container images
 
-   quay.io/dell/container-storage-modules/csi-isilon:v2.12.0
+   quay.io/dell/container-storage-modules/csi-isilon:v2.13.0
    quay.io/dell/container-storage-modules/csi-metadata-retriever:v1.6.0
    quay.io/dell/container-storage-modules/csipowermax-reverseproxy:v2.6.0
    quay.io/dell/container-storage-modules/csi-powermax:v2.9.0
