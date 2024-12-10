@@ -1592,7 +1592,7 @@ func (f *feature) thereAreNotQuotas(nVols int) error {
 	return nil
 }
 
-func FeatureContext(s *godog.Suite) {
+func FeatureContext(s *godog.ScenarioContext) {
 	f := &feature{}
 	s.Step(`^a Isilon service$`, f.aIsilonService)
 	s.Step(`^a basic volume request "([^"]*)" "(\d+)"$`, f.aBasicVolumeRequest)

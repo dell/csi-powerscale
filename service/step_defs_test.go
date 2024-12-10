@@ -283,7 +283,7 @@ func (f *feature) checkGoRoutines(tag string) {
 	f.nGoRoutines = goroutines
 }
 
-func FeatureContext(s *godog.Suite) {
+func FeatureContext(s *godog.ScenarioContext) {
 	f := &feature{}
 	s.Step(`^a Isilon service$`, f.aIsilonService)
 	s.Step(`^a Isilon service with params "([^"]*)" "([^"]*)"$`, f.aIsilonServiceWithParams)
