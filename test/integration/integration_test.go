@@ -76,14 +76,15 @@ func TestMain(m *testing.M) {
 	}
 
 	write, err := os.Create("Powerscale_integration_test_results.xml")
-	exitVal := godog.RunWithOptions("godog", func(s *godog.Suite) {
-		FeatureContext(s)
-	}, godog.Options{
-		Output: write,
-		Format: "junit",
-		Paths:  []string{os.Args[len(os.Args)-2]},
-		Tags:   os.Args[len(os.Args)-1],
-	})
+	exitVal := godog.TestSuite{
+		ScenarioInitializer: FeatureContext,
+		Options: &godog.Options{
+			Format: "junit",
+			Output: write,
+			Paths:  []string{os.Args[len(os.Args)-2]},
+			Tags:   os.Args[len(os.Args)-1],
+		},
+	}.Run()
 	if st := m.Run(); st > exitVal {
 		exitVal = st
 	}
