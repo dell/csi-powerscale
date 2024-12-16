@@ -35,13 +35,19 @@ func TestMain(m *testing.M) {
 
 	configFile := "mock/secret/secret.yaml"
 	os.Setenv(constants.EnvIsilonConfigFile, configFile)
-	status = godog.RunWithOptions("godog", func(s *godog.Suite) {
-		FeatureContext(s)
-	}, godog.Options{
+
+	opts := godog.Options{
 		Format: "pretty",
 		Paths:  []string{"features"},
 		Tags:   "~todo",
-	})
+	}
+
+	status = godog.TestSuite{
+		Name:                "godogs",
+		ScenarioInitializer: FeatureContext,
+		Options:             &opts,
+	}.Run()
+
 	fmt.Printf("godog finished\n")
 
 	if st := m.Run(); st > status {
