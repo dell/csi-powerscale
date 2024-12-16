@@ -1,6 +1,9 @@
 module github.com/dell/csi-isilon/v2
 
-go 1.23
+go 1.23.0
+
+toolchain go1.23.2
+
 require (
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/akutz/gosync v0.1.0
