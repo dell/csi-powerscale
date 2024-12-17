@@ -151,7 +151,7 @@ Feature: Isilon CSI interface
       Given a Isilon service
       When I call Probe
       And I induce error "OmitAccessMode"
-      And I call ControllerPublishVolume with "" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
+      And I call ControllerPublishVolume with name "volume2=_=_=43=_=_=System" and access type "" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
       Then the error contains "access mode is required"
 
     Scenario: ControllerPublishVolume good scenario

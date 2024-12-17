@@ -283,8 +283,12 @@ func (f *feature) checkGoRoutines(tag string) {
 	f.nGoRoutines = goroutines
 }
 
-func FeatureContext(s *godog.Suite) {
+func FeatureContext(s *godog.ScenarioContext) {
 	f := &feature{}
+	s.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
+		f.getNodeUnpublishVolumeRequest()
+		return ctx, nil
+	})
 	s.Step(`^a Isilon service$`, f.aIsilonService)
 	s.Step(`^a Isilon service with params "([^"]*)" "([^"]*)"$`, f.aIsilonServiceWithParams)
 	s.Step(`^a Isilon service with custom topology "([^"]*)" "([^"]*)"$`, f.aIsilonServiceWithParamsForCustomTopology)
