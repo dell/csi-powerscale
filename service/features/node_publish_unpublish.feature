@@ -251,6 +251,7 @@ Feature: Isilon CSI interface
 @v1.0.0
   Scenario: Ephemeral NodePublish test cases
     Given a Isilon service
+    And a capability with voltype "mount" access "single-writer"
     And I call EphemeralNodePublishVolume
     Then the error contains "none"
 
