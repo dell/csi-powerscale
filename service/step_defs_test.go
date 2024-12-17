@@ -285,7 +285,7 @@ func (f *feature) checkGoRoutines(tag string) {
 
 func FeatureContext(s *godog.ScenarioContext) {
 	f := &feature{}
-	s.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
+	s.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
 		f.getNodeUnpublishVolumeRequest()
 		return ctx, nil
 	})
