@@ -1,4 +1,4 @@
-# Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,11 +31,13 @@ FROM $BASEIMAGE AS final
 COPY --from=builder /go/src/csi-isilon /
 ENTRYPOINT ["/csi-isilon"]
 
-LABEL vendor="Dell Inc." \
-      name="csi-isilon" \
-      summary="CSI Driver for Dell EMC PowerScale" \
-      description="CSI Driver for provisioning persistent storage from Dell EMC PowerScale" \
-      version="2.13.0" \
-      license="Apache-2.0"
+LABEL vendor="Dell Technologies" \
+    maintainer="Dell Technologies" \
+    name="csi-isilon" \
+    summary="CSI Driver for Dell EMC PowerScale" \
+    description="CSI Driver for provisioning persistent storage from Dell EMC PowerScale" \
+    release="1.13.0" \
+    version="2.13.0" \
+    license="Apache-2.0"
 
 COPY ./licenses /licenses
