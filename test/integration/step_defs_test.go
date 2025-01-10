@@ -336,7 +336,7 @@ func (f *feature) thereIsAnExportForSnapshotDir(name string) error {
 		panic(fmt.Sprintf("failed to get snapshot id for snapshot '%s', error '%v'\n", name, err))
 	}
 
-	snapshotIsiPath, err := isiClient.GetSnapshotIsiPath(ctx, f.isiPath, strconv.FormatInt(snapshotSrc.Id, 10), f.vol.VolumeContext["AccessZone"])
+	snapshotIsiPath, err := isiClient.GetSnapshotIsiPath(ctx, f.isiPath, strconv.FormatInt(snapshotSrc.ID, 10), f.vol.VolumeContext["AccessZone"])
 	if err != nil {
 		f.addError(err)
 		fmt.Printf("failed to get snapshot dir path for snapshot '#{name}', error '#{err}'\n")
