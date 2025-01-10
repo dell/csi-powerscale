@@ -156,7 +156,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 				return nil, status.Errorf(codes.Internal, "Error while retrieving remote quota %s", err.Error())
 			}
 		} else {
-			quotaID = quota.Id
+			quotaID = quota.ID
 		}
 		if remoteExportID, err = remoteIsiConfig.isiSvc.ExportVolumeWithZone(ctx, isiPath, volName, remoteAccessZone, utils.GetQuotaIDWithCSITag(quotaID)); err == nil && remoteExportID != 0 {
 			// get the export and retry if not found to ensure the export has been created

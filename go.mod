@@ -15,9 +15,9 @@ require (
 	github.com/dell/dell-csi-extensions/podmon v1.6.0
 	github.com/dell/dell-csi-extensions/replication v1.9.0
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.7.0
-	github.com/dell/gocsi v1.12.0
-	github.com/dell/gofsutil v1.17.0
-	github.com/dell/goisilon v1.17.0
+	github.com/dell/gocsi v1.13.0
+	github.com/dell/gofsutil v1.18.0
+	github.com/dell/goisilon v1.18.1
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
@@ -70,7 +70,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect

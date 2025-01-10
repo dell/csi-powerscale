@@ -703,7 +703,7 @@ func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *Isilo
 	if size > sizeInBytes {
 		return fmt.Errorf("specified size '%d' is smaller than source snapshot size '%d'", sizeInBytes, size)
 	}
-	if _, err = isiConfig.isiSvc.CopySnapshot(ctx, isiPath, snapshotSourceVolumeIsiPath, snapshotSrc.Id, dstVolumeName, accessZone); err != nil {
+	if _, err = isiConfig.isiSvc.CopySnapshot(ctx, isiPath, snapshotSourceVolumeIsiPath, snapshotSrc.ID, dstVolumeName, accessZone); err != nil {
 		return fmt.Errorf("failed to copy snapshot id '%s', error '%s'", srcSnapshotID, err.Error())
 	}
 
@@ -1053,7 +1053,7 @@ func (s *service) ControllerExpandVolume(
 		updatedSoftLimit := quotaSizeSoft * (requiredBytes / quotaSizeHard)
 		updatedAdvisoryLimit := quotaSizeAdvisory * (requiredBytes / quotaSizeHard)
 
-		if err = isiConfig.isiSvc.UpdateQuotaSize(ctx, quota.Id, requiredBytes, updatedSoftLimit, updatedAdvisoryLimit, quotaSoftGrace); err != nil {
+		if err = isiConfig.isiSvc.UpdateQuotaSize(ctx, quota.ID, requiredBytes, updatedSoftLimit, updatedAdvisoryLimit, quotaSoftGrace); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
@@ -1673,7 +1673,7 @@ func (s *service) CreateSnapshot(
 	if snapshotByName, err = isiConfig.isiSvc.GetSnapshot(ctx, snapshotName); snapshotByName != nil {
 		if path.Base(snapshotByName.Path) == srcVolumeID {
 			// return the existent snapshot
-			return s.getCreateSnapshotResponse(ctx, strconv.FormatInt(snapshotByName.Id, 10), req.GetSourceVolumeId(), snapshotByName.Created, isiConfig.isiSvc.GetSnapshotSize(ctx, isiPath, snapshotName, accessZone), clusterName, accessZone), nil
+			return s.getCreateSnapshotResponse(ctx, strconv.FormatInt(snapshotByName.ID, 10), req.GetSourceVolumeId(), snapshotByName.Created, isiConfig.isiSvc.GetSnapshotSize(ctx, isiPath, snapshotName, accessZone), clusterName, accessZone), nil
 		}
 		// return already exists error
 		return nil, status.Error(codes.AlreadyExists,
@@ -1690,7 +1690,7 @@ func (s *service) CreateSnapshot(
 
 	log.Infof("snapshot creation is successful")
 	// return the response
-	return s.getCreateSnapshotResponse(ctx, strconv.FormatInt(snapshotNew.Id, 10), req.GetSourceVolumeId(), snapshotNew.Created, isiConfig.isiSvc.GetSnapshotSize(ctx, isiPath, snapshotName, accessZone), clusterName, accessZone), nil
+	return s.getCreateSnapshotResponse(ctx, strconv.FormatInt(snapshotNew.ID, 10), req.GetSourceVolumeId(), snapshotNew.Created, isiConfig.isiSvc.GetSnapshotSize(ctx, isiPath, snapshotName, accessZone), clusterName, accessZone), nil
 }
 
 // validateCreateSnapshotRequest validate the input params in CreateSnapshotRequest
