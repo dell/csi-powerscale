@@ -115,12 +115,12 @@ github.com/dell/dell-csi-extensions/replication v1.9.0 h1:u3o1FmlihM66WkwHsZ0G0S
 github.com/dell/dell-csi-extensions/replication v1.9.0/go.mod h1:h1tv4kEvtT877wpYeN9Kj7pTBhAuprXYJW/59MTl3b8=
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.7.0 h1:FRzxfjWO8oWnSKmK9KHXmIl4zBRM/IfSPt8qbax4K1k=
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.7.0/go.mod h1:v5P0GOpKzWAtukQt8F8dG4yRLelVE2+7bqnbK5iQlAM=
-github.com/dell/gocsi v1.12.0 h1:Dn/8f2BLovo57T/aC5pP/4Eqz4h6WX8SbX+hxT5NlvQ=
-github.com/dell/gocsi v1.12.0/go.mod h1:hJURrmDrXDGW4xVtgi5Kx6zUsU3ht9l+nlreNx33rf0=
-github.com/dell/gofsutil v1.17.0 h1:QA6gUb1mz8kXNEN4eEx47OHCz8nSqZrrCnaDUYmV5EY=
-github.com/dell/gofsutil v1.17.0/go.mod h1:PN2hWl/pVLQiTsFR0X1x+GfhfOrfW8pGgH5xGcGMeFs=
-github.com/dell/goisilon v1.17.0 h1:E3oBld85K0GwFPDEWuGE6OTOKUR0fiWtsiKEhnrEEXQ=
-github.com/dell/goisilon v1.17.0/go.mod h1:c8/bW2ligD3Ri2GCoPeF/EXLYgfLmlJwaKxBjd+U07s=
+github.com/dell/gocsi v1.13.0 h1:agiPFOYlcnoe4bdBXu8zECfNAspm51Vb/MgSlYVaxvU=
+github.com/dell/gocsi v1.13.0/go.mod h1:G74XoRObNZyO/H3g/h3yJzNf1TyoyaBaLPt/kg+8EcU=
+github.com/dell/gofsutil v1.18.0 h1:dZiZjBZLqHqEQw97yU4x0SR3ydF22dw7tqNS8Fvvl2c=
+github.com/dell/gofsutil v1.18.0/go.mod h1:2WiIEgoFs87REM1TbelGtpNX1Y5itopQuBlMgDLkgBg=
+github.com/dell/goisilon v1.18.0 h1:FOLBisrclUjwfeOVsNHbSKqD4ddcWsfRcnSsTPSrA+8=
+github.com/dell/goisilon v1.18.0/go.mod h1:C9sp22kpzi6AwiCo5Q7z4GbaWnaUOnL+LVYsb4y5oEA=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
@@ -143,7 +143,6 @@ github.com/frankban/quicktest v1.14.6 h1:7Xjx+VpznH+oBnejlPUj8oUpdxnVs4f8XU8WnHk
 github.com/frankban/quicktest v1.14.6/go.mod h1:4ptaffx2x8+WTWXmUCuVU6aPUX1/Mz7zb5vbUoiM6w0=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/fsnotify/fsnotify v1.4.9/go.mod h1:znqG4EE+3YCdAaPaxE2ZRY/06pZUdp0tY4IgpuI1SZQ=
-github.com/fsnotify/fsnotify v1.6.0/go.mod h1:sl3t1tCWJFWoRz9R8WJCbQihKKwmorjAbSClcnxKAGw=
 github.com/fsnotify/fsnotify v1.8.0 h1:dAwr6QBTBZIkG8roQaJjGof0pp0EeF+tNV7YBP3F/8M=
 github.com/fsnotify/fsnotify v1.8.0/go.mod h1:8jBTzvmWwFyi3Pb8djgCCO5IBqzKJ/Jwo8TRcHyHii0=
 github.com/fxamacker/cbor/v2 v2.7.0 h1:iM5WgngdRBanHcxugY4JySA0nk1wZorNOpTgCMedv5E=
@@ -382,8 +381,8 @@ github.com/onsi/ginkgo/v2 v2.21.0/go.mod h1:7Du3c42kxCUegi0IImZ1wUQzMBVecgIHjR1C
 github.com/onsi/gomega v0.0.0-20170829124025-dcabb60a477c/go.mod h1:C1qb7wdrVGGVU+Z6iS04AVkA3Q65CEZX59MT0QO5uiA=
 github.com/onsi/gomega v1.7.1/go.mod h1:XdKZgCCFLUoM/7CFJVPcG8C1xQ1AJ0vpAezJrB7JYyY=
 github.com/onsi/gomega v1.10.1/go.mod h1:iN09h71vgCQne3DLsj+A5owkum+a2tYe+TOCB1ybHNo=
-github.com/onsi/gomega v1.35.1 h1:Cwbd75ZBPxFSuZ6T+rN/WCb/gOc6YgFBXLlZLhC7Ds4=
-github.com/onsi/gomega v1.35.1/go.mod h1:PvZbdDc8J6XJEpDK4HCuRBm8a6Fzp9/DmhC9C7yFlog=
+github.com/onsi/gomega v1.36.2 h1:koNYke6TVk6ZmnyHrCXba/T/MoLBXFjeC1PtvYgw0A8=
+github.com/onsi/gomega v1.36.2/go.mod h1:DdwyADRjrc825LhMEkD76cHR5+pUnjhUN8GlHlRPHzY=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/pelletier/go-toml/v2 v2.2.3 h1:YmeHyLY8mFWbdkNWwpr+qIL2bEqT0o95WSdkNHvL12M=
@@ -705,7 +704,6 @@ golang.org/x/sys v0.0.0-20210616094352-59db8d763f22/go.mod h1:oPkhp1MJrh7nUepCBc
 golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
-golang.org/x/sys v0.0.0-20220908164124-27713097b956/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.5.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.8.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.12.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
