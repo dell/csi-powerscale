@@ -40,11 +40,6 @@ ifeq ($(IMAGENAME),)
 export IMAGENAME="$(DEFAULT_IMAGENAME)"
 endif
 
-# set the BUILDSTAGE if needed
-ifeq ($(BUILDSTAGE),)
-export BUILDSTAGE="$(DEFAULT_BUILDSTAGE)"
-endif
-
 # set the IMAGETAG if needed
 ifeq ($(IMAGETAG),)
 export IMAGETAG="$(DEFAULT_IMAGETAG)"
@@ -75,9 +70,6 @@ overrides-help:
 	@echo "             Current setting is: $(IMAGENAME)"
 	@echo "IMAGETAG   - The image tag to be built, default is an empty string which will determine the tag by examining annotated tags in the repo."
 	@echo "             Current setting is: $(IMAGETAG)"
-	@echo "BUILDSTAGE - The Dockerfile build stage to execute, default is: $(DEFAULT_BUILDSTAGE)"
-	@echo "             Stages can be found by looking at the Dockerfile"
-	@echo "             Current setting is: $(BUILDSTAGE)"
 	@echo "GOPROXY    - The goproxy to be used for resolving dependencies, default is: $(DEFAULT_GOPROXY)"
 	@echo "             Current setting is: $(GOPROXY)"
 	@echo

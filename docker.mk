@@ -1,22 +1,19 @@
 # docker makefile, included from Makefile, will build/push images with docker or podman
 
-docker-build:
+docker: download-csm-common
+	$(eval include csm-common.mk)
 	@echo "Building docker image: $(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
-	docker build -t "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)" --build-arg GOPROXY=$(GOPROXY) --build-arg GOVERSION=$(GOVERSION) .
+	docker build -t "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)" --build-arg GOPROXY=$(GOPROXY) --build-arg BASEIMAGE=$(CSM_BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) .
 
-docker-build-image-push:
+docker-push:
 	@echo "Pushing: $(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
 	docker push "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
 
 podman-build: download-csm-common
 	$(eval include csm-common.mk)
-	@echo "Base Image is set to: $(DEFAULT_BASEIMAGE)"
-	@echo "Adding Driver dependencies to $(DEFAULT_BASEIMAGE)"
-	bash ./buildubimicro.sh $(DEFAULT_BASEIMAGE)
-	@echo "Base image build: SUCCESS" $(eval BASEIMAGE=localhost/csipowerscale-ubimicro:latest)
 	@echo "Building: $(REGISTRY)/$(IMAGENAME):$(IMAGETAG)"
 	@echo "Using Golang Image $(DEFAULT_GOIMAGE)"
-	$(BUILDER) build $(NOCACHE) -t "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)" -f Dockerfile.podman --target $(BUILDSTAGE) --build-arg GOPROXY=$(GOPROXY) --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) .
+	$(BUILDER) build $(NOCACHE) -t "$(REGISTRY)/$(IMAGENAME):$(IMAGETAG)" --build-arg GOPROXY=$(GOPROXY) --build-arg BASEIMAGE=$(CSM_BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) .
 
 podman-build-no-cache:
 	@echo "Building with --no-cache ..."
