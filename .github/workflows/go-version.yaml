@@ -9,7 +9,7 @@
 # Reusable workflow to perform go version update on Golang based projects
 name: Go Version Update
 
-on:
+on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
   repository_dispatch:
     types: [go-update-workflow]
