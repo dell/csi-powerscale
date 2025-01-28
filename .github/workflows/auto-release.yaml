@@ -1,46 +1,13 @@
-name: Auto Release CSI-Powerscale
+name: Auto Release CSI-Powerflex
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
   repository_dispatch:
     types: [auto-release-workflow]
 
 jobs:
-  calculate-version:
-    runs-on: ubuntu-latest
-    outputs:
-      new-version: ${{ steps.set-version.outputs.version }}
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch the full history including tags
-
-      - name: Get latest release version
-        id: get-latest-version
-        run: |
-          latest_version=$(git describe --tags $(git rev-list --tags --max-count=1))
-          echo "latest_version=${latest_version}" >> $GITHUB_ENV
-
-      - name: Increment minor version and remove 'v' prefix
-        id: set-version
-        run: |
-          version=${{ env.latest_version }}
-          clean_version=${version#v}
-
-          # Parse version parts
-          major=$(echo $clean_version | cut -d'.' -f1)
-          minor=$(echo $clean_version | cut -d'.' -f2)
-          patch=$(echo $clean_version | cut -d'.' -f3)
-          new_minor=$((minor + 1))
-          new_version="${major}.${new_minor}.0"
-
-          echo "New version: $new_version"
-          echo "::set-output name=version::$new_version"
-
   csm-release:
-    needs: calculate-version
     uses: dell/common-github-actions/.github/workflows/csm-release-driver-module.yaml@main
     with:
-      version: ${{ inputs.version || needs.calculate-version.outputs.new-version }}
+      version: "minor"
       image: "csi-isilon"
     secrets: inherit
