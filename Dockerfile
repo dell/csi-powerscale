@@ -1,4 +1,4 @@
-# Copyright © 2019-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -10,13 +10,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License
 
+# some arguments that must be supplied
 ARG GOPROXY
+ARG GOIMAGE
+ARG BASEIMAGE
 
-FROM rockylinux:9
+# Stage to build the driver
+FROM $GOIMAGE as builder
 ARG GOPROXY
+RUN mkdir -p /go/src
+COPY ./ /go/src/
+WORKDIR /go/src/
+RUN CGO_ENABLED=0 \
+    make build
 
-RUN yum install -y libaio libuuid numactl xfsprogs e4fsprogs nfs-utils
+# Stage to build the driver image
+FROM $BASEIMAGE AS final
 
-RUN yum clean all
-COPY "csi-isilon" .
+# copy in the driver
+COPY --from=builder /go/src/csi-isilon /
 ENTRYPOINT ["/csi-isilon"]
+
+LABEL vendor="Dell Technologies" \
+    maintainer="Dell Technologies" \
+    name="csi-isilon" \
+    summary="CSI Driver for Dell EMC PowerScale" \
+    description="CSI Driver for provisioning persistent storage from Dell EMC PowerScale" \
+    release="1.13.0" \
+    version="2.13.0" \
+    license="Apache-2.0"
+
+COPY ./licenses /licenses

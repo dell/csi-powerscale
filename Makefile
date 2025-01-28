@@ -44,9 +44,9 @@ podman-build:
 podman-build-no-cache:
 	make -f docker.mk podman-build-no-cache
 
-dev-build: build
-	make -f docker.mk docker-build
-	
+docker: build
+	make -f docker.mk docker
+
 # Pushes container to the repository
 podman-build-image-push: podman-build
 	make -f docker.mk podman-build-image-push
@@ -72,4 +72,3 @@ version:
 
 gosec:
 	gosec -quiet -log gosec.log -out=gosecresults.csv -fmt=csv ./...
-
