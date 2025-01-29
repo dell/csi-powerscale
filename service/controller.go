@@ -1046,6 +1046,10 @@ func (s *service) ControllerExpandVolume(
 		quotaSizeAdvisory := quota.Thresholds.Advisory
 		quotaSoftGrace := quota.Thresholds.SoftGrace
 
+		if quotaSizeHard == 0 {
+			return nil, status.Errorf(codes.Internal, "Hard limit is 0, cannot proceed with volume expansion")
+		}
+
 		if requiredBytes <= quotaSizeHard {
 			// volume capacity is larger than or equal to the target capacity, return OK
 			return &csi.ControllerExpandVolumeResponse{CapacityBytes: quotaSizeHard, NodeExpansionRequired: false}, nil
