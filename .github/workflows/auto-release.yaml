@@ -1,0 +1,13 @@
+name: Auto Release CSI-Powerscale
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+  repository_dispatch:
+    types: [auto-release-workflow]
+
+jobs:
+  csm-release:
+    uses: dell/common-github-actions/.github/workflows/csm-release-driver-module.yaml@main
+    with:
+      version: "minor"
+      image: "csi-isilon"
+    secrets: inherit
