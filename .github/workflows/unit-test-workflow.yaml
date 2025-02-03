@@ -1,0 +1,32 @@
+name: Code Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  build:
+    name: Run Go unit tests and check package coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v4
+      - name: Run unit tests and check package coverage
+        uses: dell/common-github-actions/go-code-tester@main
+        with:
+          threshold: 80
+          test-folder: "."
+          # Optional parameter to skip certain packages
+          # skip-list: "services/mock"
+          # Optional paramter to enable the race detector
+          race-detector: "true"
+          # Optional parameter to skip tests
+          # skip-test: "TestToSkip"
+          # Optional parameter to specify regex for tests to run
+          # run-test: "TestToRun"
+          # Optional paramter to exlude certain directories from go test. Ex. intregration test folders.
+          exclude-directory: "service/mock|provider|core|service/interceptor|common/constants|csi-utils|test/integration|common/k8sutils|core/semver|common/utils|v2"
+#[Code Test/Run Go unit tests and check package coverage]   | FAIL: coverage for package github.com/dell/csi-isilon/v2 is 0.0%, lower than 80%
