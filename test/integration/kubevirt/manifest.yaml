@@ -33,7 +33,7 @@ DriverInfo:
     noatime: {}
 
   # Optional list of topology keys that the driver supports
-  #TopologyKeys: ["topology.ebs.csi.aws.com/zone"]
+  # TopologyKeys: ["topology.ebs.csi.aws.com/zone"]
   TopologyKeys:
 
   # Optional number of allowed topologies that the driver requires. Only relevenat if TopologyKeys is set
