@@ -1,6 +1,6 @@
 name: Code Test
 
-on:
+on: # yamllint disable-line rule:truthy
   push:
     branches: [ main ]
   pull_request:
@@ -29,4 +29,3 @@ jobs:
           # run-test: "TestToRun"
           # Optional paramter to exlude certain directories from go test. Ex. intregration test folders.
           exclude-directory: "service/mock|provider|core|service/interceptor|common/constants|csi-utils|test/integration|common/k8sutils|core/semver|common/utils|v2"
-#[Code Test/Run Go unit tests and check package coverage]   | FAIL: coverage for package github.com/dell/csi-isilon/v2 is 0.0%, lower than 80%
