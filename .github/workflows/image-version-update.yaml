@@ -6,7 +6,7 @@
 #
 #  http://www.apache.org/licenses/LICENSE-2.0
 
-# Reusable workflow to perform go version update on Golang based projects
+# Reusable workflow to perform image version update on Golang based projects
 name: Image Version Update
 
 on:  # yamllint disable-line rule:truthy
