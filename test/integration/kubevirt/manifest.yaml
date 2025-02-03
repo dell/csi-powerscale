@@ -1,0 +1,84 @@
+ShortName: isilon
+StorageClass:
+  # Load a StorageClass from the given file. This file must be in the same directory as this one
+  FromFile: isilon-sc.yaml
+
+SnapshotClass:
+  # Must be set to enable snapshotting tests
+  FromName: false
+
+DriverInfo:
+  # Internal name of the driver, this is used as a display name in the test case and test objects
+  Name: isilon
+
+  # The range of disk size supported by this driver. Note that Min must be the EXACT size of a volume
+  # that can be provisioned by the CSI driver. For example, when the driver requires volume sizes to be
+  # rounded to a certain value (typically 1 or 4 GiB), Min must be rounded to that value. A test will
+  # check that when it asks for a volume with size Min, it will get the volume with exactly that size.
+  SupportedSizeRange:
+    Min: 5Gi
+    Max: 16Ti
+
+  # Map of strings for supported FS types PowerScale supports nfs for sure, not sure about the others
+  SupportedFsType:
+    nfs: {}
+
+  # Map of strings for supported mount options. This will be used to test that the CSI driver correctly
+  # passes a mount option from Kubernetes to the kernel mount table. The mount options listed here must be:
+  # 1. Supported by both the CSI driver and the kernel.
+  # 2. Non-default. Note that the real set of all default mount options depends on the kernel and filesystem type.
+  # 3. Visible in /proc/mounts after mount.
+  # 4. Harmless, i.e., the mount option should not affect how the storage behaves too much.
+  SupportedMountOption:
+    noatime: {}
+
+  # Optional list of topology keys that the driver supports
+  #TopologyKeys: ["topology.ebs.csi.aws.com/zone"]
+  TopologyKeys:
+
+  # Optional number of allowed topologies that the driver requires. Only relevenat if TopologyKeys is set
+  NumAllowedTopologies: 1
+
+  # Map of strings for required mount options
+  # RequiredMountOption:
+
+  # Optional list of access modes required for provisiong. Default is RWO
+  # RequiredAccessModes:
+
+  # Map that represents the capabilities the driver supports
+  Capabilities:
+    # Data is persistest accross pod restarts
+    persistence: true
+
+    # Volume ownership via fsGroup
+    fsGroup: false
+
+    # Raw block mode - PowerScale does not support raw block volume
+    block: false
+
+    # Exec a file in the volume
+    exec: true
+
+    # Support for volume limits
+    volumeLimits: false
+
+    # Support for volume expansion in controllers
+    controllerExpansion: false
+
+    # Support for volume expansion in nodes
+    nodeExpansion: false
+
+    # Support volume that an run on single node only (like hostpath)
+    singleNodeVolume: false
+
+    # Support ReadWriteMany access modes (runs the mulit pod test which fails to clean up)
+    RWX: true
+
+    # Support topology
+    topology: false
+
+    # Support populate data from snapshot
+    snapshotDataSource: false
+
+    # Support populated data from PVC
+    pvcDataSource: false
