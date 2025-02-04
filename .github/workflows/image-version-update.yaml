@@ -1,4 +1,4 @@
-# Copyright (c) 2024 Dell Inc., or its subsidiaries. All Rights Reserved.
+# Copyright (c) 2025 Dell Inc., or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,10 @@ name: Image Version Update
 
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (major, minor, patch) Ex: minor"
+        required: true  
   repository_dispatch:
     types: [image-update-workflow]
 
@@ -19,5 +23,5 @@ jobs:
   image-version-update:
     uses: dell/common-github-actions/.github/workflows/image-version-workflow.yaml@main
     with:
-      version: "minor"
+      version: "${{ github.event.inputs.version || 'minor' }}"
     secrets: inherit
