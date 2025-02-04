@@ -1,0 +1,13 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: isilon
+allowVolumeExpansion: true
+parameters:
+  AccessZone: System
+  # Make sure this directory exists on the array before using
+  IsiPath: /ifs/data/qual
+  RootClientEnabled: "true"
+provisioner: csi-isilon.dellemc.com
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
