@@ -14,7 +14,7 @@ on:  # yamllint disable-line rule:truthy
     inputs:
       version:
         description: "Version to release (major, minor, patch) Ex: minor"
-        required: true  
+        required: true
   repository_dispatch:
     types: [image-update-workflow]
 
