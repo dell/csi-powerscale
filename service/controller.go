@@ -710,6 +710,25 @@ func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *Isilo
 	return nil
 }
 
+// createWriteableSnapshot creates a writeable snapshot.
+func (s *service) createWriteableSnapshot(ctx context.Context, isiConfig *IsilonClusterConfig,
+	isiPath, normalizedSnapshotID, dstVolumeName string, accessZone string,
+) error {
+	var err error
+
+	srcSnapshotID, _, _, err := utils.ParseNormalizedSnapshotID(ctx, normalizedSnapshotID)
+	if err != nil {
+		return err
+	}
+
+	if _, err = isiConfig.isiSvc.GetSnapshot(ctx, srcSnapshotID); err != nil {
+		return fmt.Errorf("failed to get snapshot for ID '%s', error '%v'", srcSnapshotID, err)
+	}
+
+	_, err = isiConfig.isiSvc.CreateWriteableSnapshot(ctx, srcSnapshotID, dstVolumeName)
+	return err
+}
+
 func (s *service) createVolumeFromVolume(ctx context.Context, isiConfig *IsilonClusterConfig, isiPath, srcVolumeName, dstVolumeName string, sizeInBytes int64) error {
 	var err error
 	if isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", srcVolumeName) {

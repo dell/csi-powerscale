@@ -83,6 +83,20 @@ func (svc *isiService) CreateSnapshot(ctx context.Context, path, snapshotName st
 	return snapshot, nil
 }
 
+func (svc *isiService) CreateWriteableSnapshot(ctx context.Context, sourceSnapshotID, snapshotName string) (isi.WriteableSnapshot, error) {
+	log := utils.GetRunIDLogger(ctx)
+
+	log.Debugf("begin to create writeable snapshot '%s' from source snapshot '%s'", snapshotName, sourceSnapshotID)
+
+	snapshot, err := svc.client.CreateWriteableSnapshot(ctx, sourceSnapshotID, snapshotName)
+	if err != nil {
+		log.Errorf("create writeable snapshot failed, '%s'", err.Error())
+		return nil, err
+	}
+
+	return snapshot, nil
+}
+
 func (svc *isiService) CreateVolume(ctx context.Context, isiPath, volName, isiVolumePathPermissions string) error {
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
