@@ -83,9 +83,10 @@ func (svc *isiService) CreateSnapshot(ctx context.Context, path, snapshotName st
 	return snapshot, nil
 }
 
-func (svc *isiService) CreateWriteableSnapshot(ctx context.Context, sourceSnapshotID, snapshotName string) (isi.WriteableSnapshot, error) {
+func (svc *isiService) CreateWriteableSnapshot(ctx context.Context, isipath, sourceSnapshotID, snapshotName string) (isi.WriteableSnapshot, error) {
 	log := utils.GetRunIDLogger(ctx)
 
+	log.Debugf("CreateWriteableSnapshot: isiPath: ", isipath) // Remove before PR submission.
 	log.Debugf("begin to create writeable snapshot '%s' from source snapshot '%s'", snapshotName, sourceSnapshotID)
 
 	snapshot, err := svc.client.CreateWriteableSnapshot(ctx, sourceSnapshotID, snapshotName)
