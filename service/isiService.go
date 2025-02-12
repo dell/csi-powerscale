@@ -468,11 +468,9 @@ func (svc *isiService) IsVolumeExistent(ctx context.Context, isiPath, volID, nam
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
-	log.Debugf("check if volume (id :'%s', name '%s') already exists", volID, name)
-
+	log.Debugf("check if volume (id: '%s', name: '%s') already exists", volID, name)
 	isExistent := svc.client.IsVolumeExistentWithIsiPath(ctx, isiPath, volID, name)
-
-	log.Debugf("volume (id :'%s', name '%s') already exists : '%v'", volID, name, isExistent)
+	log.Debugf("volume (id: '%s', name: '%s') already exists: '%v'", volID, name, isExistent)
 
 	return isExistent
 }
@@ -873,6 +871,10 @@ func (svc *isiService) GetSnapshotIsiPathComponents(snapshotIsiPath, zonePath st
 
 func (svc *isiService) GetSnapshotTrackingDirName(snapshotName string) string {
 	return "." + "csi-" + snapshotName + "-tracking-dir"
+}
+
+func (svc *isiService) GetWriteableSnapshotTrackingDirName(snapshotName string) string {
+	return "." + "csi-" + snapshotName + "-rw-tracking-dir"
 }
 
 func (svc *isiService) GetSubDirectoryCount(ctx context.Context, isiPath, directory string) (int64, error) {

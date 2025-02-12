@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2023 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 	"time"
 
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
+	log "github.com/sirupsen/logrus"
 
 	fPath "path"
 
@@ -229,6 +230,8 @@ func (s *service) CreateVolume(
 		sourceVolumeID                    string
 		snapshotIsiPath                   string
 		isROVolumeFromSnapshot            bool
+		isRWVolumeFromSnapshot            bool
+		sourceIsSnapshot                  bool
 		snapshotTrackingDir               string
 		snapshotTrackingDirEntryForVolume string
 		clusterName                       string
@@ -240,6 +243,7 @@ func (s *service) CreateVolume(
 		snapshotSourceVolumeIsiPath       string
 	)
 
+	log.Debugf("begin to create volume, request: %v", req)
 	params := req.GetParameters()
 
 	if _, ok := params[ClusterNameParam]; ok {
@@ -351,16 +355,17 @@ func (s *service) CreateVolume(
 	softLimit, advisoryLimit, softGracePrd = readQuotaLimitParams(params)
 	log.Infof("Limit parameters considered for quota creation SoftLimit: '%s' , AdvisoryLimit: '%s',SoftGracePrd: '%s'", softLimit, advisoryLimit, softGracePrd)
 
-	// CSI specific metada for authorization
+	// CSI specific metadata for authorization
 	headerMetadata := addMetaData(params)
 
 	// check volume content source in the request
-	isROVolumeFromSnapshot = false
-	// check volume content source in the request
+	log.Debugf("content source in the request: '%v'", req.GetVolumeContentSource())
 	if contentSource = req.GetVolumeContentSource(); contentSource != nil {
 		// Fetch source snapshot ID  or volume ID from content source
 		if snapshot := contentSource.GetSnapshot(); snapshot != nil {
+			sourceIsSnapshot = true
 			normalizedSnapshotID := snapshot.GetSnapshotId()
+			log.Debugf("normalized snapshot ID : '%s'", normalizedSnapshotID)
 			// parse the input snapshot id and fetch it's components
 			var snapshotSrcClusterName string
 			sourceSnapshotID, snapshotSrcClusterName, _, err = utils.ParseNormalizedSnapshotID(ctx, normalizedSnapshotID)
@@ -383,7 +388,7 @@ func (s *service) CreateVolume(
 			if snapshotIsiPath, err = isiConfig.isiSvc.GetSnapshotIsiPath(ctx, snapshotSourceVolumeIsiPath, sourceSnapshotID, accessZone); err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
-			log.Debugf("The Isilon directory path of snapshot is= '%s'", snapshotIsiPath)
+			log.Debugf("The Isilon directory path of snapshot is '%s'", snapshotIsiPath)
 
 			vcs := req.GetVolumeCapabilities()
 			if len(vcs) == 0 {
@@ -400,16 +405,26 @@ func (s *service) CreateVolume(
 					return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "access mode is required"))
 				}
 
-				if am.Mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
+				log.Debugf("Access mode is ('%s') %v", am.Mode.String(), am.Mode)
+				if isROAccessMode(am.Mode) {
 					isROVolumeFromSnapshot = true
+					isRWVolumeFromSnapshot = false
+					break
+				}
+
+				if isRWAccessMode(am.Mode) {
+					isROVolumeFromSnapshot = false
+					isRWVolumeFromSnapshot = true
 					break
 				}
 			}
 		} else if volume := contentSource.GetVolume(); volume != nil {
+			sourceIsSnapshot = false
 			sourceVolumeID = volume.GetVolumeId()
 			log.Infof("Creating volume from existing volume ID: '%s'", sourceVolumeID)
 		}
 	}
+
 	if isReplication {
 		log.Info("Preparing volume replication")
 
@@ -490,7 +505,8 @@ func (s *service) CreateVolume(
 	}
 
 	foundVol = false
-	if isROVolumeFromSnapshot {
+	if sourceIsSnapshot {
+		log.Debugf("isROVolumeFromSnapshot: %v isRWVolumeFromSnapshot: %v", isROVolumeFromSnapshot, isRWVolumeFromSnapshot)
 		if isReplication {
 			return nil, errors.New("unable to create replication volume from snapshot")
 		}
@@ -501,33 +517,49 @@ func (s *service) CreateVolume(
 		}
 		snapshotName := snapshotSrc.Name
 
-		// Populate names for snapshot's tracking dir, snapshot tracking dir entry for this volume
-		snapshotTrackingDir = isiConfig.isiSvc.GetSnapshotTrackingDirName(snapshotName)
-		snapshotTrackingDirEntryForVolume = fPath.Join(snapshotTrackingDir, req.GetName())
+		if isROVolumeFromSnapshot {
+			// Populate names for snapshot's RO (legacy )tracking dir and snapshot tracking dir entry for this volume.
+			snapshotTrackingDir = isiConfig.isiSvc.GetSnapshotTrackingDirName(snapshotName)
+			snapshotTrackingDirEntryForVolume = fPath.Join(snapshotTrackingDir, req.GetName())
+			log.Debugf("the snapshot tracking directory is '%s' and volume dir is '%s'", snapshotTrackingDir, snapshotTrackingDirEntryForVolume)
 
-		// Check if entry for this volume is present in snapshot tracking dir
-		if isiConfig.isiSvc.IsVolumeExistent(ctx, snapshotSourceVolumeIsiPath, "", snapshotTrackingDirEntryForVolume) {
-			log.Debugf("the path '%s' has already existed", path)
-			foundVol = true
-		} else {
-			// Allow creation of only one active volume from a snapshot at any point in time
-			totalSubDirectories, _ := isiConfig.isiSvc.GetSubDirectoryCount(ctx, snapshotSourceVolumeIsiPath, snapshotTrackingDir)
-			if totalSubDirectories > 2 {
-				return nil, fmt.Errorf("another RO volume from this snapshot is already present")
+			// Check if entry for this volume is present in snapshot tracking dir.
+			if isiConfig.isiSvc.IsVolumeExistent(ctx, snapshotSourceVolumeIsiPath, "", snapshotTrackingDirEntryForVolume) {
+				log.Debugf("the path '%s' exists", path)
+				foundVol = true
+			} else {
+				// Allow creation of only one active volume from a snapshot at any point in time.
+				totalSubDirectories, _ := isiConfig.isiSvc.GetSubDirectoryCount(ctx, snapshotSourceVolumeIsiPath, snapshotTrackingDir)
+				if totalSubDirectories > 2 {
+					return nil, fmt.Errorf("another RO volume from this snapshot is already present")
+				}
+			}
+		} else if isRWVolumeFromSnapshot {
+			// Populate names for snapshot's RW tracking dir and snapshot tracking dir entry for this volume.
+			snapshotTrackingDir = isiConfig.isiSvc.GetWriteableSnapshotTrackingDirName(snapshotName)
+			snapshotTrackingDirEntryForVolume = fPath.Join(snapshotTrackingDir, req.GetName())
+			log.Debugf("the snapshot tracking directory is '%s' and volume dir is '%s'", snapshotTrackingDir, snapshotTrackingDirEntryForVolume)
+
+			// Check if entry for this volume is present in snapshot tracking dir.
+			if isiConfig.isiSvc.IsVolumeExistent(ctx, snapshotSourceVolumeIsiPath, "", snapshotTrackingDirEntryForVolume) {
+				log.Debugf("the path '%s' exists", path)
+				foundVol = true
 			}
 		}
 	} else {
+		log.Debugf("isROVolumeFromSnapshot: %v isRWVolumeFromSnapshot: %v", isROVolumeFromSnapshot, isRWVolumeFromSnapshot)
 		path = utils.GetPathForVolume(isiPath, req.GetName())
-		// to ensure idempotency, check if the volume still exists.
-		// k8s might have made the same CreateVolume call in quick succession and the volume was already created in the first run
+		// To ensure idempotency, check if the volume still exists.
+		// k8s might have made the same CreateVolume call in quick succession and the volume was already created in the first run.
 		if isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", req.GetName()) {
-			log.Debugf("the path '%s' has already existed", path)
+			log.Debugf("the path '%s' exists", path)
 			foundVol = true
 		}
 	}
 
+	// Create an entry for this volume in the snapshot tracking dir.
 	if isROVolumeFromSnapshot && !foundVol {
-		// Create an entry for this volume in snapshot tracking dir
+		log.Debugf("in block to create volume, snapshotSourceVolumeIsiPath: %s, snapshotTrackingDir: %s snapshotTrackingDirEntryForVolume: %s", snapshotSourceVolumeIsiPath, snapshotTrackingDir, snapshotTrackingDirEntryForVolume)
 		if err = isiConfig.isiSvc.CreateVolume(ctx, snapshotSourceVolumeIsiPath, snapshotTrackingDir, volumePathPermissions); err != nil {
 			return nil, err
 		}
@@ -536,8 +568,9 @@ func (s *service) CreateVolume(
 		}
 	}
 
-	if export, err = isiConfig.isiSvc.GetExportWithPathAndZone(ctx, path, accessZone); err != nil || export == nil {
+	log.Debugf("Prep done, path is '%s'", path)
 
+	if export, err = isiConfig.isiSvc.GetExportWithPathAndZone(ctx, path, accessZone); err != nil || export == nil {
 		var errMsg string
 		if err == nil {
 			if foundVol {
@@ -622,7 +655,7 @@ func (s *service) CreateVolume(
 					}
 					// return the createVolume response with actual array volume name
 					exportPath := path
-					if export != nil && export.Paths != nil {
+					if export.Paths != nil {
 						if len(*export.Paths) > 0 {
 							exportPath = (*export.Paths)[0]
 							pathToken := strings.Split(exportPath, "/")
@@ -712,9 +745,10 @@ func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *Isilo
 
 // createWriteableSnapshot creates a writeable snapshot.
 func (s *service) createWriteableSnapshot(ctx context.Context, isiConfig *IsilonClusterConfig,
-	isiPath, normalizedSnapshotID, dstVolumeName string, accessZone string,
+	isiPath, normalizedSnapshotID, dstVolumeName string, sizeInBytes int64, accessZone string,
 ) error {
 	var err error
+	var snapshotSrc isi.Snapshot
 
 	srcSnapshotID, _, _, err := utils.ParseNormalizedSnapshotID(ctx, normalizedSnapshotID)
 	if err != nil {
@@ -725,7 +759,14 @@ func (s *service) createWriteableSnapshot(ctx context.Context, isiConfig *Isilon
 		return fmt.Errorf("failed to get snapshot for ID '%s', error '%v'", srcSnapshotID, err)
 	}
 
-	_, err = isiConfig.isiSvc.CreateWriteableSnapshot(ctx, srcSnapshotID, dstVolumeName)
+	// We don't really care about the size but the spec expects us to validate the size requested.
+	snapshotSourceVolumeIsiPath := path.Dir(snapshotSrc.Path)
+	size := isiConfig.isiSvc.GetSnapshotSize(ctx, snapshotSourceVolumeIsiPath, snapshotSrc.Name, accessZone)
+	if size != sizeInBytes {
+		return fmt.Errorf("specified size '%d' must match source snapshot size of '%d'", sizeInBytes, size)
+	}
+
+	_, err = isiConfig.isiSvc.CreateWriteableSnapshot(ctx, isiPath, srcSnapshotID, dstVolumeName)
 	return err
 }
 
@@ -756,9 +797,9 @@ func (s *service) createVolumeFromSource(
 	req *csi.CreateVolumeRequest,
 	sizeInBytes int64, accessZone string,
 ) error {
+	log.Debugf("create volume from source %v isiPath %s", contentSource, isiPath)
 	if contentSnapshot := contentSource.GetSnapshot(); contentSnapshot != nil {
-		// create volume from source snapshot
-		if err := s.createVolumeFromSnapshot(ctx, isiConfig, isiPath, contentSnapshot.GetSnapshotId(), req.GetName(), sizeInBytes, accessZone); err != nil {
+		if err := s.createWriteableSnapshot(ctx, isiConfig, isiPath, contentSnapshot.GetSnapshotId(), req.GetName(), sizeInBytes, accessZone); err != nil {
 			return status.Error(codes.Internal, err.Error())
 		}
 	}
@@ -1826,7 +1867,7 @@ func (s *service) DeleteSnapshot(
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, " runid%s error %s", runID, err.Error())
 	}
-	log.Debugf("The Isilon directory path of snapshot is= %v", snapshotIsiPath)
+	log.Debugf("The Isilon directory path of snapshot is %v", snapshotIsiPath)
 
 	export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, snapshotIsiPath, accessZone)
 	if err != nil {
@@ -2103,4 +2144,23 @@ func removeString(exportList []string, strToRemove string) []string {
 
 func (s *service) CreateVolumeGroupSnapshot(_ context.Context, _ *vgsext.CreateVolumeGroupSnapshotRequest) (*vgsext.CreateVolumeGroupSnapshotResponse, error) {
 	panic("implement me")
+}
+
+func isRWAccessMode(mode csi.VolumeCapability_AccessMode_Mode) bool {
+	if mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER ||
+		mode == csi.VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER ||
+		mode == csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER ||
+		mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER ||
+		mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER {
+		return true
+	}
+	return false
+}
+
+func isROAccessMode(mode csi.VolumeCapability_AccessMode_Mode) bool {
+	if mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY ||
+		mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
+		return true
+	}
+	return false
 }
