@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"testing"
-
-	"github.com/dell/csi-isilon/v2/common/utils"
 	"github.com/dell/gocsi"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
