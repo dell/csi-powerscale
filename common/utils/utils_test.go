@@ -60,14 +60,6 @@ func TestRemoveStringsFromSlice(t *testing.T) {
 	assert.Equal(t, 1, len(result))
 }
 
-// func TestGetNormalizedVolumeID(t *testing.T) {
-// 	ctx := context.Background()
-
-// 	volID := GetNormalizedVolumeID(ctx, "k8s-e89c9d089e", 19, "csi0zone", "cluster1")
-
-// 	assert.Equal(t, "k8s-e89c9d089e=_=_=19=_=_=csi0zone=_=_=cluster1", volID)
-// }
-
 func TestParseNormalizedVolumeID(t *testing.T) {
 	ctx := context.Background()
 
