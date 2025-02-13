@@ -31,6 +31,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+var buildConfigFromFlags = clientcmd.BuildConfigFromFlags
+var newForConfig = kubernetes.NewForConfig
+var inClusterConfig = rest.InClusterConfig
+
 type leaderElection interface {
 	Run() error
 	WithNamespace(namespace string)
@@ -41,22 +45,22 @@ func CreateKubeClientSet(kubeconfig string) (*kubernetes.Clientset, error) {
 	var clientset *kubernetes.Clientset
 	if kubeconfig != "" {
 		// use the current context in kubeconfig
-		config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+		config, err := buildConfigFromFlags("", kubeconfig)
 		if err != nil {
 			return nil, err
 		}
 		// create the clientset
-		clientset, err = kubernetes.NewForConfig(config)
+		clientset, err = newForConfig(config)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		config, err := rest.InClusterConfig()
+		config, err := inClusterConfig()
 		if err != nil {
 			return nil, err
 		}
 		// creates the clientset
-		clientset, err = kubernetes.NewForConfig(config)
+		clientset, err = newForConfig(config)
 		if err != nil {
 			return nil, err
 		}
