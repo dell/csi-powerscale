@@ -20,9 +20,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path"
+	"runtime"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	isi "github.com/dell/goisilon"
+	apiv2 "github.com/dell/goisilon/api/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/codes"
@@ -286,17 +291,6 @@ func TestGetMessageWithRunID(t *testing.T) {
 	}
 }
 
-func TestParseBooleanFromContext(t *testing.T) {
-	ctx := context.Background()
-	os.Setenv("TEST_BOOL", "true")
-	defer os.Unsetenv("TEST_BOOL")
-
-	val := ParseBooleanFromContext(ctx, "TEST_BOOL")
-	if val != true {
-		t.Errorf("Expected true, got %v", val)
-	}
-}
-
 func TestParseArrayFromContext(t *testing.T) {
 	ctx := context.Background()
 	arrYAML := "- item1\n- item2\n- item3"
@@ -312,17 +306,6 @@ func TestParseArrayFromContext(t *testing.T) {
 	}
 }
 
-func TestParseUintFromContext(t *testing.T) {
-	ctx := context.Background()
-	os.Setenv("TEST_UINT", "42")
-	defer os.Unsetenv("TEST_UINT")
-
-	val := ParseUintFromContext(ctx, "TEST_UINT")
-	if val != 42 {
-		t.Errorf("Expected 42, got %v", val)
-	}
-}
-
 func TestParseInt64FromContext(t *testing.T) {
 	ctx := context.Background()
 	os.Setenv("TEST_INT64", "-100")
@@ -334,26 +317,6 @@ func TestParseInt64FromContext(t *testing.T) {
 	}
 	if val != -100 {
 		t.Errorf("Expected -100, got %v", val)
-	}
-}
-
-func TestRemoveExistingCSISockFile(t *testing.T) {
-	const testSockFile = "/tmp/test.sock"
-	os.Setenv("CSI_ENDPOINT", testSockFile)
-
-	// Create a test socket file
-	_, err := os.Create(testSockFile)
-	if err != nil {
-		t.Fatalf("failed to create test socket file: %v", err)
-	}
-
-	err = RemoveExistingCSISockFile()
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
-
-	if _, err := os.Stat(testSockFile); !os.IsNotExist(err) {
-		t.Errorf("expected file to be removed, but it still exists")
 	}
 }
 
@@ -596,4 +559,200 @@ func TestIsStringInSlices(t *testing.T) {
 	// Case 8: Empty search string
 	result = IsStringInSlices("", []string{"banana", "cherry"}, []string{"apple", "grape"})
 	assert.False(t, result, "Expected empty string not to be found in slices")
+}
+
+func TestGetQuotaIDFromDescription(t *testing.T) {
+	tests := []struct {
+		name        string
+		export      isi.Export
+		expectedID  string
+		expectedErr error
+	}{
+		{
+			name: "Valid Quota ID",
+			export: &apiv2.Export{
+				ID:          1,
+				Paths:       &[]string{"/path/to/export"},
+				Description: "CSI_QUOTA_ID:12345",
+			},
+			expectedID: "12345",
+		},
+		{
+			name: "No Quota ID in Description",
+			export: &apiv2.Export{
+				ID:          2,
+				Paths:       &[]string{"/another/path"},
+				Description: "Some user-defined text",
+			},
+			expectedID: "",
+		},
+		{
+			name: "Empty Description",
+			export: &apiv2.Export{
+				ID:          3,
+				Paths:       &[]string{"/empty/description"},
+				Description: "",
+			},
+			expectedID: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			quotaID, err := GetQuotaIDFromDescription(ctx, tt.export)
+			assert.Equal(t, tt.expectedID, quotaID)
+			assert.Equal(t, tt.expectedErr, err)
+		})
+	}
+}
+
+func TestParseUnitFromContext(t *testing.T) {
+	ctx := context.Background()
+
+	// Test case: Valid integer value
+	os.Setenv("TEST_UINT", "42")
+	defer os.Unsetenv("TEST_UINT")
+
+	val := ParseUintFromContext(ctx, "TEST_UINT")
+	assert.Equal(t, uint(42), val, "Expected 42, got %v", val)
+
+	// Test case: Invalid integer value (error case)
+	os.Setenv("TEST_UINT_INVALID", "not_a_number")
+	defer os.Unsetenv("TEST_UINT_INVALID")
+
+	val = ParseUintFromContext(ctx, "TEST_UINT_INVALID")
+	assert.Equal(t, uint(0), val, "Expected 0 due to parsing error, got %v", val)
+
+	// Test case: Missing environment variable
+	val = ParseUintFromContext(ctx, "NON_EXISTENT_KEY")
+	assert.Equal(t, uint(0), val, "Expected 0 for non-existent key, got %v", val)
+}
+
+func TestRemoveExistingCSISockFile(t *testing.T) {
+	const testSockFile = "/tmp/test.sock"
+	os.Setenv("CSI_ENDPOINT", testSockFile)
+	defer os.Unsetenv("CSI_ENDPOINT")
+
+	// Create a test socket file
+	file, err := os.Create(testSockFile)
+	if err != nil {
+		t.Fatalf("Failed to create test socket file: %v", err)
+	}
+	file.Close()
+
+	// Test: Successful removal
+	err = RemoveExistingCSISockFile()
+	assert.NoError(t, err, "Expected no error in normal removal")
+
+	// Ensure file is deleted
+	_, err = os.Stat(testSockFile)
+	assert.True(t, os.IsNotExist(err), "Expected file to be removed, but it still exists")
+
+	// ---- ERROR CASE ----
+	// Create the file again
+	file, err = os.Create(testSockFile)
+	if err != nil {
+		t.Fatalf("Failed to recreate test socket file: %v", err)
+	}
+	file.Close()
+
+	// Make the file "immutable" (Linux only)
+	if runtime.GOOS == "linux" {
+		exec.Command("chattr", "+i", testSockFile).Run()
+		defer exec.Command("chattr", "-i", testSockFile).Run() // Cleanup
+	}
+
+	// Attempt removal (should fail)
+	err = RemoveExistingCSISockFile()
+	assert.Error(t, err, "Expected error due to immutable file")
+
+	// Cleanup
+	if runtime.GOOS == "linux" {
+		exec.Command("chattr", "-i", testSockFile).Run() // Remove immutable flag
+	}
+	os.Remove(testSockFile)
+}
+
+func TestParseBooleanFromContext(t *testing.T) {
+	ctx := context.Background()
+
+	// Test Case 1: Valid "true" value
+	t.Run("Valid true boolean", func(t *testing.T) {
+		os.Setenv("TEST_BOOL", "true")
+		defer os.Unsetenv("TEST_BOOL")
+
+		result := ParseBooleanFromContext(ctx, "TEST_BOOL")
+		assert.True(t, result, "Expected true")
+	})
+
+	// Test Case 2: Valid "false" value
+	t.Run("Valid false boolean", func(t *testing.T) {
+		os.Setenv("TEST_BOOL", "false")
+		defer os.Unsetenv("TEST_BOOL")
+
+		result := ParseBooleanFromContext(ctx, "TEST_BOOL")
+		assert.False(t, result, "Expected false")
+	})
+
+	// Test Case 3: Invalid boolean value (error condition)
+	t.Run("Invalid boolean value", func(t *testing.T) {
+		os.Setenv("TEST_BOOL", "notaboolean") // Invalid input
+		defer os.Unsetenv("TEST_BOOL")
+
+		result := ParseBooleanFromContext(ctx, "TEST_BOOL")
+		assert.False(t, result, "Expected false due to invalid boolean value")
+	})
+
+	// Test Case 4: Environment variable not set
+	t.Run("Missing environment variable", func(t *testing.T) {
+		os.Unsetenv("TEST_BOOL") // Ensure the variable is not set
+
+		result := ParseBooleanFromContext(ctx, "TEST_BOOL")
+		assert.False(t, result, "Expected false when the environment variable is missing")
+	})
+}
+
+func TestParseInt64FromContext1(t *testing.T) {
+	ctx := context.Background()
+
+	// Test Case 1: Valid int64 value
+	t.Run("Valid int64 value", func(t *testing.T) {
+		os.Setenv("TEST_INT", "123456789")
+		defer os.Unsetenv("TEST_INT")
+
+		result, err := ParseInt64FromContext(ctx, "TEST_INT")
+		assert.NoError(t, err, "Expected no error for valid int64 value")
+		assert.Equal(t, int64(123456789), result, "Expected parsed int64 value")
+	})
+
+	// Test Case 2: Invalid int64 value (error condition)
+	t.Run("Invalid int64 value", func(t *testing.T) {
+		os.Setenv("TEST_INT", "notanumber") // Invalid input
+		defer os.Unsetenv("TEST_INT")
+
+		result, err := ParseInt64FromContext(ctx, "TEST_INT")
+		assert.Error(t, err, "Expected error for invalid int64 value")
+		assert.Equal(t, int64(0), result, "Expected default int64 value (0) on error")
+	})
+
+	// Test Case 3: Missing environment variable
+	t.Run("Missing environment variable", func(t *testing.T) {
+		os.Unsetenv("TEST_INT") // Ensure the variable is not set
+
+		result, err := ParseInt64FromContext(ctx, "TEST_INT")
+		assert.NoError(t, err, "Expected no error when environment variable is missing")
+		assert.Equal(t, int64(0), result, "Expected default int64 value (0) when env variable is not set")
+	})
+}
+
+func TestGetPathForVolume1(t *testing.T) {
+	t.Run("Empty isiPath returns default /ifs/ path", func(t *testing.T) {
+		volName := "testVolume"
+		expectedPath := path.Join("/ifs/", volName)
+
+		actualPath := GetPathForVolume("", volName)
+
+		assert.Equal(t, expectedPath, actualPath, "Expected default path /ifs/<volName>")
+	})
 }
