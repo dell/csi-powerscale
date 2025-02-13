@@ -1681,8 +1681,11 @@ func (s *service) CreateSnapshot(
 				"incompatible with the specified source volume id '%s'", snapshotName, req.GetSourceVolumeId()))
 	}
 
-	// create new snapshot for source direcory
+	// create new snapshot for source directory
+	log.Infof("isiPath.......... '%s'", isiPath)
+	log.Infof("srcVolumeID.......... '%s'", srcVolumeID)
 	path := utils.GetPathForVolume(isiPath, srcVolumeID)
+	log.Infof("path.......... '%s'", path)
 	if snapshotNew, err = isiConfig.isiSvc.CreateSnapshot(ctx, path, snapshotName); err != nil {
 		return nil, status.Errorf(codes.Internal, " runid=%s %s", runID, err.Error())
 	}
