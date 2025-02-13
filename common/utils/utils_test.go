@@ -125,13 +125,6 @@ func TestGetExportIDFromConflictMessage(t *testing.T) {
 	assert.Equal(t, exportID, comparation)
 }
 
-func TestGetFQDNByIP(t *testing.T) {
-	ctx := context.Background()
-	fqdn, _ := GetFQDNByIP(ctx, "111.111.111.111")
-	fmt.Println(fqdn)
-	assert.Equal(t, fqdn, "")
-}
-
 func TestGetVolumeNameFromExportPath(t *testing.T) {
 	exportPath := "/ifs/data/k8s-123456"
 	volName1 := GetVolumeNameFromExportPath(exportPath)
@@ -754,5 +747,62 @@ func TestGetPathForVolume1(t *testing.T) {
 		actualPath := GetPathForVolume("", volName)
 
 		assert.Equal(t, expectedPath, actualPath, "Expected default path /ifs/<volName>")
+	})
+}
+
+func TestParseArrayFromContext1(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Valid YAML array", func(t *testing.T) {
+		arrYAML := "- item1\n- item2\n- item3"
+		os.Setenv("TEST_ARRAY", arrYAML)
+		defer os.Unsetenv("TEST_ARRAY")
+
+		val, err := ParseArrayFromContext(ctx, "TEST_ARRAY")
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"item1", "item2", "item3"}, val)
+	})
+
+	t.Run("Invalid YAML format", func(t *testing.T) {
+		invalidYAML := "{invalid_yaml}"
+		os.Setenv("TEST_ARRAY", invalidYAML)
+		defer os.Unsetenv("TEST_ARRAY")
+
+		val, err := ParseArrayFromContext(ctx, "TEST_ARRAY")
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "invalid array value for 'TEST_ARRAY'")
+		assert.Empty(t, val)
+	})
+
+	t.Run("Key not found", func(t *testing.T) {
+		os.Unsetenv("TEST_ARRAY")
+
+		val, err := ParseArrayFromContext(ctx, "TEST_ARRAY")
+		assert.Nil(t, err)
+		assert.Empty(t, val)
+	})
+}
+
+func TestGetFQDNByIP(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Valid IP with FQDN", func(t *testing.T) {
+		// Use a public IP that is likely to return a valid FQDN
+		fqdn, err := GetFQDNByIP(ctx, "8.8.8.8") // Google's public DNS server
+		if err == nil {
+			assert.NotEmpty(t, fqdn, "Expected a non-empty FQDN")
+		}
+	})
+
+	t.Run("Invalid IP should return error", func(t *testing.T) {
+		fqdn, err := GetFQDNByIP(ctx, "256.256.256.256") // Invalid IP
+		assert.Error(t, err, "Expected an error for invalid IP")
+		assert.Empty(t, fqdn, "Expected empty FQDN for invalid IP")
+	})
+
+	t.Run("Non-resolvable IP should return error", func(t *testing.T) {
+		fqdn, err := GetFQDNByIP(ctx, "192.0.2.1") // IP in TEST-NET-1 (unlikely to resolve)
+		assert.Error(t, err, "Expected an error for non-resolvable IP")
+		assert.Empty(t, fqdn, "Expected empty FQDN for non-resolvable IP")
 	})
 }
