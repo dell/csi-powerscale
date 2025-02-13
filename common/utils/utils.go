@@ -465,3 +465,22 @@ func GetMessageWithRunID(runid string, format string, args ...interface{}) strin
 	str := fmt.Sprintf(format, args...)
 	return fmt.Sprintf(" runid=%s %s", runid, str)
 }
+
+func IsRWAccessMode(mode csi.VolumeCapability_AccessMode_Mode) bool {
+	if mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER ||
+		mode == csi.VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER ||
+		mode == csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER ||
+		mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER ||
+		mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER {
+		return true
+	}
+	return false
+}
+
+func IsROAccessMode(mode csi.VolumeCapability_AccessMode_Mode) bool {
+	if mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY ||
+		mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
+		return true
+	}
+	return false
+}
