@@ -19,13 +19,19 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
 )
 
 // timeout for making http requests
-const timeout = time.Second * 5
+var timeout = time.Second * 5
+
+var (
+	GetHttpNewRequestWithContext = http.NewRequestWithContext
+	GetIoReadAll                 = io.ReadAll
+)
 
 // queryStatus make API call to the specified url to retrieve connection status
 func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error) {
@@ -39,7 +45,7 @@ func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error
 	timeOutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(timeOutCtx, "GET", url, nil)
+	req, err := GetHttpNewRequestWithContext(timeOutCtx, "GET", url, nil)
 	if err != nil {
 		log.Errorf("failed to create request for API %s due to %s ", url, err.Error())
 		return false, err
@@ -60,7 +66,7 @@ func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error
 			log.Printf("Error closing HTTP response: %s", err.Error())
 		}
 	}()
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := GetIoReadAll(resp.Body)
 	if err != nil {
 		log.Errorf("failed to read API response due to %s ", err.Error())
 		return false, err
