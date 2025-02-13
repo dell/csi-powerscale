@@ -1,6 +1,7 @@
 package k8sutils
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -45,6 +46,20 @@ func TestCreateKubeClientSet(t *testing.T) {
 			clientErr:  nil,
 			wantErr:    true,
 		},
+		{
+			name:       "New for config error",
+			kubeconfig: "",
+			configErr:  nil,
+			clientErr:  errors.New("client error"),
+			wantErr:    true,
+		},
+		{
+			name:       "New for config error",
+			kubeconfig: "invalid_kubeconfig",
+			configErr:  nil,
+			clientErr:  errors.New("client error"),
+			wantErr:    true,
+		},
 	}
 
 	// Save original functions
@@ -84,5 +99,37 @@ func TestCreateKubeClientSet(t *testing.T) {
 				t.Errorf("CreateKubeClientSet() = nil, want non-nil")
 			}
 		})
+	}
+}
+
+func TestGetStats(t *testing.T) {
+	// Set up the necessary dependencies
+	ctx := context.Background()
+	volumePath := "/path/to/volume"
+	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, _ := GetStats(ctx, volumePath)
+
+	expectedAvailableBytes := int64(0)
+	expectedTotalBytes := int64(0)
+	expectedUsedBytes := int64(0)
+	expectedTotalInodes := int64(0)
+	expectedFreeInodes := int64(0)
+	expectedUsedInodes := int64(0)
+	if availableBytes != expectedAvailableBytes {
+		t.Errorf("Expected availableBytes to be %d, but got %d", expectedAvailableBytes, availableBytes)
+	}
+	if totalBytes != expectedTotalBytes {
+		t.Errorf("Expected totalBytes to be %d, but got %d", expectedTotalBytes, totalBytes)
+	}
+	if usedBytes != expectedUsedBytes {
+		t.Errorf("Expected usedBytes to be %d, but got %d", expectedUsedBytes, usedBytes)
+	}
+	if totalInodes != expectedTotalInodes {
+		t.Errorf("Expected totalInodes to be %d, but got %d", expectedTotalInodes, totalInodes)
+	}
+	if freeInodes != expectedFreeInodes {
+		t.Errorf("Expected freeInodes to be %d, but got %d", expectedFreeInodes, freeInodes)
+	}
+	if usedInodes != expectedUsedInodes {
+		t.Errorf("Expected usedInodes to be %d, but got %d", expectedUsedInodes, usedInodes)
 	}
 }
