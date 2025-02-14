@@ -83,13 +83,13 @@ func (svc *isiService) CreateSnapshot(ctx context.Context, path, snapshotName st
 	return snapshot, nil
 }
 
-func (svc *isiService) CreateWriteableSnapshot(ctx context.Context, isipath, sourceSnapshotID, snapshotName string) (isi.WriteableSnapshot, error) {
+func (svc *isiService) CreateWriteableSnapshot(ctx context.Context, sourceSnapshotID, isiPath, snapshotName string) (isi.WriteableSnapshot, error) {
 	log := utils.GetRunIDLogger(ctx)
 
-	log.Debugf("CreateWriteableSnapshot: isiPath: ", isipath) // Remove before PR submission.
-	log.Debugf("begin to create writeable snapshot '%s' from source snapshot '%s'", snapshotName, sourceSnapshotID)
+	path := fmt.Sprintf("%s/%s", isiPath, snapshotName)
+	log.Debugf("begin to create writeable snapshot '%s' from source snapshot '%s'", path, sourceSnapshotID)
 
-	snapshot, err := svc.client.CreateWriteableSnapshot(ctx, sourceSnapshotID, snapshotName)
+	snapshot, err := svc.client.CreateWriteableSnapshot(ctx, sourceSnapshotID, path)
 	if err != nil {
 		log.Errorf("create writeable snapshot failed, '%s'", err.Error())
 		return nil, err
@@ -374,6 +374,20 @@ func (svc *isiService) DeleteVolume(ctx context.Context, isiPath, volName string
 
 	if err := svc.client.DeleteVolumeWithIsiPath(ctx, isiPath, volName); err != nil {
 		return fmt.Errorf("failed to delete volume directory '%v' : '%v'", volName, err)
+	}
+
+	return nil
+}
+
+func (svc *isiService) DeleteWriteableSnapshot(ctx context.Context, isiPath, volName string) error {
+
+	log := utils.GetRunIDLogger(ctx)
+
+	path := fmt.Sprintf("%s/%s", isiPath, volName)
+	log.Debugf("begin to delete writeable snapshot '%s'", path)
+
+	if err := svc.client.RemoveWriteableSnapshot(ctx, path); err != nil {
+		return fmt.Errorf("failed to delete writeable snapshot '%v': '%v'", volName, err)
 	}
 
 	return nil
@@ -817,6 +831,20 @@ func (svc *isiService) isROVolumeFromSnapshot(exportPath, accessZone string) boo
 		}
 	}
 	return isROVolFromSnapshot
+}
+
+func (svc *isiService) isRWVolumeFromSnapshot(ctx context.Context, exportPath, accessZone string) bool {
+	isRWVolumeFromSnapshot := false
+
+	log := utils.GetRunIDLogger(ctx)
+	log.Debugf("export path '%s' accessZone '%s'", exportPath, accessZone)
+	if accessZone == "System" {
+		if strings.Index(exportPath, "/ifs/") != -1 {
+			isRWVolumeFromSnapshot = true
+		}
+	}
+
+	return isRWVolumeFromSnapshot
 }
 
 func (svc *isiService) GetSnapshotNameFromIsiPath(ctx context.Context, snapshotIsiPath, accessZone, zonePath string) (string, error) {
