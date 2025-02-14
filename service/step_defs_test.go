@@ -917,6 +917,10 @@ func (f *feature) iInduceError(errtype string) error {
 	case "no-nodeId":
 		stepHandlersErrors.PodmonVolumeStatisticsError = true
 		stepHandlersErrors.PodmonNoNodeIDError = true
+	case "invalid-nodeId":
+		stepHandlersErrors.PodmonInvalidNodeIDError = true
+	case "invalid-volumeId":
+		stepHandlersErrors.PodmonInvalidVolumeIDError = true
 	case "no-volume-no-nodeId":
 		stepHandlersErrors.PodmonVolumeStatisticsError = true
 		stepHandlersErrors.PodmonNoVolumeNoNodeIDError = true
@@ -3326,6 +3330,11 @@ func (f *feature) iCallValidateVolumeHostConnectivity() error {
 		csiNodeID = ""
 		volid := f.createVolumeResponse.GetVolume().VolumeId
 		volIDs = volIDs[:0]
+		volIDs = append(volIDs, volid)
+	} else if stepHandlersErrors.PodmonInvalidNodeIDError == true {
+		csiNodeID = "node1=#=#=fqdn.example.com"
+	} else if stepHandlersErrors.PodmonInvalidVolumeIDError == true {
+		volid := "9999"
 		volIDs = append(volIDs, volid)
 	} else if stepHandlersErrors.PodmonControllerProbeError == true {
 		f.service.mode = "controller"

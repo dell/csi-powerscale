@@ -107,6 +107,8 @@ var (
 		PodmonNoNodeIDError           bool
 		PodmonNoVolumeNoNodeIDError   bool
 		ModifyLastAttempt             bool
+		PodmonInvalidNodeIDError      bool
+		PodmonInvalidVolumeIDError    bool
 	}
 )
 
