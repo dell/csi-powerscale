@@ -28,6 +28,13 @@ func TestGetNFSClientIP(t *testing.T) {
 				"10.247.96.0/21",
 				"10.244.0.0/24",
 			},
+			interfaceAddrsFn: func() ([]net.Addr, error) {
+				return []net.Addr{
+					&net.IPNet{
+						IP:   net.IPv4(10, 244, 0, 0),
+						Mask: net.CIDRMask(24, 32),
+					}}, nil
+			},
 			expectError: false,
 		},
 		{
