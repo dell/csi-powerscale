@@ -237,10 +237,8 @@ func isVolumeMounted(ctx context.Context, filterStr string, target string) (bool
 			log.Debugf("target '%s' does not exist", target)
 			return mounted, nil
 		}
-	} else {
-		// No mount exists also means not published
-		log.Debugf("target '%s' does not exist", target)
-		return false, nil
 	}
+	// No mount exists also means not published
+	log.Debugf("target '%s' does not exist", target)
 	return false, nil
 }

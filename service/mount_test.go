@@ -78,3 +78,22 @@ func TestMkdirExistingFile(t *testing.T) {
 	assert.Error(t, err)
 	assert.False(t, created)
 }
+
+func TestMkdirNotExistingFile(t *testing.T) {
+	ctx := context.Background()
+
+	// Make temp directory to use for testing
+	basepath, err := os.MkdirTemp("/tmp", "*")
+	assert.NoError(t, err)
+	defer os.RemoveAll(basepath)
+
+	path := ""
+	file, err := os.Create(path)
+	assert.Error(t, err)
+	file.Close()
+
+	// Test creating a directory with an existing file path
+	created, err := mkdir(ctx, path)
+	assert.Error(t, err)
+	assert.False(t, created)
+}
