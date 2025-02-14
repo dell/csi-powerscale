@@ -35,6 +35,10 @@ var buildConfigFromFlags = clientcmd.BuildConfigFromFlags
 var newForConfig = kubernetes.NewForConfig
 var inClusterConfig = rest.InClusterConfig
 
+var fsInfo = func(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
+	return gofsutil.FsInfo(ctx, path)
+}
+
 type leaderElection interface {
 	Run() error
 	WithNamespace(namespace string)
@@ -85,7 +89,7 @@ func LeaderElection(clientset *kubernetes.Clientset, lockName string, namespace 
 
 // GetStats - Returns the stats for the volume mounted on given volume path
 func GetStats(ctx context.Context, volumePath string) (int64, int64, int64, int64, int64, int64, error) {
-	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := gofsutil.FsInfo(ctx, volumePath)
+	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := fsInfo(ctx, volumePath)
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, status.Error(codes.Internal, fmt.Sprintf(
 			"failed to get volume stats: %s", err))

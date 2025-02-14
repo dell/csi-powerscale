@@ -149,6 +149,46 @@ func TestGetStats(t *testing.T) {
 	}
 }
 
+func TestGetStatsNoError(t *testing.T) {
+	// Set up the necessary dependencies
+	defaultFsInfo := fsInfo
+	fsInfo = func(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
+		return 1, 1, 1, 1, 1, 1, nil
+	}
+	defer func() {
+		fsInfo = defaultFsInfo
+	}()
+
+	ctx := context.Background()
+	volumePath := "/path/to/volume"
+	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, _ := GetStats(ctx, volumePath)
+
+	expectedAvailableBytes := int64(1)
+	expectedTotalBytes := int64(1)
+	expectedUsedBytes := int64(1)
+	expectedTotalInodes := int64(1)
+	expectedFreeInodes := int64(1)
+	expectedUsedInodes := int64(1)
+	if availableBytes != expectedAvailableBytes {
+		t.Errorf("Expected availableBytes to be %d, but got %d", expectedAvailableBytes, availableBytes)
+	}
+	if totalBytes != expectedTotalBytes {
+		t.Errorf("Expected totalBytes to be %d, but got %d", expectedTotalBytes, totalBytes)
+	}
+	if usedBytes != expectedUsedBytes {
+		t.Errorf("Expected usedBytes to be %d, but got %d", expectedUsedBytes, usedBytes)
+	}
+	if totalInodes != expectedTotalInodes {
+		t.Errorf("Expected totalInodes to be %d, but got %d", expectedTotalInodes, totalInodes)
+	}
+	if freeInodes != expectedFreeInodes {
+		t.Errorf("Expected freeInodes to be %d, but got %d", expectedFreeInodes, freeInodes)
+	}
+	if usedInodes != expectedUsedInodes {
+		t.Errorf("Expected usedInodes to be %d, but got %d", expectedUsedInodes, usedInodes)
+	}
+}
+
 func TestLeaderElection(t *testing.T) {
 	clientset := &kubernetes.Clientset{} // Mock or use a fake clientset if needed
 	runFunc := func(ctx context.Context) {
