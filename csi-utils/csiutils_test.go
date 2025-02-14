@@ -1,14 +1,26 @@
 package csiutils
 
 import (
+	"errors"
+	"net"
 	"testing"
 )
 
 func TestGetNFSClientIP(t *testing.T) {
+	defaulInterfaceAddrsFn := interfaceAddrs
+	defaultParseCIDRFn := parseCIDR
+
+	afterEach := func() {
+		interfaceAddrs = defaulInterfaceAddrsFn
+		parseCIDR = defaultParseCIDRFn
+	}
+
 	tests := []struct {
-		name            string
-		allowedNetworks []string
-		expectError     bool
+		name             string
+		allowedNetworks  []string
+		interfaceAddrsFn func() ([]net.Addr, error)
+		parseCIDRFn      func(s string) (net.IP, *net.IPNet, error)
+		expectError      bool
 	}{
 		{
 			name: "Valid_Network",
@@ -44,10 +56,34 @@ func TestGetNFSClientIP(t *testing.T) {
 			allowedNetworks: []string{},
 			expectError:     true,
 		},
+		{
+			name:            "Error_getting_network_interfaces",
+			allowedNetworks: []string{},
+			interfaceAddrsFn: func() ([]net.Addr, error) {
+				return nil, errors.New("error")
+			},
+			expectError: true,
+		},
+		{
+			name:            "Error_parsing_cidr",
+			allowedNetworks: []string{},
+			parseCIDRFn: func(s string) (net.IP, *net.IPNet, error) {
+				return nil, nil, errors.New("error")
+			},
+			expectError: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.interfaceAddrsFn != nil {
+				interfaceAddrs = tt.interfaceAddrsFn
+			}
+			if tt.parseCIDRFn != nil {
+				parseCIDR = tt.parseCIDRFn
+			}
+			defer afterEach()
+
 			ip, err := GetNFSClientIP(tt.allowedNetworks)
 
 			if tt.expectError {

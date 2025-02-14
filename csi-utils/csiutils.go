@@ -23,11 +23,19 @@ import (
 	"github.com/dell/csi-isilon/v2/common/utils"
 )
 
+var interfaceAddrs = func() ([]net.Addr, error) {
+	return net.InterfaceAddrs()
+}
+
+var parseCIDR = func(s string) (net.IP, *net.IPNet, error) {
+	return net.ParseCIDR(s)
+}
+
 // GetNFSClientIP is used to fetch IP address from networks on which NFS traffic is allowed
 func GetNFSClientIP(allowedNetworks []string) (string, error) {
 	var nodeIP string
 	log := utils.GetLogger()
-	addrs, err := net.InterfaceAddrs()
+	addrs, err := interfaceAddrs()
 	if err != nil {
 		log.Errorf("Encountered error while fetching system IP addresses: %+v\n", err.Error())
 		return "", err
@@ -43,7 +51,7 @@ func GetNFSClientIP(allowedNetworks []string) (string, error) {
 		switch v := a.(type) {
 		case *net.IPNet:
 			if v.IP.To4() != nil {
-				ip, cnet, err := net.ParseCIDR(a.String())
+				ip, cnet, err := parseCIDR(a.String())
 				log.Debugf("IP address: %s and Network: %s", ip, cnet)
 				if err != nil {
 					log.Errorf("Encountered error while parsing IP address %v", a)
