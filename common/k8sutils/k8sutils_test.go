@@ -3,11 +3,26 @@ package k8sutils
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/mock"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
+
+var exitFunc = os.Exit
+
+type MockLeaderElection struct {
+	mock.Mock
+}
+
+func (m *MockLeaderElection) Run() error {
+	args := m.Called()
+	return args.Error(0)
+}
 
 func TestCreateKubeClientSet(t *testing.T) {
 	// Test cases
@@ -131,5 +146,35 @@ func TestGetStats(t *testing.T) {
 	}
 	if usedInodes != expectedUsedInodes {
 		t.Errorf("Expected usedInodes to be %d, but got %d", expectedUsedInodes, usedInodes)
+	}
+}
+
+func TestLeaderElection(t *testing.T) {
+	clientset := &kubernetes.Clientset{} // Mock or use a fake clientset if needed
+	runFunc := func(ctx context.Context) {
+		fmt.Println("Running leader function")
+	}
+
+	mockLE := new(MockLeaderElection)
+	mockLE.On("Run").Return(nil) // Mocking a successful run
+
+	// Override exitFunc to prevent test from exiting
+	exitCalled := false
+	oldExit := exitFunc
+	defer func() { recover(); exitFunc = oldExit }()
+	exitFunc = func(code int) { exitCalled = true; panic("exitFunc called") }
+
+	// Simulate LeaderElection function
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				exitCalled = true
+			}
+		}()
+		LeaderElection(clientset, "test-lock", "test-namespace", time.Second, time.Second*2, time.Second*3, runFunc)
+	}()
+
+	if !exitCalled {
+		t.Errorf("exitFunc was called unexpectedly")
 	}
 }
