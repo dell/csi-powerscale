@@ -166,3 +166,57 @@ func TestGetNodeLabels(t *testing.T) {
 	_, err := s.GetNodeLabels()
 	assert.NotEqual(t, nil, err)
 }
+
+func TestServiceInitializeServiceOpts(t *testing.T) {
+	wantOps := Opts{
+		Port:                     "8080",
+		Path:                     "/ifs",
+		IsiVolumePathPermissions: "0777",
+		AccessZone:               "System",
+		KubeConfigPath:           "/home/kubeconfig",
+		replicationContextPrefix: "prefix/",
+		replicationPrefix:        "prefix",
+		IgnoreUnresolvableHosts:  false,
+	}
+
+	wantEnvNodeName := "node"
+	wantEnvNodeIP := "10.0.0.1"
+	wantEnvIsilonConfigFile := "X_CSI_ISI_CONFIG_PATH"
+
+	os.Setenv(constants.EnvPort, wantOps.Port)
+	os.Setenv(constants.EnvPath, "")
+	os.Setenv(constants.EnvIsiVolumePathPermissions, "")
+	os.Setenv(constants.EnvAccessZone, "")
+	os.Setenv(constants.EnvNodeName, wantEnvNodeName)
+	os.Setenv(constants.EnvNodeIP, wantEnvNodeIP)
+	os.Setenv(constants.EnvKubeConfigPath, wantOps.KubeConfigPath)
+	os.Setenv(constants.EnvIsilonConfigFile, wantEnvIsilonConfigFile)
+	os.Setenv(constants.EnvReplicationContextPrefix, "prefix")
+	os.Setenv(constants.EnvReplicationPrefix, wantOps.replicationPrefix)
+
+	defer func() {
+		os.Unsetenv(constants.EnvPort)
+		os.Unsetenv(constants.EnvPath)
+		os.Unsetenv(constants.EnvIsiVolumePathPermissions)
+		os.Unsetenv(constants.EnvAccessZone)
+		os.Unsetenv(constants.EnvNodeName)
+		os.Unsetenv(constants.EnvNodeIP)
+		os.Unsetenv(constants.EnvKubeConfigPath)
+		os.Unsetenv(constants.EnvIsilonConfigFile)
+		os.Unsetenv(constants.EnvReplicationContextPrefix)
+		os.Unsetenv(constants.EnvReplicationPrefix)
+	}()
+
+	serviceInstance := &service{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ctx = context.WithValue(ctx, constants.EnvMaxVolumesPerNode, "test")
+
+	serviceInstance.initializeServiceOpts(ctx)
+
+	assert.Equal(t, wantOps, serviceInstance.opts)
+	assert.Equal(t, wantEnvNodeName, serviceInstance.nodeID)
+	assert.Equal(t, wantEnvNodeIP, serviceInstance.nodeIP)
+}
