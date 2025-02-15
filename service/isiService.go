@@ -383,7 +383,7 @@ func (svc *isiService) DeleteWriteableSnapshot(ctx context.Context, isiPath, vol
 
 	log := utils.GetRunIDLogger(ctx)
 
-	path := fmt.Sprintf("%s/%s", isiPath, volName)
+	path := path.Join(isiPath, volName)
 	log.Debugf("begin to delete writeable snapshot '%s'", path)
 
 	if err := svc.client.RemoveWriteableSnapshot(ctx, path); err != nil {
@@ -834,17 +834,22 @@ func (svc *isiService) isROVolumeFromSnapshot(exportPath, accessZone string) boo
 }
 
 func (svc *isiService) isRWVolumeFromSnapshot(ctx context.Context, exportPath, accessZone string) bool {
-	isRWVolumeFromSnapshot := false
 
 	log := utils.GetRunIDLogger(ctx)
 	log.Debugf("export path '%s' accessZone '%s'", exportPath, accessZone)
-	if accessZone == "System" {
-		if strings.Index(exportPath, "/ifs/") != -1 {
-			isRWVolumeFromSnapshot = true
-		}
+
+	if accessZone == "System" && strings.HasPrefix(exportPath, "/ifs/.snapshot") {
+		return false
 	}
 
-	return isRWVolumeFromSnapshot
+	snapshot, err := svc.GetWriteableSnapshotByIsiPath(ctx, exportPath)
+	if err != nil {
+		log.Errorf("failed to get writeable snapshot '%s', error '%v'", exportPath, err)
+		return false
+	}
+
+	log.Debugf("snapshot '%s' is writeable, state %s", snapshot.DstPath, snapshot.State)
+	return true
 }
 
 func (svc *isiService) GetSnapshotNameFromIsiPath(ctx context.Context, snapshotIsiPath, accessZone, zonePath string) (string, error) {
@@ -899,10 +904,6 @@ func (svc *isiService) GetSnapshotIsiPathComponents(snapshotIsiPath, zonePath st
 
 func (svc *isiService) GetSnapshotTrackingDirName(snapshotName string) string {
 	return "." + "csi-" + snapshotName + "-tracking-dir"
-}
-
-func (svc *isiService) GetWriteableSnapshotTrackingDirName(snapshotName string) string {
-	return "." + "csi-" + snapshotName + "-rw-tracking-dir"
 }
 
 func (svc *isiService) GetSubDirectoryCount(ctx context.Context, isiPath, directory string) (int64, error) {
@@ -975,4 +976,33 @@ func (svc *isiService) GetSnapshotSourceVolumeIsiPath(ctx context.Context, snaps
 	}
 
 	return path.Dir(snapshot.Path), nil
+}
+
+// GetWriteableSnapshotByIsiPath retrieves a writeable snapshot by its full path.
+//
+// ctx: the context.
+// path: the full path (dst_path) of the snapshot.
+//
+// Returns the snapshot on success and error in case of failure.
+func (svc *isiService) GetWriteableSnapshotByIsiPath(ctx context.Context, path string) (isi.WriteableSnapshot, error) {
+	snapshot, err := svc.client.GetWriteableSnapshot(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get writeable snapshot '%s', error '%v'", path, err)
+	}
+
+	return snapshot, nil
+}
+func (svc *isiService) GetWriteableSnapshotsBySourceId(ctx context.Context, sourceID int64) ([]isi.WriteableSnapshot, error) {
+	allSnapshots, err := svc.client.GetWriteableSnapshots(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get writeable snapshots, error '%v'", err)
+	}
+
+	writeableSnapshots := make([]isi.WriteableSnapshot, 0)
+	for _, snapshot := range allSnapshots {
+		if snapshot.SrcID == sourceID && snapshot.SrcPath != "" {
+			writeableSnapshots = append(writeableSnapshots, snapshot)
+		}
+	}
+	return writeableSnapshots, nil
 }
