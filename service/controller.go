@@ -1802,11 +1802,12 @@ func (s *service) DeleteSnapshot(
 	if req.GetSnapshotId() == "" {
 		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "snapshot id to be deleted is required"))
 	}
-	// parse the input snapshot id and fetch it's components
+
 	snapshotID, clusterName, accessZone, err := utils.ParseNormalizedSnapshotID(ctx, req.GetSnapshotId())
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to parse snapshot ID %s, error : %v", req.GetSnapshotId(), err))
 	}
+
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
@@ -1847,41 +1848,39 @@ func (s *service) DeleteSnapshot(
 
 	// Get snapshot path
 	snapshotSourceVolumeIsiPath, _ := isiConfig.isiSvc.GetSnapshotSourceVolumeIsiPath(ctx, snapshotID)
-	log.Infof("Snapshot source volume isiPath is '%s'", snapshotSourceVolumeIsiPath)
+	log.Infof("Snapshot source volume isiPath (parent directory) is '%s'", snapshotSourceVolumeIsiPath)
+
 	snapshotIsiPath, err := isiConfig.isiSvc.GetSnapshotIsiPath(ctx, snapshotSourceVolumeIsiPath, snapshotID, accessZone)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, " runid %s error %s", runID, err.Error())
+		return nil, status.Errorf(codes.Internal, " runID: %s error: %s", runID, err.Error())
 	}
-	log.Debugf("The Isilon directory path of snapshot is %v", snapshotIsiPath)
+	log.Debugf("The Isilon path of snapshot is %v", snapshotIsiPath)
 
 	export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, snapshotIsiPath, accessZone)
 	if err != nil {
 		return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "cannot check if snapshot has exports: %s", err.Error()))
 	}
 
-	// Check if there are any RO volumes created from this snapshot.
-	var safeToDelete bool
-	safeToDelete, err = s.processSnapshotTrackingDirectoryDuringDeleteSnapshot(ctx, export, snapshotIsiPath, accessZone, isiConfig)
-	if err != nil {
-		return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "error processing snapshot tracking directories: %s", err.Error()))
-	}
+	deleteSnapshot := true
 
-	if export != nil && safeToDelete {
-		if err := isiConfig.isiSvc.UnexportByIDWithZone(ctx, export.ID, ""); err != nil {
-			return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "failed to unexport snapshot: %s", err.Error()))
+	// Check if there are any RO volumes created from this snapshot
+	// Note: This is true only for RO volumes from snapshots
+	if export != nil {
+		if err := s.processSnapshotTrackingDirectoryDuringDeleteSnapshot(ctx, export, snapshotIsiPath, accessZone, &deleteSnapshot, isiConfig); err != nil {
+			log.Error("Failed to get RO volume from snapshot ", err.Error())
+			return nil, err
 		}
 	}
 
 	// Check for any writeable snapshots.
 	writeableSnapshots, err := isiConfig.isiSvc.GetWriteableSnapshotsBySourceId(ctx, id)
 	if len(writeableSnapshots) != 0 {
-		safeToDelete = false
-		message := fmt.Sprintf("Not able to delete snapshot when it is linked to %d writeable snapshots", len(writeableSnapshots))
-		log.Errorf("%s", message)
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "%s", message))
+		deleteSnapshot = false
+		log.Errorf("The following %d writeable snapshots are linked to this snapshot: %v", len(writeableSnapshots), writeableSnapshots)
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "%s", "Not able to delete snapshot when it is linked to writeable snapshots"))
 	}
 
-	if safeToDelete {
+	if deleteSnapshot {
 		err = isiConfig.isiSvc.DeleteSnapshot(ctx, id, "")
 		if err != nil {
 			return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "error deleting snapshot: %s", err.Error()))
@@ -1896,24 +1895,25 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteSnapshot(
 	export isi.Export,
 	snapshotIsiPath,
 	accessZone string,
+	deleteSnapshot *bool,
 	isiConfig *IsilonClusterConfig,
-) (bool, error) {
-	// Fetch log handler.
+) error {
+	// Fetch log handler
 	ctx, log, _ := GetRunIDLog(ctx)
 
-	// Get Zone details.
+	// get Zone details
 	zone, err := isiConfig.isiSvc.GetZoneByName(ctx, accessZone)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	// Populate names for snapshot's tracking dir and snapshot delete marker.
+	// Populate names for snapshot's tracking dir and snapshot delete marker
 	isiPath, snapshotName, _ := isiConfig.isiSvc.GetSnapshotIsiPathComponents(snapshotIsiPath, zone.Path)
 	snapshotTrackingDir := isiConfig.isiSvc.GetSnapshotTrackingDirName(snapshotName)
 	snapshotTrackingDirDeleteMarker := path.Join(snapshotTrackingDir, DeleteSnapshotMarker)
 
 	// Check if the snapshot tracking dir is present (this indicates
-	// there are some volumes created from this snapshot).
+	// there were some RO volumes created from this snapshot)
 	// Get subdirectories count of snapshot tracking dir.
 	// Every directory will have two subdirectory entries . and ..
 	totalSubDirectories, _ := isiConfig.isiSvc.GetSubDirectoryCount(ctx, isiPath, snapshotTrackingDir)
@@ -1921,21 +1921,25 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteSnapshot(
 	// There are no more volumes present which were created using this snapshot
 	// Every directory will have two subdirectories . and ..
 	if totalSubDirectories == IgnoreDotAndDotDotSubDirs || totalSubDirectories == 0 {
-		// Delete snapshot tracking directory. Ignore failures as it should not fail deletion.
+		if err := isiConfig.isiSvc.UnexportByIDWithZone(ctx, export.ID, ""); err != nil {
+			return err
+		}
+
+		// Delete snapshot tracking directory
 		if err := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, snapshotTrackingDir); err != nil {
 			log.Errorf("error while deleting snapshot tracking directory '%s'", path.Join(isiPath, snapshotTrackingDir))
 		}
-		return true, nil
+	} else {
+		*deleteSnapshot = false
+		// Set a marker in snapshot tracking dir to delete snapshot, once
+		// all the volumes created from this snapshot were deleted
+		log.Debugf("set DeleteSnapshotMarker marker in snapshot tracking dir")
+		if err := isiConfig.isiSvc.CreateVolume(ctx, isiPath, snapshotTrackingDirDeleteMarker, isiConfig.IsiVolumePathPermissions); err != nil {
+			return err
+		}
 	}
 
-	// Set a marker in snapshot tracking dir to delete the snapshot after
-	// all the volumes created from this snapshot are deleted.
-	log.Debugf("set DeleteSnapshotMarker marker in snapshot tracking dir")
-	if err := isiConfig.isiSvc.CreateVolume(ctx, isiPath, snapshotTrackingDirDeleteMarker, isiConfig.IsiVolumePathPermissions); err != nil {
-		log.Errorf("error while creating marker '%s' in snapshot tracking dir '%s'", snapshotTrackingDirDeleteMarker, path.Join(isiPath, snapshotTrackingDir))
-	}
-
-	return false, nil
+	return nil
 }
 
 // Validate volume capabilities

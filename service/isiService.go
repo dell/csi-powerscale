@@ -993,6 +993,11 @@ func (svc *isiService) GetWriteableSnapshotByIsiPath(ctx context.Context, path s
 	return snapshot, nil
 }
 func (svc *isiService) GetWriteableSnapshotsBySourceId(ctx context.Context, sourceID int64) ([]isi.WriteableSnapshot, error) {
+
+	log := utils.GetRunIDLogger(ctx)
+
+	log.Debugf("getting writeable snapshots with source ID '%v'", sourceID)
+
 	allSnapshots, err := svc.client.GetWriteableSnapshots(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get writeable snapshots, error '%v'", err)
@@ -1000,7 +1005,7 @@ func (svc *isiService) GetWriteableSnapshotsBySourceId(ctx context.Context, sour
 
 	writeableSnapshots := make([]isi.WriteableSnapshot, 0)
 	for _, snapshot := range allSnapshots {
-		if snapshot.SrcID == sourceID && snapshot.SrcPath != "" {
+		if snapshot.SrcID == sourceID {
 			writeableSnapshots = append(writeableSnapshots, snapshot)
 		}
 	}
