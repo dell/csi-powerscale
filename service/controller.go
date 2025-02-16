@@ -610,8 +610,8 @@ func (s *service) CreateVolume(
 	}
 
 	if isRWVolumeFromSnapshot {
-		if _, err = isiConfig.isiSvc.CreateWriteableSnapshot(ctx, sourceSnapshotID, isiPath, req.GetName()); err != nil {
-			log.Errorf("CreateWriteableSnapshot for source snapshot '%s' returned error '%s'", sourceSnapshotID, err)
+		if _, err = isiConfig.isiSvc.CreateWritableSnapshot(ctx, sourceSnapshotID, isiPath, req.GetName()); err != nil {
+			log.Errorf("CreateWritableSnapshot for source snapshot '%s' returned error '%s'", sourceSnapshotID, err)
 			// Delete the tracking directory entry for this volume.
 			if err2 := isiConfig.isiSvc.DeleteVolume(ctx, snapshotSourceVolumeIsiPath, snapshotTrackingDirEntryForVolume); err2 != nil {
 				log.Warnf("Deletion RW snapshot tracking volume '%s' returned error '%s'", snapshotTrackingDirEntryForVolume, err2)
@@ -678,8 +678,8 @@ func (s *service) CreateVolume(
 			}
 		} else {
 			if isRWVolumeFromSnapshot {
-				if err2 := isiConfig.isiSvc.DeleteWriteableSnapshot(ctx, isiPath, req.GetName()); err2 != nil {
-					log.Infof("failed to delete writeable snapshot in failure case: '%s'", err2)
+				if err2 := isiConfig.isiSvc.DeleteWritableSnapshot(ctx, isiPath, req.GetName()); err2 != nil {
+					log.Infof("failed to delete writable snapshot in failure case: '%s'", err2)
 				}
 			}
 			return nil, err
@@ -967,7 +967,7 @@ func (s *service) DeleteVolume(
 		log.Debugf("volume '%s' not found, skip calling delete directory.", volName)
 	} else {
 		if isiConfig.isiSvc.isRWVolumeFromSnapshot(ctx, exportPath, accessZone) {
-			if err := isiConfig.isiSvc.DeleteWriteableSnapshot(ctx, isiPath, volName); err != nil {
+			if err := isiConfig.isiSvc.DeleteWritableSnapshot(ctx, isiPath, volName); err != nil {
 				return nil, err
 			}
 		} else if err := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, volName); err != nil {
@@ -1877,16 +1877,16 @@ func (s *service) DeleteSnapshot(
 		}
 	}
 
-	// Check for any writeable snapshots.
-	writeableSnapshots, err := isiConfig.isiSvc.GetWriteableSnapshotsBySourceId(ctx, id)
-	if len(writeableSnapshots) != 0 {
+	// Check for any writable snapshots.
+	writableSnapshots, err := isiConfig.isiSvc.GetWritableSnapshotsBySourceId(ctx, id)
+	if len(writableSnapshots) != 0 {
 		deleteSnapshot = false
 		sb := strings.Builder{}
-		for _, ws := range writeableSnapshots {
+		for _, ws := range writableSnapshots {
 			sb.WriteString(fmt.Sprintf(" %d:%s", ws.ID, ws.DstPath))
 		}
-		log.Errorf("The following %d writeable snapshots are linked to this snapshot:%v", len(writeableSnapshots), sb.String())
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "%s", "Not able to delete snapshot when it is linked to writeable snapshots"))
+		log.Errorf("The following %d writable snapshots are linked to this snapshot:%v", len(writableSnapshots), sb.String())
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "%s", "Not able to delete snapshot when it is linked to writable snapshots"))
 	}
 
 	if deleteSnapshot {

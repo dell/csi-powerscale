@@ -83,15 +83,15 @@ func (svc *isiService) CreateSnapshot(ctx context.Context, path, snapshotName st
 	return snapshot, nil
 }
 
-func (svc *isiService) CreateWriteableSnapshot(ctx context.Context, sourceSnapshotID, isiPath, snapshotName string) (isi.WriteableSnapshot, error) {
+func (svc *isiService) CreateWritableSnapshot(ctx context.Context, sourceSnapshotID, isiPath, snapshotName string) (isi.WritableSnapshot, error) {
 	log := utils.GetRunIDLogger(ctx)
 
 	path := fmt.Sprintf("%s/%s", isiPath, snapshotName)
-	log.Debugf("begin to create writeable snapshot '%s' from source snapshot '%s'", path, sourceSnapshotID)
+	log.Debugf("begin to create writable snapshot '%s' from source snapshot '%s'", path, sourceSnapshotID)
 
-	snapshot, err := svc.client.CreateWriteableSnapshot(ctx, sourceSnapshotID, path)
+	snapshot, err := svc.client.CreateWritableSnapshot(ctx, sourceSnapshotID, path)
 	if err != nil {
-		log.Errorf("create writeable snapshot failed, '%s'", err.Error())
+		log.Errorf("create writable snapshot failed, '%s'", err.Error())
 		return nil, err
 	}
 
@@ -379,15 +379,15 @@ func (svc *isiService) DeleteVolume(ctx context.Context, isiPath, volName string
 	return nil
 }
 
-func (svc *isiService) DeleteWriteableSnapshot(ctx context.Context, isiPath, volName string) error {
+func (svc *isiService) DeleteWritableSnapshot(ctx context.Context, isiPath, volName string) error {
 
 	log := utils.GetRunIDLogger(ctx)
 
 	path := path.Join(isiPath, volName)
-	log.Debugf("begin to delete writeable snapshot '%s'", path)
+	log.Debugf("begin to delete writable snapshot '%s'", path)
 
-	if err := svc.client.RemoveWriteableSnapshot(ctx, path); err != nil {
-		return fmt.Errorf("failed to delete writeable snapshot '%v': '%v'", volName, err)
+	if err := svc.client.RemoveWritableSnapshot(ctx, path); err != nil {
+		return fmt.Errorf("failed to delete writable snapshot '%v': '%v'", volName, err)
 	}
 
 	return nil
@@ -842,13 +842,13 @@ func (svc *isiService) isRWVolumeFromSnapshot(ctx context.Context, exportPath, a
 		return false
 	}
 
-	snapshot, err := svc.GetWriteableSnapshotByIsiPath(ctx, exportPath)
+	snapshot, err := svc.GetWritableSnapshotByIsiPath(ctx, exportPath)
 	if err != nil {
-		log.Errorf("failed to get writeable snapshot '%s', error '%v'", exportPath, err)
+		log.Errorf("failed to get writable snapshot '%s', error '%v'", exportPath, err)
 		return false
 	}
 
-	log.Debugf("snapshot '%s' is writeable, state %s", snapshot.DstPath, snapshot.State)
+	log.Debugf("snapshot '%s' is writable, state %s", snapshot.DstPath, snapshot.State)
 	return true
 }
 
@@ -978,36 +978,36 @@ func (svc *isiService) GetSnapshotSourceVolumeIsiPath(ctx context.Context, snaps
 	return path.Dir(snapshot.Path), nil
 }
 
-// GetWriteableSnapshotByIsiPath retrieves a writeable snapshot by its full path.
+// GetWritableSnapshotByIsiPath retrieves a writable snapshot by its full path.
 //
 // ctx: the context.
 // path: the full path (dst_path) of the snapshot.
 //
 // Returns the snapshot on success and error in case of failure.
-func (svc *isiService) GetWriteableSnapshotByIsiPath(ctx context.Context, path string) (isi.WriteableSnapshot, error) {
-	snapshot, err := svc.client.GetWriteableSnapshot(ctx, path)
+func (svc *isiService) GetWritableSnapshotByIsiPath(ctx context.Context, path string) (isi.WritableSnapshot, error) {
+	snapshot, err := svc.client.GetWritableSnapshot(ctx, path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get writeable snapshot '%s', error '%v'", path, err)
+		return nil, fmt.Errorf("failed to get writable snapshot '%s', error '%v'", path, err)
 	}
 
 	return snapshot, nil
 }
-func (svc *isiService) GetWriteableSnapshotsBySourceId(ctx context.Context, sourceID int64) ([]isi.WriteableSnapshot, error) {
+func (svc *isiService) GetWritableSnapshotsBySourceId(ctx context.Context, sourceID int64) ([]isi.WritableSnapshot, error) {
 
 	log := utils.GetRunIDLogger(ctx)
 
-	log.Debugf("getting writeable snapshots with source ID '%v'", sourceID)
+	log.Debugf("getting writable snapshots with source ID '%v'", sourceID)
 
-	allSnapshots, err := svc.client.GetWriteableSnapshots(ctx)
+	allSnapshots, err := svc.client.GetWritableSnapshots(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get writeable snapshots, error '%v'", err)
+		return nil, fmt.Errorf("failed to get writable snapshots, error '%v'", err)
 	}
 
-	writeableSnapshots := make([]isi.WriteableSnapshot, 0)
+	writableSnapshots := make([]isi.WritableSnapshot, 0)
 	for _, snapshot := range allSnapshots {
 		if snapshot.SrcID == sourceID {
-			writeableSnapshots = append(writeableSnapshots, snapshot)
+			writableSnapshots = append(writableSnapshots, snapshot)
 		}
 	}
-	return writeableSnapshots, nil
+	return writableSnapshots, nil
 }
