@@ -506,11 +506,11 @@ func (s *service) CreateVolume(
 
 	foundVol = false
 	if sourceIsSnapshot {
+		log.Debugf("isROVolumeFromSnapshot: %v isRWVolumeFromSnapshot: %v", isROVolumeFromSnapshot, isRWVolumeFromSnapshot)
+
 		if isReplication {
 			return nil, errors.New("unable to create replication volume from snapshot")
 		}
-
-		log.Debugf("isROVolumeFromSnapshot: %v isRWVolumeFromSnapshot: %v", isROVolumeFromSnapshot, isRWVolumeFromSnapshot)
 
 		snapshotSrc, err := isiConfig.isiSvc.GetSnapshot(ctx, sourceSnapshotID)
 		if err != nil {
@@ -536,9 +536,14 @@ func (s *service) CreateVolume(
 					return nil, fmt.Errorf("another RO volume from this snapshot is already present")
 				}
 			}
+		} else if isRWVolumeFromSnapshot {
+			path = utils.GetPathForVolume(isiPath, req.GetName())
+			if isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", req.GetName()) {
+				log.Debugf("the path '%s' exists", path)
+				foundVol = true
+			}
 		}
 	} else {
-		log.Debugf("isROVolumeFromSnapshot: %v isRWVolumeFromSnapshot: %v", isROVolumeFromSnapshot, isRWVolumeFromSnapshot)
 		path = utils.GetPathForVolume(isiPath, req.GetName())
 		// To ensure idempotency, check if the volume still exists.
 		// k8s might have made the same CreateVolume call in quick succession and the volume was already created in the first run.
@@ -1876,7 +1881,11 @@ func (s *service) DeleteSnapshot(
 	writeableSnapshots, err := isiConfig.isiSvc.GetWriteableSnapshotsBySourceId(ctx, id)
 	if len(writeableSnapshots) != 0 {
 		deleteSnapshot = false
-		log.Errorf("The following %d writeable snapshots are linked to this snapshot: %v", len(writeableSnapshots), writeableSnapshots)
+		sb := strings.Builder{}
+		for _, ws := range writeableSnapshots {
+			sb.WriteString(fmt.Sprintf(" %d:%s", ws.ID, ws.DstPath))
+		}
+		log.Errorf("The following %d writeable snapshots are linked to this snapshot:%v", len(writeableSnapshots), sb.String())
 		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "%s", "Not able to delete snapshot when it is linked to writeable snapshots"))
 	}
 
