@@ -60,6 +60,7 @@ var (
 		UnexportError                 bool
 		DeleteQuotaError              bool
 		QuotaNotFoundError            bool
+		InvalidQuotaError             bool
 		DeleteVolumeError             bool
 		GetJobsInternalError          bool
 		GetPolicyInternalError        bool
@@ -425,6 +426,10 @@ func handleGetQuotaByPath(w http.ResponseWriter, _ *http.Request) {
 	if stepHandlersErrors.QuotaNotFoundError {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(readFromFile("mock/quota/quota_not_found.txt"))
+		return
+	}
+	if stepHandlersErrors.InvalidQuotaError {
+		w.Write(readFromFile("mock/quota/invalid_quota.txt"))
 		return
 	}
 	w.Write(readFromFile("mock/quota/get_quota_by_id.txt"))

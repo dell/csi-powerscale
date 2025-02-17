@@ -862,6 +862,8 @@ func (f *feature) iInduceError(errtype string) error {
 		stepHandlersErrors.DeleteQuotaError = true
 	case "QuotaNotFoundError":
 		stepHandlersErrors.QuotaNotFoundError = true
+	case "InvalidQuotaError":
+		stepHandlersErrors.InvalidQuotaError = true
 	case "DeleteVolumeError":
 		stepHandlersErrors.DeleteVolumeError = true
 	case "GetPolicyInternalError":
@@ -1116,6 +1118,7 @@ func clearErrors() {
 	stepHandlersErrors.UnexportError = false
 	stepHandlersErrors.DeleteQuotaError = false
 	stepHandlersErrors.QuotaNotFoundError = false
+	stepHandlersErrors.InvalidQuotaError = false
 	stepHandlersErrors.DeleteVolumeError = false
 	inducedErrors.noIsiService = false
 	inducedErrors.autoProbeNotEnabled = false

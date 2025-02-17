@@ -45,6 +45,7 @@ Feature: Isilon CSI interface
       | induced                  | errormsg                    |
       | "InstancesError"         | "none"                      |
       | "QuotaNotFoundError"     | "Failed to fetch quota"     |
+      | "InvalidQuotaError"      | "none"                      |
       | "CreateExportError"      | "EOF"                       |
       | "GetExportInternalError" | "EOF"                       |
       | "none"                   | "none"                      |
