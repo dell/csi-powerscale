@@ -1,14 +1,17 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestNodeHealth(t *testing.T) {
@@ -88,17 +91,27 @@ func TestGetArrayConnectivityStatus(t *testing.T) {
 	}
 }
 
-func TestConnectivityStatus(t *testing.T) {
+// Mock for MarshalSyncMapToJSON
+type MockMarshal struct {
+	mock.Mock
+}
+
+func (m *MockMarshal) MarshalSyncMapToJSON(_ *sync.Map) ([]byte, error) {
+	args := m.Called()
+	return nil, args.Error(1)
+}
+
+func TestConnectivityStatus_Success(t *testing.T) {
 	// Set up the test logger
 	log := logrus.New()
 	log.SetLevel(logrus.DebugLevel)
 
-	val1 := ArrayConnectivityStatus{LastSuccess: 1617181723, LastAttempt: 1617181724}
-	val2 := ArrayConnectivityStatus{LastSuccess: 1617181725, LastAttempt: 1617181726}
+	// Initialize probeStatus
+	probeStatus = &sync.Map{}
 
 	// Populate probeStatus with test data
-	probeStatus.Store("cluster1", val1)
-	probeStatus.Store("cluster2", val2)
+	probeStatus.Store("cluster1", ArrayConnectivityStatus{LastSuccess: 1617181723, LastAttempt: 1617181724})
+	probeStatus.Store("cluster2", ArrayConnectivityStatus{LastSuccess: 1617181725, LastAttempt: 1617181726})
 
 	// Create a request to pass to our handler
 	req, err := http.NewRequest("GET", "/arrayStatus", nil)
@@ -123,4 +136,42 @@ func TestConnectivityStatus(t *testing.T) {
 	expectedResponse, err := MarshalSyncMapToJSON(probeStatus)
 	assert.NoError(t, err)
 	assert.JSONEq(t, string(expectedResponse), rr.Body.String())
+}
+
+func TestConnectivityStatus_ErrorDuringMarshal(t *testing.T) {
+	// Set up the test logger
+	log := logrus.New()
+	log.SetLevel(logrus.DebugLevel)
+
+	// Initialize probeStatus
+	probeStatus = &sync.Map{}
+
+	// Populate probeStatus with test data
+	probeStatus.Store("cluster1", ArrayConnectivityStatus{LastSuccess: 1617181723, LastAttempt: 1617181724})
+	probeStatus.Store("cluster2", ArrayConnectivityStatus{LastSuccess: 1617181725, LastAttempt: 1617181726})
+
+	// Create a request to pass to our handler
+	req, err := http.NewRequest("GET", "/arrayStatus", nil)
+	assert.NoError(t, err)
+
+	// Create a ResponseRecorder to record the response
+	rr := httptest.NewRecorder()
+
+	// Create a mock for MarshalSyncMapToJSON
+	mockMarshal := new(MockMarshal)
+	mockMarshal.On("MarshalSyncMapToJSON").Return(nil, errors.New("mock error"))
+
+	// Replace the original MarshalSyncMapToJSON with the mock
+	originalMarshal := MarshalSyncMapToJSON
+	MarshalSyncMapToJSON = mockMarshal.MarshalSyncMapToJSON
+	defer func() { MarshalSyncMapToJSON = originalMarshal }()
+
+	// Create a handler function
+	handler := http.HandlerFunc(connectivityStatus)
+
+	// Call the handler with our ResponseRecorder and request
+	handler.ServeHTTP(rr, req)
+
+	// Check the Content-Type header is what we expect
+	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
 }
