@@ -776,26 +776,11 @@ func (s *service) cloneVolume(ctx context.Context, isiConfig *IsilonClusterConfi
 	if snapshot, err = isiConfig.isiSvc.CreateSnapshot(ctx, srcPath, snapshotName); err != nil {
 		return fmt.Errorf("failed to create intermediate snapshot of '%s' with name '%s', error: '%v'", srcPath, snapshotName, err)
 	}
-	var result error
-	if size == sizeInBytes {
-		log.Infof("requested size %d matches source size %d, will use a writable snapshot", sizeInBytes, size)
-		_, err = isiConfig.isiSvc.CreateWritableSnapshot(ctx, strconv.FormatInt(snapshot.ID, 10), isiPath, dstVolumeName)
-		if err != nil {
-			result = fmt.Errorf("failed to create writable snapshot of '%s' with name '%s', error: '%v'", srcPath, snapshotName, err)
-			log.Debugf("%s", "cleaning up temporary snapshot")
-			isiConfig.isiSvc.DeleteSnapshot(ctx, snapshot.ID, snapshotName)
-			return result
-		}
-	} else {
-		log.Infof("requested size %d is larger than source size %d, will copy from snapshot to target volume", sizeInBytes, size)
-		snapshotSourceVolumeIsiPath := path.Dir(snapshot.Path)
 
-		if _, err = isiConfig.isiSvc.CopySnapshot(ctx, isiPath, snapshotSourceVolumeIsiPath, snapshot.ID, dstVolumeName, accessZone); err != nil {
-			result = fmt.Errorf("failed to copy volume name '%s', error '%v'", srcVolumeName, err)
-		}
-		log.Debugf("cleaning up temporary snapshot %s", snapshotName)
+	_, err = isiConfig.isiSvc.CreateWritableSnapshot(ctx, strconv.FormatInt(snapshot.ID, 10), isiPath, dstVolumeName)
+	if err != nil {
 		isiConfig.isiSvc.DeleteSnapshot(ctx, snapshot.ID, snapshotName)
-		return result
+		return fmt.Errorf("failed to create writable snapshot of '%s' with name '%s', error: '%v'", srcPath, snapshotName, err)
 	}
 
 	return nil
