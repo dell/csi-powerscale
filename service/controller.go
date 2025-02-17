@@ -1705,6 +1705,14 @@ func (s *service) validateCreateSnapshotRequest(
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
 
+	getParams := req.GetParameters()
+	if getParams != nil {
+		log.Printf("getParams:")
+		for key, value := range getParams {
+			log.Printf("    [%s]=%s", key, value)
+		}
+	}
+
 	srcVolumeID, _, _, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
 	if err != nil {
 		return "", "", status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
@@ -1716,7 +1724,7 @@ func (s *service) validateCreateSnapshotRequest(
 	log.Infof("<Eternals> inside validateCreateSnapshotRequest isiPath.......... '%s'", isiPath)
 	log.Infof("<Eternals> inside validateCreateSnapshotRequest srcVolumeID.......... '%s'", srcVolumeID)
 
-	path := utils.GetPathForVolume(isiPath, srcVolumeID)
+	path := utils.GetPathForVolume(isiPath, req.Name)
 	log.Infof("<Eternals> path.......... '%s'", path)
 
 	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, srcVolumeID, "") {

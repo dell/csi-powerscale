@@ -457,11 +457,11 @@ func (svc *isiService) IsVolumeExistent(ctx context.Context, isiPath, volID, nam
 	log.Infof("<Eternals> inside IsVolumeExistent volID.......... '%s'", volID)
 	log.Infof("<Eternals> inside IsVolumeExistent name.......... '%s'", name)
 
-	log.Debugf("check if volume (id :'%s', name '%s') already exists", volID, name)
+	log.Infof("check if volume (id :'%s', name '%s') already exists", volID, name)
 
 	isExistent := svc.client.IsVolumeExistentWithIsiPath(ctx, isiPath, volID, name)
 
-	log.Debugf("volume (id :'%s', name '%s') already exists : '%v'", volID, name, isExistent)
+	log.Infof("volume (id :'%s', name '%s') already exists : '%v'", volID, name, isExistent)
 
 	return isExistent
 }
