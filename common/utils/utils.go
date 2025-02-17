@@ -484,3 +484,14 @@ func IsROAccessMode(mode csi.VolumeCapability_AccessMode_Mode) bool {
 	}
 	return false
 }
+
+// GetInternalSnapshotName generates a snapshot name for internal use.
+//
+// It takes in two parameters:
+// - srcVolume: the source volume unqualified name.
+// - dstVolume: the destination volume unqualified name.
+//
+// It returns a string representing the private snapshot name.
+func GetInternalSnapshotName(srcVolume, dstVolume string) string {
+	return fmt.Sprintf("csi-internal-%s-%s", srcVolume, dstVolume)
+}

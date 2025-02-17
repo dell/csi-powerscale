@@ -86,7 +86,7 @@ func (svc *isiService) CreateSnapshot(ctx context.Context, path, snapshotName st
 func (svc *isiService) CreateWritableSnapshot(ctx context.Context, sourceSnapshotID, isiPath, snapshotName string) (isi.WritableSnapshot, error) {
 	log := utils.GetRunIDLogger(ctx)
 
-	path := fmt.Sprintf("%s/%s", isiPath, snapshotName)
+	path := path.Join(isiPath, snapshotName)
 	log.Debugf("begin to create writable snapshot '%s' from source snapshot '%s'", path, sourceSnapshotID)
 
 	snapshot, err := svc.client.CreateWritableSnapshot(ctx, sourceSnapshotID, path)
@@ -848,7 +848,7 @@ func (svc *isiService) isRWVolumeFromSnapshot(ctx context.Context, exportPath, a
 		return false
 	}
 
-	log.Debugf("snapshot '%s' is writable, state %s", snapshot.DstPath, snapshot.State)
+	log.Debugf("snapshot '%s' is a writable snapshot, state %s", snapshot.DstPath, snapshot.State)
 	return true
 }
 
