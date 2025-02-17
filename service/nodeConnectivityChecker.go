@@ -75,7 +75,7 @@ func setPollingFrequency(ctx context.Context) int64 {
 }
 
 // MarshalSyncMapToJSON marshal the sync Map to Json
-func MarshalSyncMapToJSON(m *sync.Map) ([]byte, error) {
+var MarshalSyncMapToJSON = func(m *sync.Map) ([]byte, error) {
 	tmpMap := make(map[string]ArrayConnectivityStatus)
 	m.Range(func(k, v interface{}) bool {
 		// Ensure the value is of type ArrayConnectivityStatus
