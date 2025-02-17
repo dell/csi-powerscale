@@ -1659,7 +1659,8 @@ func (s *service) CreateSnapshot(
 	} else {
 		// use the default isiPath if not set in the storage class
 		isiPath = isiConfig.IsiPath
-	}
+	}	
+	log.Infof("before validateCreateSnapshotRequest isiPath.......... '%s'", isiPath)
 
 	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
 	if err != nil {
