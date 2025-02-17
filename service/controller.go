@@ -1659,8 +1659,8 @@ func (s *service) CreateSnapshot(
 	} else {
 		// use the default isiPath if not set in the storage class
 		isiPath = isiConfig.IsiPath
-	}	
-	log.Infof("before validateCreateSnapshotRequest isiPath.......... '%s'", isiPath)
+	}
+	log.Infof("<Eternals> before validateCreateSnapshotRequest isiPath.......... '%s'", isiPath)
 
 	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
 	if err != nil {
@@ -1683,10 +1683,10 @@ func (s *service) CreateSnapshot(
 	}
 
 	// create new snapshot for source directory
-	log.Infof("isiPath.......... '%s'", isiPath)
-	log.Infof("srcVolumeID.......... '%s'", srcVolumeID)
+	log.Infof("<Eternals> isiPath.......... '%s'", isiPath)
+	log.Infof("<Eternals> srcVolumeID.......... '%s'", srcVolumeID)
 	path := utils.GetPathForVolume(isiPath, srcVolumeID)
-	log.Infof("path.......... '%s'", path)
+	log.Infof("<Eternals> path.......... '%s'", path)
 	if snapshotNew, err = isiConfig.isiSvc.CreateSnapshot(ctx, path, snapshotName); err != nil {
 		return nil, status.Errorf(codes.Internal, " runid=%s %s", runID, err.Error())
 	}
@@ -1712,6 +1712,9 @@ func (s *service) validateCreateSnapshotRequest(
 
 	ctx, log = setClusterContext(ctx, clusterName)
 	log.Debugf("Cluster Name: %v", clusterName)
+
+	log.Infof("<Eternals> inside validateCreateSnapshotRequest isiPath.......... '%s'", isiPath)
+	log.Infof("<Eternals> inside validateCreateSnapshotRequest srcVolumeID.......... '%s'", srcVolumeID)
 
 	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", srcVolumeID) {
 		return "", "", status.Error(codes.InvalidArgument,
