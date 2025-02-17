@@ -1716,6 +1716,9 @@ func (s *service) validateCreateSnapshotRequest(
 	log.Infof("<Eternals> inside validateCreateSnapshotRequest isiPath.......... '%s'", isiPath)
 	log.Infof("<Eternals> inside validateCreateSnapshotRequest srcVolumeID.......... '%s'", srcVolumeID)
 
+	path := utils.GetPathForVolume(isiPath, srcVolumeID)
+	log.Infof("<Eternals> path.......... '%s'", path)
+
 	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, srcVolumeID, "") {
 		return "", "", status.Error(codes.InvalidArgument,
 			utils.GetMessageWithRunID(runID, "source volume id is invalid"))
