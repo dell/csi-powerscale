@@ -94,7 +94,7 @@ func ParseInt64FromContext(ctx context.Context, key string) (int64, error) {
 }
 
 // RemoveExistingCSISockFile When the sock file that the gRPC server is going to be listening on already exists, error will be thrown saying the address is already in use, thus remove it first
-func RemoveExistingCSISockFile() error {
+var RemoveExistingCSISockFile = func() error {
 	log := GetLogger()
 	protoAddr := os.Getenv(constants.EnvCSIEndpoint)
 
