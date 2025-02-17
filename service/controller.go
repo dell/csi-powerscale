@@ -388,7 +388,6 @@ func (s *service) CreateVolume(
 			if snapshotIsiPath, err = isiConfig.isiSvc.GetSnapshotIsiPath(ctx, snapshotSourceVolumeIsiPath, sourceSnapshotID, accessZone); err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
-			log.Debugf("the Isilon directory path of snapshot is '%s'", snapshotIsiPath)
 
 			vcs := req.GetVolumeCapabilities()
 			if len(vcs) == 0 {
@@ -511,8 +510,6 @@ func (s *service) CreateVolume(
 			return nil, errors.New("unable to create replication volume from snapshot")
 		}
 
-		log.Debugf("isROVolumeFromSnapshot: %v isRWVolumeFromSnapshot: %v", isROVolumeFromSnapshot, isRWVolumeFromSnapshot)
-
 		snapshotSrc, err := isiConfig.isiSvc.GetSnapshot(ctx, sourceSnapshotID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get snapshot id '%s', error '%v'", sourceSnapshotID, err)
@@ -556,7 +553,6 @@ func (s *service) CreateVolume(
 
 	// Create an entry for this volume in the snapshot tracking dir. The tracking directory is not exported.
 	if isROVolumeFromSnapshot && !foundVol {
-		log.Debugf("in block to create tracking directory for volume, snapshotSourceVolumeIsiPath: %s, snapshotTrackingDir: %s snapshotTrackingDirEntryForVolume: %s", snapshotSourceVolumeIsiPath, snapshotTrackingDir, snapshotTrackingDirEntryForVolume)
 		if err = isiConfig.isiSvc.CreateVolume(ctx, snapshotSourceVolumeIsiPath, snapshotTrackingDir, volumePathPermissions); err != nil {
 			return nil, err
 		}
