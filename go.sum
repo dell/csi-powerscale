@@ -127,6 +127,10 @@ github.com/dell/goisilon v1.18.2-0.20250214115444-00a9888ffd9c h1:P3G7vIydGVZ0Us
 github.com/dell/goisilon v1.18.2-0.20250214115444-00a9888ffd9c/go.mod h1:C9sp22kpzi6AwiCo5Q7z4GbaWnaUOnL+LVYsb4y5oEA=
 github.com/dell/goisilon v1.18.2-0.20250216032033-e34db273e184 h1:0pmflTE6iXlpQRrX54YFHfMWKOqVVWECYjRgcucp2PA=
 github.com/dell/goisilon v1.18.2-0.20250216032033-e34db273e184/go.mod h1:C9sp22kpzi6AwiCo5Q7z4GbaWnaUOnL+LVYsb4y5oEA=
+github.com/dell/goisilon v1.18.2-0.20250217130258-f64c1974074f h1:H/EIevTIeRPAuD7vR+cYMxAFl0HpYrQaXPUpaoSk3dI=
+github.com/dell/goisilon v1.18.2-0.20250217130258-f64c1974074f/go.mod h1:C9sp22kpzi6AwiCo5Q7z4GbaWnaUOnL+LVYsb4y5oEA=
+github.com/dell/goisilon v1.18.2-0.20250217131337-fa35ad0ee293 h1:HufPEbehEHRpqslrmYboh5wNtM04RdxfOxiokS5s1Rc=
+github.com/dell/goisilon v1.18.2-0.20250217131337-fa35ad0ee293/go.mod h1:C9sp22kpzi6AwiCo5Q7z4GbaWnaUOnL+LVYsb4y5oEA=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=

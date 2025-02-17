@@ -612,8 +612,6 @@ func (s *service) CreateVolume(
 
 	if isRWVolumeFromSnapshot {
 		if _, err = isiConfig.isiSvc.CreateWritableSnapshot(ctx, sourceSnapshotID, isiPath, req.GetName()); err != nil {
-			log.Errorf("CreateWritableSnapshot for source snapshot '%s' returned error '%s'", sourceSnapshotID, err)
-			// Delete the tracking directory entry for this volume.
 			if err2 := isiConfig.isiSvc.DeleteVolume(ctx, snapshotSourceVolumeIsiPath, snapshotTrackingDirEntryForVolume); err2 != nil {
 				log.Warnf("Deletion RW snapshot tracking volume '%s' returned error '%s'", snapshotTrackingDirEntryForVolume, err2)
 			}
@@ -632,23 +630,21 @@ func (s *service) CreateVolume(
 	}
 
 	volumeName := req.GetName()
-	if !foundVol && !sourceIsSnapshot {
-		// create quota
+	if !foundVol && !isROVolumeFromSnapshot {
+		// Create quota.
 		if quotaID, err = isiConfig.isiSvc.CreateQuota(ctx, path, volumeName, softLimit, advisoryLimit, softGracePrd, sizeInBytes, s.opts.QuotaEnabled); err != nil {
 			log.Errorf("error creating quota ('%s', '%d' bytes), abort, also roll back by deleting the newly created volume: '%v'", req.GetName(), sizeInBytes, err)
 			// roll back, delete the newly created volume
 			if err = isiConfig.isiSvc.DeleteVolume(ctx, isiPath, volumeName); err != nil {
 				return nil, fmt.Errorf("rollback (deleting volume '%s') failed with error : '%v'", req.GetName(), err)
 			}
-			return nil, fmt.Errorf("error creating quota ('%s', '%d' bytes), abort, also successfully rolled back by deleting the newly created volume", req.GetName(), sizeInBytes)
+			return nil, fmt.Errorf("error creating quota ('%s', '%d' bytes), aborted and successfully rolled back by deleting the newly created volume", req.GetName(), sizeInBytes)
 		}
 	}
 
-	log.Debugf("volume creation done, now dealing with export tasks")
-
 	// Export volume in the given access zone, also add normalized quota id to the description field. In DeleteVolume,
 	// the quota ID will be used for the quota to be directly deleted by ID.
-	if sourceIsSnapshot {
+	if isROVolumeFromSnapshot {
 		if exportID, err = isiConfig.isiSvc.ExportVolumeWithZone(ctx, path, "", accessZone, ""); err == nil && exportID != 0 {
 			// get the export and retry if not found to ensure the export has been created
 			for i := 0; i < MaxRetries; i++ {
@@ -677,11 +673,6 @@ func (s *service) CreateVolume(
 				log.Printf("begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
 			}
 		} else {
-			if isRWVolumeFromSnapshot {
-				if err2 := isiConfig.isiSvc.DeleteWritableSnapshot(ctx, isiPath, req.GetName()); err2 != nil {
-					log.Infof("failed to delete writable snapshot in failure case: '%s'", err2)
-				}
-			}
 			return nil, err
 		}
 	} else {
@@ -698,7 +689,7 @@ func (s *service) CreateVolume(
 					}
 					// return the createVolume response with actual array volume name
 					exportPath := path
-					if export != nil && export.Paths != nil {
+					if export.Paths != nil {
 						if len(*export.Paths) > 0 {
 							exportPath = (*export.Paths)[0]
 							pathToken := strings.Split(exportPath, "/")
@@ -718,8 +709,14 @@ func (s *service) CreateVolume(
 				log.Infof("failed to clear quota in failure case: '%s'", err)
 			}
 
-			if err := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, req.GetName()); err != nil {
-				log.Infof("failed to delete volume in failure case: '%s'", err)
+			if isRWVolumeFromSnapshot {
+				if err := isiConfig.isiSvc.DeleteWritableSnapshot(ctx, isiPath, req.GetName()); err != nil {
+					log.Infof("failed to delete writable snapshot in failure case: '%s'", err)
+				}
+			} else {
+				if err := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, req.GetName()); err != nil {
+					log.Infof("failed to delete volume in failure case: '%s'", err)
+				}
 			}
 			return nil, err
 		}

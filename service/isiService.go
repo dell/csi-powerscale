@@ -244,7 +244,7 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit
 		// create quota with container set to true
 		var quotaID string
 		var err error
-		if quotaID, err = svc.client.CreateQuotaWithPath(ctx, path, true, sizeInBytes, softlimitInt, advisoryLimitInt, softGracePrdInt); err != nil {
+		if quotaID, err = svc.client.CreateQuotaWithPath(ctx, path, true, sizeInBytes, softlimitInt, advisoryLimitInt, softGracePrdInt, true); err != nil {
 			if (isQuotaActivated) && (checkLicErr == nil) {
 				return "", fmt.Errorf("SmartQuotas is activated, but creating quota failed with error: '%v'", err)
 			}

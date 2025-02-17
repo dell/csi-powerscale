@@ -493,5 +493,5 @@ func IsROAccessMode(mode csi.VolumeCapability_AccessMode_Mode) bool {
 //
 // It returns a string representing the private snapshot name.
 func GetInternalSnapshotName(srcVolume, dstVolume string) string {
-	return fmt.Sprintf("csi-internal-%s-%s", srcVolume, dstVolume)
+	return fmt.Sprintf("csi-internal.%s.%s", srcVolume, dstVolume)
 }
