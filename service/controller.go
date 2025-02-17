@@ -972,29 +972,25 @@ func (s *service) DeleteVolume(
 		return nil, fmt.Errorf("exports found for volume %s in AccessZone %s. It is not safe to delete the volume", volName, accessZone)
 	}
 
-	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", volName) {
-		log.Debugf("volume '%s' not found, skip calling delete directory.", volName)
-	} else {
-		writableSnapshot, err := isiConfig.isiSvc.GetWritableSnapshotByIsiPath(ctx, isiPath)
+	if isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", volName) {
+		writableSnapshot, err := isiConfig.isiSvc.GetWritableSnapshotByIsiPath(ctx, exportPath)
 		if err == nil {
 			if err := isiConfig.isiSvc.DeleteWritableSnapshot(ctx, isiPath, volName); err != nil {
 				return nil, err
 			}
 
 			// Check if this writable snapshot had a private source snapshot.
-			snapshot, err := isiConfig.isiSvc.GetSnapshot(ctx, writableSnapshot.SrcSnap)
-			if err != nil {
-				log.Debugf("snapshot '%v' found", snapshot)
-				privateSnapshotName := utils.GetInternalSnapshotName(filepath.Base(writableSnapshot.SrcPath), volName)
-				if snapshot.Name == privateSnapshotName {
-					if err := isiConfig.isiSvc.DeleteSnapshot(ctx, snapshot.ID, privateSnapshotName); err != nil {
-						return nil, err
-					}
+			privateSnapshotName := utils.GetInternalSnapshotName(filepath.Base(writableSnapshot.SrcPath), volName)
+			if writableSnapshot.SrcSnap == privateSnapshotName {
+				if err := isiConfig.isiSvc.DeleteSnapshot(ctx, writableSnapshot.SrcID, privateSnapshotName); err != nil {
+					return nil, fmt.Errorf("cound not delete private source snapshot '%s' of writable snapshot '%s'", privateSnapshotName, writableSnapshot.SrcPath)
 				}
 			}
 		} else if err := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, volName); err != nil {
 			return nil, err
 		}
+	} else {
+		log.Debugf("volume '%s' not found, skip calling delete directory.", volName)
 	}
 	return &csi.DeleteVolumeResponse{}, nil
 }

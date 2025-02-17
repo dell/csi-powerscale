@@ -482,9 +482,9 @@ func (svc *isiService) IsVolumeExistent(ctx context.Context, isiPath, volID, nam
 	// Fetch log handler
 	log := utils.GetRunIDLogger(ctx)
 
-	log.Debugf("check if volume (id: '%s', name: '%s') already exists", volID, name)
+	log.Debugf("check if volume (isiPath: '%s', id: '%s', name: '%s') exists", isiPath, volID, name)
 	isExistent := svc.client.IsVolumeExistentWithIsiPath(ctx, isiPath, volID, name)
-	log.Debugf("volume (id: '%s', name: '%s') already exists: '%v'", volID, name, isExistent)
+	log.Debugf("volume (id: '%s', name: '%s') exists: '%v'", volID, name, isExistent)
 
 	return isExistent
 }
