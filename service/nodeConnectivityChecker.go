@@ -78,7 +78,10 @@ func setPollingFrequency(ctx context.Context) int64 {
 func MarshalSyncMapToJSON(m *sync.Map) ([]byte, error) {
 	tmpMap := make(map[string]ArrayConnectivityStatus)
 	m.Range(func(k, v interface{}) bool {
-		tmpMap[k.(string)] = v.(ArrayConnectivityStatus)
+		// Ensure the value is of type ArrayConnectivityStatus
+		if status, ok := v.(ArrayConnectivityStatus); ok {
+			tmpMap[k.(string)] = status
+		}
 		return true
 	})
 	log.Debugf("map value is %+v", tmpMap)

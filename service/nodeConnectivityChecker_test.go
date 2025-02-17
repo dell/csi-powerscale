@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,21 +31,6 @@ func TestNodeHealth(t *testing.T) {
 	}
 }
 
-func TestConnectivityStatus(t *testing.T) {
-	arrayID := "array1"
-	status := ArrayConnectivityStatus{
-		LastSuccess: time.Now().Unix(),
-		LastAttempt: time.Now().Unix(),
-	}
-	probeStatus.Store(arrayID, status)
-	// Test case: Successful response
-	w := httptest.NewRecorder()
-	connectivityStatus(w, httptest.NewRequest("GET", "/connectivity-status", nil))
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
-	assert.True(t, strings.Contains(w.Body.String(), "array1"))
-}
-
 func TestGetArrayConnectivityStatus(t *testing.T) {
 	// Setup router
 	router := mux.NewRouter()
@@ -59,7 +43,6 @@ func TestGetArrayConnectivityStatus(t *testing.T) {
 		expectedBody  string
 		mockStatus    interface{}
 		mockStatusSet bool
-		isJSON        bool
 	}{
 		{
 			arrayID:       "existingArray",
@@ -67,14 +50,19 @@ func TestGetArrayConnectivityStatus(t *testing.T) {
 			expectedBody:  `{"status":"connected"}`,
 			mockStatus:    map[string]string{"status": "connected"},
 			mockStatusSet: true,
-			isJSON:        true,
 		},
 		{
 			arrayID:       "nonExistingArray",
 			expectedCode:  http.StatusNotFound,
 			expectedBody:  "array nonExistingArray not found \n",
 			mockStatusSet: false,
-			isJSON:        false,
+		},
+		{
+			arrayID:       "errorArray",
+			expectedCode:  http.StatusInternalServerError,
+			expectedBody:  "",
+			mockStatus:    make(chan int), // This will cause json.Marshal to fail
+			mockStatusSet: true,
 		},
 	}
 
@@ -92,10 +80,47 @@ func TestGetArrayConnectivityStatus(t *testing.T) {
 		router.ServeHTTP(rr, req)
 
 		assert.Equal(t, tt.expectedCode, rr.Code)
-		if tt.isJSON {
+		if tt.expectedCode == http.StatusOK {
 			assert.JSONEq(t, tt.expectedBody, rr.Body.String())
 		} else {
 			assert.Equal(t, tt.expectedBody, rr.Body.String())
 		}
 	}
+}
+
+func TestConnectivityStatus(t *testing.T) {
+	// Set up the test logger
+	log := logrus.New()
+	log.SetLevel(logrus.DebugLevel)
+
+	val1 := ArrayConnectivityStatus{LastSuccess: 1617181723, LastAttempt: 1617181724}
+	val2 := ArrayConnectivityStatus{LastSuccess: 1617181725, LastAttempt: 1617181726}
+
+	// Populate probeStatus with test data
+	probeStatus.Store("cluster1", val1)
+	probeStatus.Store("cluster2", val2)
+
+	// Create a request to pass to our handler
+	req, err := http.NewRequest("GET", "/arrayStatus", nil)
+	assert.NoError(t, err)
+
+	// Create a ResponseRecorder to record the response
+	rr := httptest.NewRecorder()
+
+	// Create a handler function
+	handler := http.HandlerFunc(connectivityStatus)
+
+	// Call the handler with our ResponseRecorder and request
+	handler.ServeHTTP(rr, req)
+
+	// Check the status code is what we expect
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	// Check the Content-Type header is what we expect
+	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+
+	// Check the response body is what we expect
+	expectedResponse, err := MarshalSyncMapToJSON(probeStatus)
+	assert.NoError(t, err)
+	assert.JSONEq(t, string(expectedResponse), rr.Body.String())
 }
