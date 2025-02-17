@@ -23,12 +23,17 @@ import (
 	"net/http"
 	_ "net/http/pprof" // #nosec G108
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/cucumber/godog"
 	"github.com/dell/csi-isilon/v2/common/constants"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMain(m *testing.M) {
@@ -219,4 +224,171 @@ func TestServiceInitializeServiceOpts(t *testing.T) {
 	assert.Equal(t, wantOps, serviceInstance.opts)
 	assert.Equal(t, wantEnvNodeName, serviceInstance.nodeID)
 	assert.Equal(t, wantEnvNodeIP, serviceInstance.nodeIP)
+}
+
+func TestSyncIsilonConfigs(t *testing.T) {
+	isilonConfigFile = ""
+	s := &service{}
+	ctx := context.Background()
+	err := s.syncIsilonConfigs(ctx)
+	assert.NotEqual(t, nil, err)
+}
+
+func TestGetNewIsilonConfigs(t *testing.T) {
+	ctx := context.Background()
+	s := &service{}
+
+	isilonConfigFile = "config.yaml"
+	tmpDir := t.TempDir()
+	isilonConfigFile := filepath.Join(tmpDir, isilonConfigFile)
+
+	// scenario 1
+	content := `isilonClusters:
+  - clusterName=`
+	configBytes, err := writeToFileandRead(isilonConfigFile, content)
+	_, _, err = s.getNewIsilonConfigs(ctx, configBytes)
+	assert.NotEqual(t, nil, err)
+
+	// scenario 2
+	content = `isilon:
+  - clusterName: "abc"`
+	configBytes, err = writeToFileandRead(isilonConfigFile, content)
+	_, _, err = s.getNewIsilonConfigs(ctx, configBytes)
+	assert.NotEqual(t, nil, err)
+
+	// scenario 3
+	opt := Opts{
+		CustomTopologyEnabled: true,
+	}
+	s = &service{
+		opts: opt,
+	}
+	content = `isilonClusters:
+  - clusterName: "cluster1"
+    username: "user"
+    password: "password"
+    endpoint: "1.2.3.4"
+    isDefault: true
+  - clusterName: "cluster2"
+    username: "user"
+    password: "password"
+    endpoint: "1.2.3.4"
+    isDefault: true`
+	configBytes, err = writeToFileandRead(isilonConfigFile, content)
+	_, _, err = s.getNewIsilonConfigs(ctx, configBytes)
+	assert.NotEqual(t, nil, err)
+
+	// scenario 4
+	opt = Opts{
+		CustomTopologyEnabled: false,
+	}
+	s = &service{
+		opts: opt,
+	}
+
+	content = `isilonClusters:
+  - clusterName: ""
+    username: "user"
+    password: "password"
+    endpoint: "1.2.3.4"
+    isDefault: true`
+	configBytes, err = writeToFileandRead(isilonConfigFile, content)
+	_, _, err = s.getNewIsilonConfigs(ctx, configBytes)
+	assert.NotEqual(t, nil, err)
+
+	// scenario 5
+	content = `isilonClusters:
+  - clusterName: "cluster1"
+    username: ""
+    password: "password"
+    endpoint: "1.2.3.4"
+    isDefault: true`
+	configBytes, err = writeToFileandRead(isilonConfigFile, content)
+	_, _, err = s.getNewIsilonConfigs(ctx, configBytes)
+	assert.NotEqual(t, nil, err)
+
+	// scenario 6
+	content = `isilonClusters:
+  - clusterName: "cluster1"
+    username: "user"
+    password: ""
+    endpoint: "1.2.3.4"
+    isDefault: true`
+	configBytes, err = writeToFileandRead(isilonConfigFile, content)
+	_, _, err = s.getNewIsilonConfigs(ctx, configBytes)
+	assert.NotEqual(t, nil, err)
+
+	// scenario 7
+	content = `isilonClusters:
+  - clusterName: "cluster1"
+    username: "user"
+    password: "password"
+    endpoint: ""
+    isDefault: true`
+	configBytes, err = writeToFileandRead(isilonConfigFile, content)
+	_, _, err = s.getNewIsilonConfigs(ctx, configBytes)
+	assert.NotEqual(t, nil, err)
+}
+
+func writeToFileandRead(filePath, content string) ([]byte, error) {
+	err := os.WriteFile(filePath, []byte(content), 0o644)
+	if err != nil {
+		return nil, fmt.Errorf("error writing to file: %w", err)
+	}
+	fmt.Println("File written successfully:", filePath)
+	configBytes, err := os.ReadFile(filepath.Clean(filePath))
+	return configBytes, nil
+}
+
+// Mocking the logger
+type MockLogger struct {
+	mock.Mock
+}
+
+func (m *MockLogger) Info(args ...interface{}) {
+	m.Called(args...)
+}
+
+func (m *MockLogger) Debug(args ...interface{}) {
+	m.Called(args...)
+}
+
+func (m *MockLogger) Error(args ...interface{}) {
+	m.Called(args...)
+}
+
+func TestLoadIsilonConfigs(t *testing.T) {
+	// Create a temporary directory to simulate the config file path
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.yaml")
+
+	// Create a dummy config file
+	err := os.WriteFile(configFile, []byte("dummy-content"), 0o644)
+	require.NoError(t, err)
+
+	// Create the service instance
+	svc := &service{
+		isiClusters: new(sync.Map),
+	}
+
+	ctx := context.Background()
+
+	// Run loadIsilonConfigs in a separate goroutine
+	go func() {
+		err := svc.loadIsilonConfigs(ctx, configFile)
+		require.NoError(t, err)
+	}()
+
+	// Simulate a config file update event
+	parentFolder := filepath.Dir(configFile)
+	eventPath := filepath.Join(parentFolder, "..data")
+
+	time.Sleep(500 * time.Millisecond) // Give some time for the watcher to start
+
+	// Create the simulated event folder
+	err = os.Mkdir(eventPath, 0o755)
+	require.NoError(t, err)
+
+	// Wait to let the watcher pick up the event
+	time.Sleep(1 * time.Second)
 }
