@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 
 	isi "github.com/dell/goisilon"
@@ -100,7 +102,7 @@ func (m *MockClient) Get(
 	params api.OrderedValues, headers map[string]string,
 	resp interface{},
 ) error {
-	return nil
+	return errors.New("mock error")
 }
 
 func (m *MockClient) Post(
@@ -118,7 +120,285 @@ func (m *MockClient) Put(
 	params api.OrderedValues, headers map[string]string,
 	body, resp interface{},
 ) error {
-	return nil
+	return errors.New("mock error")
+}
+
+func TestCopySnapshot(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name                        string
+		isiPath                     string
+		snapshotSourceVolumeIsiPath string
+		srcSnapshotID               int64
+		dstVolumeName               string
+		accessZone                  string
+		expected                    isi.Volume
+		err                         error
+	}{
+		{
+			name:                        "Error case",
+			isiPath:                     "/ifs/data",
+			snapshotSourceVolumeIsiPath: "/ifs/data/snapshots",
+			srcSnapshotID:               456,
+			dstVolumeName:               "new_volume",
+			accessZone:                  "System",
+			expected:                    nil,
+			err:                         errors.New("mock error"),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			volumeNew, err := svc.CopySnapshot(ctx, tc.isiPath, tc.snapshotSourceVolumeIsiPath, tc.srcSnapshotID, tc.dstVolumeName, tc.accessZone)
+			if err != nil {
+				if tc.err == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.err.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.err, err)
+				}
+			} else {
+				if tc.err != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.err)
+				} else {
+					// Check if the returned volume matches the expected volume
+					if !reflect.DeepEqual(volumeNew, tc.expected) {
+						t.Errorf("Expected volume '%v', but got '%v'", tc.expected, volumeNew)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestCopyVolume(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name          string
+		isiPath       string
+		srcVolumeName string
+		dstVolumeName string
+		expected      isi.Volume
+		err           error
+	}{
+		{
+			name:          "Error case",
+			isiPath:       "/ifs/data",
+			srcVolumeName: "src_volume",
+			dstVolumeName: "dst_volume",
+			expected:      nil,
+			err:           errors.New("mock error"),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			volumeNew, err := svc.CopyVolume(ctx, tc.isiPath, tc.srcVolumeName, tc.dstVolumeName)
+			if err != nil {
+				if tc.err == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.err.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.err, err)
+				}
+			} else {
+				if tc.err != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.err)
+				} else {
+					// Check if the returned volume matches the expected volume
+					if !reflect.DeepEqual(volumeNew, tc.expected) {
+						t.Errorf("Expected volume '%v', but got '%v'", tc.expected, volumeNew)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestCreateVolume(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name                     string
+		isiPath                  string
+		volName                  string
+		isiVolumePathPermissions string
+		expected                 isi.Volume
+		err                      error
+	}{
+		{
+			name:                     "Error case",
+			isiPath:                  "/ifs/data",
+			volName:                  "test_volume",
+			isiVolumePathPermissions: "755",
+			expected:                 nil,
+			err:                      errors.New("mock error"),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			err := svc.CreateVolume(ctx, tc.isiPath, tc.volName, tc.isiVolumePathPermissions)
+			if err != nil {
+				if tc.err == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.err.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.err, err)
+				}
+			} else {
+				if tc.err != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.err)
+				}
+			}
+		})
+	}
+}
+
+func TestCreateVolumeWithMetaData(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name                     string
+		isiPath                  string
+		volName                  string
+		isiVolumePathPermissions string
+		metadata                 map[string]string
+		expected                 isi.Volume
+		err                      error
+	}{
+		{
+			name:                     "Error case",
+			isiPath:                  "/ifs/data",
+			volName:                  "test_volume",
+			isiVolumePathPermissions: "755",
+			metadata: map[string]string{
+				"key3": "value3",
+			},
+			expected: nil,
+			err:      errors.New("mock error"),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			err := svc.CreateVolumeWithMetaData(ctx, tc.isiPath, tc.volName, tc.isiVolumePathPermissions, tc.metadata)
+			if err != nil {
+				if tc.err == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.err.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.err, err)
+				}
+			} else {
+				if tc.err != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.err)
+				}
+			}
+		})
+	}
+}
+
+func TestGetVolumeQuota(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name         string
+		volName      string
+		exportID     int
+		accessZone   string
+		expectedQuot isi.Quota
+		expectedErr  error
+	}{
+		{
+			name:         "Error case",
+			volName:      "test_volume",
+			exportID:     456,
+			accessZone:   "System",
+			expectedQuot: nil,
+			expectedErr:  errors.New("failed to get export 'test_volume':'456' with access zone 'System', error: 'mock error'"),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			quota, err := svc.GetVolumeQuota(ctx, tc.volName, tc.exportID, tc.accessZone)
+			if err != nil {
+				if tc.expectedErr == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.expectedErr, err)
+				}
+			} else {
+				if tc.expectedErr != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.expectedErr)
+				} else {
+					// Check if the returned quota matches the expected quota
+					if !reflect.DeepEqual(quota, tc.expectedQuot) {
+						t.Errorf("Expected quota '%v', but got '%v'", tc.expectedQuot, quota)
+					}
+				}
+			}
+		})
+	}
 }
 
 func TestCreateQuota(t *testing.T) {
@@ -163,6 +443,251 @@ func TestCreateQuota(t *testing.T) {
 
 			_, err := svc.CreateQuota(ctx, tc.isiPath, tc.volName, tc.softLimit, tc.advisoryLimit, tc.softGracePrd, tc.sizeInBytes, tc.quotaEnabled)
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestGetExportsWithParams(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name     string
+		params   api.OrderedValues
+		expected isi.Exports
+		err      error
+	}{
+		{
+			name: "Error case",
+			params: api.OrderedValues{
+				{[]byte("zone"), []byte("")},
+			},
+			expected: nil,
+			err:      errors.New("failed to get exports with params"),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			exports, err := svc.GetExportsWithParams(ctx, tc.params)
+			if err != nil {
+				if tc.err == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.err.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.err, err)
+				}
+			} else {
+				if tc.err != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.err)
+				} else {
+					// Check if the returned exports match the expected exports
+					if !reflect.DeepEqual(exports, tc.expected) {
+						t.Errorf("Expected exports '%v', but got '%v'", tc.expected, exports)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestGetVolumeSize(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name         string
+		isiPath      string
+		volName      string
+		expectedSize int64
+		expectedErr  error
+	}{
+		{
+			name:         "Error case",
+			isiPath:      "/ifs/data",
+			volName:      "test_volume",
+			expectedSize: 0,
+			expectedErr:  errors.New("mock error"),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			size := svc.GetVolumeSize(ctx, tc.isiPath, tc.volName)
+			assert.Equal(t, tc.expectedSize, size)
+		})
+	}
+}
+
+func TestIsIOInProgress(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name            string
+		expectedClients isi.Clients
+		expectedErr     error
+	}{
+		{
+			name:            "Error case",
+			expectedClients: nil,
+			expectedErr:     errors.New("mock error"),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			clients, err := svc.IsIOInProgress(ctx)
+			if err != nil {
+				if tc.expectedErr == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.expectedErr, err)
+				}
+			} else {
+				if tc.expectedErr != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.expectedErr)
+				} else {
+					// Check if the returned clients match the expected clients
+					if !reflect.DeepEqual(clients, tc.expectedClients) {
+						t.Errorf("Expected clients '%v', but got '%v'", tc.expectedClients, clients)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestOtherClientsAlreadyAdded(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name         string
+		exportID     int
+		accessZone   string
+		nodeID       string
+		expectedBool bool
+	}{
+		{
+			name:         "Export is nil",
+			exportID:     456,
+			accessZone:   "System",
+			nodeID:       "node2",
+			expectedBool: true,
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			result := svc.OtherClientsAlreadyAdded(ctx, tc.exportID, tc.accessZone, tc.nodeID)
+
+			if result != tc.expectedBool {
+				t.Errorf("Expected '%v', but got '%v'", tc.expectedBool, result)
+			}
+		})
+	}
+}
+
+func TestAddExportClientNetworkIdentifierByIDWithZone(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name                    string
+		clusterName             string
+		exportID                int
+		accessZone              string
+		nodeID                  string
+		ignoreUnresolvableHosts bool
+		expectedErr             error
+	}{
+		{
+			name:                    "Error case",
+			clusterName:             "cluster2",
+			exportID:                456,
+			accessZone:              "System",
+			nodeID:                  "!@$%~^",
+			ignoreUnresolvableHosts: true,
+			expectedErr:             errors.New("node ID '!@$%~^' cannot match the expected '^(.+)=#=#=(.+)=#=#=(.+)$' pattern"),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			err := svc.AddExportClientNetworkIdentifierByIDWithZone(ctx, tc.clusterName, tc.exportID, tc.accessZone, tc.nodeID, tc.ignoreUnresolvableHosts, func(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error {
+				// Simulate the addClientFunc behavior
+				if tc.expectedErr != nil {
+					return tc.expectedErr
+				}
+				return nil
+			})
+
+			if err != nil {
+				if tc.expectedErr == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.expectedErr, err)
+				}
+			} else {
+				if tc.expectedErr != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.expectedErr)
+				}
+			}
 		})
 	}
 }

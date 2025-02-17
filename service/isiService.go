@@ -262,21 +262,22 @@ func (svc *isiService) DeleteQuotaByExportIDWithZone(ctx context.Context, volNam
 		return fmt.Errorf("failed to get export '%s':'%d' with access zone '%s', skip DeleteQuotaByID. error : '%s'", volName, exportID, accessZone, err.Error())
 	}
 
-	log.Debugf("export (id : '%d') corresponding to path '%s' found, description field is '%s'", export.ID, volName, export.Description)
+	if export != nil {
+		log.Debugf("export (id : '%d') corresponding to path '%s' found, description field is '%s'", export.ID, volName, export.Description)
 
-	if quotaID, err = utils.GetQuotaIDFromDescription(ctx, export); err != nil {
-		return err
-	}
+		quotaID, _ = utils.GetQuotaIDFromDescription(ctx, export)
 
-	if quotaID == "" {
-		log.Debugf("No quota set on the volume, skip deleting quota")
-		return nil
-	}
+		if quotaID == "" {
+			log.Debugf("No quota set on the volume, skip deleting quota")
+			return nil
+		}
 
-	log.Debugf("deleting quota with id '%s' for path '%s'", quotaID, volName)
+		log.Debugf("deleting quota with id '%s' for path '%s'", quotaID, volName)
 
-	if err = svc.client.ClearQuotaByID(ctx, quotaID); err != nil {
-		return err
+		if err = svc.client.ClearQuotaByID(ctx, quotaID); err != nil {
+			return err
+		}
+
 	}
 
 	return nil
@@ -296,19 +297,22 @@ func (svc *isiService) GetVolumeQuota(ctx context.Context, volName string, expor
 		return nil, fmt.Errorf("failed to get export '%s':'%d' with access zone '%s', error: '%s'", volName, exportID, accessZone, err.Error())
 	}
 
-	log.Debugf("export (id : '%d') corresponding to path '%s' found, description field is '%s'", export.ID, volName, export.Description)
+	if export != nil {
+		log.Debugf("export (id : '%d') corresponding to path '%s' found, description field is '%s'", export.ID, volName, export.Description)
 
-	if quotaID, err = utils.GetQuotaIDFromDescription(ctx, export); err != nil {
-		return nil, err
+		quotaID, err = utils.GetQuotaIDFromDescription(ctx, export)
+
+		if quotaID == "" {
+			log.Debugf("No quota set on the volume")
+			return nil, fmt.Errorf("failed to get quota: No quota set on the volume '%s'", volName)
+		}
+
+		log.Debugf("get quota by id '%s'", quotaID)
+		return svc.client.GetQuotaByID(ctx, quotaID)
+
 	}
 
-	if quotaID == "" {
-		log.Debugf("No quota set on the volume")
-		return nil, fmt.Errorf("failed to get quota: No quota set on the volume '%s'", volName)
-	}
-
-	log.Debugf("get quota by id '%s'", quotaID)
-	return svc.client.GetQuotaByID(ctx, quotaID)
+	return nil, fmt.Errorf("failed to get quota for volume '%s'", volName)
 }
 
 func (svc *isiService) UpdateQuotaSize(ctx context.Context, quotaID string, updatedSize, updatedSoftLimit, updatedAdvisoryLimit, softGrace int64) error {
