@@ -951,3 +951,17 @@ func (svc *isiService) GetVolumeByID(ctx context.Context, volID, volName string)
 
 	return vol, nil
 }
+
+func (svc *isiService) GetVolumes(ctx context.Context) ([]isi.Volume, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
+	var vols []isi.Volume
+	var err error
+	if vols, err = svc.client.GetVolumes(ctx); err != nil {
+		log.Errorf("failed to get volumes '%s'", err)
+		return nil, err
+	}
+
+	return vols, nil
+}
