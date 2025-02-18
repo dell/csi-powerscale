@@ -751,8 +751,7 @@ func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *Isilo
 	return nil
 }
 
-func (s *service) cloneVolume(ctx context.Context, isiConfig *IsilonClusterConfig, isiPath, srcVolumeName, dstVolumeName string, sizeInBytes int64, accessZone string) error {
-
+func (s *service) cloneVolume(ctx context.Context, isiConfig *IsilonClusterConfig, isiPath, srcVolumeName, dstVolumeName string, sizeInBytes int64) error {
 	_, log := GetLogger(ctx)
 	log.Debugf("copy volume from source %s to %s isiPath is %s", srcVolumeName, dstVolumeName, isiPath)
 
@@ -802,7 +801,7 @@ func (s *service) copyVolumeFromSource(
 		return status.Error(codes.Internal, err.Error())
 	}
 
-	if err := s.cloneVolume(ctx, isiConfig, isiPath, srcVolumeName, req.GetName(), sizeInBytes, accessZone); err != nil {
+	if err := s.cloneVolume(ctx, isiConfig, isiPath, srcVolumeName, req.GetName(), sizeInBytes); err != nil {
 		return status.Error(codes.Internal, err.Error())
 	}
 

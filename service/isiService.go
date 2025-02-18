@@ -380,7 +380,6 @@ func (svc *isiService) DeleteVolume(ctx context.Context, isiPath, volName string
 }
 
 func (svc *isiService) DeleteWritableSnapshot(ctx context.Context, isiPath, volName string) error {
-
 	log := utils.GetRunIDLogger(ctx)
 
 	path := path.Join(isiPath, volName)
@@ -834,7 +833,6 @@ func (svc *isiService) isROVolumeFromSnapshot(exportPath, accessZone string) boo
 }
 
 func (svc *isiService) isRWVolumeFromSnapshot(ctx context.Context, exportPath, accessZone string) bool {
-
 	log := utils.GetRunIDLogger(ctx)
 	log.Debugf("export path '%s' accessZone '%s'", exportPath, accessZone)
 
@@ -992,8 +990,8 @@ func (svc *isiService) GetWritableSnapshotByIsiPath(ctx context.Context, path st
 
 	return snapshot, nil
 }
-func (svc *isiService) GetWritableSnapshotsBySourceId(ctx context.Context, sourceID int64) ([]isi.WritableSnapshot, error) {
 
+func (svc *isiService) GetWritableSnapshotsBySourceId(ctx context.Context, sourceID int64) ([]isi.WritableSnapshot, error) {
 	log := utils.GetRunIDLogger(ctx)
 
 	log.Debugf("getting writable snapshots with source ID '%v'", sourceID)
