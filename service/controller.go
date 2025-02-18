@@ -231,8 +231,8 @@ func (s *service) CreateVolume(
 		snapshotIsiPath                   string
 		isROVolumeFromSnapshot            bool
 		isRWVolumeFromSnapshot            bool
-		sourceIsSnapshot                  bool
-		sourceIsVolume                    bool
+		isSourceSnapshot                  bool
+		isSourceVolume                    bool
 		snapshotTrackingDir               string
 		snapshotTrackingDirEntryForVolume string
 		clusterName                       string
@@ -353,7 +353,7 @@ func (s *service) CreateVolume(
 
 	// Reading quota limit parameters
 	softLimit, advisoryLimit, softGracePrd = readQuotaLimitParams(params)
-	log.Infof("limit parameters considered for quota creation SoftLimit: '%s' , AdvisoryLimit: '%s',SoftGracePrd: '%s'", softLimit, advisoryLimit, softGracePrd)
+	log.Infof("parameters considered for quota creation SoftLimit: '%s' , AdvisoryLimit: '%s',SoftGracePrd: '%s'", softLimit, advisoryLimit, softGracePrd)
 
 	// CSI specific metadata for authorization
 	headerMetadata := addMetaData(params)
@@ -363,7 +363,7 @@ func (s *service) CreateVolume(
 	if contentSource = req.GetVolumeContentSource(); contentSource != nil {
 		// Fetch source snapshot ID or volume ID from content source.
 		if snapshot := contentSource.GetSnapshot(); snapshot != nil {
-			sourceIsSnapshot = true
+			isSourceSnapshot = true
 			normalizedSnapshotID := snapshot.GetSnapshotId()
 
 			// parse the input snapshot id and fetch it's components
@@ -388,6 +388,8 @@ func (s *service) CreateVolume(
 			if snapshotIsiPath, err = isiConfig.isiSvc.GetSnapshotIsiPath(ctx, snapshotSourceVolumeIsiPath, sourceSnapshotID, accessZone); err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
+
+			log.Debugf("the Isilon directory path of snapshot is '%s'", snapshotIsiPath)
 
 			vcs := req.GetVolumeCapabilities()
 			if len(vcs) == 0 {
@@ -418,8 +420,8 @@ func (s *service) CreateVolume(
 				}
 			}
 		} else if volume := contentSource.GetVolume(); volume != nil {
-			sourceIsSnapshot = false
-			sourceIsVolume = true
+			isSourceSnapshot = false
+			isSourceVolume = true
 			sourceVolumeID = volume.GetVolumeId()
 			log.Infof("creating volume from existing volume ID: '%s'", sourceVolumeID)
 		}
@@ -505,7 +507,7 @@ func (s *service) CreateVolume(
 	}
 
 	foundVol = false
-	if sourceIsSnapshot {
+	if isSourceSnapshot {
 		if isReplication {
 			return nil, errors.New("unable to create replication volume from snapshot")
 		}
@@ -592,7 +594,7 @@ func (s *service) CreateVolume(
 	}
 
 	// Create new volume (directory) with ACL 0777.
-	if !sourceIsSnapshot && !sourceIsVolume {
+	if !isSourceSnapshot && !isSourceVolume {
 		if len(headerMetadata) == 0 {
 			if err = isiConfig.isiSvc.CreateVolume(ctx, isiPath, req.GetName(), volumePathPermissions); err != nil {
 				return nil, err
@@ -615,7 +617,7 @@ func (s *service) CreateVolume(
 		}
 	}
 
-	if sourceIsVolume {
+	if isSourceVolume {
 		err = s.copyVolumeFromSource(ctx, isiConfig, isiPath, contentSource, req, sizeInBytes, accessZone)
 		if err != nil {
 			if err := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, req.GetName()); err != nil {
