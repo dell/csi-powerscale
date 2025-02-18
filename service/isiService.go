@@ -935,3 +935,19 @@ func (svc *isiService) GetSnapshotSourceVolumeIsiPath(ctx context.Context, snaps
 
 	return path.Dir(snapshot.Path), nil
 }
+
+func (svc *isiService) GetVolumeByID(ctx context.Context, volID, volName string) (isi.Volume, error) {
+	// Fetch log handler
+	log := utils.GetRunIDLogger(ctx)
+
+	log.Debugf("begin getting volume with id '%s' and name '%s' for Isilon", volID, volID)
+
+	var vol isi.Volume
+	var err error
+	if vol, err = svc.client.GetVolume(ctx, volID, volName); err != nil {
+		log.Errorf("failed to get volume '%s'", err)
+		return nil, err
+	}
+
+	return vol, nil
+}
