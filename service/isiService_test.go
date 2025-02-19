@@ -691,3 +691,355 @@ func TestAddExportClientNetworkIdentifierByIDWithZone(t *testing.T) {
 		})
 	}
 }
+
+func TestAddExportClientByIDWithZone(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name                    string
+		exportID                int
+		accessZone              string
+		clientIP                string
+		ignoreUnresolvableHosts bool
+		expectedErr             error
+	}{
+		{
+			name:                    "Error case",
+			exportID:                456,
+			accessZone:              "System",
+			clientIP:                "5.6.7.8",
+			ignoreUnresolvableHosts: true,
+			expectedErr:             errors.New("failed to add client to export id '456' with access zone 'System' : 'mock error'"),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			err := svc.AddExportClientByIDWithZone(ctx, tc.exportID, tc.accessZone, tc.clientIP, tc.ignoreUnresolvableHosts)
+
+			if err != nil {
+				if tc.expectedErr == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.expectedErr, err)
+				}
+			} else {
+				if tc.expectedErr != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.expectedErr)
+				}
+			}
+		})
+	}
+}
+
+func TestAddExportRootClientByIDWithZone(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name        string
+		exportID    int
+		accessZone  string
+		clientIP    string
+		expectedErr error
+	}{
+		{
+			name:        "Error case",
+			exportID:    456,
+			accessZone:  "System",
+			clientIP:    "5.6.7.8",
+			expectedErr: errors.New("failed to add client to export id '456' with access zone 'System' : 'mock error'"),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			err := svc.AddExportRootClientByIDWithZone(ctx, tc.exportID, tc.accessZone, tc.clientIP, false)
+
+			if err != nil {
+				if tc.expectedErr == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.expectedErr, err)
+				}
+			} else {
+				if tc.expectedErr != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.expectedErr)
+				}
+			}
+		})
+	}
+}
+
+func TestAddExportReadOnlyClientByIDWithZone(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name                    string
+		exportID                int
+		accessZone              string
+		clientIP                string
+		ignoreUnresolvableHosts bool
+		expectedErr             error
+	}{
+		{
+			name:                    "Error case",
+			exportID:                456,
+			accessZone:              "System",
+			clientIP:                "5.6.7.8",
+			ignoreUnresolvableHosts: true,
+			expectedErr:             errors.New("failed to add read only client to export id '456' with access zone 'System' : 'mock error'"),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			err := svc.AddExportReadOnlyClientByIDWithZone(ctx, tc.exportID, tc.accessZone, tc.clientIP, tc.ignoreUnresolvableHosts)
+
+			if err != nil {
+				if tc.expectedErr == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.expectedErr, err)
+				}
+			} else {
+				if tc.expectedErr != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.expectedErr)
+				}
+			}
+		})
+	}
+}
+
+func TestRemoveExportClientByIDWithZone(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name                    string
+		exportID                int
+		accessZone              string
+		clientIP                string
+		ignoreUnresolvableHosts bool
+		expectedErr             error
+	}{
+		{
+			name:                    "Node id doesn't match pattern",
+			exportID:                456,
+			accessZone:              "System",
+			clientIP:                "5.6.7.8",
+			ignoreUnresolvableHosts: true,
+			expectedErr:             errors.New("node ID '5.6.7.8' cannot match the expected '^(.+)=#=#=(.+)=#=#=(.+)$' pattern"),
+		},
+		{
+			name:                    "Error case",
+			exportID:                456,
+			accessZone:              "System",
+			clientIP:                "abc=#=#=def=#=#=xyz",
+			ignoreUnresolvableHosts: true,
+			expectedErr:             errors.New("failed to remove clients from export '456' with access zone 'System' : 'mock error'"),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			err := svc.RemoveExportClientByIDWithZone(ctx, tc.exportID, tc.accessZone, tc.clientIP, tc.ignoreUnresolvableHosts)
+
+			if err != nil {
+				if tc.expectedErr == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.expectedErr, err)
+				}
+			} else {
+				if tc.expectedErr != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.expectedErr)
+				}
+			}
+		})
+	}
+}
+
+func TestDeleteSnapshot(t *testing.T) {
+
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	tests := []struct {
+		name         string
+		snapshotID   int64
+		snapshotName string
+		expectedErr  error
+	}{
+		{
+			name:         "Snapshot not found",
+			snapshotID:   2,
+			snapshotName: "snapshot2",
+			expectedErr:  errors.New("mock error"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			err := svc.DeleteSnapshot(ctx, tc.snapshotID, tc.snapshotName)
+			if err != nil {
+				if tc.expectedErr == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.expectedErr, err)
+				}
+			} else {
+				if tc.expectedErr != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.expectedErr)
+				}
+			}
+		})
+	}
+}
+
+func TestGetSnapshotIsiPathComponents(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	tests := []struct {
+		name                 string
+		snapshotIsiPath      string
+		zonePath             string
+		expectedIsiPath      string
+		expectedSnapshotName string
+		expectedSrcVolName   string
+	}{
+		{
+			name:                 "Invalid snapshot isi path",
+			snapshotIsiPath:      "/ifs/path/to/volume",
+			zonePath:             "/ifs",
+			expectedIsiPath:      "/ifs",
+			expectedSnapshotName: "to",
+			expectedSrcVolName:   "volume",
+		},
+		{
+			name:                 "Length of directories slice is less than 3",
+			snapshotIsiPath:      "/ifs/path/test",
+			zonePath:             "/ifs",
+			expectedIsiPath:      "/ifs",
+			expectedSnapshotName: "test",
+			expectedSrcVolName:   "test",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			isiPath, snapshotName, srcVolName := svc.GetSnapshotIsiPathComponents(test.snapshotIsiPath, test.zonePath)
+
+			if isiPath != test.expectedIsiPath {
+				t.Errorf("Expected isiPath '%s', got '%s'", test.expectedIsiPath, isiPath)
+			}
+
+			if snapshotName != test.expectedSnapshotName {
+				t.Errorf("Expected snapshotName '%s', got '%s'", test.expectedSnapshotName, snapshotName)
+			}
+
+			if srcVolName != test.expectedSrcVolName {
+				t.Errorf("Expected srcVolName '%s', got '%s'", test.expectedSrcVolName, srcVolName)
+			}
+		})
+	}
+}
+
+func TestIsHostAlreadyAdded(t *testing.T) {
+	mockClient := &MockClient{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name         string
+		exportID     int
+		accessZone   string
+		nodeID       string
+		expectedBool bool
+	}{
+		{
+			name:         "Node ID is in client fields",
+			exportID:     789,
+			accessZone:   "System",
+			nodeID:       "node2",
+			expectedBool: true,
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			result := svc.IsHostAlreadyAdded(ctx, tc.exportID, tc.accessZone, tc.nodeID)
+
+			if result != tc.expectedBool {
+				t.Errorf("Expected '%v', but got '%v'", tc.expectedBool, result)
+			}
+		})
+	}
+}
