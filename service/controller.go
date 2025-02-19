@@ -69,6 +69,11 @@ const (
 	SoftGracePrdParam             = "SoftGracePrd"
 	SoftGracePrdParamDefault      = ""
 
+	// The different types of storage "volumes" that can be created.
+	VolumeTypeDirectory        = "Directory"
+	VolumeTypeSnapshot         = "Snapshot"
+	VolumeTypeWritableSnapshot = "WritableSnapshot"
+
 	// Parameters to set quota limit from pvc
 	PVCSoftLimitParam     = "pvcSoftLimit"
 	PVCAdvisoryLimitParam = "pvcAdvisoryLimit"
@@ -229,6 +234,7 @@ func (s *service) CreateVolume(
 		sourceSnapshotID                  string
 		sourceVolumeID                    string
 		snapshotIsiPath                   string
+		createdVolumeType                 string
 		isROVolumeFromSnapshot            bool
 		isRWVolumeFromSnapshot            bool
 		isSourceSnapshot                  bool
@@ -410,21 +416,26 @@ func (s *service) CreateVolume(
 				if utils.IsROAccessMode(am.Mode) {
 					isROVolumeFromSnapshot = true
 					isRWVolumeFromSnapshot = false
+					createdVolumeType = VolumeTypeSnapshot
 					break
 				}
 
 				if utils.IsRWAccessMode(am.Mode) {
 					isROVolumeFromSnapshot = false
 					isRWVolumeFromSnapshot = true
+					createdVolumeType = VolumeTypeWritableSnapshot
 					break
 				}
 			}
 		} else if volume := contentSource.GetVolume(); volume != nil {
 			isSourceSnapshot = false
 			isSourceVolume = true
+			createdVolumeType = VolumeTypeWritableSnapshot
 			sourceVolumeID = volume.GetVolumeId()
 			log.Infof("creating volume from existing volume ID: '%s'", sourceVolumeID)
 		}
+	} else {
+		createdVolumeType = VolumeTypeDirectory
 	}
 
 	if isReplication {
@@ -583,7 +594,7 @@ func (s *service) CreateVolume(
 		log.Debugf("id of the corresponding nfs export of existing volume '%s' has been resolved to '%d'", req.GetName(), exportID)
 		if exportID != 0 {
 			if foundVol || isROVolumeFromSnapshot {
-				return s.newCreateVolumeResponse(ctx, exportID, req.GetName(), path, export.Zone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
+				return s.newCreateVolumeResponse(ctx, exportID, req.GetName(), path, export.Zone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, createdVolumeType), nil
 			}
 			// in case the export exists but no related volume (directory)
 			if err = isiConfig.isiSvc.UnexportByIDWithZone(ctx, exportID, accessZone); err != nil {
@@ -611,7 +622,7 @@ func (s *service) CreateVolume(
 	if isRWVolumeFromSnapshot {
 		if _, err = isiConfig.isiSvc.CreateWritableSnapshot(ctx, sourceSnapshotID, isiPath, req.GetName()); err != nil {
 			if err2 := isiConfig.isiSvc.DeleteVolume(ctx, snapshotSourceVolumeIsiPath, snapshotTrackingDirEntryForVolume); err2 != nil {
-				log.Warnf("Deletion RW snapshot tracking volume '%s' returned error '%s'", snapshotTrackingDirEntryForVolume, err2)
+				log.Warnf("deletion of RW snapshot tracking volume '%s' returned error '%s'", snapshotTrackingDirEntryForVolume, err2)
 			}
 			return nil, err
 		}
@@ -621,7 +632,7 @@ func (s *service) CreateVolume(
 		err = s.copyVolumeFromSource(ctx, isiConfig, isiPath, contentSource, req, sizeInBytes, accessZone)
 		if err != nil {
 			if err := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, req.GetName()); err != nil {
-				log.Infof("delete volume in CreateVolume returned error '%s'", err)
+				log.Infof("deletion of volume in CreateVolume returned error '%s'", err)
 			}
 			return nil, err
 		}
@@ -665,7 +676,7 @@ func (s *service) CreateVolume(
 						}
 					}
 					// return the response
-					return s.newCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
+					return s.newCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, createdVolumeType), nil
 				}
 				time.Sleep(RetrySleepTime)
 				log.Printf("begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
@@ -696,7 +707,7 @@ func (s *service) CreateVolume(
 						}
 					}
 
-					return s.newCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
+					return s.newCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, createdVolumeType), nil
 				}
 				time.Sleep(RetrySleepTime)
 				log.Printf("begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
@@ -809,13 +820,13 @@ func (s *service) copyVolumeFromSource(
 }
 
 // newCreateVolumeResponse creates a new CreateVolumeResponse instance.
-func (s *service) newCreateVolumeResponse(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName string) *csi.CreateVolumeResponse {
+func (s *service) newCreateVolumeResponse(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, volumeType string) *csi.CreateVolumeResponse {
 	return &csi.CreateVolumeResponse{
-		Volume: s.getCSIVolume(ctx, exportID, volName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName),
+		Volume: s.getCSIVolume(ctx, exportID, volName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, volumeType),
 	}
 }
 
-func (s *service) getCSIVolume(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName string) *csi.Volume {
+func (s *service) getCSIVolume(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, volumeType string) *csi.Volume {
 	// Make the additional volume attributes
 	attributes := map[string]string{
 		"ID":                strconv.Itoa(exportID),
@@ -825,6 +836,7 @@ func (s *service) getCSIVolume(ctx context.Context, exportID int, volName, path,
 		"AzServiceIP":       azServiceIP,
 		"RootClientEnabled": rootClientEnabled,
 		"ClusterName":       clusterName,
+		"VolumeType":        volumeType,
 	}
 
 	// Fetch log handler
