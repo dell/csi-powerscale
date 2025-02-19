@@ -2,10 +2,16 @@ package service
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
+	isi "github.com/dell/goisilon"
+	api "github.com/dell/goisilon/api/v1"
+	apiv1 "github.com/dell/goisilon/api/v1"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRemoveString(t *testing.T) {
@@ -220,6 +226,153 @@ func TestCreateVolumeGroupSnapshot(t *testing.T) {
 				if resp == nil {
 					t.Errorf("Expected non-nil response, got nil")
 				}
+			}
+		})
+	}
+}
+
+func TestCreateVolumeFromSnapshot(t *testing.T) {
+	// Backup original functions
+	originalGetSnapshotFunc := getSnapshotFunc
+	originalGetSnapshotSizeFunc := getSnapshotSizeFunc
+	originalCopySnapshotFunc := copySnapshotFunc
+
+	// Restore original functions after the test
+	defer func() { getSnapshotFunc = originalGetSnapshotFunc }()
+	defer func() { getSnapshotSizeFunc = originalGetSnapshotSizeFunc }()
+	defer func() { copySnapshotFunc = originalCopySnapshotFunc }()
+
+	// Mock implementations
+	getSnapshotFunc = func(ctx context.Context, isiConfig *IsilonClusterConfig) func(ctx context.Context, snapshotID string) (isi.Snapshot, error) {
+		return func(ctx context.Context, snapshotID string) (isi.Snapshot, error) {
+			if snapshotID == "snapshot1234" {
+				return &api.IsiSnapshot{ID: 1234, Path: "/ifs/data/snapshot1234"}, nil
+			}
+			return nil, errors.New("snapshot not found")
+		}
+	}
+
+	getSnapshotSizeFunc = func(ctx context.Context, isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, snapshotName, accessZone string) int64 {
+		return func(ctx context.Context, volumePath, snapshotName, accessZone string) int64 {
+			return 100
+		}
+	}
+
+	copySnapshotFunc = func(ctx context.Context, isiConfig *IsilonClusterConfig) func(ctx context.Context, dstPath, srcPath string, snapshotID int64, dstName, accessZone string) (isi.Volume, error) {
+		return func(ctx context.Context, dstPath, srcPath string, snapshotID int64, dstName, accessZone string) (isi.Volume, error) {
+			if snapshotID == 1234 {
+				return &apiv1.IsiVolume{Name: dstName, AttributeMap: []struct {
+					Name  string      `json:"name"`
+					Value interface{} `json:"value"`
+				}{}}, nil
+			}
+			return &apiv1.IsiVolume{}, errors.New("failed to copy snapshot")
+		}
+	}
+
+	isiConfig := &IsilonClusterConfig{
+		// Any necessary initialization here
+	}
+
+	s := &service{}
+
+	tests := []struct {
+		name          string
+		normalizedID  string
+		dstVolumeName string
+		sizeInBytes   int64
+		expectedError error
+	}{
+		{"ValidCase", "snapshot1234", "dstVolumeName", 200, nil},
+		{"InvalidSnapshotSize", "snapshot1234", "dstVolumeName", 50, fmt.Errorf("specified size '50' is smaller than source snapshot size '100'")},
+		{"SnapshotNotFound", "invalidSnapshotID", "dstVolumeName", 200, fmt.Errorf("failed to get snapshot id 'invalidSnapshotID', error 'snapshot not found'")},
+	}
+
+	ctx := context.Background()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := s.createVolumeFromSnapshot(ctx, isiConfig, "/ifs/data/destinationPath", tt.normalizedID, tt.dstVolumeName, tt.sizeInBytes, "accessZone")
+			if tt.expectedError != nil {
+				assert.EqualError(t, err, tt.expectedError.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCreateVolumeFromVolume(t *testing.T) {
+	// Backup original functions
+	originalIsVolumeExistentFunc := isVolumeExistentFunc
+	originalGetVolumeSizeFunc := getVolumeSizeFunc
+	originalCopyVolumeFunc := copyVolumeFunc
+
+	// Restore original functions after the test
+	defer func() { isVolumeExistentFunc = originalIsVolumeExistentFunc }()
+	defer func() { getVolumeSizeFunc = originalGetVolumeSizeFunc }()
+	defer func() { copyVolumeFunc = originalCopyVolumeFunc }()
+
+	// Mock implementations
+	isVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, ns, srcVolumeName string) bool {
+		return func(ctx context.Context, isiPath, ns, srcVolumeName string) bool {
+			if srcVolumeName == "existentVolume" || srcVolumeName == "errorVolumeCopy" {
+				return true
+			}
+			return false
+		}
+	}
+
+	getVolumeSizeFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, srcVolumeName string) int64 {
+		return func(ctx context.Context, isiPath, srcVolumeName string) int64 {
+			if srcVolumeName == "existentVolume" || srcVolumeName == "errorVolumeCopy" {
+				return 100
+			}
+			return 0
+		}
+	}
+
+	copyVolumeFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, srcVolumeName, dstVolumeName string) (isi.Volume, error) {
+		return func(ctx context.Context, isiPath, srcVolumeName, dstVolumeName string) (isi.Volume, error) {
+			if srcVolumeName == "errorVolumeCopy" {
+				return &apiv1.IsiVolume{}, errors.New("failed to copy volume name")
+			}
+			if srcVolumeName == "existentVolume" {
+				return &apiv1.IsiVolume{Name: dstVolumeName, AttributeMap: []struct {
+					Name  string      `json:"name"`
+					Value interface{} `json:"value"`
+				}{}}, nil
+			}
+			return &apiv1.IsiVolume{}, errors.New("failed to copy volume")
+		}
+	}
+
+	isiConfig := &IsilonClusterConfig{
+		// Any necessary initialization here
+	}
+
+	s := &service{}
+
+	tests := []struct {
+		name          string
+		srcVolumeName string
+		dstVolumeName string
+		sizeInBytes   int64
+		expectedError error
+	}{
+		{"ValidCase", "existentVolume", "newVolume", 200, nil},
+		{"InvalidVolumeSize", "existentVolume", "newVolume", 50, fmt.Errorf("specified size '50' is smaller than source volume size '100'")},
+		{"VolumeNotFound", "nonExistentVolume", "newVolume", 200, fmt.Errorf("failed to get volume name 'nonExistentVolume', error '<nil>'")},
+		{"CopyVolumeError", "errorVolumeCopy", "newVolume", 200, fmt.Errorf("failed to copy volume name 'errorVolumeCopy', error 'failed to copy volume name'")},
+	}
+
+	ctx := context.Background()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := s.createVolumeFromVolume(ctx, isiConfig, "/ifs/data/volumePath", tt.srcVolumeName, tt.dstVolumeName, tt.sizeInBytes)
+			if tt.expectedError != nil {
+				assert.EqualError(t, err, tt.expectedError.Error())
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
