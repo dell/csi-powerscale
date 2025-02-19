@@ -681,9 +681,27 @@ func (s *service) CreateVolume(
 	return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "the export id %d and path %s may not be ready yet after retrying", exportID, path))
 }
 
+// Define function types for external function calls
+var getSnapshotFunc = func(ctx context.Context, isiConfig *IsilonClusterConfig) func(ctx context.Context, snapshotID string) (isi.Snapshot, error) {
+	return isiConfig.isiSvc.GetSnapshot
+}
+
+var getSnapshotSizeFunc = func(ctx context.Context, isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, snapshotName, accessZone string) int64 {
+	return isiConfig.isiSvc.GetSnapshotSize
+}
+
+var copySnapshotFunc = func(ctx context.Context, isiConfig *IsilonClusterConfig) func(ctx context.Context, dstPath string, srcPath string, snapshotID int64, dstName string, accessZone string) (isi.Volume, error) {
+	return isiConfig.isiSvc.CopySnapshot
+}
+
 func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *IsilonClusterConfig,
 	isiPath, normalizedSnapshotID, dstVolumeName string, sizeInBytes int64, accessZone string,
 ) error {
+
+	getSnapshot := getSnapshotFunc(ctx, isiConfig)
+	getSnapshotSize := getSnapshotSizeFunc(ctx, isiConfig)
+	copySnapshot := copySnapshotFunc(ctx, isiConfig)
+
 	var snapshotSrc isi.Snapshot
 	var err error
 
@@ -693,33 +711,50 @@ func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *Isilo
 		return err
 	}
 
-	if snapshotSrc, err = isiConfig.isiSvc.GetSnapshot(ctx, srcSnapshotID); err != nil {
+	if snapshotSrc, err = getSnapshot(ctx, srcSnapshotID); err != nil {
 		return fmt.Errorf("failed to get snapshot id '%s', error '%v'", srcSnapshotID, err)
 	}
 
 	// check source snapshot size
 	snapshotSourceVolumeIsiPath := path.Dir(snapshotSrc.Path)
-	size := isiConfig.isiSvc.GetSnapshotSize(ctx, snapshotSourceVolumeIsiPath, snapshotSrc.Name, accessZone)
+	size := getSnapshotSize(ctx, snapshotSourceVolumeIsiPath, snapshotSrc.Name, accessZone)
 	if size > sizeInBytes {
 		return fmt.Errorf("specified size '%d' is smaller than source snapshot size '%d'", sizeInBytes, size)
 	}
-	if _, err = isiConfig.isiSvc.CopySnapshot(ctx, isiPath, snapshotSourceVolumeIsiPath, snapshotSrc.ID, dstVolumeName, accessZone); err != nil {
+	if _, err = copySnapshot(ctx, isiPath, snapshotSourceVolumeIsiPath, snapshotSrc.ID, dstVolumeName, accessZone); err != nil {
 		return fmt.Errorf("failed to copy snapshot id '%s', error '%s'", srcSnapshotID, err.Error())
 	}
 
 	return nil
 }
 
+var (
+	isVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, ns, srcVolumeName string) bool {
+		return isiConfig.isiSvc.IsVolumeExistent
+	}
+
+	getVolumeSizeFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, srcVolumeName string) int64 {
+		return isiConfig.isiSvc.GetVolumeSize
+	}
+
+	copyVolumeFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, srcVolumeName, dstVolumeName string) (isi.Volume, error) {
+		return isiConfig.isiSvc.CopyVolume
+	}
+)
+
 func (s *service) createVolumeFromVolume(ctx context.Context, isiConfig *IsilonClusterConfig, isiPath, srcVolumeName, dstVolumeName string, sizeInBytes int64) error {
+	isVolumeExistent := isVolumeExistentFunc(isiConfig)
+	getVolumeSize := getVolumeSizeFunc(isiConfig)
+	copyVolume := copyVolumeFunc(isiConfig)
 	var err error
-	if isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", srcVolumeName) {
+	if isVolumeExistent(ctx, isiPath, "", srcVolumeName) {
 		// check source volume size
-		size := isiConfig.isiSvc.GetVolumeSize(ctx, isiPath, srcVolumeName)
+		size := getVolumeSize(ctx, isiPath, srcVolumeName)
 		if size > sizeInBytes {
 			return fmt.Errorf("specified size '%d' is smaller than source volume size '%d'", sizeInBytes, size)
 		}
 
-		if _, err = isiConfig.isiSvc.CopyVolume(ctx, isiPath, srcVolumeName, dstVolumeName); err != nil {
+		if _, err = copyVolume(ctx, isiPath, srcVolumeName, dstVolumeName); err != nil {
 			return fmt.Errorf("failed to copy volume name '%s', error '%v'", srcVolumeName, err)
 		}
 	} else {

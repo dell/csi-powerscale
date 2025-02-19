@@ -35,6 +35,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+var (
+	getIsVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(context.Context, string, string, string) bool {
+		return isiConfig.isiSvc.IsVolumeExistent
+	}
+	getIsVolumeMounted = isVolumeMounted
+	getOsReadDir       = os.ReadDir
+)
+
 func (s *service) NodeExpandVolume(
 	context.Context,
 	*csi.NodeExpandVolumeRequest,
@@ -457,14 +465,17 @@ func (s *service) NodeGetVolumeStats(
 		return nil, err
 	}
 
-	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, volName, "") {
+	isVolumeExistentFunc := getIsVolumeExistentFunc(isiConfig)
+	isVolumeExistent := isVolumeExistentFunc(ctx, volName, volPath, "")
+
+	if !isVolumeExistent {
 		abnormal = true
 		message = fmt.Sprintf("volume %v does not exists at this path %v", volName, isiPath)
 	}
 
 	// check whether the original volume is mounted
 	if !abnormal {
-		isMounted, err := isVolumeMounted(ctx, volName, volPath)
+		isMounted, err := getIsVolumeMounted(ctx, volName, volPath)
 		if !isMounted {
 			abnormal = true
 			message = fmt.Sprintf("no volume is mounted at path: %s", err)
@@ -473,7 +484,7 @@ func (s *service) NodeGetVolumeStats(
 
 	// check whether volume path is accessible
 	if !abnormal {
-		_, err = os.ReadDir(volPath)
+		_, err = getOsReadDir(volPath)
 		if err != nil {
 			abnormal = true
 			message = fmt.Sprintf("volume Path is not accessible: %s", err)
