@@ -170,7 +170,9 @@ func ParseLogLevel(lvl string) (logrus.Level, error) {
 }
 
 // UpdateLogLevel updates the log level
-func UpdateLogLevel(lvl logrus.Level) {
+func UpdateLogLevel(lvl logrus.Level, mu *sync.Mutex) {
+	mu.Lock()
+	defer mu.Unlock()
 	singletonLog.Level = lvl
 }
 

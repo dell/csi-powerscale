@@ -63,6 +63,7 @@ var (
 
 // DriverConfigParamsFile is the name of the input driver config params file
 var DriverConfigParamsFile string
+var updateMutex sync.Mutex
 
 // Manifest is the SP's manifest.
 var Manifest = map[string]string{
@@ -819,7 +820,7 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 			}
 		}
 	}
-	utils.UpdateLogLevel(logLevel)
+	utils.UpdateLogLevel(logLevel, &updateMutex)
 	log.Infof("log level set to '%s'", logLevel)
 
 	err := s.syncIsilonConfigs(ctx)
