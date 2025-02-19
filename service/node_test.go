@@ -117,3 +117,100 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		})
 	}
 }
+
+func TestEphemeralNodePublish(t *testing.T) {
+	ctx := context.Background()
+
+	originalGetCreateVolumeFunc := getCreateVolumeFunc
+	getCreateVolumeFunc = func(s *service) func(context.Context, *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+		return func(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+			return &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId: "volume-id",
+				},
+			}, nil
+		}
+	}
+
+	defer func() { getCreateVolumeFunc = originalGetCreateVolumeFunc }()
+
+	originalGetUtilsGetFQDNByIP := getUtilsGetFQDNByIP
+	getUtilsGetFQDNByIP = func(ctx context.Context, ip string) (string, error) {
+		return "testFQDN", nil
+	}
+	defer func() { getUtilsGetFQDNByIP = originalGetUtilsGetFQDNByIP }()
+
+	IsiClusters := new(sync.Map)
+	testBool := false
+	testIsilonClusterConfig := IsilonClusterConfig{
+		ClusterName:               "TestCluster",
+		Endpoint:                  "http://testendpoint",
+		EndpointPort:              "8080",
+		MountEndpoint:             "http://mountendpoint",
+		EndpointURL:               "http://endpointurl",
+		accessZone:                "TestAccessZone",
+		User:                      "testuser",
+		Password:                  "testpassword",
+		SkipCertificateValidation: &testBool,
+		IsiPath:                   "/ifs/data",
+		IsiVolumePathPermissions:  "0777",
+		IsDefault:                 &testBool,
+		ReplicationCertificateID:  "certID",
+		IgnoreUnresolvableHosts:   &testBool,
+		isiSvc: &isiService{
+			endpoint: "http://testendpoint:8080",
+			client:   &isi.Client{},
+		},
+	}
+
+	IsiClusters.Store(testIsilonClusterConfig.ClusterName, &testIsilonClusterConfig)
+	s := &service{
+		defaultIsiClusterName: "TestCluster",
+		isiClusters:           IsiClusters,
+		nodeIP:                "1.2.3.4",
+		nodeID:                "TestNodeID",
+		opts: Opts{
+			AccessZone:            "TestAccessZone",
+			CustomTopologyEnabled: true,
+		},
+	}
+
+	type testCase struct {
+		name     string
+		req      *csi.NodePublishVolumeRequest
+		expected *csi.NodePublishVolumeResponse
+		wantErr  bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "Successful ephemeral volume publish",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId: "123",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				VolumeContext: map[string]string{
+					"csi.storage.k8s.io/ephemeral": "true",
+				},
+			},
+			expected: nil,
+			wantErr:  true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := s.ephemeralNodePublish(ctx, tc.req)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("NodeGetVolumeStats() error = %v, wantErr %v", err, tc.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tc.expected) {
+				t.Errorf("NodeGetVolumeStats() = %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}

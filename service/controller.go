@@ -113,6 +113,12 @@ const (
 // clusterToNodeIDMap is a map[clusterName][]*nodeIDToClientMap
 var clusterToNodeIDMap = new(sync.Map)
 
+var (
+	getGetExportWithPathAndZoneFunc = func(isiConfig *IsilonClusterConfig) func(context.Context, string, string) (isi.Export, error) {
+		return isiConfig.isiSvc.GetExportWithPathAndZone
+	}
+)
+
 // type nodeIDElementsMap map[string]string
 type nodeIDToClientMap map[string]string
 
@@ -520,7 +526,9 @@ func (s *service) CreateVolume(
 		path = utils.GetPathForVolume(isiPath, req.GetName())
 		// to ensure idempotency, check if the volume still exists.
 		// k8s might have made the same CreateVolume call in quick succession and the volume was already created in the first run
-		if isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", req.GetName()) {
+		isVolumeExistentFunc := getIsVolumeExistentFunc(isiConfig)
+		isVolumeExistent := isVolumeExistentFunc(ctx, isiPath, "", req.GetName())
+		if isVolumeExistent {
 			log.Debugf("the path '%s' has already existed", path)
 			foundVol = true
 		}
@@ -536,7 +544,8 @@ func (s *service) CreateVolume(
 		}
 	}
 
-	if export, err = isiConfig.isiSvc.GetExportWithPathAndZone(ctx, path, accessZone); err != nil || export == nil {
+	getExportWithPathAndZoneFunc := getGetExportWithPathAndZoneFunc(isiConfig)
+	if export, err = getExportWithPathAndZoneFunc(ctx, path, accessZone); err != nil || export == nil {
 
 		var errMsg string
 		if err == nil {

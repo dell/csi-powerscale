@@ -39,8 +39,12 @@ var (
 	getIsVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(context.Context, string, string, string) bool {
 		return isiConfig.isiSvc.IsVolumeExistent
 	}
-	getIsVolumeMounted = isVolumeMounted
-	getOsReadDir       = os.ReadDir
+	getIsVolumeMounted  = isVolumeMounted
+	getOsReadDir        = os.ReadDir
+	getCreateVolumeFunc = func(s *service) func(context.Context, *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+		return s.CreateVolume
+	}
+	getUtilsGetFQDNByIP = utils.GetFQDNByIP
 )
 
 func (s *service) NodeExpandVolume(
@@ -557,7 +561,8 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 
 	volID := req.GetVolumeId()
 	volName := fmt.Sprintf("ephemeral-%s", volID)
-	createEphemeralVolResp, err := s.CreateVolume(ctx, &csi.CreateVolumeRequest{
+	createVolumeFunc := getCreateVolumeFunc(s)
+	createEphemeralVolResp, err := createVolumeFunc(ctx, &csi.CreateVolumeRequest{
 		Name:               volName,
 		VolumeCapabilities: []*csi.VolumeCapability{req.VolumeCapability},
 		Parameters:         req.VolumeContext,
@@ -739,7 +744,7 @@ func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
 		}
 	}
 
-	nodeFQDN, err := utils.GetFQDNByIP(ctx, nodeIP)
+	nodeFQDN, err := getUtilsGetFQDNByIP(ctx, nodeIP)
 	if (err) != nil {
 		nodeFQDN = nodeIP
 		log.Warnf("Setting nodeFQDN to %s as failed to resolve IP to FQDN due to %v", nodeIP, err)
