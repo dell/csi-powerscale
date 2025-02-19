@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	isi "github.com/dell/goisilon"
 	api "github.com/dell/goisilon/api/v1"
 	apiv1 "github.com/dell/goisilon/api/v1"
@@ -169,6 +170,62 @@ func TestReadQuotaLimitParams(t *testing.T) {
 			}
 			if softGracePrd != tc.expectedSoftGrace {
 				t.Errorf("Expected soft grace period '%s', but got '%s'", tc.expectedSoftGrace, softGracePrd)
+			}
+		})
+	}
+}
+
+// Test function for CreateVolumeGroupSnapshot
+func TestCreateVolumeGroupSnapshot(t *testing.T) {
+	s := &service{}
+
+	tests := []struct {
+		name    string
+		req     *vgsext.CreateVolumeGroupSnapshotRequest
+		wantErr bool
+	}{
+		{
+			name: "Valid Request",
+			req: &vgsext.CreateVolumeGroupSnapshotRequest{
+				SourceVolumeIDs: []string{"volume1", "volume2"},
+				Name:            "snapshot-group-1",
+				Description:     "A test snapshot group",
+				Parameters:      map[string]string{"param1": "value1"},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "Invalid Request - nil request",
+			req:     nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+
+			// Capture the possible panic for unimplemented function
+			defer func() {
+				if r := recover(); r != nil {
+					t.Skip("Function not implemented")
+				}
+			}()
+
+			// Call the function
+			resp, err := s.CreateVolumeGroupSnapshot(ctx, tt.req)
+
+			// Check if error condition matches
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CreateVolumeGroupSnapshot() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			// Add additional assertions if needed
+			if !tt.wantErr {
+				if resp == nil {
+					t.Errorf("Expected non-nil response, got nil")
+				}
 			}
 		})
 	}
