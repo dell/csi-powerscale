@@ -1,0 +1,119 @@
+/*
+ Copyright (c) 2025 Dell Inc, or its subsidiaries.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+*/
+
+package service
+
+import (
+	"os"
+	"reflect"
+	"sync"
+	"testing"
+
+	"github.com/container-storage-interface/spec/lib/go/csi"
+	isi "github.com/dell/goisilon"
+	"golang.org/x/net/context"
+)
+
+func TestNodeGetVolumeStats(t *testing.T) {
+	originalGetIsVolumeExistentFunc := getIsVolumeExistentFunc
+	getIsVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, volID, name string) bool {
+		return func(ctx context.Context, isiPath, volID, name string) bool {
+			return true
+		}
+	}
+
+	defer func() { getIsVolumeExistentFunc = originalGetIsVolumeExistentFunc }()
+
+	originalGetIsVolumeMounted := getIsVolumeMounted
+	getIsVolumeMounted = func(ctx context.Context, filterStr string, target string) (bool, error) {
+		return true, nil
+	}
+	defer func() { getIsVolumeMounted = originalGetIsVolumeMounted }()
+
+	originalGetOsReadDir := getOsReadDir
+	getOsReadDir = func(path string) ([]os.DirEntry, error) {
+		return []os.DirEntry{}, nil
+	}
+	defer func() { getOsReadDir = originalGetOsReadDir }()
+
+	tests := []struct {
+		name         string
+		ctx          context.Context
+		req          *csi.NodeGetVolumeStatsRequest
+		wantResponse *csi.NodeGetVolumeStatsResponse
+		wantErr      bool
+	}{
+		{
+			name: "Valid volume ID",
+			ctx:  context.Background(),
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   "volume-id",
+				VolumePath: "/path/to/volume",
+			},
+			wantResponse: &csi.NodeGetVolumeStatsResponse{
+				Usage: []*csi.VolumeUsage{
+					{},
+				},
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: false,
+					Message:  "failed to get volume stats metrics : rpc error: code = Internal desc = failed to get volume stats: no such file or directory",
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			IsiClusters := new(sync.Map)
+			testBool := false
+			testIsilonClusterConfig := IsilonClusterConfig{
+				ClusterName:               "TestCluster",
+				Endpoint:                  "http://testendpoint",
+				EndpointPort:              "8080",
+				MountEndpoint:             "http://mountendpoint",
+				EndpointURL:               "http://endpointurl",
+				accessZone:                "TestAccessZone",
+				User:                      "testuser",
+				Password:                  "testpassword",
+				SkipCertificateValidation: &testBool,
+				IsiPath:                   "/ifs/data",
+				IsiVolumePathPermissions:  "0777",
+				IsDefault:                 &testBool,
+				ReplicationCertificateID:  "certID",
+				IgnoreUnresolvableHosts:   &testBool,
+				isiSvc: &isiService{
+					endpoint: "http://testendpoint:8080",
+					client:   &isi.Client{},
+				},
+			}
+
+			IsiClusters.Store(testIsilonClusterConfig.ClusterName, &testIsilonClusterConfig)
+			s := &service{
+				defaultIsiClusterName: "TestCluster",
+				isiClusters:           IsiClusters,
+			}
+			got, err := s.NodeGetVolumeStats(tt.ctx, tt.req)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NodeGetVolumeStats() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.wantResponse) {
+				t.Errorf("NodeGetVolumeStats() = %v, want %v", got, tt.wantResponse)
+			}
+		})
+	}
+}
