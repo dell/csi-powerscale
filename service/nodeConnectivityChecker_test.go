@@ -39,6 +39,13 @@ func TestGetArrayConnectivityStatus(t *testing.T) {
 	router := mux.NewRouter()
 	router.HandleFunc("/arrayStatus/{arrayId}", getArrayConnectivityStatus).Methods("GET")
 
+	// Initialize probeStatus
+	probeStatus = &sync.Map{}
+
+	// Populate probeStatus with test data
+	probeStatus.Store("cluster1", ArrayConnectivityStatus{LastSuccess: 1617181723, LastAttempt: 1617181724})
+	probeStatus.Store("cluster2", ArrayConnectivityStatus{LastSuccess: 1617181725, LastAttempt: 1617181726})
+
 	// Test cases
 	tests := []struct {
 		arrayID       string
