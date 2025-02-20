@@ -157,8 +157,9 @@ func TestEphemeralNodePublish(t *testing.T) {
 	}
 
 	type mockedFuncsStruct struct {
-		mockedGetCreateVolumeFunc func(s *service) func(context.Context, *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error)
-		mockedGetUtilsGetFQDNByIP func(ctx context.Context, ip string) (string, error)
+		mockedGetCreateVolumeFunc      func(*service) func(context.Context, *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error)
+		mockedGetUtilsGetFQDNByIP      func(context.Context, string) (string, error)
+		mockGetControllerPublishVolume func(*service) func(context.Context, *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error)
 	}
 
 	type testCase struct {
@@ -170,6 +171,37 @@ func TestEphemeralNodePublish(t *testing.T) {
 	}
 
 	testCases := []testCase{
+		{
+			name: "Failed in ControllerPublishVolume",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId: "123",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				VolumeContext: map[string]string{
+					"csi.storage.k8s.io/ephemeral": "true",
+				},
+			},
+			mockedFuncs: mockedFuncsStruct{
+				mockedGetCreateVolumeFunc: func(s *service) func(_ context.Context, _ *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+					return func(_ context.Context, _ *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+						return &csi.CreateVolumeResponse{
+							Volume: &csi.Volume{
+								VolumeId: "volume-id",
+							},
+						}, nil
+					}
+				},
+				mockedGetUtilsGetFQDNByIP: func(_ context.Context, _ string) (string, error) {
+					return "testFQDN", nil
+				},
+				mockGetControllerPublishVolume: getControllerPublishVolume,
+			},
+			expected: nil,
+			wantErr:  true,
+		},
 		{
 			name: "Successful ephemeral volume publish",
 			req: &csi.NodePublishVolumeRequest{
@@ -184,7 +216,7 @@ func TestEphemeralNodePublish(t *testing.T) {
 				},
 			},
 			mockedFuncs: mockedFuncsStruct{
-				mockedGetCreateVolumeFunc: func(s *service) func(context.Context, *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+				mockedGetCreateVolumeFunc: func(s *service) func(_ context.Context, _ *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 					return func(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 						return &csi.CreateVolumeResponse{
 							Volume: &csi.Volume{
@@ -193,8 +225,13 @@ func TestEphemeralNodePublish(t *testing.T) {
 						}, nil
 					}
 				},
-				mockedGetUtilsGetFQDNByIP: func(ctx context.Context, ip string) (string, error) {
+				mockedGetUtilsGetFQDNByIP: func(_ context.Context, _ string) (string, error) {
 					return "testFQDN", nil
+				},
+				mockGetControllerPublishVolume: func(s *service) func(_ context.Context, _ *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+					return func(_ context.Context, _ *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+						return &csi.ControllerPublishVolumeResponse{}, nil
+					}
 				},
 			},
 			expected: nil,
@@ -213,6 +250,11 @@ func TestEphemeralNodePublish(t *testing.T) {
 			originalGetUtilsGetFQDNByIP := getUtilsGetFQDNByIP
 			getUtilsGetFQDNByIP = tc.mockedFuncs.mockedGetUtilsGetFQDNByIP
 			defer func() { getUtilsGetFQDNByIP = originalGetUtilsGetFQDNByIP }()
+
+			// Mocking function getControllerPublishVolume
+			originalGetControllerPublishVolume := getControllerPublishVolume
+			getControllerPublishVolume = tc.mockedFuncs.mockGetControllerPublishVolume
+			defer func() { getControllerPublishVolume = originalGetControllerPublishVolume }()
 
 			// Calling the function
 			got, err := s.ephemeralNodePublish(ctx, tc.req)

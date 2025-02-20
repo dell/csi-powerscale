@@ -44,6 +44,9 @@ var (
 	getCreateVolumeFunc = func(s *service) func(context.Context, *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 		return s.CreateVolume
 	}
+	getControllerPublishVolume = func(s *service) func(context.Context, *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+		return s.ControllerPublishVolume
+	}
 	getUtilsGetFQDNByIP = utils.GetFQDNByIP
 )
 
@@ -586,7 +589,7 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 		return nil, err
 	}
 
-	controllerPublishEphemeralVolResp, err := s.ControllerPublishVolume(ctx, &csi.ControllerPublishVolumeRequest{
+	controllerPublishEphemeralVolResp, err := getControllerPublishVolume(s)(ctx, &csi.ControllerPublishVolumeRequest{
 		VolumeId:         createEphemeralVolResp.Volume.VolumeId,
 		NodeId:           nodeID,
 		VolumeCapability: req.VolumeCapability,
