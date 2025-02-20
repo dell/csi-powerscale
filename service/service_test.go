@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/akutz/gournal"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/v2/common/constants"
 	"github.com/sirupsen/logrus"
@@ -34,6 +35,11 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	
+	"github.com/spf13/viper"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // commenting this out for now, as it is an integration test
@@ -688,3 +694,161 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 			t.Errorf("ValidateCreateVolumeRequest returned nil error, expected error")
 		}*/
 }
+
+// Mocking the service struct
+// We will mock this method to control its behavior in tests
+type mockService struct {
+	service
+	mock.Mock
+}
+
+func (m *mockService) syncIsilonConfigs(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *mockService) probe(ctx context.Context, isiConfig *IsilonClusterConfig) error {
+	args := m.Called(ctx, isiConfig)
+	return args.Error(0)
+}
+
+func TestUpdateDriverConfigParams(t *testing.T) {
+	// Create a mock service
+	mockSvc := new(mockService)
+	// Create a new Viper instance and set test configuration
+	v := viper.New()
+	v.Set(constants.ParamCSILogLevel, "debug") // Example log level
+	mockSvc.On("syncIsilonConfigs", mock.Anything).Return(nil)
+	err := mockSvc.updateDriverConfigParams(context.Background(), v)
+	assert.NotEqual(t, nil, err)
+
+	v = viper.New()
+	v.Set(constants.ParamCSILogLevel, "invalid-log-level")
+	err = mockSvc.updateDriverConfigParams(context.Background(), v)
+	// Assertions
+	assert.Error(t, err, "Expected error due to invalid log level")
+	assert.Contains(t, err.Error(), "not valid", "Error message should indicate invalid log level")
+
+	v = viper.New()
+	v.Set(constants.ParamCSILogLevel, "info")
+
+	// Mock syncIsilonConfigs to return an error
+	syncErr := errors.New("sync failure")
+	mockSvc.On("syncIsilonConfigs", mock.Anything).Return(syncErr)
+	err = mockSvc.updateDriverConfigParams(context.Background(), v)
+	assert.NotEqual(t, nil, err)
+}
+
+func TestLogServiceStats(t *testing.T) {
+	s := &service{
+		opts: Opts{
+			Path:                      "/test/path",
+			SkipCertificateValidation: true,
+			AutoProbe:                 true,
+			AccessZone:                "test-access-zone",
+			QuotaEnabled:              true,
+		},
+		mode: "test-mode",
+	}
+
+	s.logServiceStats()
+}
+
+func TestGetIsiService(t *testing.T) {
+	s := service{}
+	clusterConfig := IsilonClusterConfig{
+		ClusterName: "cluster1",
+		Password:    "",
+	}
+	err := s.validateOptsParameters(&clusterConfig)
+	assert.NotEqual(t, nil, err)
+}
+
+func TestAutoProbe(t *testing.T) {
+	mockSvc := new(mockService)
+	mockSvc.opts.AutoProbe = false
+	ctx := context.Background()
+	isiConfig := &IsilonClusterConfig{}
+
+	err := mockSvc.autoProbe(ctx, isiConfig)
+
+	assert.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+
+	mockSvc = new(mockService)
+	mockSvc.opts.AutoProbe = true
+	mockSvc.On("probe", ctx, isiConfig).Return(nil).Twice()
+
+	err = mockSvc.autoProbe(ctx, isiConfig)
+
+	assert.Error(t, err)
+}
+
+func TestValidateDeleteVolumeRequest(t *testing.T) {
+	mockSvc := new(mockService)
+	ctx := context.Background()
+
+	req := &csi.DeleteVolumeRequest{VolumeId: "1234"}
+	mockSvc.On("ValidateDeleteVolumeRequest", ctx, req).Return(nil).Twice()
+	err := mockSvc.ValidateDeleteVolumeRequest(ctx, req)
+	assert.Error(t, err)
+
+	// empty volume id
+	mockSvc = new(mockService)
+
+	req = &csi.DeleteVolumeRequest{VolumeId: ""}
+	err = mockSvc.ValidateDeleteVolumeRequest(ctx, req)
+	assert.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), "no volume id is provided")
+}
+
+func TestLogStatistics(t *testing.T) {
+	s := service{
+		statisticsCounter: -1,
+	}
+	s.logStatistics()
+}
+
+func TestProbe(t *testing.T) {
+	s := service{
+		mode: constants.ModeController,
+	}
+	ctx := context.Background()
+	clusterConfig := IsilonClusterConfig{
+		ClusterName: "c1",
+	}
+	err := s.probe(ctx, &clusterConfig)
+	assert.NotEqual(t, nil, err)
+
+	s = service{
+		mode: constants.ModeNode,
+	}
+	err = s.probe(ctx, &clusterConfig)
+	assert.NotEqual(t, nil, err)
+
+	s = service{
+		mode: "",
+	}
+	err = s.probe(ctx, &clusterConfig)
+	assert.NotEqual(t, nil, err)
+
+	s = service{
+		mode: "error",
+	}
+	err = s.probe(ctx, &clusterConfig)
+	assert.NotEqual(t, nil, err)
+}
+
+func TestSetNoProbeOnStart(t *testing.T) {
+	s := service{}
+	ctx := context.Background()
+	s.setNoProbeOnStart(ctx)
+}
+
+func TestGetGournalLevel(t *testing.T) {
+	logLevel := logrus.InfoLevel
+	level := getGournalLevelFromLogrusLevel(logLevel)
+	assert.Equal(t, gournal.ParseLevel(logLevel.String()), level)
+}
+
