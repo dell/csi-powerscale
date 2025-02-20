@@ -121,25 +121,6 @@ func TestNodeGetVolumeStats(t *testing.T) {
 func TestEphemeralNodePublish(t *testing.T) {
 	ctx := context.Background()
 
-	originalGetCreateVolumeFunc := getCreateVolumeFunc
-	getCreateVolumeFunc = func(s *service) func(context.Context, *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-		return func(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-			return &csi.CreateVolumeResponse{
-				Volume: &csi.Volume{
-					VolumeId: "volume-id",
-				},
-			}, nil
-		}
-	}
-
-	defer func() { getCreateVolumeFunc = originalGetCreateVolumeFunc }()
-
-	originalGetUtilsGetFQDNByIP := getUtilsGetFQDNByIP
-	getUtilsGetFQDNByIP = func(ctx context.Context, ip string) (string, error) {
-		return "testFQDN", nil
-	}
-	defer func() { getUtilsGetFQDNByIP = originalGetUtilsGetFQDNByIP }()
-
 	IsiClusters := new(sync.Map)
 	testBool := false
 	testIsilonClusterConfig := IsilonClusterConfig{
@@ -175,11 +156,17 @@ func TestEphemeralNodePublish(t *testing.T) {
 		},
 	}
 
+	type mockedFuncsStruct struct {
+		mockedGetCreateVolumeFunc func(s *service) func(context.Context, *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error)
+		mockedGetUtilsGetFQDNByIP func(ctx context.Context, ip string) (string, error)
+	}
+
 	type testCase struct {
-		name     string
-		req      *csi.NodePublishVolumeRequest
-		expected *csi.NodePublishVolumeResponse
-		wantErr  bool
+		name        string
+		req         *csi.NodePublishVolumeRequest
+		mockedFuncs mockedFuncsStruct
+		expected    *csi.NodePublishVolumeResponse
+		wantErr     bool
 	}
 
 	testCases := []testCase{
@@ -196,6 +183,20 @@ func TestEphemeralNodePublish(t *testing.T) {
 					"csi.storage.k8s.io/ephemeral": "true",
 				},
 			},
+			mockedFuncs: mockedFuncsStruct{
+				mockedGetCreateVolumeFunc: func(s *service) func(context.Context, *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+					return func(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+						return &csi.CreateVolumeResponse{
+							Volume: &csi.Volume{
+								VolumeId: "volume-id",
+							},
+						}, nil
+					}
+				},
+				mockedGetUtilsGetFQDNByIP: func(ctx context.Context, ip string) (string, error) {
+					return "testFQDN", nil
+				},
+			},
 			expected: nil,
 			wantErr:  true,
 		},
@@ -203,6 +204,17 @@ func TestEphemeralNodePublish(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			// Mocking function getCreateVolumeFunc
+			originalGetCreateVolumeFunc := getCreateVolumeFunc
+			getCreateVolumeFunc = tc.mockedFuncs.mockedGetCreateVolumeFunc
+			defer func() { getCreateVolumeFunc = originalGetCreateVolumeFunc }()
+
+			// Mocking function getUtilsGetFQDNByIP
+			originalGetUtilsGetFQDNByIP := getUtilsGetFQDNByIP
+			getUtilsGetFQDNByIP = tc.mockedFuncs.mockedGetUtilsGetFQDNByIP
+			defer func() { getUtilsGetFQDNByIP = originalGetUtilsGetFQDNByIP }()
+
+			// Calling the function
 			got, err := s.ephemeralNodePublish(ctx, tc.req)
 			if (err != nil) != tc.wantErr {
 				t.Errorf("NodeGetVolumeStats() error = %v, wantErr %v", err, tc.wantErr)
