@@ -203,7 +203,7 @@ func TestEphemeralNodePublish(t *testing.T) {
 			wantErr:  true,
 		},
 		{
-			name: "Successful ephemeral volume publish",
+			name: "Failed in NodePublishVolume",
 			req: &csi.NodePublishVolumeRequest{
 				VolumeId: "123",
 				VolumeCapability: &csi.VolumeCapability{
