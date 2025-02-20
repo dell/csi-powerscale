@@ -113,7 +113,7 @@ type service struct {
 	statisticsCounter     int
 	isiClusters           *sync.Map
 	defaultIsiClusterName string
-	k8sclient             *kubernetes.Clientset
+	k8sclient             kubernetes.Interface
 }
 
 // IsilonClusters To unmarshal secret.yaml file

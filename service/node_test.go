@@ -17,6 +17,7 @@
 package service
 
 import (
+	"errors"
 	"os"
 	"reflect"
 	"sync"
@@ -120,6 +121,25 @@ func TestNodeGetVolumeStats(t *testing.T) {
 
 func TestEphemeralNodePublish(t *testing.T) {
 	ctx := context.Background()
+	defaultEphemeralNodeUnpublishFunc := ephemeralNodeUnpublishFunc
+	defaultGetControllerPublishVolume := getControllerPublishVolume
+	defaultGetUtilsGetFQDNByIP := getUtilsGetFQDNByIP
+	defaultGetCreateVolumeFunc := getCreateVolumeFunc
+	defaultCloseFileFunc := closeFileFunc
+	defaultMakeDirAllFunc := mkDirAllFunc
+	defaultCreateFileFunc := createFileFunc
+	defaultWriteStringFunc := writeStringFunc
+
+	after := func() {
+		ephemeralNodeUnpublishFunc = defaultEphemeralNodeUnpublishFunc
+		getControllerPublishVolume = defaultGetControllerPublishVolume
+		getUtilsGetFQDNByIP = defaultGetUtilsGetFQDNByIP // TODO: We should just be assigning/reverting the original utils function's contents, not a wrapper around them...
+		getCreateVolumeFunc = defaultGetCreateVolumeFunc
+		closeFileFunc = defaultCloseFileFunc
+		mkDirAllFunc = defaultMakeDirAllFunc
+		createFileFunc = defaultCreateFileFunc
+		writeStringFunc = defaultWriteStringFunc
+	}
 
 	IsiClusters := new(sync.Map)
 	testBool := false
@@ -163,11 +183,12 @@ func TestEphemeralNodePublish(t *testing.T) {
 	}
 
 	type testCase struct {
-		name        string
-		req         *csi.NodePublishVolumeRequest
-		mockedFuncs mockedFuncsStruct
-		expected    *csi.NodePublishVolumeResponse
-		wantErr     bool
+		name string
+		req  *csi.NodePublishVolumeRequest
+		//mockedFuncs mockedFuncsStruct
+		expected *csi.NodePublishVolumeResponse
+		wantErr  bool
+		setup    func()
 	}
 
 	testCases := []testCase{
@@ -184,8 +205,8 @@ func TestEphemeralNodePublish(t *testing.T) {
 					"csi.storage.k8s.io/ephemeral": "true",
 				},
 			},
-			mockedFuncs: mockedFuncsStruct{
-				mockedGetCreateVolumeFunc: func(s *service) func(_ context.Context, _ *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+			setup: func() {
+				getCreateVolumeFunc = func(s *service) func(_ context.Context, _ *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 					return func(_ context.Context, _ *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 						return &csi.CreateVolumeResponse{
 							Volume: &csi.Volume{
@@ -193,11 +214,11 @@ func TestEphemeralNodePublish(t *testing.T) {
 							},
 						}, nil
 					}
-				},
-				mockedGetUtilsGetFQDNByIP: func(_ context.Context, _ string) (string, error) {
+				}
+				getUtilsGetFQDNByIP = func(_ context.Context, _ string) (string, error) {
 					return "testFQDN", nil
-				},
-				mockGetControllerPublishVolume: getControllerPublishVolume,
+				}
+
 			},
 			expected: nil,
 			wantErr:  true,
@@ -215,8 +236,14 @@ func TestEphemeralNodePublish(t *testing.T) {
 					"csi.storage.k8s.io/ephemeral": "true",
 				},
 			},
-			mockedFuncs: mockedFuncsStruct{
-				mockedGetCreateVolumeFunc: func(s *service) func(_ context.Context, _ *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+			setup: func() {
+
+				getControllerPublishVolume = func(s *service) func(_ context.Context, _ *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+					return func(_ context.Context, _ *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+						return &csi.ControllerPublishVolumeResponse{}, nil
+					}
+				}
+				getCreateVolumeFunc = func(s *service) func(_ context.Context, _ *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 					return func(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 						return &csi.CreateVolumeResponse{
 							Volume: &csi.Volume{
@@ -224,15 +251,103 @@ func TestEphemeralNodePublish(t *testing.T) {
 							},
 						}, nil
 					}
-				},
-				mockedGetUtilsGetFQDNByIP: func(_ context.Context, _ string) (string, error) {
+				}
+
+				getUtilsGetFQDNByIP = func(_ context.Context, _ string) (string, error) {
 					return "testFQDN", nil
+				}
+			},
+			expected: nil,
+			wantErr:  true,
+		},
+
+		// new
+		{
+			name: "fail to make directory",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId: "123",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
 				},
-				mockGetControllerPublishVolume: func(s *service) func(_ context.Context, _ *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+				VolumeContext: map[string]string{
+					"csi.storage.k8s.io/ephemeral": "true",
+				},
+			},
+			setup: func() {
+
+				getControllerPublishVolume = func(s *service) func(_ context.Context, _ *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 					return func(_ context.Context, _ *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 						return &csi.ControllerPublishVolumeResponse{}, nil
 					}
+				}
+				getCreateVolumeFunc = func(s *service) func(_ context.Context, _ *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+					return func(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+						return &csi.CreateVolumeResponse{
+							Volume: &csi.Volume{
+								VolumeId: "volume-id",
+							},
+						}, nil
+					}
+				}
+
+				getUtilsGetFQDNByIP = func(_ context.Context, _ string) (string, error) {
+					return "testFQDN", nil
+				}
+
+				mkDirAllFunc = func(_ string, _ os.FileMode) error {
+					return errors.New("fail to make directory")
+				}
+
+				ephemeralNodeUnpublishFunc = func(s *service, ctx context.Context, req *csi.NodeUnpublishVolumeRequest) error {
+					return errors.New("failed to unpublish")
+				}
+			},
+			expected: nil,
+			wantErr:  true,
+		},
+		{
+			name: "fail to make file",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId: "123",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
 				},
+				VolumeContext: map[string]string{
+					"csi.storage.k8s.io/ephemeral": "true",
+				},
+			},
+			setup: func() {
+
+				getControllerPublishVolume = func(s *service) func(_ context.Context, _ *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+					return func(_ context.Context, _ *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+						return &csi.ControllerPublishVolumeResponse{}, nil
+					}
+				}
+				getCreateVolumeFunc = func(s *service) func(_ context.Context, _ *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+					return func(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+						return &csi.CreateVolumeResponse{
+							Volume: &csi.Volume{
+								VolumeId: "volume-id",
+							},
+						}, nil
+					}
+				}
+
+				getUtilsGetFQDNByIP = func(_ context.Context, _ string) (string, error) {
+					return "testFQDN", nil
+				}
+
+				createFileFunc = func(_ string) (*os.File, error) {
+					return nil, errors.New("fail to make file")
+				}
+
+				ephemeralNodeUnpublishFunc = func(s *service, ctx context.Context, req *csi.NodeUnpublishVolumeRequest) error {
+					return errors.New("failed to unpublish")
+				}
 			},
 			expected: nil,
 			wantErr:  true,
@@ -241,20 +356,10 @@ func TestEphemeralNodePublish(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Mocking function getCreateVolumeFunc
-			originalGetCreateVolumeFunc := getCreateVolumeFunc
-			getCreateVolumeFunc = tc.mockedFuncs.mockedGetCreateVolumeFunc
-			defer func() { getCreateVolumeFunc = originalGetCreateVolumeFunc }()
-
-			// Mocking function getUtilsGetFQDNByIP
-			originalGetUtilsGetFQDNByIP := getUtilsGetFQDNByIP
-			getUtilsGetFQDNByIP = tc.mockedFuncs.mockedGetUtilsGetFQDNByIP
-			defer func() { getUtilsGetFQDNByIP = originalGetUtilsGetFQDNByIP }()
-
-			// Mocking function getControllerPublishVolume
-			originalGetControllerPublishVolume := getControllerPublishVolume
-			getControllerPublishVolume = tc.mockedFuncs.mockGetControllerPublishVolume
-			defer func() { getControllerPublishVolume = originalGetControllerPublishVolume }()
+			defer after()
+			if tc.setup != nil {
+				tc.setup()
+			}
 
 			// Calling the function
 			got, err := s.ephemeralNodePublish(ctx, tc.req)

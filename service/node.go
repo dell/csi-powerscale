@@ -18,6 +18,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -629,7 +630,7 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		log.Infof("path %s does not exists", filePath)
-		err = os.MkdirAll(filePath, 0o750)
+		err = mkDirAllFunc(filePath, 0o750)
 		if err != nil {
 			log.Error("Create directory in target path for ephemeral vol failed with error :" + err.Error())
 			if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
@@ -641,7 +642,7 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 	}
 	log.Infof("Created dir in target path %s", filePath)
 
-	f, err := os.Create(filepath.Clean(filePath) + "/id")
+	f, err := createFileFunc(filepath.Clean(filePath) + "/id")
 	if err != nil {
 		log.Error("Create id file in target path for ephemeral vol failed with error :" + err.Error())
 		if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
@@ -653,11 +654,11 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 	log.Infof("Created file in target path %s", filePath+"/id")
 
 	defer func() {
-		if err := f.Close(); err != nil {
+		if err := closeFileFunc(f); err != nil {
 			log.Errorf("Error closing file: %s \n", err)
 		}
 	}()
-	_, err2 := f.WriteString(createEphemeralVolResp.Volume.VolumeId)
+	_, err2 := writeStringFunc(f, createEphemeralVolResp.Volume.VolumeId)
 	if err2 != nil {
 		log.Error("Writing to id file in target path for ephemeral vol failed with error :" + err2.Error())
 		if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
@@ -670,8 +671,30 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
+var mkDirAllFunc = func(path string, perm fs.FileMode) error {
+	return os.MkdirAll(path, perm)
+}
+
+var createFileFunc = func(path string) (*os.File, error) {
+	return os.Create(path)
+}
+
+var writeStringFunc = func(f *os.File, output string) (int, error) {
+	return f.WriteString(output)
+}
+
+var closeFileFunc = func(f *os.File) error {
+	return f.Close()
+}
+
 func (s *service) ephemeralNodeUnpublish(
 	ctx context.Context,
+	req *csi.NodeUnpublishVolumeRequest,
+) error {
+	return ephemeralNodeUnpublishFunc(s, ctx, req)
+}
+
+var ephemeralNodeUnpublishFunc = func(s *service, ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest,
 ) error {
 	// Fetch log handler
