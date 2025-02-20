@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	_ "net/http/pprof" // #nosec G108
 	"os"
 	"path/filepath"
@@ -29,13 +30,14 @@ import (
 
 	"github.com/akutz/gournal"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/cucumber/godog"
 	"github.com/dell/csi-isilon/v2/common/constants"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	
+
 	"github.com/spf13/viper"
 
 	"google.golang.org/grpc/codes"
@@ -43,7 +45,7 @@ import (
 )
 
 // commenting this out for now, as it is an integration test
-/*
+
 func TestMain(m *testing.M) {
 	status := 0
 
@@ -74,7 +76,7 @@ func TestMain(m *testing.M) {
 	fmt.Printf("status %d\n", status)
 
 	os.Exit(status)
-}*/
+}
 
 func TestGetLoggerfunc(t *testing.T) {
 	ctx, _ := GetLogger(nil)
@@ -261,7 +263,6 @@ func TestServiceInitializeServiceOpts(t *testing.T) {
 	os.Setenv(constants.EnvAllowedNetworks, "!@#")
 	err := serviceInstance.initializeServiceOpts(ctx)
 	assert.NotNil(t, err)
-
 }
 
 func TestSyncIsilonConfigs(t *testing.T) {
@@ -851,4 +852,3 @@ func TestGetGournalLevel(t *testing.T) {
 	level := getGournalLevelFromLogrusLevel(logLevel)
 	assert.Equal(t, gournal.ParseLevel(logLevel.String()), level)
 }
-
