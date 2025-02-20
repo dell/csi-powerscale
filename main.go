@@ -1,7 +1,7 @@
 package main
 
 /*
- Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -41,6 +41,12 @@ func init() {
 
 // main is ignored when this package is built as a go plug-in
 func main() {
+	mainR(gocsi.Run)
+}
+
+func mainR(runFunc func(ctx context.Context, name, desc string, usage string, sp gocsi.StoragePluginProvider)) {
+	fmt.Println("All command-line arguments:", os.Args)
+
 	enableLeaderElection := flag.Bool("leader-election", false, "Enables leader election.")
 	leaderElectionNamespace := flag.String("leader-election-namespace", "", "The namespace where leader election lease will be created. Defaults to the pod namespace if not set.")
 	leaderElectionLeaseDuration := flag.Duration("leader-election-lease-duration", 15*time.Second, "Duration, in seconds, that non-leader candidates will wait to force acquire leadership")
@@ -57,7 +63,7 @@ func main() {
 	service.DriverConfigParamsFile = *driverConfigParamsfile
 
 	run := func(ctx context.Context) {
-		gocsi.Run(
+		runFunc(
 			ctx,
 			constants.PluginName,
 			"An Isilon Container Storage Interface (CSI) Plugin",
