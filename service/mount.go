@@ -38,6 +38,14 @@ func publishVolume(
 	req *csi.NodePublishVolumeRequest,
 	nfsExportURL string,
 ) error {
+	return publishVolumeFunc(ctx, req, nfsExportURL)
+}
+
+var publishVolumeFunc = func(
+	ctx context.Context,
+	req *csi.NodePublishVolumeRequest,
+	nfsExportURL string,
+) error {
 	// Fetch log handler
 	ctx, log := GetLogger(ctx)
 

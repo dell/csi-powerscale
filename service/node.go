@@ -628,7 +628,7 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 	}
 	log.Infof("NodePublish step for volume %s was successful", volID)
 
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	if _, err := statFileFunc(filePath); os.IsNotExist(err) {
 		log.Infof("path %s does not exists", filePath)
 		err = mkDirAllFunc(filePath, 0o750)
 		if err != nil {
@@ -685,6 +685,10 @@ var writeStringFunc = func(f *os.File, output string) (int, error) {
 
 var closeFileFunc = func(f *os.File) error {
 	return f.Close()
+}
+
+var statFileFunc = func(path string) (fs.FileInfo, error) {
+	return os.Stat(path)
 }
 
 func (s *service) ephemeralNodeUnpublish(

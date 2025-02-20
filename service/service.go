@@ -852,6 +852,10 @@ func (s *service) GetCSINodeIP(_ context.Context) (string, error) {
 }
 
 func (s *service) getVolByName(ctx context.Context, isiPath, volName string, isiConfig *IsilonClusterConfig) (isi.Volume, error) {
+	return getVolByNameFunc(s, ctx, isiPath, volName, isiConfig)
+}
+
+var getVolByNameFunc = func(s *service, ctx context.Context, isiPath, volName string, isiConfig *IsilonClusterConfig) (isi.Volume, error) {
 	// The `GetVolume` API returns a slice of volumes, but when only passing
 	// in a volume ID, the response will be just the one volume
 	vol, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)
