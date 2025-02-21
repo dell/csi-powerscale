@@ -1,7 +1,7 @@
 package main
 
 /*
- Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -30,17 +30,27 @@ import (
 	"github.com/dell/csi-isilon/v2/provider"
 	"github.com/dell/csi-isilon/v2/service"
 	"github.com/dell/gocsi"
+	"k8s.io/client-go/kubernetes"
 )
 
-func init() {
-	err := os.Setenv(constants.EnvGOCSIDebug, "true")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to set %s to true \n", constants.EnvGOCSIDebug)
-	}
+// func init() {
+// 	err := os.Setenv(constants.EnvGOCSIDebug, "true")
+// 	if err != nil {
+// 		fmt.Fprintf(os.Stderr, "unable to set %s to true \n", constants.EnvGOCSIDebug)
+// 	}
+// }
+
+func main() {
+	mainR(gocsi.Run, func(kubeconfig string) (kubernetes.Interface, error) {
+		return k8sutils.CreateKubeClientSet(kubeconfig)
+	}, func(clientset kubernetes.Interface, lockName, namespace string, renewDeadline, leaseDuration, retryPeriod time.Duration, run func(ctx context.Context)) {
+		k8sutils.LeaderElection(clientset.(*kubernetes.Clientset), lockName, namespace, renewDeadline, leaseDuration, retryPeriod, run)
+	})
 }
 
-// main is ignored when this package is built as a go plug-in
-func main() {
+func mainR(runFunc func(ctx context.Context, name, desc string, usage string, sp gocsi.StoragePluginProvider), createKubeClientSet func(kubeconfig string) (kubernetes.Interface, error), leaderElection func(clientset kubernetes.Interface, lockName, namespace string, renewDeadline, leaseDuration, retryPeriod time.Duration, run func(ctx context.Context))) {
+	fmt.Println("All command-line arguments:", os.Args)
+
 	enableLeaderElection := flag.Bool("leader-election", false, "Enables leader election.")
 	leaderElectionNamespace := flag.String("leader-election-namespace", "", "The namespace where leader election lease will be created. Defaults to the pod namespace if not set.")
 	leaderElectionLeaseDuration := flag.Duration("leader-election-lease-duration", 15*time.Second, "Duration, in seconds, that non-leader candidates will wait to force acquire leadership")
@@ -57,7 +67,7 @@ func main() {
 	service.DriverConfigParamsFile = *driverConfigParamsfile
 
 	run := func(ctx context.Context) {
-		gocsi.Run(
+		runFunc(
 			ctx,
 			constants.PluginName,
 			"An Isilon Container Storage Interface (CSI) Plugin",
@@ -70,13 +80,13 @@ func main() {
 	} else {
 		driverName := strings.Replace(constants.PluginName, ".", "-", -1)
 		lockName := fmt.Sprintf("driver-%s", driverName)
-		k8sclientset, err := k8sutils.CreateKubeClientSet(*kubeconfig)
+		k8sclientset, err := createKubeClientSet(*kubeconfig)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "failed to initialize leader election: %v", err)
 			os.Exit(1)
 		}
 		// Attempt to become leader and start the driver
-		k8sutils.LeaderElection(k8sclientset, lockName, *leaderElectionNamespace,
+		leaderElection(k8sclientset, lockName, *leaderElectionNamespace,
 			*leaderElectionRenewDeadline, *leaderElectionLeaseDuration, *leaderElectionRetryPeriod, run)
 	}
 }
