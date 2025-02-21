@@ -10,8 +10,8 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	isi "github.com/dell/goisilon"
-	api "github.com/dell/goisilon/api/v1"
-	apiv1 "github.com/dell/goisilon/api/v1"
+	v1 "github.com/dell/goisilon/api/v1"
+	v2 "github.com/dell/goisilon/api/v2"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -250,7 +250,7 @@ func TestCreateVolumeFromSnapshot(t *testing.T) {
 	getSnapshotFunc = func(ctx context.Context, isiConfig *IsilonClusterConfig) func(ctx context.Context, snapshotID string) (isi.Snapshot, error) {
 		return func(ctx context.Context, snapshotID string) (isi.Snapshot, error) {
 			if snapshotID == "snapshot1234" {
-				return &api.IsiSnapshot{ID: 1234, Path: "/ifs/data/snapshot1234"}, nil
+				return &v1.IsiSnapshot{ID: 1234, Path: "/ifs/data/snapshot1234"}, nil
 			}
 			return nil, errors.New("snapshot not found")
 		}
@@ -265,12 +265,12 @@ func TestCreateVolumeFromSnapshot(t *testing.T) {
 	copySnapshotFunc = func(ctx context.Context, isiConfig *IsilonClusterConfig) func(ctx context.Context, dstPath, srcPath string, snapshotID int64, dstName, accessZone string) (isi.Volume, error) {
 		return func(ctx context.Context, dstPath, srcPath string, snapshotID int64, dstName, accessZone string) (isi.Volume, error) {
 			if snapshotID == 1234 {
-				return &apiv1.IsiVolume{Name: dstName, AttributeMap: []struct {
+				return &v1.IsiVolume{Name: dstName, AttributeMap: []struct {
 					Name  string      `json:"name"`
 					Value interface{} `json:"value"`
 				}{}}, nil
 			}
-			return &apiv1.IsiVolume{}, errors.New("failed to copy snapshot")
+			return &v1.IsiVolume{}, errors.New("failed to copy snapshot")
 		}
 	}
 
@@ -338,15 +338,15 @@ func TestCreateVolumeFromVolume(t *testing.T) {
 	copyVolumeFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, srcVolumeName, dstVolumeName string) (isi.Volume, error) {
 		return func(ctx context.Context, isiPath, srcVolumeName, dstVolumeName string) (isi.Volume, error) {
 			if srcVolumeName == "errorVolumeCopy" {
-				return &apiv1.IsiVolume{}, errors.New("failed to copy volume name")
+				return &v1.IsiVolume{}, errors.New("failed to copy volume name")
 			}
 			if srcVolumeName == "existentVolume" {
-				return &apiv1.IsiVolume{Name: dstVolumeName, AttributeMap: []struct {
+				return &v1.IsiVolume{Name: dstVolumeName, AttributeMap: []struct {
 					Name  string      `json:"name"`
 					Value interface{} `json:"value"`
 				}{}}, nil
 			}
-			return &apiv1.IsiVolume{}, errors.New("failed to copy volume")
+			return &v1.IsiVolume{}, errors.New("failed to copy volume")
 		}
 	}
 
@@ -865,7 +865,7 @@ func TestValidateVolumeCaps(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			supported, reason := validateVolumeCaps(tt.vcs, &apiv1.IsiVolume{})
+			supported, reason := validateVolumeCaps(tt.vcs, &v1.IsiVolume{})
 			assert.Equal(t, tt.expected, supported)
 			assert.Equal(t, tt.reason, reason)
 		})
@@ -1025,6 +1025,267 @@ func TestGetCreateSnapshotResponse(t *testing.T) {
 			actual := s.getCreateSnapshotResponse(context.Background(), tt.snapshotID, tt.sourceVolumeID, tt.creationTime, tt.sizeInBytes, tt.clusterName, tt.accessZone)
 			// Assert the result
 			assert.Equal(t, tt.expected, actual)
+		})
+	}
+}
+
+func TestProcessSnapshotTrackingDirectoryDuringDeleteVolume(t *testing.T) {
+	ctx := context.Background()
+	originalGetZoneByNameFunc := getZoneByNameFunc
+	originalGetSnapshotIsiPathComponentsFunc := getSnapshotIsiPathComponentsFunc
+	originalGetSnapshotTrackingDirNameFunc := getSnapshotTrackingDirNameFunc
+	originalIsVolumeExistentFunc := isVolumeExistentFunc
+	originalDeleteVolumeFunc := deleteVolumeFunc
+	originalGetSubDirectoryCountFunc := getSubDirectoryCountFunc
+	originalUnexportByIDWithZoneFunc := unexportByIDWithZoneFunc
+	originalRemoveSnapshotFunc := removeSnapshotFunc
+
+	after := func() {
+		getZoneByNameFunc = originalGetZoneByNameFunc
+		getSnapshotIsiPathComponentsFunc = originalGetSnapshotIsiPathComponentsFunc
+		getSnapshotTrackingDirNameFunc = originalGetSnapshotTrackingDirNameFunc
+		isVolumeExistentFunc = originalIsVolumeExistentFunc
+		deleteVolumeFunc = originalDeleteVolumeFunc
+		getSubDirectoryCountFunc = originalGetSubDirectoryCountFunc
+		unexportByIDWithZoneFunc = originalUnexportByIDWithZoneFunc
+		removeSnapshotFunc = originalRemoveSnapshotFunc
+	}
+
+	isiConfig := &IsilonClusterConfig{
+		isiSvc: &isiService{
+			endpoint: "http://testendpoint:8080",
+			client:   &isi.Client{},
+		},
+	}
+
+	s := &service{}
+
+	type testCase struct {
+		name        string
+		volName     string
+		accessZone  string
+		export      isi.Export
+		expectedErr error
+		setup       func()
+	}
+
+	testCases := []testCase{
+		{
+			name:       "GetZoneError",
+			volName:    "volumeName",
+			accessZone: "accessZone",
+			export: &v2.Export{
+				Paths: &[]string{"/exportPath"},
+			},
+			expectedErr: fmt.Errorf("failed to get zone"),
+			setup: func() {
+				// Mock implementations for a valid case
+				getZoneByNameFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, zoneName string) (*v1.IsiZone, error) {
+					return func(ctx context.Context, zoneName string) (*v1.IsiZone, error) {
+						return nil, errors.New("failed to get zone")
+					}
+				}
+			},
+		},
+		{
+			name:       "ValidCase",
+			volName:    "volumeName",
+			accessZone: "accessZone",
+			export: &v2.Export{
+				Paths: &[]string{"/exportPath"},
+			},
+			expectedErr: nil,
+			setup: func() {
+				// Mock implementations for a valid case
+				getZoneByNameFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, zoneName string) (*v1.IsiZone, error) {
+					return func(ctx context.Context, zoneName string) (*v1.IsiZone, error) {
+						return &v1.IsiZone{Path: "/zonePath"}, nil
+					}
+				}
+				getSnapshotIsiPathComponentsFunc = func(isiConfig *IsilonClusterConfig) func(exportPath, zonePath string) (string, string, string) {
+					return func(exportPath, zonePath string) (string, string, string) {
+						return "/isiPath", "snapshotName", ""
+					}
+				}
+				getSnapshotTrackingDirNameFunc = func(isiConfig *IsilonClusterConfig) func(snapshotName string) string {
+					return func(snapshotName string) string {
+						return "/snapshotTrackingDir"
+					}
+				}
+				isVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeID, volumeEntry string) bool {
+					return func(ctx context.Context, volumePath, volumeID, volumeEntry string) bool {
+						return true
+					}
+				}
+				deleteVolumeFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeSelector string) error {
+					return func(ctx context.Context, volumePath, volumeSelector string) error {
+						return nil
+					}
+				}
+				getSubDirectoryCountFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeSelector string) (int64, error) {
+					return func(ctx context.Context, volumePath, volumeSelector string) (int64, error) {
+						return 3, nil
+					}
+				}
+				getSubDirectoryCountFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeSelector string) (int64, error) {
+					return func(ctx context.Context, volumePath, volumeSelector string) (int64, error) {
+						return 2, nil
+					}
+				}
+			},
+		},
+		{
+			name:       "unexportByIDWithZoneFuncError",
+			volName:    "volumeName",
+			accessZone: "accessZone",
+			export: &v2.Export{
+				Paths: &[]string{"/exportPath"},
+			},
+			expectedErr: nil,
+			setup: func() {
+				// Mock implementations for a valid case
+				getZoneByNameFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, zoneName string) (*v1.IsiZone, error) {
+					return func(ctx context.Context, zoneName string) (*v1.IsiZone, error) {
+						return &v1.IsiZone{Path: "/zonePath"}, nil
+					}
+				}
+				getSnapshotIsiPathComponentsFunc = func(isiConfig *IsilonClusterConfig) func(exportPath, zonePath string) (string, string, string) {
+					return func(exportPath, zonePath string) (string, string, string) {
+						return "/isiPath", "snapshotName", ""
+					}
+				}
+				getSnapshotTrackingDirNameFunc = func(isiConfig *IsilonClusterConfig) func(snapshotName string) string {
+					return func(snapshotName string) string {
+						return "/snapshotTrackingDir"
+					}
+				}
+				isVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeID, volumeEntry string) bool {
+					return func(ctx context.Context, volumePath, volumeID, volumeEntry string) bool {
+						return true
+					}
+				}
+				deleteVolumeFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeSelector string) error {
+					return func(ctx context.Context, volumePath, volumeSelector string) error {
+						return nil
+					}
+				}
+				getSubDirectoryCountFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeSelector string) (int64, error) {
+					return func(ctx context.Context, volumePath, volumeSelector string) (int64, error) {
+						return 3, nil
+					}
+				}
+				unexportByIDWithZoneFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, exportID int, zoneName string) error {
+					return func(ctx context.Context, exportID int, zoneName string) error {
+						return errors.New("failed to delete snapshot directory export")
+					}
+				}
+			},
+		},
+		{
+			name:       "RemoveSnapshotFuncError",
+			volName:    "volumeName",
+			accessZone: "accessZone",
+			export: &v2.Export{
+				Paths: &[]string{"/exportPath"},
+			},
+			expectedErr: nil,
+			setup: func() {
+				returnVal := true
+				getZoneByNameFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, zoneName string) (*v1.IsiZone, error) {
+					return func(ctx context.Context, zoneName string) (*v1.IsiZone, error) {
+						return &v1.IsiZone{Path: "/zonePath"}, nil
+					}
+				}
+				getSnapshotIsiPathComponentsFunc = func(isiConfig *IsilonClusterConfig) func(exportPath, zonePath string) (string, string, string) {
+					return func(exportPath, zonePath string) (string, string, string) {
+						return "/isiPath", "snapshotName", ""
+					}
+				}
+				getSnapshotTrackingDirNameFunc = func(isiConfig *IsilonClusterConfig) func(snapshotName string) string {
+					return func(snapshotName string) string {
+						return "/snapshotTrackingDir"
+					}
+				}
+				isVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeID, volumeEntry string) bool {
+					return func(ctx context.Context, volumePath, volumeID, volumeEntry string) bool {
+						return returnVal
+					}
+				}
+				getSubDirectoryCountFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeSelector string) (int64, error) {
+					return func(ctx context.Context, volumePath, volumeSelector string) (int64, error) {
+						return 3, nil
+					}
+				}
+				unexportByIDWithZoneFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, exportID int, zoneName string) error {
+					return func(ctx context.Context, exportID int, zoneName string) error {
+						return nil
+					}
+				}
+				deleteVolumeFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeSelector string) error {
+					return func(ctx context.Context, volumePath, volumeSelector string) error {
+						return nil
+					}
+				}
+				removeSnapshotFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, snapID int64, snapName string) error {
+					return func(ctx context.Context, snapID int64, snapName string) error {
+						return errors.New("error deleting snapshot: 'some error'")
+					}
+				}
+			},
+		},
+		{
+			name:       "getSubDirectoryCountFuncError",
+			volName:    "volumeName",
+			accessZone: "accessZone",
+			export: &v2.Export{
+				Paths: &[]string{"/exportPath"},
+			},
+			expectedErr: nil,
+			setup: func() {
+				returnVal := true
+				getZoneByNameFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, zoneName string) (*v1.IsiZone, error) {
+					return func(ctx context.Context, zoneName string) (*v1.IsiZone, error) {
+						return &v1.IsiZone{Path: "/zonePath"}, nil
+					}
+				}
+				getSnapshotIsiPathComponentsFunc = func(isiConfig *IsilonClusterConfig) func(exportPath, zonePath string) (string, string, string) {
+					return func(exportPath, zonePath string) (string, string, string) {
+						return "/isiPath", "snapshotName", ""
+					}
+				}
+				getSnapshotTrackingDirNameFunc = func(isiConfig *IsilonClusterConfig) func(snapshotName string) string {
+					return func(snapshotName string) string {
+						return "/snapshotTrackingDir"
+					}
+				}
+				isVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeID, volumeEntry string) bool {
+					return func(ctx context.Context, volumePath, volumeID, volumeEntry string) bool {
+						return !returnVal
+					}
+				}
+				getSubDirectoryCountFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeSelector string) (int64, error) {
+					return func(ctx context.Context, volumePath, volumeSelector string) (int64, error) {
+						return 0, errors.New("error getting subdirectory count: 'some error'")
+					}
+				}
+
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			if tt.setup != nil {
+				tt.setup()
+			}
+
+			err := s.processSnapshotTrackingDirectoryDuringDeleteVolume(ctx, tt.volName, tt.accessZone, tt.export, isiConfig)
+			if tt.expectedErr != nil {
+				assert.EqualError(t, err, tt.expectedErr.Error())
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }

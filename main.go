@@ -30,21 +30,18 @@ import (
 	"github.com/dell/csi-isilon/v2/provider"
 	"github.com/dell/csi-isilon/v2/service"
 	"github.com/dell/gocsi"
+	"k8s.io/client-go/kubernetes"
 )
 
-func init() {
-	err := os.Setenv(constants.EnvGOCSIDebug, "true")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to set %s to true \n", constants.EnvGOCSIDebug)
-	}
-}
-
-// main is ignored when this package is built as a go plug-in
 func main() {
-	mainR(gocsi.Run)
+	mainR(gocsi.Run, func(kubeconfig string) (kubernetes.Interface, error) {
+		return k8sutils.CreateKubeClientSet(kubeconfig)
+	}, func(clientset kubernetes.Interface, lockName, namespace string, renewDeadline, leaseDuration, retryPeriod time.Duration, run func(ctx context.Context)) {
+		k8sutils.LeaderElection(clientset.(*kubernetes.Clientset), lockName, namespace, renewDeadline, leaseDuration, retryPeriod, run)
+	})
 }
 
-func mainR(runFunc func(ctx context.Context, name, desc string, usage string, sp gocsi.StoragePluginProvider)) {
+func mainR(runFunc func(ctx context.Context, name, desc string, usage string, sp gocsi.StoragePluginProvider), createKubeClientSet func(kubeconfig string) (kubernetes.Interface, error), leaderElection func(clientset kubernetes.Interface, lockName, namespace string, renewDeadline, leaseDuration, retryPeriod time.Duration, run func(ctx context.Context))) {
 	fmt.Println("All command-line arguments:", os.Args)
 
 	enableLeaderElection := flag.Bool("leader-election", false, "Enables leader election.")
@@ -76,13 +73,13 @@ func mainR(runFunc func(ctx context.Context, name, desc string, usage string, sp
 	} else {
 		driverName := strings.Replace(constants.PluginName, ".", "-", -1)
 		lockName := fmt.Sprintf("driver-%s", driverName)
-		k8sclientset, err := k8sutils.CreateKubeClientSet(*kubeconfig)
+		k8sclientset, err := createKubeClientSet(*kubeconfig)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "failed to initialize leader election: %v", err)
 			os.Exit(1)
 		}
 		// Attempt to become leader and start the driver
-		k8sutils.LeaderElection(k8sclientset, lockName, *leaderElectionNamespace,
+		leaderElection(k8sclientset, lockName, *leaderElectionNamespace,
 			*leaderElectionRenewDeadline, *leaderElectionLeaseDuration, *leaderElectionRetryPeriod, run)
 	}
 }
