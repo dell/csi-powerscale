@@ -67,6 +67,7 @@ const (
 	AdvisoryLimitParamDefault     = ""
 	SoftGracePrdParam             = "SoftGracePrd"
 	SoftGracePrdParamDefault      = ""
+	GlobalIsiPath                 = ""
 
 	// Parameters to set quota limit from pvc
 	PVCSoftLimitParam     = "pvcSoftLimit"
@@ -1097,6 +1098,9 @@ func (s *service) ControllerPublishVolume(
 		}
 	}
 
+	GlobalIsiPath := volumeContext["Path"]
+	log.Infof("<Eternals> GlobalIsiPath.......... '%s'", GlobalIsiPath)
+
 	volID := req.GetVolumeId()
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument,
@@ -1661,6 +1665,8 @@ func (s *service) CreateSnapshot(
 		isiPath = isiConfig.IsiPath
 	}
 	log.Infof("<Eternals> before validateCreateSnapshotRequest isiPath.......... '%s'", isiPath)
+	isiPath = GlobalIsiPath
+	log.Infof("<Eternals> before validateCreateSnapshotRequest updated isiPath.......... '%s'", isiPath)
 
 	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
 	if err != nil {
