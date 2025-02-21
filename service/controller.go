@@ -34,6 +34,7 @@ import (
 	"github.com/dell/csi-isilon/v2/common/utils"
 	isi "github.com/dell/goisilon"
 	isiApi "github.com/dell/goisilon/api"
+	v1 "github.com/dell/goisilon/api/v1"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -738,10 +739,6 @@ func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *Isilo
 }
 
 var (
-	isVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, ns, srcVolumeName string) bool {
-		return isiConfig.isiSvc.IsVolumeExistent
-	}
-
 	getVolumeSizeFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, srcVolumeName string) int64 {
 		return isiConfig.isiSvc.GetVolumeSize
 	}
@@ -999,6 +996,40 @@ func (s *service) DeleteVolume(
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
+var (
+	getZoneByNameFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, zoneName string) (*v1.IsiZone, error) {
+		return isiConfig.isiSvc.GetZoneByName
+	}
+
+	getSnapshotIsiPathComponentsFunc = func(isiConfig *IsilonClusterConfig) func(exportPath, zonePath string) (string, string, string) {
+		return isiConfig.isiSvc.GetSnapshotIsiPathComponents
+	}
+
+	getSnapshotTrackingDirNameFunc = func(isiConfig *IsilonClusterConfig) func(snapshotName string) string {
+		return isiConfig.isiSvc.GetSnapshotTrackingDirName
+	}
+
+	isVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeID, volumeEntry string) bool {
+		return isiConfig.isiSvc.IsVolumeExistent
+	}
+
+	deleteVolumeFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeSelector string) error {
+		return isiConfig.isiSvc.DeleteVolume
+	}
+
+	getSubDirectoryCountFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeSelector string) (int64, error) {
+		return isiConfig.isiSvc.GetSubDirectoryCount
+	}
+
+	unexportByIDWithZoneFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, exportID int, zoneName string) error {
+		return isiConfig.isiSvc.UnexportByIDWithZone
+	}
+
+	removeSnapshotFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, snapID int64, snapName string) error {
+		return isiConfig.isiSvc.client.RemoveSnapshot
+	}
+)
+
 func (s *service) processSnapshotTrackingDirectoryDuringDeleteVolume(
 	ctx context.Context,
 	volName string,
@@ -1012,30 +1043,30 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteVolume(
 	ctx, log, _ := GetRunIDLog(ctx)
 
 	// Get Zone Path
-	zone, err := isiConfig.isiSvc.GetZoneByName(ctx, accessZone)
+	zone, err := getZoneByNameFunc(isiConfig)(ctx, accessZone)
 	if err != nil {
 		return err
 	}
 	// Delete the snapshot tracking directory entry for this volume
-	isiPath, snapshotName, _ := isiConfig.isiSvc.GetSnapshotIsiPathComponents(exportPath, zone.Path)
+	isiPath, snapshotName, _ := getSnapshotIsiPathComponentsFunc(isiConfig)(exportPath, zone.Path)
 	log.Debugf("snapshot name associated with volume '%s' is '%s'", volName, snapshotName)
 
 	// Populate names for snapshot's tracking dir, snapshot tracking dir entry for this volume
 	// and snapshot delete marker
-	snapshotTrackingDir := isiConfig.isiSvc.GetSnapshotTrackingDirName(snapshotName)
+	snapshotTrackingDir := getSnapshotTrackingDirNameFunc(isiConfig)(snapshotName)
 	snapshotTrackingDirEntryForVolume := path.Join(snapshotTrackingDir, volName)
 	snapshotTrackingDirDeleteMarker := path.Join(snapshotTrackingDir, DeleteSnapshotMarker)
 
 	log.Debugf("Delete the snapshot tracking directory entry '%s' for volume '%s'", snapshotTrackingDirEntryForVolume, volName)
-	if isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", snapshotTrackingDirEntryForVolume) {
-		if err := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, snapshotTrackingDirEntryForVolume); err != nil {
+	if isVolumeExistentFunc(isiConfig)(ctx, isiPath, "", snapshotTrackingDirEntryForVolume) {
+		if err := deleteVolumeFunc(isiConfig)(ctx, isiPath, snapshotTrackingDirEntryForVolume); err != nil {
 			return err
 		}
 	}
 
 	// Get subdirectories count of snapshot tracking dir.
 	// Every directory will have two subdirectory entries . and ..
-	totalSubDirectories, err := isiConfig.isiSvc.GetSubDirectoryCount(ctx, isiPath, snapshotTrackingDir)
+	totalSubDirectories, err := getSubDirectoryCountFunc(isiConfig)(ctx, isiPath, snapshotTrackingDir)
 	if err != nil {
 		log.Errorf("failed to get subdirectories count of snapshot tracking dir '%s'", snapshotTrackingDir)
 		return nil
@@ -1043,22 +1074,22 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteVolume(
 
 	// Delete snapshot tracking directory, if required (i.e., if there is a
 	// snapshot delete marker as a result of snapshot deletion on k8s side)
-	if isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", snapshotTrackingDirDeleteMarker) {
+	if isVolumeExistentFunc(isiConfig)(ctx, isiPath, "", snapshotTrackingDirDeleteMarker) {
 		// There are no more volumes present which were created using this snapshot
 		// This indicates that there are only three subdirectories ., .. and snapshot delete marker.
 		if totalSubDirectories == 3 {
-			err = isiConfig.isiSvc.UnexportByIDWithZone(ctx, export.ID, "")
+			err = unexportByIDWithZoneFunc(isiConfig)(ctx, export.ID, "")
 			if err != nil {
 				log.Errorf("failed to delete snapshot directory export with id '%v'", export.ID)
 				return nil
 			}
 			// Delete snapshot tracking directory
-			if err := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, snapshotTrackingDir); err != nil {
+			if err := deleteVolumeFunc(isiConfig)(ctx, isiPath, snapshotTrackingDir); err != nil {
 				log.Errorf("error while deleting snapshot tracking directory '%s'", path.Join(isiPath, snapshotName))
 				return nil
 			}
 			// Delete snapshot
-			err = isiConfig.isiSvc.client.RemoveSnapshot(context.Background(), -1, snapshotName)
+			err = removeSnapshotFunc(isiConfig)(context.Background(), -1, snapshotName)
 			if err != nil {
 				log.Errorf("error deleting snapshot: '%s'", err.Error())
 				return nil
@@ -1068,7 +1099,7 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteVolume(
 
 	if totalSubDirectories == 2 {
 		// Delete snapshot tracking directory
-		if err := isiConfig.isiSvc.DeleteVolume(ctx, isiPath, snapshotTrackingDir); err != nil {
+		if err := deleteVolumeFunc(isiConfig)(ctx, isiPath, snapshotTrackingDir); err != nil {
 			log.Errorf("error while deleting snapshot tracking directory '%s'", path.Join(isiPath, snapshotName))
 			return nil
 		}
