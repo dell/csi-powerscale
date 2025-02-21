@@ -49,6 +49,7 @@ var (
 		return s.ControllerPublishVolume
 	}
 	getUtilsGetFQDNByIP = utils.GetFQDNByIP
+	getK8sutilsGetStats = k8sutils.GetStats
 )
 
 func (s *service) NodeExpandVolume(
@@ -517,7 +518,7 @@ func (s *service) NodeGetVolumeStats(
 	}
 
 	// Get Volume stats metrics
-	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := k8sutils.GetStats(ctx, volPath)
+	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := getK8sutilsGetStats(ctx, volPath)
 	if err != nil {
 		return &csi.NodeGetVolumeStatsResponse{
 			Usage: []*csi.VolumeUsage{

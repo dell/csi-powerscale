@@ -29,16 +29,17 @@ import (
 	"golang.org/x/net/context"
 )
 
-// TODO: Fix this test and uncomment it.
 func TestNodeGetVolumeStats(t *testing.T) {
 	originalGetIsVolumeExistentFunc := getIsVolumeExistentFunc
 	originalGetIsVolumeMounted := getIsVolumeMounted
 	originalGetOsReadDir := getOsReadDir
+	originalGetK8sutilsGetStats := getK8sutilsGetStats
 
 	after := func() {
 		getIsVolumeExistentFunc = originalGetIsVolumeExistentFunc
 		getIsVolumeMounted = originalGetIsVolumeMounted
 		getOsReadDir = originalGetOsReadDir
+		getK8sutilsGetStats = originalGetK8sutilsGetStats
 	}
 
 	IsiClusters := new(sync.Map)
@@ -79,7 +80,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		wantErr      bool
 	}{
 		{
-			name: "Valid volume ID",
+			name: "Failed to get volume stats metrics",
 			ctx:  context.Background(),
 			req: &csi.NodeGetVolumeStatsRequest{
 				VolumeId:   "volume-id",
@@ -108,6 +109,107 @@ func TestNodeGetVolumeStats(t *testing.T) {
 					Abnormal: false,
 					Message:  "failed to get volume stats metrics : rpc error: code = Internal desc = failed to get volume stats: no such file or directory",
 				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "No volume is mounted at path",
+			ctx:  context.Background(),
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   "volume-id",
+				VolumePath: "/path/to/volume",
+			},
+			setup: func() {
+				getIsVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, volID, name string) bool {
+					return func(ctx context.Context, isiPath, volID, name string) bool {
+						return true
+					}
+				}
+
+				getIsVolumeMounted = func(ctx context.Context, filterStr string, target string) (bool, error) {
+					return false, errors.New("test error msg")
+				}
+			},
+			wantResponse: &csi.NodeGetVolumeStatsResponse{
+				Usage: []*csi.VolumeUsage{
+					{},
+				},
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: true,
+					Message:  "no volume is mounted at path: test error msg",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Volume Path is not accessible",
+			ctx:  context.Background(),
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   "volume-id",
+				VolumePath: "/path/to/volume",
+			},
+			setup: func() {
+				getIsVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, volID, name string) bool {
+					return func(ctx context.Context, isiPath, volID, name string) bool {
+						return true
+					}
+				}
+
+				getIsVolumeMounted = func(ctx context.Context, filterStr string, target string) (bool, error) {
+					return true, nil
+				}
+
+				getOsReadDir = func(path string) ([]os.DirEntry, error) {
+					return []os.DirEntry{}, errors.New("volume Path is not accessible")
+				}
+			},
+			wantResponse: &csi.NodeGetVolumeStatsResponse{
+				Usage: []*csi.VolumeUsage{
+					{},
+				},
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: true,
+					Message:  "volume Path is not accessible: volume Path is not accessible",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Success in NodeGetVolumeStats",
+			ctx:  context.Background(),
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   "volume-id",
+				VolumePath: "/path/to/volume",
+			},
+			setup: func() {
+				getIsVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, volID, name string) bool {
+					return func(ctx context.Context, isiPath, volID, name string) bool {
+						return true
+					}
+				}
+
+				getIsVolumeMounted = func(ctx context.Context, filterStr string, target string) (bool, error) {
+					return true, nil
+				}
+
+				getOsReadDir = func(path string) ([]os.DirEntry, error) {
+					return []os.DirEntry{}, nil
+				}
+
+				getK8sutilsGetStats = func(ctx context.Context, volumePath string) (int64, int64, int64, int64, int64, int64, error) {
+					return 0, 0, 0, 0, 0, 0, nil
+				}
+			},
+			wantResponse: &csi.NodeGetVolumeStatsResponse{
+				Usage: []*csi.VolumeUsage{
+					{
+						Unit: csi.VolumeUsage_BYTES,
+					},
+					{
+						Unit: csi.VolumeUsage_INODES,
+					},
+				},
+				VolumeCondition: &csi.VolumeCondition{},
 			},
 			wantErr: false,
 		},
