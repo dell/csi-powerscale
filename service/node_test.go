@@ -30,33 +30,51 @@ import (
 )
 
 // TODO: Fix this test and uncomment it.
-/*
 func TestNodeGetVolumeStats(t *testing.T) {
 	originalGetIsVolumeExistentFunc := getIsVolumeExistentFunc
-	getIsVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, volID, name string) bool {
-		return func(ctx context.Context, isiPath, volID, name string) bool {
-			return true
-		}
-	}
-
-	defer func() { getIsVolumeExistentFunc = originalGetIsVolumeExistentFunc }()
-
 	originalGetIsVolumeMounted := getIsVolumeMounted
-	getIsVolumeMounted = func(ctx context.Context, filterStr string, target string) (bool, error) {
-		return true, nil
-	}
-	defer func() { getIsVolumeMounted = originalGetIsVolumeMounted }()
-
 	originalGetOsReadDir := getOsReadDir
-	getOsReadDir = func(path string) ([]os.DirEntry, error) {
-		return []os.DirEntry{}, nil
+
+	after := func() {
+		getIsVolumeExistentFunc = originalGetIsVolumeExistentFunc
+		getIsVolumeMounted = originalGetIsVolumeMounted
+		getOsReadDir = originalGetOsReadDir
 	}
-	defer func() { getOsReadDir = originalGetOsReadDir }()
+
+	IsiClusters := new(sync.Map)
+	testBool := false
+	testIsilonClusterConfig := IsilonClusterConfig{
+		ClusterName:               "TestCluster",
+		Endpoint:                  "http://testendpoint",
+		EndpointPort:              "8080",
+		MountEndpoint:             "http://mountendpoint",
+		EndpointURL:               "http://endpointurl",
+		accessZone:                "TestAccessZone",
+		User:                      "testuser",
+		Password:                  "testpassword",
+		SkipCertificateValidation: &testBool,
+		IsiPath:                   "/ifs/data",
+		IsiVolumePathPermissions:  "0777",
+		IsDefault:                 &testBool,
+		ReplicationCertificateID:  "certID",
+		IgnoreUnresolvableHosts:   &testBool,
+		isiSvc: &isiService{
+			endpoint: "http://testendpoint:8080",
+			client:   &isi.Client{},
+		},
+	}
+
+	IsiClusters.Store(testIsilonClusterConfig.ClusterName, &testIsilonClusterConfig)
+	s := &service{
+		defaultIsiClusterName: "TestCluster",
+		isiClusters:           IsiClusters,
+	}
 
 	tests := []struct {
 		name         string
 		ctx          context.Context
 		req          *csi.NodeGetVolumeStatsRequest
+		setup        func()
 		wantResponse *csi.NodeGetVolumeStatsResponse
 		wantErr      bool
 	}{
@@ -66,6 +84,21 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			req: &csi.NodeGetVolumeStatsRequest{
 				VolumeId:   "volume-id",
 				VolumePath: "/path/to/volume",
+			},
+			setup: func() {
+				getIsVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, volID, name string) bool {
+					return func(ctx context.Context, isiPath, volID, name string) bool {
+						return true
+					}
+				}
+
+				getIsVolumeMounted = func(ctx context.Context, filterStr string, target string) (bool, error) {
+					return true, nil
+				}
+
+				getOsReadDir = func(path string) ([]os.DirEntry, error) {
+					return []os.DirEntry{}, nil
+				}
 			},
 			wantResponse: &csi.NodeGetVolumeStatsResponse{
 				Usage: []*csi.VolumeUsage{
@@ -82,34 +115,11 @@ func TestNodeGetVolumeStats(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			IsiClusters := new(sync.Map)
-			testBool := false
-			testIsilonClusterConfig := IsilonClusterConfig{
-				ClusterName:               "TestCluster",
-				Endpoint:                  "http://testendpoint",
-				EndpointPort:              "8080",
-				MountEndpoint:             "http://mountendpoint",
-				EndpointURL:               "http://endpointurl",
-				accessZone:                "TestAccessZone",
-				User:                      "testuser",
-				Password:                  "testpassword",
-				SkipCertificateValidation: &testBool,
-				IsiPath:                   "/ifs/data",
-				IsiVolumePathPermissions:  "0777",
-				IsDefault:                 &testBool,
-				ReplicationCertificateID:  "certID",
-				IgnoreUnresolvableHosts:   &testBool,
-				isiSvc: &isiService{
-					endpoint: "http://testendpoint:8080",
-					client:   &isi.Client{},
-				},
+			defer after()
+			if tt.setup != nil {
+				tt.setup()
 			}
 
-			IsiClusters.Store(testIsilonClusterConfig.ClusterName, &testIsilonClusterConfig)
-			s := &service{
-				defaultIsiClusterName: "TestCluster",
-				isiClusters:           IsiClusters,
-			}
 			got, err := s.NodeGetVolumeStats(tt.ctx, tt.req)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NodeGetVolumeStats() error = %v, wantErr %v", err, tt.wantErr)
@@ -120,7 +130,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			}
 		})
 	}
-}*/
+}
 
 func TestEphemeralNodePublish(t *testing.T) {
 	ctx := context.Background()
@@ -186,9 +196,8 @@ func TestEphemeralNodePublish(t *testing.T) {
 	}
 
 	type testCase struct {
-		name string
-		req  *csi.NodePublishVolumeRequest
-		//mockedFuncs mockedFuncsStruct
+		name     string
+		req      *csi.NodePublishVolumeRequest
 		expected *csi.NodePublishVolumeResponse
 		wantErr  bool
 		setup    func()
@@ -581,11 +590,11 @@ func TestEphemeralNodePublish(t *testing.T) {
 			// Calling the function
 			got, err := s.ephemeralNodePublish(ctx, tc.req)
 			if (err != nil) != tc.wantErr {
-				t.Errorf("NodeGetVolumeStats() error = %v, wantErr %v", err, tc.wantErr)
+				t.Errorf("ephemeralNodePublish() error = %v, wantErr %v", err, tc.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tc.expected) {
-				t.Errorf("NodeGetVolumeStats() = %v, want %v", got, tc.expected)
+				t.Errorf("ephemeralNodePublish() = %v, want %v", got, tc.expected)
 			}
 		})
 	}
