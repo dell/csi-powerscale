@@ -33,13 +33,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// func init() {
-// 	err := os.Setenv(constants.EnvGOCSIDebug, "true")
-// 	if err != nil {
-// 		fmt.Fprintf(os.Stderr, "unable to set %s to true \n", constants.EnvGOCSIDebug)
-// 	}
-// }
-
 func main() {
 	mainR(gocsi.Run, func(kubeconfig string) (kubernetes.Interface, error) {
 		return k8sutils.CreateKubeClientSet(kubeconfig)

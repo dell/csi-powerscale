@@ -28,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/akutz/gournal"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
 	"github.com/dell/csi-isilon/v2/common/constants"
 	"github.com/sirupsen/logrus"
@@ -35,7 +37,19 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/spf13/viper"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"k8s.io/client-go/kubernetes/fake"
 )
+
+// commenting this out for now, as it is an integration test
 
 func TestMain(m *testing.M) {
 	status := 0
@@ -229,6 +243,31 @@ func TestServiceInitializeServiceOpts(t *testing.T) {
 	os.Unsetenv(constants.EnvIsilonConfigFile)
 	serviceInstance.initializeServiceOpts(ctx)
 	assert.Equal(t, wantEnvNodeIP, serviceInstance.nodeIP)
+
+	os.Unsetenv(constants.EnvPort)
+	serviceInstance.initializeServiceOpts(ctx)
+	assert.Equal(t, constants.DefaultPortNumber, serviceInstance.opts.Port)
+
+	os.Unsetenv(constants.EnvPath)
+	serviceInstance.initializeServiceOpts(ctx)
+	assert.Equal(t, constants.DefaultIsiPath, serviceInstance.opts.Path)
+
+	os.Unsetenv(constants.EnvIsiVolumePathPermissions)
+	serviceInstance.initializeServiceOpts(ctx)
+	assert.Equal(t, constants.DefaultIsiVolumePathPermissions, serviceInstance.opts.IsiVolumePathPermissions)
+
+	os.Unsetenv(constants.EnvAccessZone)
+	serviceInstance.initializeServiceOpts(ctx)
+	assert.Equal(t, constants.DefaultAccessZone, serviceInstance.opts.AccessZone)
+
+	// parsing error
+	os.Setenv(constants.EnvMaxVolumesPerNode, "test!@#$")
+	serviceInstance.initializeServiceOpts(ctx)
+	assert.EqualValues(t, 0, serviceInstance.opts.MaxVolumesPerNode)
+
+	os.Setenv(constants.EnvAllowedNetworks, "!@#")
+	err := serviceInstance.initializeServiceOpts(ctx)
+	assert.NotNil(t, err)
 }
 
 func TestSyncIsilonConfigs(t *testing.T) {
@@ -498,4 +537,423 @@ func TestGetIsilonConfig(t *testing.T) {
 	}
 	_, err := s.getIsilonConfig(ctx, &clusterName)
 	assert.NotEqual(t, "nil", err)
+}
+
+func TestIsVolumeTypeBlock(t *testing.T) {
+	// Test case: empty VolumeCapabilities
+	vcs := []*csi.VolumeCapability{}
+	isBlock := isVolumeTypeBlock(vcs)
+	if isBlock {
+		t.Errorf("isVolumeTypeBlock returned true, expected false")
+	}
+
+	// Test case: VolumeCapability with Block access type
+	block := &csi.VolumeCapability_BlockVolume{}
+	accessType := &csi.VolumeCapability_Block{Block: block}
+	vc := &csi.VolumeCapability{AccessType: accessType}
+	vcs = []*csi.VolumeCapability{vc}
+	isBlock = isVolumeTypeBlock(vcs)
+	if !isBlock {
+		t.Errorf("isVolumeTypeBlock returned false, expected true")
+	}
+	/*
+	   // Test case: VolumeCapability with Mount access type
+	   mount := &csi.VolumeCapability_Mount{Mount: &csi.VolumeCapability_MountVolume{}}
+	   accessType = &csi.VolumeCapability_Mount{Mount: mount}
+	   vc = &csi.VolumeCapability{AccessType: accessType}
+	   vcs = []*csi.VolumeCapability{vc}
+	   isBlock = isVolumeTypeBlock(vcs)
+
+	   	if isBlock {
+	   		t.Errorf("isVolumeTypeBlock returned true, expected false")
+	   	}
+	*/
+}
+
+func TestString(t *testing.T) {
+	trueVar := true
+	clusterConfig := IsilonClusterConfig{
+		ClusterName:               "cluster1",
+		Endpoint:                  "1.2.3.4",
+		EndpointPort:              "8080",
+		MountEndpoint:             "https://1.2.3.4:8080",
+		EndpointURL:               "https://1.2.3.4:8080",
+		accessZone:                "System",
+		User:                      "user1",
+		Password:                  "password1",
+		IsiPath:                   "/ifs/data/csi-isilon",
+		IsDefault:                 &trueVar,
+		SkipCertificateValidation: &trueVar,
+		IgnoreUnresolvableHosts:   &trueVar,
+		IsiVolumePathPermissions:  "0777",
+		isiSvc:                    &isiService{},
+		ReplicationCertificateID:  "replicationCertificateID",
+	}
+	expectedOutput := "ClusterName: cluster1, Endpoint: 1.2.3.4, EndpointPort: 8080, EndpointURL: https://1.2.3.4:8080, User: user1, SkipCertificateValidation: true, IsiPath: /ifs/data/csi-isilon, IsiVolumePathPermissions: 0777, IsDefault: true, IgnoreUnresolvableHosts: true, AccessZone: System, isiSvc: &{ <nil>}"
+
+	// Call the function that prints to stdout
+	capturedOutput := clusterConfig.String()
+
+	// Compare the captured output to the expected output
+	if capturedOutput != expectedOutput {
+		t.Errorf("Captured output '%s' does not match expected output '%s'", capturedOutput, expectedOutput)
+	}
+}
+
+func TestValidateCreateVolumeRequest(t *testing.T) {
+	o := Opts{
+		Path: "path",
+	}
+	s := service{
+		opts: o,
+	}
+	// Test case: empty CreateVolumeRequest
+	req := &csi.CreateVolumeRequest{}
+	size, err := s.ValidateCreateVolumeRequest(req)
+	if err == nil {
+		t.Errorf("ValidateCreateVolumeRequest returned nil error, expected error")
+	}
+
+	// Test case: valid CreateVolumeRequest
+	req = &csi.CreateVolumeRequest{
+		Name: "volume1",
+		CapacityRange: &csi.CapacityRange{
+			RequiredBytes: 10 * 1024 * 1024 * 1024,
+		},
+		VolumeCapabilities: []*csi.VolumeCapability{
+			{
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{
+						FsType: "nfs",
+					},
+				},
+				AccessMode: &csi.VolumeCapability_AccessMode{
+					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				},
+			},
+		},
+		Parameters: map[string]string{
+			AccessZoneParam: "System",
+			IsiPathParam:    "/ifs/data/csi-isilon",
+		},
+	}
+	expectedSize := int64(10 * 1024 * 1024 * 1024)
+	size, err = s.ValidateCreateVolumeRequest(req)
+	if err != nil {
+		t.Errorf("ValidateCreateVolumeRequest returned error '%s', expected nil", err.Error())
+	}
+	if size != expectedSize {
+		t.Errorf("ValidateCreateVolumeRequest returned size '%d', expected '%d'", size, expectedSize)
+	}
+
+	// Test case: invalid CreateVolumeRequest
+	req = &csi.CreateVolumeRequest{
+		Name: "volume1",
+		CapacityRange: &csi.CapacityRange{
+			RequiredBytes: -1,
+		},
+		VolumeCapabilities: []*csi.VolumeCapability{
+			{
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{
+						FsType: "nfs",
+					},
+				},
+				AccessMode: &csi.VolumeCapability_AccessMode{
+					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				},
+			},
+		},
+		Parameters: map[string]string{
+			AccessZoneParam: "System",
+			IsiPathParam:    "/ifs/data/csi-isilon",
+		},
+	}
+	_, err = s.ValidateCreateVolumeRequest(req)
+	if err == nil {
+		t.Errorf("ValidateCreateVolumeRequest returned nil error, expected error")
+	}
+
+	// block type error
+	// TODO: Adjust this to hit the uncovered error condition
+	/*
+		req = &csi.CreateVolumeRequest{
+			Name: "volume1",
+			CapacityRange: &csi.CapacityRange{
+				RequiredBytes: -1,
+			},
+			VolumeCapabilities: []*csi.VolumeCapability{
+				{
+					AccessType: &csi.VolumeCapability_Block{},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+			},
+			Parameters: map[string]string{
+				AccessZoneParam: "System",
+				IsiPathParam:    "/ifs/data/csi-isilon",
+			},
+		}
+		_, err = s.ValidateCreateVolumeRequest(req)
+		if err == nil {
+			t.Errorf("ValidateCreateVolumeRequest returned nil error, expected error")
+		}*/
+}
+
+// Mocking the service struct
+// We will mock this method to control its behavior in tests
+type mockService struct {
+	service
+	mock.Mock
+}
+
+func (m *mockService) syncIsilonConfigs(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *mockService) probe(ctx context.Context, isiConfig *IsilonClusterConfig) error {
+	args := m.Called(ctx, isiConfig)
+	return args.Error(0)
+}
+
+func TestUpdateDriverConfigParams(t *testing.T) {
+	// Create a mock service
+	mockSvc := new(mockService)
+	// Create a new Viper instance and set test configuration
+	v := viper.New()
+	v.Set(constants.ParamCSILogLevel, "debug") // Example log level
+	mockSvc.On("syncIsilonConfigs", mock.Anything).Return(nil)
+	err := mockSvc.updateDriverConfigParams(context.Background(), v)
+	assert.NotEqual(t, nil, err)
+
+	v = viper.New()
+	v.Set(constants.ParamCSILogLevel, "invalid-log-level")
+	err = mockSvc.updateDriverConfigParams(context.Background(), v)
+	// Assertions
+	assert.Error(t, err, "Expected error due to invalid log level")
+	assert.Contains(t, err.Error(), "not valid", "Error message should indicate invalid log level")
+
+	v = viper.New()
+	v.Set(constants.ParamCSILogLevel, "info")
+
+	// Mock syncIsilonConfigs to return an error
+	syncErr := errors.New("sync failure")
+	mockSvc.On("syncIsilonConfigs", mock.Anything).Return(syncErr)
+	err = mockSvc.updateDriverConfigParams(context.Background(), v)
+	assert.NotEqual(t, nil, err)
+}
+
+func TestLogServiceStats(t *testing.T) {
+	s := &service{
+		opts: Opts{
+			Path:                      "/test/path",
+			SkipCertificateValidation: true,
+			AutoProbe:                 true,
+			AccessZone:                "test-access-zone",
+			QuotaEnabled:              true,
+		},
+		mode: "test-mode",
+	}
+
+	s.logServiceStats()
+}
+
+func TestGetIsiService(t *testing.T) {
+	s := service{}
+	clusterConfig := IsilonClusterConfig{
+		ClusterName: "cluster1",
+		Password:    "",
+	}
+	err := s.validateOptsParameters(&clusterConfig)
+	assert.NotEqual(t, nil, err)
+}
+
+func TestAutoProbe(t *testing.T) {
+	mockSvc := new(mockService)
+	mockSvc.opts.AutoProbe = false
+	ctx := context.Background()
+	isiConfig := &IsilonClusterConfig{}
+
+	err := mockSvc.autoProbe(ctx, isiConfig)
+
+	assert.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+
+	mockSvc = new(mockService)
+	mockSvc.opts.AutoProbe = true
+	mockSvc.On("probe", ctx, isiConfig).Return(nil).Twice()
+
+	err = mockSvc.autoProbe(ctx, isiConfig)
+
+	assert.Error(t, err)
+}
+
+func TestValidateDeleteVolumeRequest(t *testing.T) {
+	mockSvc := new(mockService)
+	ctx := context.Background()
+
+	req := &csi.DeleteVolumeRequest{VolumeId: "1234"}
+	mockSvc.On("ValidateDeleteVolumeRequest", ctx, req).Return(nil).Twice()
+	err := mockSvc.ValidateDeleteVolumeRequest(ctx, req)
+	assert.Error(t, err)
+
+	// empty volume id
+	mockSvc = new(mockService)
+
+	req = &csi.DeleteVolumeRequest{VolumeId: ""}
+	err = mockSvc.ValidateDeleteVolumeRequest(ctx, req)
+	assert.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), "no volume id is provided")
+}
+
+func TestLogStatistics(t *testing.T) {
+	s := service{
+		statisticsCounter: -1,
+	}
+	s.logStatistics()
+}
+
+func TestProbe(t *testing.T) {
+	s := service{
+		mode: constants.ModeController,
+	}
+	ctx := context.Background()
+	clusterConfig := IsilonClusterConfig{
+		ClusterName: "c1",
+	}
+	err := s.probe(ctx, &clusterConfig)
+	assert.NotEqual(t, nil, err)
+
+	s = service{
+		mode: constants.ModeNode,
+	}
+	err = s.probe(ctx, &clusterConfig)
+	assert.NotEqual(t, nil, err)
+
+	s = service{
+		mode: "",
+	}
+	err = s.probe(ctx, &clusterConfig)
+	assert.NotEqual(t, nil, err)
+
+	s = service{
+		mode: "error",
+	}
+	err = s.probe(ctx, &clusterConfig)
+	assert.NotEqual(t, nil, err)
+}
+
+func TestSetNoProbeOnStart(t *testing.T) {
+	s := service{}
+	ctx := context.Background()
+	s.setNoProbeOnStart(ctx)
+}
+
+func TestGetGournalLevel(t *testing.T) {
+	logLevel := logrus.InfoLevel
+	level := getGournalLevelFromLogrusLevel(logLevel)
+	assert.Equal(t, gournal.ParseLevel(logLevel.String()), level)
+}
+
+func TestValidateIsiPath(t *testing.T) {
+	// Create a new instance of the service struct
+	client := fake.NewSimpleClientset()
+	s := &service{
+		k8sclient: client,
+	}
+	s.k8sclient = client
+
+	// Create a context.Context
+	ctx := context.Background()
+
+	// Create a fake PersistentVolume and StorageClass
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pv",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			StorageClassName: "test-sc",
+		},
+	}
+	sc := &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-sc",
+		},
+		Parameters: map[string]string{
+			IsiPathParam: "/ifs/data",
+		},
+	}
+
+	// Add the PersistentVolume and StorageClass to the fake clientset
+	_, err := s.k8sclient.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create PersistentVolume: %v", err)
+	}
+	_, err = s.k8sclient.StorageV1().StorageClasses().Create(ctx, sc, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create StorageClass: %v", err)
+	}
+
+	// Test case: valid isiPath
+	volName := "test-pv"
+	expectedIsiPath := "/ifs/data"
+	isiPath, err := s.validateIsiPath(ctx, volName)
+	if err != nil {
+		t.Errorf("expected no error, got: %v", err)
+	}
+	if isiPath != expectedIsiPath {
+		t.Errorf("expected isiPath %q, got %q", expectedIsiPath, isiPath)
+	}
+
+	// Test case: no isiPath
+	sc.Parameters = map[string]string{}
+	_, err = s.k8sclient.StorageV1().StorageClasses().Update(ctx, sc, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("failed to update StorageClass: %v", err)
+	}
+	isiPath, err = s.validateIsiPath(ctx, volName)
+	if err != nil {
+		t.Errorf("expected no error, got: %v", err)
+	}
+	if isiPath != "" {
+		t.Errorf("expected empty isiPath, got %q", isiPath)
+	}
+
+	// Test case: storage class does not exist
+	pv.Spec.StorageClassName = "nonexistent-sc"
+	_, err = s.k8sclient.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("failed to update PersistentVolume: %v", err)
+	}
+	isiPath, err = s.validateIsiPath(ctx, volName)
+	if err == nil {
+		t.Errorf("expected error, got: %v", err)
+	}
+	if isiPath != "" {
+		t.Errorf("expected empty isiPath, got %q", isiPath)
+	}
+
+	// Test case: empty storage class
+	pv.Spec.StorageClassName = ""
+	_, err = s.k8sclient.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("failed to update PersistentVolume: %v", err)
+	}
+	isiPath, err = s.validateIsiPath(ctx, volName)
+	if err != nil {
+		t.Errorf("expected no error, got: %v", err)
+	}
+	if isiPath != "" {
+		t.Errorf("expected empty isiPath, got %q", isiPath)
+	}
+
+	// Test case: error getting PersistentVolume
+	s.k8sclient.CoreV1().PersistentVolumes().Delete(ctx, "test-pv", metav1.DeleteOptions{})
+	_, err = s.validateIsiPath(ctx, volName)
+	if err == nil {
+		t.Errorf("expected error, got nil")
+	}
 }
