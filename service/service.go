@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -62,7 +62,10 @@ var (
 )
 
 // DriverConfigParamsFile is the name of the input driver config params file
-var DriverConfigParamsFile string
+var (
+	DriverConfigParamsFile string
+	updateMutex            sync.Mutex
+)
 
 // Manifest is the SP's manifest.
 var Manifest = map[string]string{
@@ -112,7 +115,7 @@ type service struct {
 	statisticsCounter     int
 	isiClusters           *sync.Map
 	defaultIsiClusterName string
-	k8sclient             *kubernetes.Clientset
+	k8sclient             kubernetes.Interface
 }
 
 // IsilonClusters To unmarshal secret.yaml file
@@ -819,7 +822,7 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 			}
 		}
 	}
-	utils.UpdateLogLevel(logLevel)
+	utils.UpdateLogLevel(logLevel, &updateMutex)
 	log.Infof("log level set to '%s'", logLevel)
 
 	err := s.syncIsilonConfigs(ctx)
@@ -851,6 +854,10 @@ func (s *service) GetCSINodeIP(_ context.Context) (string, error) {
 }
 
 func (s *service) getVolByName(ctx context.Context, isiPath, volName string, isiConfig *IsilonClusterConfig) (isi.Volume, error) {
+	return getVolByNameFunc(s, ctx, isiPath, volName, isiConfig)
+}
+
+var getVolByNameFunc = func(_ *service, ctx context.Context, isiPath, volName string, isiConfig *IsilonClusterConfig) (isi.Volume, error) {
 	// The `GetVolume` API returns a slice of volumes, but when only passing
 	// in a volume ID, the response will be just the one volume
 	vol, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)

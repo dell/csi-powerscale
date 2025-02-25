@@ -1,7 +1,7 @@
 package main
 
 /*
- Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -30,34 +30,56 @@ import (
 	"github.com/dell/csi-isilon/v2/provider"
 	"github.com/dell/csi-isilon/v2/service"
 	"github.com/dell/gocsi"
+	log "github.com/sirupsen/logrus"
+	"k8s.io/client-go/kubernetes"
 )
 
-func init() {
-	err := os.Setenv(constants.EnvGOCSIDebug, "true")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to set %s to true \n", constants.EnvGOCSIDebug)
+var exitFunc = os.Exit
+
+func validateArgs(driverConfigParamsfile *string) {
+	log.Info("Validating driver config params file argument")
+	if *driverConfigParamsfile == "" {
+		fmt.Fprintf(os.Stderr, "driver-config-params argument is mandatory")
+		exitFunc(1)
 	}
 }
 
-// main is ignored when this package is built as a go plug-in
+func checkLeaderElectionError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to initialize leader election: %v", err)
+		exitFunc(1)
+	}
+}
+
 func main() {
+	mainR(gocsi.Run, func(kubeconfig string) (kubernetes.Interface, error) {
+		return k8sutils.CreateKubeClientSet(kubeconfig)
+	}, func(clientset kubernetes.Interface, lockName, namespace string, renewDeadline, leaseDuration, retryPeriod time.Duration, run func(ctx context.Context)) {
+		k8sutils.LeaderElection(clientset.(*kubernetes.Clientset), lockName, namespace, renewDeadline, leaseDuration, retryPeriod, run)
+	})
+}
+
+func mainR(runFunc func(ctx context.Context, name, desc string, usage string, sp gocsi.StoragePluginProvider), createKubeClientSet func(kubeconfig string) (kubernetes.Interface, error), leaderElection func(clientset kubernetes.Interface, lockName, namespace string, renewDeadline, leaseDuration, retryPeriod time.Duration, run func(ctx context.Context))) {
 	enableLeaderElection := flag.Bool("leader-election", false, "Enables leader election.")
+	log.Info("Enabling leader election")
 	leaderElectionNamespace := flag.String("leader-election-namespace", "", "The namespace where leader election lease will be created. Defaults to the pod namespace if not set.")
+	log.Info("leader-election-namespace = " + *leaderElectionNamespace)
 	leaderElectionLeaseDuration := flag.Duration("leader-election-lease-duration", 15*time.Second, "Duration, in seconds, that non-leader candidates will wait to force acquire leadership")
+	log.Info("leader-election-lease-duration = " + leaderElectionLeaseDuration.String())
 	leaderElectionRenewDeadline := flag.Duration("leader-election-renew-deadline", 10*time.Second, "Duration, in seconds, that the acting leader will retry refreshing leadership before giving up.")
+	log.Info("leader-election-renew-deadline = " + leaderElectionRenewDeadline.String())
 	leaderElectionRetryPeriod := flag.Duration("leader-election-retry-period", 5*time.Second, "Duration, in seconds, the LeaderElector clients should wait between tries of actions")
+	log.Info("leader-election-retry-period = " + leaderElectionRetryPeriod.String())
 	driverConfigParamsfile := flag.String("driver-config-params", "", "yaml file with driver config params")
+	log.Info("driver-config-params = " + *driverConfigParamsfile)
 	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	flag.Parse()
 
-	if *driverConfigParamsfile == "" {
-		fmt.Fprintf(os.Stderr, "driver-config-params argument is mandatory")
-		os.Exit(1)
-	}
+	validateArgs(driverConfigParamsfile)
 	service.DriverConfigParamsFile = *driverConfigParamsfile
 
 	run := func(ctx context.Context) {
-		gocsi.Run(
+		runFunc(
 			ctx,
 			constants.PluginName,
 			"An Isilon Container Storage Interface (CSI) Plugin",
@@ -65,18 +87,17 @@ func main() {
 			provider.New())
 	}
 
-	if !*enableLeaderElection {
+	if *enableLeaderElection == false {
 		run(context.TODO())
 	} else {
 		driverName := strings.Replace(constants.PluginName, ".", "-", -1)
 		lockName := fmt.Sprintf("driver-%s", driverName)
-		k8sclientset, err := k8sutils.CreateKubeClientSet(*kubeconfig)
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "failed to initialize leader election: %v", err)
-			os.Exit(1)
-		}
+		k8sclientset, err := createKubeClientSet(*kubeconfig)
+		log.Info("Checking for leader election error")
+		checkLeaderElectionError(err)
 		// Attempt to become leader and start the driver
-		k8sutils.LeaderElection(k8sclientset, lockName, *leaderElectionNamespace,
+		log.Info("Starting leader election")
+		leaderElection(k8sclientset, lockName, *leaderElectionNamespace,
 			*leaderElectionRenewDeadline, *leaderElectionLeaseDuration, *leaderElectionRetryPeriod, run)
 	}
 }
