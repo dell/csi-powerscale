@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019-2023 Dell Inc, or its subsidiaries.
+Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,6 +71,25 @@ func TestMkdirExistingFile(t *testing.T) {
 	path := basepath + "/file"
 	file, err := os.Create(path)
 	assert.NoError(t, err)
+	file.Close()
+
+	// Test creating a directory with an existing file path
+	created, err := mkdir(ctx, path)
+	assert.Error(t, err)
+	assert.False(t, created)
+}
+
+func TestMkdirNotExistingFile(t *testing.T) {
+	ctx := context.Background()
+
+	// Make temp directory to use for testing
+	basepath, err := os.MkdirTemp("/tmp", "*")
+	assert.NoError(t, err)
+	defer os.RemoveAll(basepath)
+
+	path := ""
+	file, err := os.Create(path)
+	assert.Error(t, err)
 	file.Close()
 
 	// Test creating a directory with an existing file path

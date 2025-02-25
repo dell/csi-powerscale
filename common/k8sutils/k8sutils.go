@@ -1,7 +1,5 @@
-package k8sutils
-
 /*
- Copyright (c) 2020-2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2020-2025 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -15,6 +13,8 @@ package k8sutils
  See the License for the specific language governing permissions and
  limitations under the License.
 */
+
+package k8sutils
 
 import (
 	"context"
@@ -31,6 +31,16 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+var (
+	buildConfigFromFlags = clientcmd.BuildConfigFromFlags
+	newForConfig         = kubernetes.NewForConfig
+	inClusterConfig      = rest.InClusterConfig
+)
+
+var fsInfo = func(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
+	return gofsutil.FsInfo(ctx, path)
+}
+
 type leaderElection interface {
 	Run() error
 	WithNamespace(namespace string)
@@ -41,22 +51,22 @@ func CreateKubeClientSet(kubeconfig string) (*kubernetes.Clientset, error) {
 	var clientset *kubernetes.Clientset
 	if kubeconfig != "" {
 		// use the current context in kubeconfig
-		config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+		config, err := buildConfigFromFlags("", kubeconfig)
 		if err != nil {
 			return nil, err
 		}
 		// create the clientset
-		clientset, err = kubernetes.NewForConfig(config)
+		clientset, err = newForConfig(config)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		config, err := rest.InClusterConfig()
+		config, err := inClusterConfig()
 		if err != nil {
 			return nil, err
 		}
 		// creates the clientset
-		clientset, err = kubernetes.NewForConfig(config)
+		clientset, err = newForConfig(config)
 		if err != nil {
 			return nil, err
 		}
@@ -81,7 +91,7 @@ func LeaderElection(clientset *kubernetes.Clientset, lockName string, namespace 
 
 // GetStats - Returns the stats for the volume mounted on given volume path
 func GetStats(ctx context.Context, volumePath string) (int64, int64, int64, int64, int64, int64, error) {
-	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := gofsutil.FsInfo(ctx, volumePath)
+	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := fsInfo(ctx, volumePath)
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, status.Error(codes.Internal, fmt.Sprintf(
 			"failed to get volume stats: %s", err))

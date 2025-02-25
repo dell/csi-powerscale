@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -33,6 +34,22 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+)
+
+var (
+	getIsVolumeExistentFunc = func(isiConfig *IsilonClusterConfig) func(context.Context, string, string, string) bool {
+		return isiConfig.isiSvc.IsVolumeExistent
+	}
+	getIsVolumeMounted  = isVolumeMounted
+	getOsReadDir        = os.ReadDir
+	getCreateVolumeFunc = func(s *service) func(context.Context, *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+		return s.CreateVolume
+	}
+	getControllerPublishVolume = func(s *service) func(context.Context, *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+		return s.ControllerPublishVolume
+	}
+	getUtilsGetFQDNByIP = utils.GetFQDNByIP
+	getK8sutilsGetStats = k8sutils.GetStats
 )
 
 func (s *service) NodeExpandVolume(
@@ -206,7 +223,7 @@ func (s *service) NodeUnpublishVolume(
 
 	if _, err := os.Stat(lockFile); err == nil {
 		isEphemeralVolume = true
-		data, err = os.ReadFile(filepath.Clean(lockFile))
+		data, err = readFileFunc(filepath.Clean(lockFile))
 		if err != nil {
 			return nil, errors.New("unable to get volume id for ephemeral volume")
 		}
@@ -457,14 +474,17 @@ func (s *service) NodeGetVolumeStats(
 		return nil, err
 	}
 
-	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, volName, "") {
+	isVolumeExistentFunc := getIsVolumeExistentFunc(isiConfig)
+	isVolumeExistent := isVolumeExistentFunc(ctx, volName, volPath, "")
+
+	if !isVolumeExistent {
 		abnormal = true
 		message = fmt.Sprintf("volume %v does not exists at this path %v", volName, isiPath)
 	}
 
 	// check whether the original volume is mounted
 	if !abnormal {
-		isMounted, err := isVolumeMounted(ctx, volName, volPath)
+		isMounted, err := getIsVolumeMounted(ctx, volName, volPath)
 		if !isMounted {
 			abnormal = true
 			message = fmt.Sprintf("no volume is mounted at path: %s", err)
@@ -473,7 +493,7 @@ func (s *service) NodeGetVolumeStats(
 
 	// check whether volume path is accessible
 	if !abnormal {
-		_, err = os.ReadDir(volPath)
+		_, err = getOsReadDir(volPath)
 		if err != nil {
 			abnormal = true
 			message = fmt.Sprintf("volume Path is not accessible: %s", err)
@@ -498,7 +518,7 @@ func (s *service) NodeGetVolumeStats(
 	}
 
 	// Get Volume stats metrics
-	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := k8sutils.GetStats(ctx, volPath)
+	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := getK8sutilsGetStats(ctx, volPath)
 	if err != nil {
 		return &csi.NodeGetVolumeStatsResponse{
 			Usage: []*csi.VolumeUsage{
@@ -546,7 +566,8 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 
 	volID := req.GetVolumeId()
 	volName := fmt.Sprintf("ephemeral-%s", volID)
-	createEphemeralVolResp, err := s.CreateVolume(ctx, &csi.CreateVolumeRequest{
+	createVolumeFunc := getCreateVolumeFunc(s)
+	createEphemeralVolResp, err := createVolumeFunc(ctx, &csi.CreateVolumeRequest{
 		Name:               volName,
 		VolumeCapabilities: []*csi.VolumeCapability{req.VolumeCapability},
 		Parameters:         req.VolumeContext,
@@ -570,7 +591,7 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 		return nil, err
 	}
 
-	controllerPublishEphemeralVolResp, err := s.ControllerPublishVolume(ctx, &csi.ControllerPublishVolumeRequest{
+	controllerPublishEphemeralVolResp, err := getControllerPublishVolume(s)(ctx, &csi.ControllerPublishVolumeRequest{
 		VolumeId:         createEphemeralVolResp.Volume.VolumeId,
 		NodeId:           nodeID,
 		VolumeCapability: req.VolumeCapability,
@@ -608,9 +629,9 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 	}
 	log.Infof("NodePublish step for volume %s was successful", volID)
 
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	if _, err := statFileFunc(filePath); os.IsNotExist(err) {
 		log.Infof("path %s does not exists", filePath)
-		err = os.MkdirAll(filePath, 0o750)
+		err = mkDirAllFunc(filePath, 0o750)
 		if err != nil {
 			log.Error("Create directory in target path for ephemeral vol failed with error :" + err.Error())
 			if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
@@ -622,7 +643,7 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 	}
 	log.Infof("Created dir in target path %s", filePath)
 
-	f, err := os.Create(filepath.Clean(filePath) + "/id")
+	f, err := createFileFunc(filepath.Clean(filePath) + "/id")
 	if err != nil {
 		log.Error("Create id file in target path for ephemeral vol failed with error :" + err.Error())
 		if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
@@ -634,11 +655,11 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 	log.Infof("Created file in target path %s", filePath+"/id")
 
 	defer func() {
-		if err := f.Close(); err != nil {
+		if err := closeFileFunc(f); err != nil {
 			log.Errorf("Error closing file: %s \n", err)
 		}
 	}()
-	_, err2 := f.WriteString(createEphemeralVolResp.Volume.VolumeId)
+	_, err2 := writeStringFunc(f, createEphemeralVolResp.Volume.VolumeId)
 	if err2 != nil {
 		log.Error("Writing to id file in target path for ephemeral vol failed with error :" + err2.Error())
 		if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
@@ -651,8 +672,40 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
+var mkDirAllFunc = func(path string, perm fs.FileMode) error {
+	return os.MkdirAll(path, perm)
+}
+
+var createFileFunc = func(path string) (*os.File, error) {
+	cleanedPath := filepath.Clean(path)
+	return os.Create(cleanedPath)
+}
+
+var writeStringFunc = func(f *os.File, output string) (int, error) {
+	return f.WriteString(output)
+}
+
+var closeFileFunc = func(f *os.File) error {
+	return f.Close()
+}
+
+var statFileFunc = func(path string) (fs.FileInfo, error) {
+	return os.Stat(path)
+}
+
+var readFileFunc = func(path string) ([]byte, error) {
+	cleanedPath := filepath.Clean(path)
+	return os.ReadFile(cleanedPath)
+}
+
 func (s *service) ephemeralNodeUnpublish(
 	ctx context.Context,
+	req *csi.NodeUnpublishVolumeRequest,
+) error {
+	return ephemeralNodeUnpublishFunc(s, ctx, req)
+}
+
+var ephemeralNodeUnpublishFunc = func(s *service, ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest,
 ) error {
 	// Fetch log handler
@@ -728,7 +781,7 @@ func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
 		}
 	}
 
-	nodeFQDN, err := utils.GetFQDNByIP(ctx, nodeIP)
+	nodeFQDN, err := getUtilsGetFQDNByIP(ctx, nodeIP)
 	if (err) != nil {
 		nodeFQDN = nodeIP
 		log.Warnf("Setting nodeFQDN to %s as failed to resolve IP to FQDN due to %v", nodeIP, err)

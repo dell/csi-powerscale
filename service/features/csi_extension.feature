@@ -13,6 +13,22 @@ Feature: Isilon CSI interface
     And I call ValidateConnectivity
     Then the error contains "none"
 
+  Scenario: Call ValidateConnectivity with invalid volID
+    Given a Isilon service
+    When I call Probe
+    And I call CreateVolume "volume1"
+    And I induce error "invalid-volumeId"    
+    And I call ValidateConnectivity
+    Then the error contains "none"   
+
+  Scenario: Call ValidateConnectivity with invalid NodeID
+    Given a Isilon service
+    When I call Probe
+    And I call CreateVolume "volume1"
+    And I induce error "invalid-nodeId"    
+    And I call ValidateConnectivity
+    Then the error contains "failed to parse node ID"        
+
   Scenario: Call ValidateConnectivity with no Node
     Given a Isilon service
     When I call CreateVolume "volume1"
