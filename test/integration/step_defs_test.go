@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
+Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -590,24 +590,21 @@ func (f *feature) checkNodeExistsForOneExport(am *csi.VolumeCapability_AccessMod
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER:
 		if utils.IsStringInSlice(nodeIP, *export.Clients) && !utils.IsStringInSlice(nodeIP, *export.ReadWriteClients) && !utils.IsStringInSlice(nodeIP, *export.ReadOnlyClients) && !utils.IsStringInSlice(nodeIP, *export.RootClients) {
 			break
-		} else {
-			err := fmt.Errorf("the location of nodeIP '%s' is wrong", nodeIP)
-			return err
 		}
+		err := fmt.Errorf("the location of nodeIP '%s' is wrong", nodeIP)
+		return err
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
 		if utils.IsStringInSlice(nodeIP, *export.ReadOnlyClients) && !utils.IsStringInSlice(nodeIP, *export.ReadWriteClients) && !utils.IsStringInSlice(nodeIP, *export.Clients) && !utils.IsStringInSlice(nodeIP, *export.RootClients) {
 			break
-		} else {
-			err := fmt.Errorf("the location of nodeIP '%s' is wrong", nodeIP)
-			return err
 		}
+		err := fmt.Errorf("the location of nodeIP '%s' is wrong", nodeIP)
+		return err
 	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
 		if len(*export.Clients) == 2 && utils.IsStringInSlice(nodeIP, *export.Clients) && !utils.IsStringInSlice(nodeIP, *export.ReadWriteClients) && !utils.IsStringInSlice(nodeIP, *export.ReadOnlyClients) && !utils.IsStringInSlice(nodeIP, *export.RootClients) {
 			break
-		} else {
-			err := fmt.Errorf("the location of nodeIP '%s' is wrong", nodeIP)
-			return err
 		}
+		err := fmt.Errorf("the location of nodeIP '%s' is wrong", nodeIP)
+		return err
 	default:
 		err := fmt.Errorf("unsupported access mode: '%s'", am.String())
 		return err

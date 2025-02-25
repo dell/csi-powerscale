@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2022-2025 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -37,7 +37,10 @@ const (
 )
 
 // pollingFrequency in seconds
-var pollingFrequencyInSeconds int64
+var (
+	pollingFrequencyInSeconds int64
+	pollingFrequencyLock      sync.Mutex
+)
 
 // port for API calls
 var apiPort string
@@ -75,10 +78,13 @@ func setPollingFrequency(ctx context.Context) int64 {
 }
 
 // MarshalSyncMapToJSON marshal the sync Map to Json
-func MarshalSyncMapToJSON(m *sync.Map) ([]byte, error) {
+var MarshalSyncMapToJSON = func(m *sync.Map) ([]byte, error) {
 	tmpMap := make(map[string]ArrayConnectivityStatus)
 	m.Range(func(k, v interface{}) bool {
-		tmpMap[k.(string)] = v.(ArrayConnectivityStatus)
+		// Ensure the value is of type ArrayConnectivityStatus
+		if status, ok := v.(ArrayConnectivityStatus); ok {
+			tmpMap[k.(string)] = status
+		}
 		return true
 	})
 	log.Debugf("map value is %+v", tmpMap)
@@ -92,8 +98,9 @@ func (s *service) startAPIService(ctx context.Context) {
 		log.Info("podmon is not enabled")
 		return
 	}
-
+	pollingFrequencyLock.Lock()
 	pollingFrequencyInSeconds = setPollingFrequency(ctx)
+	pollingFrequencyLock.Unlock()
 	setAPIPort(ctx)
 
 	// start methods based on mode
@@ -233,6 +240,8 @@ func (s *service) testConnectivityAndUpdateStatus(ctx context.Context, cluster *
 		probeStatus.Store(cluster.ClusterName, status)
 		cancel()
 		// sleep for half the pollingFrequency and run check again
+		pollingFrequencyLock.Lock()
 		time.Sleep(time.Second * time.Duration(pollingFrequencyInSeconds/2))
+		pollingFrequencyLock.Unlock()
 	}
 }

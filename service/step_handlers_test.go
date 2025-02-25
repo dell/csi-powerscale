@@ -60,13 +60,16 @@ var (
 		UnexportError                 bool
 		DeleteQuotaError              bool
 		QuotaNotFoundError            bool
+		InvalidQuotaError             bool
 		DeleteVolumeError             bool
 		GetJobsInternalError          bool
 		GetPolicyInternalError        bool
 		GetTargetPolicyInternalError  bool
 		GetTargetPolicyNotFound       bool
 		count                         int
+		countMutex                    sync.Mutex
 		counter                       int
+		counterMutex                  sync.Mutex
 		reprotectCount                int
 		reprotectTPCount              int
 		failoverTPCount               int
@@ -107,6 +110,8 @@ var (
 		PodmonNoNodeIDError           bool
 		PodmonNoVolumeNoNodeIDError   bool
 		ModifyLastAttempt             bool
+		PodmonInvalidNodeIDError      bool
+		PodmonInvalidVolumeIDError    bool
 	}
 )
 
@@ -423,6 +428,10 @@ func handleGetQuotaByPath(w http.ResponseWriter, _ *http.Request) {
 	if stepHandlersErrors.QuotaNotFoundError {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(readFromFile("mock/quota/quota_not_found.txt"))
+		return
+	}
+	if stepHandlersErrors.InvalidQuotaError {
+		w.Write(readFromFile("mock/quota/invalid_quota.txt"))
 		return
 	}
 	w.Write(readFromFile("mock/quota/get_quota_by_id.txt"))
@@ -788,7 +797,9 @@ func handleGetPoliciesByName(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	defer func() {
+		stepHandlersErrors.counterMutex.Lock()
 		stepHandlersErrors.counter++
+		stepHandlersErrors.counterMutex.Unlock()
 	}()
 
 	if stepHandlersErrors.counter%2 == 0 {
@@ -967,7 +978,9 @@ func handleGetTargetPoliciesByName(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	defer func() {
+		stepHandlersErrors.countMutex.Lock()
 		stepHandlersErrors.count++
+		stepHandlersErrors.countMutex.Unlock()
 	}()
 	if stepHandlersErrors.count%2 == 0 {
 		w.Write(readFromFile("mock/policy/get_target_policies.txt"))
