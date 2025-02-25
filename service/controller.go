@@ -117,6 +117,8 @@ var clusterToNodeIDMap = new(sync.Map)
 // type nodeIDElementsMap map[string]string
 type nodeIDToClientMap map[string]string
 
+var volumePathMap = make(map[string]string)
+
 // IsValid - checks valid RPO
 func (rpo RPOEnum) IsValid() error {
 	switch rpo {
@@ -1102,6 +1104,12 @@ func (s *service) ControllerPublishVolume(
 	log.Infof("<Eternals> GlobalIsiPath.......... '%s'", GlobalIsiPath)
 
 	volID := req.GetVolumeId()
+
+	ok, _ := volumePathMap[volID]
+	if !ok {
+		volumePathMap[volID] = volumeContext["Path"]
+	}
+
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument,
 			utils.GetMessageWithRunID(runID, "volume ID is required"))
@@ -1693,6 +1701,14 @@ func (s *service) CreateSnapshot(
 	log.Infof("<Eternals> srcVolumeID.......... '%s'", srcVolumeID)
 	path := utils.GetPathForVolume(isiPath, srcVolumeID)
 	log.Infof("<Eternals> path.......... '%s'", path)
+
+	ok, volPath := volumePathMap[srcVolumeID]
+	log.Infof("<Eternals> new VolPath.......... %s", volPath)
+	log.Infof("<Eternals> new VolPath.......... %s", volPath)
+	if ok {
+		path = volPath
+	}
+
 	if snapshotNew, err = isiConfig.isiSvc.CreateSnapshot(ctx, path, snapshotName); err != nil {
 		return nil, status.Errorf(codes.Internal, " runid=%s %s", runID, err.Error())
 	}
@@ -1715,7 +1731,7 @@ func (s *service) validateCreateSnapshotRequest(
 	if getParams != nil {
 		log.Printf("getParams:")
 		for key, value := range getParams {
-			log.Printf("    [%s]=%s", key, value)
+			log.Printf("[%s]=%s", key, value)
 		}
 	}
 
