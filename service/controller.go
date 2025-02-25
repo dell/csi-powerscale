@@ -1105,7 +1105,7 @@ func (s *service) ControllerPublishVolume(
 
 	volID := req.GetVolumeId()
 
-	ok, _ := volumePathMap[volID]
+	_, ok := volumePathMap[volID]
 	if !ok {
 		volumePathMap[volID] = volumeContext["Path"]
 	}
