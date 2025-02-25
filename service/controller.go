@@ -1702,9 +1702,13 @@ func (s *service) CreateSnapshot(
 	path := utils.GetPathForVolume(isiPath, srcVolumeID)
 	log.Infof("<Eternals> path.......... '%s'", path)
 
-	ok, volPath := volumePathMap[srcVolumeID]
+	for key, value := range volumePathMap {
+		fmt.Printf("<Eternals> Print  volumePathMap Key: %s, Value: %s\n", key, value)
+	}
+
+	volPath, ok := volumePathMap[srcVolumeID]
 	log.Infof("<Eternals> new VolPath.......... %s", volPath)
-	log.Infof("<Eternals> new VolPath.......... %s", volPath)
+
 	if ok {
 		path = volPath
 	}
