@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2023 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -34,6 +34,14 @@ import (
 
 // TODO: All WithFields call containing logrus have to be converted to log
 func publishVolume(
+	ctx context.Context,
+	req *csi.NodePublishVolumeRequest,
+	nfsExportURL string,
+) error {
+	return publishVolumeFunc(ctx, req, nfsExportURL)
+}
+
+var publishVolumeFunc = func(
 	ctx context.Context,
 	req *csi.NodePublishVolumeRequest,
 	nfsExportURL string,
@@ -237,10 +245,8 @@ func isVolumeMounted(ctx context.Context, filterStr string, target string) (bool
 			log.Debugf("target '%s' does not exist", target)
 			return mounted, nil
 		}
-	} else {
-		// No mount exists also means not published
-		log.Debugf("target '%s' does not exist", target)
-		return false, nil
 	}
+	// No mount exists also means not published
+	log.Debugf("target '%s' does not exist", target)
 	return false, nil
 }
