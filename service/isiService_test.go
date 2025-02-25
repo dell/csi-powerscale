@@ -109,18 +109,6 @@ func (m *MockClient) DoWithHeaders(
 	return nil
 }
 
-/*
-func (m *MockClient) Get(
-
-	ctx context.Context,
-	path, id string,
-	params api.OrderedValues, headers map[string]string,
-	resp interface{},
-
-	) error {
-		return errors.New("mock error")
-	}
-*/
 func (m *MockClient) Get(ctx context.Context, path string, id string, params api.OrderedValues, headers map[string]string, resp interface{}) error {
 	ret := m.Called(ctx, path, id, params, headers, resp)
 
@@ -163,15 +151,6 @@ func (m *MockClient) Put(ctx context.Context, path string, id string, params api
 
 	return r0
 }
-
-/*func (m *MockClient) Put(
-	ctx context.Context,
-	path, id string,
-	params api.OrderedValues, headers map[string]string,
-	body, resp interface{},
-) error {
-	return errors.New("mock error")
-} */
 
 func TestCopySnapshot(t *testing.T) {
 	mockClient := &MockClient{}

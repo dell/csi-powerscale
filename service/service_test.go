@@ -556,18 +556,6 @@ func TestIsVolumeTypeBlock(t *testing.T) {
 	if !isBlock {
 		t.Errorf("isVolumeTypeBlock returned false, expected true")
 	}
-	/*
-	   // Test case: VolumeCapability with Mount access type
-	   mount := &csi.VolumeCapability_Mount{Mount: &csi.VolumeCapability_MountVolume{}}
-	   accessType = &csi.VolumeCapability_Mount{Mount: mount}
-	   vc = &csi.VolumeCapability{AccessType: accessType}
-	   vcs = []*csi.VolumeCapability{vc}
-	   isBlock = isVolumeTypeBlock(vcs)
-
-	   	if isBlock {
-	   		t.Errorf("isVolumeTypeBlock returned true, expected false")
-	   	}
-	*/
 }
 
 func TestString(t *testing.T) {
@@ -673,32 +661,6 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 	if err == nil {
 		t.Errorf("ValidateCreateVolumeRequest returned nil error, expected error")
 	}
-
-	// block type error
-	// TODO: Adjust this to hit the uncovered error condition
-	/*
-		req = &csi.CreateVolumeRequest{
-			Name: "volume1",
-			CapacityRange: &csi.CapacityRange{
-				RequiredBytes: -1,
-			},
-			VolumeCapabilities: []*csi.VolumeCapability{
-				{
-					AccessType: &csi.VolumeCapability_Block{},
-					AccessMode: &csi.VolumeCapability_AccessMode{
-						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-					},
-				},
-			},
-			Parameters: map[string]string{
-				AccessZoneParam: "System",
-				IsiPathParam:    "/ifs/data/csi-isilon",
-			},
-		}
-		_, err = s.ValidateCreateVolumeRequest(req)
-		if err == nil {
-			t.Errorf("ValidateCreateVolumeRequest returned nil error, expected error")
-		}*/
 }
 
 // Mocking the service struct

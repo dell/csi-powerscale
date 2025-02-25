@@ -47,7 +47,7 @@ func validateArgs(driverConfigParamsfile *string) {
 func checkLeaderElectionError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to initialize leader election: %v", err)
-		// exitFunc(1)
+		exitFunc(1)
 	}
 }
 
