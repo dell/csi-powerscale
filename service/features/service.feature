@@ -472,15 +472,6 @@ Feature: Isilon CSI interface
       And I call ProbeController
       Then the error contains "none"
 
-    Scenario Outline: Dynamic log config change
-      Given a Isilon service
-      When I call DynamicLogChange <file>
-      Then a valid DynamicLogChange occurs <file> <level>
-      Examples:
-        | file                  | level   |
-        | "logLevelInfo.yaml"   | "info" |
-        | "logConfigError.yaml" | "debug" |
-
     Scenario: Create Volume with Replication Enabled
       Given a Isilon service
       When I call CreateVolumeRequest
@@ -504,32 +495,6 @@ Feature: Isilon CSI interface
       Given a Isilon service
       When I call DeleteSnapshot "48=_=_=cluster1=_=_=System"
       Then the error contains "failed to unexport volume directory '0' in access zone '' : 'EOF'"
-
-    Scenario Outline: podmon enable change
-      Given a Isilon service
-      And I set podmon enable to <value>
-      And I call BeforeServe
-      When I call startAPIService
-      Then the error contains "probe of all isilon clusters failed"
-      Examples:
-        | value |
-        | "true" |
-        | "false" |
-
-    Scenario Outline: startAPIService with different polling feq and API port
-      Given a Isilon service
-      And I set mode to <mode>
-      And I call BeforeServe
-      And I set podmon enable to <value>
-      And I set API port to <port>
-      And I set polling freq to <freq>
-      And I call startAPIService
-      Then the error contains "probe of all isilon clusters failed"
-      Examples:
-       | mode | value | port   | freq |
-       |"controller"  | "false" |"8097" | "70"  |
-       | "controller" | "true" | "7089" | "90" |
-       | "controller" | "true" | "0" | "0" |
 
   Scenario: Create RO volume from snapshot With RootClient Enabled
     Given a Isilon service

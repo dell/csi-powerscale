@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2024 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -862,6 +862,8 @@ func (f *feature) iInduceError(errtype string) error {
 		stepHandlersErrors.DeleteQuotaError = true
 	case "QuotaNotFoundError":
 		stepHandlersErrors.QuotaNotFoundError = true
+	case "InvalidQuotaError":
+		stepHandlersErrors.InvalidQuotaError = true
 	case "DeleteVolumeError":
 		stepHandlersErrors.DeleteVolumeError = true
 	case "GetPolicyInternalError":
@@ -917,6 +919,10 @@ func (f *feature) iInduceError(errtype string) error {
 	case "no-nodeId":
 		stepHandlersErrors.PodmonVolumeStatisticsError = true
 		stepHandlersErrors.PodmonNoNodeIDError = true
+	case "invalid-nodeId":
+		stepHandlersErrors.PodmonInvalidNodeIDError = true
+	case "invalid-volumeId":
+		stepHandlersErrors.PodmonInvalidVolumeIDError = true
 	case "no-volume-no-nodeId":
 		stepHandlersErrors.PodmonVolumeStatisticsError = true
 		stepHandlersErrors.PodmonNoVolumeNoNodeIDError = true
@@ -1112,6 +1118,7 @@ func clearErrors() {
 	stepHandlersErrors.UnexportError = false
 	stepHandlersErrors.DeleteQuotaError = false
 	stepHandlersErrors.QuotaNotFoundError = false
+	stepHandlersErrors.InvalidQuotaError = false
 	stepHandlersErrors.DeleteVolumeError = false
 	inducedErrors.noIsiService = false
 	inducedErrors.autoProbeNotEnabled = false
@@ -3326,6 +3333,11 @@ func (f *feature) iCallValidateVolumeHostConnectivity() error {
 		csiNodeID = ""
 		volid := f.createVolumeResponse.GetVolume().VolumeId
 		volIDs = volIDs[:0]
+		volIDs = append(volIDs, volid)
+	} else if stepHandlersErrors.PodmonInvalidNodeIDError == true {
+		csiNodeID = "node1=#=#=fqdn.example.com"
+	} else if stepHandlersErrors.PodmonInvalidVolumeIDError == true {
+		volid := "9999"
 		volIDs = append(volIDs, volid)
 	} else if stepHandlersErrors.PodmonControllerProbeError == true {
 		f.service.mode = "controller"

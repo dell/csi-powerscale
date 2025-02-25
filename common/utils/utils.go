@@ -1,7 +1,5 @@
-package utils
-
 /*
- Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -15,6 +13,8 @@ package utils
  See the License for the specific language governing permissions and
  limitations under the License.
 */
+
+package utils
 
 import (
 	"context"
@@ -94,7 +94,7 @@ func ParseInt64FromContext(ctx context.Context, key string) (int64, error) {
 }
 
 // RemoveExistingCSISockFile When the sock file that the gRPC server is going to be listening on already exists, error will be thrown saying the address is already in use, thus remove it first
-func RemoveExistingCSISockFile() error {
+var RemoveExistingCSISockFile = func() error {
 	log := GetLogger()
 	protoAddr := os.Getenv(constants.EnvCSIEndpoint)
 
