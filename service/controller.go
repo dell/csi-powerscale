@@ -1108,6 +1108,7 @@ func (s *service) ControllerPublishVolume(
 	_, ok := volumePathMap[volID]
 	if !ok {
 		volumePathMap[volID] = volumeContext["Path"]
+		log.Infof("<Eternals> new vol added to map..........")
 	}
 
 	if volID == "" {
