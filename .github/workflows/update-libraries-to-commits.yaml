@@ -10,6 +10,8 @@
 name: Dell Libraries Commit Update
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
+  repository_dispatch:
+    types: [latest-commits-libraries]
 
 jobs:
   package-update:
