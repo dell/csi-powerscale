@@ -10,7 +10,8 @@ updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "sunday"
       time: "18:00"
     allow:
       # Allow direct updates for packages
