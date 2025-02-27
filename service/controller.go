@@ -1105,15 +1105,17 @@ func (s *service) ControllerPublishVolume(
 
 	volID := req.GetVolumeId()
 
-	_, ok := volumePathMap[volID]
-	if !ok {
-		volumePathMap[volID] = volumeContext["Path"]
-		log.Infof("<Eternals> new vol added to map..........")
-	}
-
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument,
 			utils.GetMessageWithRunID(runID, "volume ID is required"))
+	}
+
+	log.Infof("<Eternals> Map ::ControllerPublishVolume() ..........")
+	contextPath := volumeContext["Path"]
+	_, ok := volumePathMap[volID]
+	if !ok {
+		volumePathMap[volID] = contextPath
+		log.Infof("<Eternals> new vol added to map..........")
 	}
 
 	volName, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, volID)
@@ -1675,7 +1677,21 @@ func (s *service) CreateSnapshot(
 	}
 	log.Infof("<Eternals> before validateCreateSnapshotRequest isiPath.......... '%s'", isiPath)
 	isiPath = GlobalIsiPath
+
 	log.Infof("<Eternals> before validateCreateSnapshotRequest updated isiPath.......... '%s'", isiPath)
+
+	for key, value := range volumePathMap {
+		fmt.Printf("<Eternals> Print  volumePathMap Key: %s, Value: %s\n", key, value)
+	}
+
+	log.Infof("<Eternals> volumeId CreateSnapshot()......... %s", req.GetSourceVolumeId())
+
+	volPath, ok := volumePathMap[req.GetSourceVolumeId()]
+	log.Infof("<Eternals> new VolPath CreateSnapshot().......... %s", volPath)
+
+	if ok {
+		isiPath = volPath
+	}
 
 	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
 	if err != nil {
@@ -1707,7 +1723,7 @@ func (s *service) CreateSnapshot(
 		fmt.Printf("<Eternals> Print  volumePathMap Key: %s, Value: %s\n", key, value)
 	}
 
-	volPath, ok := volumePathMap[srcVolumeID]
+	volPath, ok = volumePathMap[srcVolumeID]
 	log.Infof("<Eternals> new VolPath.......... %s", volPath)
 
 	if ok {
@@ -1750,6 +1766,13 @@ func (s *service) validateCreateSnapshotRequest(
 
 	log.Infof("<Eternals> inside validateCreateSnapshotRequest isiPath.......... '%s'", isiPath)
 	log.Infof("<Eternals> inside validateCreateSnapshotRequest srcVolumeID.......... '%s'", srcVolumeID)
+
+	volPath, ok := volumePathMap[srcVolumeID]
+	log.Infof("<Eternals>  VolPath validateCreateSnapshotRequest.......... %s", volPath)
+
+	if ok {
+		isiPath = volPath
+	}
 
 	path := utils.GetPathForVolume(isiPath, req.Name)
 	log.Infof("<Eternals> path.......... '%s'", path)
