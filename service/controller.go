@@ -1770,8 +1770,14 @@ func (s *service) validateCreateSnapshotRequest(
 	volPath, ok := volumePathMap[srcVolumeID]
 	log.Infof("<Eternals>  VolPath validateCreateSnapshotRequest.......... %s", volPath)
 
+	isiPathFromParams, err := s.validateIsiPath(ctx, srcVolumeID)
+	if err != nil {
+		log.Error("Failed get isiPath", err.Error())
+	}
+	log.Infof("<Eternals>  VolPath isiPathFromParams.......... %s", isiPathFromParams)
+
 	if ok {
-		isiPath = volPath
+		isiPath = isiPathFromParams
 	}
 
 	path := utils.GetPathForVolume(isiPath, req.Name)
