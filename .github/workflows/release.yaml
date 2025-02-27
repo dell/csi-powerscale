@@ -1,7 +1,7 @@
 name: Release CSI-Powerscale
 # Invocable as a reusable workflow
 # Can be manually triggered
-on: # yamllint disable-line rule:truthy
+on:  # yamllint disable-line rule:truthy
   workflow_call:
   workflow_dispatch:
     inputs:
