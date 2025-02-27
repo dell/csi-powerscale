@@ -1675,8 +1675,8 @@ func (s *service) CreateSnapshot(
 		// use the default isiPath if not set in the storage class
 		isiPath = isiConfig.IsiPath
 	}
-	log.Infof("<Eternals> before validateCreateSnapshotRequest isiPath.......... '%s'", isiPath)
-	isiPath = GlobalIsiPath
+	// log.Infof("<Eternals> before validateCreateSnapshotRequest isiPath.......... '%s'", isiPath)
+	// isiPath = GlobalIsiPath
 
 	log.Infof("<Eternals> before validateCreateSnapshotRequest updated isiPath.......... '%s'", isiPath)
 
@@ -1714,22 +1714,23 @@ func (s *service) CreateSnapshot(
 	}
 
 	// create new snapshot for source directory
-	log.Infof("<Eternals> isiPath.......... '%s'", isiPath)
-	log.Infof("<Eternals> srcVolumeID.......... '%s'", srcVolumeID)
+	// log.Infof("<Eternals> isiPath.......... '%s'", isiPath)
+	// log.Infof("<Eternals> srcVolumeID.......... '%s'", srcVolumeID)
+	// path := utils.GetPathForVolume(isiPath, srcVolumeID)
+	// log.Infof("<Eternals> path.......... '%s'", path)
+
+	// for key, value := range volumePathMap {
+	// 	fmt.Printf("<Eternals> Print  volumePathMap Key: %s, Value: %s\n", key, value)
+	// }
+
+	// volPath, ok = volumePathMap[srcVolumeID]
+	// if ok {
+	// 	isiPath = volPath
+	// }
+
+	log.Infof("<Eternals> isiPath before CreateSnapshot() is called.......... '%s'", isiPath)
+	// create new snapshot for source directory
 	path := utils.GetPathForVolume(isiPath, srcVolumeID)
-	log.Infof("<Eternals> path.......... '%s'", path)
-
-	for key, value := range volumePathMap {
-		fmt.Printf("<Eternals> Print  volumePathMap Key: %s, Value: %s\n", key, value)
-	}
-
-	volPath, ok = volumePathMap[srcVolumeID]
-	log.Infof("<Eternals> new VolPath.......... %s", volPath)
-
-	if ok {
-		path = volPath
-	}
-
 	if snapshotNew, err = isiConfig.isiSvc.CreateSnapshot(ctx, path, snapshotName); err != nil {
 		return nil, status.Errorf(codes.Internal, " runid=%s %s", runID, err.Error())
 	}
