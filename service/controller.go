@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -1777,12 +1776,11 @@ func (s *service) validateCreateSnapshotRequest(
 	//}
 	//log.Infof("<Eternals>  VolPath isiPathFromParams.......... %s", isiPathFromParams)
 
-	if ok {
-		isiPath = filepath.Dir(isiPath)
-	}
+	lastSeparatorIndex := strings.LastIndex(isiPath, "/")
+	isiPath = isiPath[:lastSeparatorIndex]
 
-	path := utils.GetPathForVolume(isiPath, req.Name)
-	log.Infof("<Eternals> path.......... '%s'", path)
+	//path := utils.GetPathForVolume(isiPath, req.Name)
+	//log.Infof("<Eternals> path.......... '%s'", path)
 
 	// vols, err := isiConfig.isiSvc.GetVolumes(ctx)
 	// if err != nil {
@@ -1793,13 +1791,13 @@ func (s *service) validateCreateSnapshotRequest(
 	// 	log.Infof("<Eternals> volume: %+v", v)
 	// }
 
-	vol, err := isiConfig.isiSvc.GetVolumeByID(ctx, srcVolumeID, "")
-	if err != nil {
-		log.Errorf("<Eternals> error: %v", err)
-	}
-	log.Infof("<Eternals> vol.......... %v", vol, err)
+	// vol, err := isiConfig.isiSvc.GetVolumeByID(ctx, srcVolumeID, "")
+	// if err != nil {
+	// 	log.Errorf("<Eternals> error: %v", err)
+	// }
+	// log.Infof("<Eternals> vol.......... %v", vol, err)
 
-	log.Infof("<Eternals> ispath before IsVolumeExistent.......... %s", isiPath)
+	log.Infof("<Eternals> isipath before IsVolumeExistent.......... %s", isiPath)
 
 	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, srcVolumeID, "") {
 		return "", "", status.Error(codes.InvalidArgument,
