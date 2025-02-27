@@ -1686,14 +1686,14 @@ func (s *service) CreateSnapshot(
 
 	log.Infof("<Eternals> volumeId CreateSnapshot()......... %s", req.GetSourceVolumeId())
 
-	volPath, ok := volumePathMap[req.GetSourceVolumeId()]
+	volPath, _ := volumePathMap[req.GetSourceVolumeId()]
 	log.Infof("<Eternals> new VolPath CreateSnapshot().......... %s", volPath)
 
-	if ok {
-		isiPath = volPath
-	}
+	//if ok {
+	//	isiPath = volPath
+	//}
 
-	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
+	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, volPath, isiConfig)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
 	}
@@ -1765,7 +1765,7 @@ func (s *service) validateCreateSnapshotRequest(
 	ctx, log = setClusterContext(ctx, clusterName)
 	log.Debugf("Cluster Name: %v", clusterName)
 
-	log.Infof("<Eternals> inside validateCreateSnapshotRequest isiPath.......... '%s'", isiPath)
+	log.Infof("<Eternals> inside validateCreateSnapshotRequest isiPath/volpath.......... '%s'", isiPath)
 	log.Infof("<Eternals> inside validateCreateSnapshotRequest srcVolumeID.......... '%s'", srcVolumeID)
 
 	volPath, _ := volumePathMap[srcVolumeID]
