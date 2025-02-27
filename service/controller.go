@@ -1767,17 +1767,20 @@ func (s *service) CreateSnapshot(
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
 	}
-	log.Info("Eternals: CreateSnapshot() : srcVolumeID: %s", srcVolumeID)
+	log.Info("Eternals: CreateSnapshot() : srcVolumeID: '%s'", srcVolumeID)
 	volPath, err := s.getIsiPath(ctx, srcVolumeID)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
 	}
 
-	log.Info("Eternals: CreateSnapshot() : volPath: %s", volPath)
+	log.Info("Eternals: CreateSnapshot() : volPath: '%s'", volPath)
 	lastSeparatorIndex := strings.LastIndex(isiPath, "/")
-	isiPath = volPath[:lastSeparatorIndex]
+	volPath = volPath[:lastSeparatorIndex]
+	log.Info("Eternals: CreateSnapshot() : volPath after split: '%s'", volPath)
 
-	log.Info("Eternals: CreateSnapshot() : isiPath: %s", isiPath)
+	isiPath = volPath
+
+	log.Info("Eternals: CreateSnapshot() : neisiPath: '%s'", isiPath)
 
 	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
 	if err != nil {
@@ -1801,7 +1804,7 @@ func (s *service) CreateSnapshot(
 
 	// create new snapshot for source direcory
 	path := utils.GetPathForVolume(isiPath, srcVolumeID)
-	log.Info("Eternals: before GetPathForVolume > CreateSnapshot() : isiPath : %s path: %s snapshotName: %s", isiPath, path, snapshotName)
+	log.Info("Eternals: before GetPathForVolume > CreateSnapshot() : isiPath : '%s' path: '%s' snapshotName: '%s'", isiPath, path, snapshotName)
 
 	if snapshotNew, err = isiConfig.isiSvc.CreateSnapshot(ctx, path, snapshotName); err != nil {
 		return nil, status.Errorf(codes.Internal, " runid=%s %s", runID, err.Error())
@@ -1832,7 +1835,7 @@ func (s *service) validateCreateSnapshotRequest(
 	log.Infof("<Eternals> validateCreateSnapshotRequest isiPath.......... '%s'", isiPath)
 	log.Infof("<Eternals> validateCreateSnapshotRequest volID.......... '%s'", srcVolumeID)
 
-	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", srcVolumeID) {
+	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, srcVolumeID, "") {
 		return "", "", status.Error(codes.InvalidArgument,
 			utils.GetMessageWithRunID(runID, "source volume id is invalid"))
 	}
