@@ -1767,20 +1767,20 @@ func (s *service) CreateSnapshot(
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
 	}
-	log.Info("Eternals: CreateSnapshot() : srcVolumeID: '%s'", srcVolumeID)
+	log.Infof("Eternals: CreateSnapshot() : srcVolumeID: '%s'", srcVolumeID)
 	volPath, err := s.getIsiPath(ctx, srcVolumeID)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
 	}
 
-	log.Info("Eternals: CreateSnapshot() : volPath: '%s'", volPath)
-	lastSeparatorIndex := strings.LastIndex(isiPath, "/")
-	volPath = volPath[:lastSeparatorIndex]
-	log.Info("Eternals: CreateSnapshot() : volPath after split: '%s'", volPath)
+	log.Infof("Eternals: CreateSnapshot() : volPath: '%s'", volPath)
+	//lastSeparatorIndex := strings.LastIndex(isiPath, "/")
+	//volPath = volPath[:lastSeparatorIndex]
+	log.Infof("Eternals: CreateSnapshot() : volPath after split: '%s'", volPath)
 
 	isiPath = volPath
 
-	log.Info("Eternals: CreateSnapshot() : neisiPath: '%s'", isiPath)
+	log.Info("Eternals: CreateSnapshot() : new isiPath: '%s'", isiPath)
 
 	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
 	if err != nil {
