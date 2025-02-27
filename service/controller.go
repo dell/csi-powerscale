@@ -1774,8 +1774,10 @@ func (s *service) CreateSnapshot(
 	}
 
 	log.Infof("Eternals: CreateSnapshot() : volPath: '%s'", volPath)
-	//lastSeparatorIndex := strings.LastIndex(isiPath, "/")
-	//volPath = volPath[:lastSeparatorIndex]
+	lastSeparatorIndex := strings.LastIndex(volPath, "/")
+	if lastSeparatorIndex != -1 {
+		volPath = volPath[:lastSeparatorIndex+1] // Include the last separator
+	}
 	log.Infof("Eternals: CreateSnapshot() : volPath after split: '%s'", volPath)
 
 	isiPath = volPath
