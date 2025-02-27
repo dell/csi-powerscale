@@ -1767,7 +1767,7 @@ func (s *service) validateCreateSnapshotRequest(
 	log.Infof("<Eternals> inside validateCreateSnapshotRequest isiPath.......... '%s'", isiPath)
 	log.Infof("<Eternals> inside validateCreateSnapshotRequest srcVolumeID.......... '%s'", srcVolumeID)
 
-	volPath, ok := volumePathMap[srcVolumeID]
+	volPath, _ := volumePathMap[srcVolumeID]
 	log.Infof("<Eternals>  VolPath validateCreateSnapshotRequest.......... %s", volPath)
 
 	//isiPathFromParams, err := s.validateIsiPath(ctx, srcVolumeID)
