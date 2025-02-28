@@ -1749,20 +1749,9 @@ func (s *service) CreateSnapshot(
 	// snapshotName: name of the snapshot that need to be created
 	var (
 		snapshotNew isi.Snapshot
-		//params      map[string]string
-		isiPath string
+		isiPath     string
 	)
-	//params = req.GetParameters()
-	// if _, ok := params[IsiPathParam]; ok {
-	// 	if params[IsiPathParam] == "" {
-	// 		isiPath = isiConfig.IsiPath
-	// 	} else {
-	// 		isiPath = params[IsiPathParam]
-	// 	}
-	// } else {
-	// 	// use the default isiPath if not set in the storage class
-	// 	isiPath = isiConfig.IsiPath
-	// }
+
 	srcVolumeID, _, _, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
@@ -1775,8 +1764,6 @@ func (s *service) CreateSnapshot(
 	}
 
 	isiPath = utils.TrimVolumePath(volPath)
-
-	log.Info("Eternals: CreateSnapshot() : new isiPath: '%s'", isiPath)
 
 	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
 	if err != nil {
