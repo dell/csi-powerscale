@@ -919,3 +919,57 @@ func TestValidateIsiPath(t *testing.T) {
 		t.Errorf("expected error, got nil")
 	}
 }
+
+func TestGetIsiPathByName(t *testing.T) {
+	client := fake.NewSimpleClientset()
+	s := &service{
+		k8sclient: client,
+	}
+
+	ctx := context.Background()
+
+	// Create a fake PersistentVolume
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pv",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: &v1.CSIPersistentVolumeSource{
+					VolumeAttributes: map[string]string{
+						"Path": "/ifs/data",
+					},
+				},
+			},
+		},
+	}
+
+	// Add the PersistentVolume to the fake clientset
+	_, err := s.k8sclient.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create PersistentVolume: %v", err)
+	}
+
+	t.Run("Valid volume name", func(t *testing.T) {
+		volName := "test-pv"
+		expectedPath := "/ifs/data"
+		path, err := s.GetIsiPathByName(ctx, volName)
+		assert.NoError(t, err, "expected no error")
+		assert.Equal(t, expectedPath, path, "expected path to be '/ifs/data'")
+	})
+
+	t.Run("Invalid volume name", func(t *testing.T) {
+		volName := "invalid-pv"
+		path, err := s.GetIsiPathByName(ctx, volName)
+		assert.Error(t, err, "expected an error for invalid volume name")
+		assert.Empty(t, path, "expected empty path for invalid volume name")
+	})
+
+	t.Run("No k8s clientset", func(t *testing.T) {
+		s.k8sclient = nil
+		volName := "test-pv"
+		path, err := s.GetIsiPathByName(ctx, volName)
+		assert.Error(t, err, "expected an error for no k8s clientset")
+		assert.Empty(t, path, "expected empty path for no k8s clientset")
+	})
+}

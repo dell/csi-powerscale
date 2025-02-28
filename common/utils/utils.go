@@ -465,3 +465,12 @@ func GetMessageWithRunID(runid string, format string, args ...interface{}) strin
 	str := fmt.Sprintf(format, args...)
 	return fmt.Sprintf(" runid=%s %s", runid, str)
 }
+
+// TrimVolumePath trims the last part of a volume path after the last forward slash ("/") character.
+func TrimVolumePath(volPath string) string {
+	lastSeparatorIndex := strings.LastIndex(volPath, "/")
+	if lastSeparatorIndex != -1 {
+		volPath = volPath[:lastSeparatorIndex+1]
+	}
+	return volPath
+}
