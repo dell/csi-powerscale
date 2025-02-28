@@ -1757,7 +1757,7 @@ func (s *service) CreateSnapshot(
 		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
 	}
 
-	//get isipath directly from pv
+	// get isipath directly from pv
 	volPath, err := s.GetIsiPathByName(ctx, srcVolumeID)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
