@@ -1093,7 +1093,7 @@ func (s *service) validateIsiPath(ctx context.Context, volName string) (string, 
 	return isiPath, nil
 }
 
-func (s *service) getIsiPath(ctx context.Context, volName string) (string, error) {
+func (s *service) GetIsiPathByName(ctx context.Context, volName string) (string, error) {
 	if s.k8sclient == nil {
 		return "", fmt.Errorf("no k8s clientset")
 	}
