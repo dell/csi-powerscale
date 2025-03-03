@@ -20,5 +20,5 @@ jobs:
     name: Release CSM Drivers and Modules
     with:
       version: ${{ github.event.inputs.option }}
-      images: 'csi-powerscale'
+      images: 'csi-isilon'
     secrets: inherit
