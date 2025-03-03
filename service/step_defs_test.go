@@ -354,7 +354,7 @@ func FeatureContext(s *godog.ScenarioContext) {
 	s.Step(`^I call NodeUnpublishVolume$`, f.iCallNodeUnpublishVolume)
 	s.Step(`^I call EphemeralNodeUnpublishVolume$`, f.iCallEphemeralNodeUnpublishVolume)
 	s.Step(`^a valid NodeUnpublishVolumeResponse is returned$`, f.aValidNodeUnpublishVolumeResponseIsReturned)
-	s.Step(`^I call CreateSnapshot "([^"]*)" "([^"]*)" "([^"]*)"$`, f.iCallCreateSnapshot)
+	s.Step(`^I call CreateSnapshot "([^"]*)" "([^"]*)"$`, f.iCallCreateSnapshot)
 	s.Step(`^a valid CreateSnapshotResponse is returned$`, f.aValidCreateSnapshotResponseIsReturned)
 	s.Step(`^I call DeleteSnapshot "([^"]*)"$`, f.iCallDeleteSnapshot)
 	s.Step(`^I call CreateVolumeFromSnapshot "([^"]*)" "([^"]*)"$`, f.iCallCreateVolumeFromSnapshot)
