@@ -8,7 +8,7 @@ Feature: Isilon CSI interface
   Scenario: Create snapshot good scenario
     Given a Isilon service
     When I call Probe
-    And I call CreateSnapshot "volume2=_=_=19=_=_=System" "create_snapshot_name" "/ifs/data/csi-isilon"
+    And I call CreateSnapshot "volume2=_=_=19=_=_=System" "create_snapshot_name"
     Then a valid CreateSnapshotResponse is returned
 
   Scenario: Create snapshot with cluster name in volume id good scenario

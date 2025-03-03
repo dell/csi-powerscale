@@ -792,3 +792,33 @@ func TestGetFQDNByIP(t *testing.T) {
 		assert.Empty(t, fqdn, "Expected empty FQDN for non-resolvable IP")
 	})
 }
+
+func TestTrimVolumePath(t *testing.T) {
+	t.Run("Path with multiple separators", func(t *testing.T) {
+		volPath := "/path/to/volume/"
+		expected := "/path/to/volume/"
+		result := TrimVolumePath(volPath)
+		assert.Equal(t, expected, result, "Expected the trimmed path to be '/path/to/volume/'")
+	})
+
+	t.Run("Path with single separator", func(t *testing.T) {
+		volPath := "/volume/"
+		expected := "/volume/"
+		result := TrimVolumePath(volPath)
+		assert.Equal(t, expected, result, "Expected the trimmed path to be '/volume/'")
+	})
+
+	t.Run("Path without separator", func(t *testing.T) {
+		volPath := "volume"
+		expected := "volume"
+		result := TrimVolumePath(volPath)
+		assert.Equal(t, expected, result, "Expected the trimmed path to be 'volume'")
+	})
+
+	t.Run("Empty path", func(t *testing.T) {
+		volPath := ""
+		expected := ""
+		result := TrimVolumePath(volPath)
+		assert.Equal(t, expected, result, "Expected the trimmed path to be an empty string")
+	})
+}
