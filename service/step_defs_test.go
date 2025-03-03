@@ -1999,20 +1999,16 @@ func (f *feature) iCallDeleteSnapshot(snapshotID string) error {
 	return nil
 }
 
-func getCreateSnapshotRequest(srcVolumeID, name, isiPath string) *csi.CreateSnapshotRequest {
+func getCreateSnapshotRequest(srcVolumeID, name string) *csi.CreateSnapshotRequest {
 	req := new(csi.CreateSnapshotRequest)
 	req.SourceVolumeId = srcVolumeID
 	req.Name = name
-	parameters := make(map[string]string)
-	if isiPath != "none" {
-		parameters[IsiPathParam] = isiPath
-	}
-	req.Parameters = parameters
 	return req
 }
 
-func (f *feature) iCallCreateSnapshot(srcVolumeID, name, isiPath string) error {
-	f.createSnapshotRequest = getCreateSnapshotRequest(srcVolumeID, name, isiPath)
+func (f *feature) iCallCreateSnapshot(srcVolumeID, name string) error {
+	MockK8sAPI()
+	f.createSnapshotRequest = getCreateSnapshotRequest(srcVolumeID, name)
 	req := f.createSnapshotRequest
 
 	f.createSnapshotResponse, f.err = f.service.CreateSnapshot(context.Background(), req)
