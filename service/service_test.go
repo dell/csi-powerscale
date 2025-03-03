@@ -926,6 +926,7 @@ func TestGetIsiPathByName(t *testing.T) {
 		k8sclient: client,
 	}
 
+	s.k8sclient = client
 	ctx := context.Background()
 
 	// Create a fake PersistentVolume
