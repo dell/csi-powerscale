@@ -1725,7 +1725,7 @@ func (s *service) CreateSnapshot(
 
 	log.Infof("CreateSnapshot started")
 	// parse the input volume id and fetch it's components
-	_, _, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
+	srcVolumeID, _, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
 	}
@@ -1749,20 +1749,16 @@ func (s *service) CreateSnapshot(
 	// snapshotName: name of the snapshot that need to be created
 	var (
 		snapshotNew isi.Snapshot
-		params      map[string]string
 		isiPath     string
 	)
-	params = req.GetParameters()
-	if _, ok := params[IsiPathParam]; ok {
-		if params[IsiPathParam] == "" {
-			isiPath = isiConfig.IsiPath
-		} else {
-			isiPath = params[IsiPathParam]
-		}
-	} else {
-		// use the default isiPath if not set in the storage class
-		isiPath = isiConfig.IsiPath
+
+	// get isipath directly from pv
+	volPath, err := s.GetIsiPathByName(ctx, srcVolumeID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
 	}
+
+	isiPath = utils.TrimVolumePath(volPath)
 
 	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
 	if err != nil {
@@ -1812,7 +1808,7 @@ func (s *service) validateCreateSnapshotRequest(
 	ctx, log = setClusterContext(ctx, clusterName)
 	log.Debugf("Cluster Name: %v", clusterName)
 
-	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", srcVolumeID) {
+	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, srcVolumeID, "") {
 		return "", "", status.Error(codes.InvalidArgument,
 			utils.GetMessageWithRunID(runID, "source volume id is invalid"))
 	}
