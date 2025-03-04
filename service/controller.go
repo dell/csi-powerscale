@@ -1725,7 +1725,7 @@ func (s *service) CreateSnapshot(
 
 	log.Infof("CreateSnapshot started")
 	// parse the input volume id and fetch it's components
-	_, _, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
+	srcVolumeID, _, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
 	}
@@ -1751,11 +1751,6 @@ func (s *service) CreateSnapshot(
 		snapshotNew isi.Snapshot
 		isiPath     string
 	)
-
-	srcVolumeID, _, _, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
-	}
 
 	// get isipath directly from pv
 	volPath, err := s.GetIsiPathByName(ctx, srcVolumeID)

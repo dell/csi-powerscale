@@ -14,20 +14,20 @@ Feature: Isilon CSI interface
   Scenario: Create snapshot with cluster name in volume id good scenario
     Given a Isilon service
     When I call Probe
-    And I call CreateSnapshot "volume2=_=_=19=_=_=System=_=_=cluster1" "create_snapshot_name" "/ifs/data/csi-isilon"
+    And I call CreateSnapshot "volume2=_=_=19=_=_=System=_=_=cluster1" "create_snapshot_name"
     Then a valid CreateSnapshotResponse is returned
 
   Scenario: Create snapshot with cluster name in volume id whose config doesn't exists
     Given a Isilon service
     When I call Probe
-    And I call CreateSnapshot "volume2=_=_=19=_=_=System=_=_=cluster2" "create_snapshot_name" "/ifs/data/csi-isilon"
+    And I call CreateSnapshot "volume2=_=_=19=_=_=System=_=_=cluster2" "create_snapshot_name"
     Then the error contains "failed to get cluster config details for clusterName: 'cluster2'"
 
   Scenario: Create snapshot with internal server error
     Given a Isilon service
     When I call Probe
     And I induce error "CreateSnapshotError"
-    And I call CreateSnapshot "volume2=_=_=19=_=_=System" "create_snapshot_name" "/ifs/data/csi-isilon"
+    And I call CreateSnapshot "volume2=_=_=19=_=_=System" "create_snapshot_name"
     Then the error contains "EOF"
 
   Scenario Outline: Create snapshot with negative or idempotent arguments
@@ -35,17 +35,17 @@ Feature: Isilon CSI interface
     When I call CreateSnapshot <volumeID> <snapshotName> <isiPath>
     Then the error contains <errormsg>
 
-    Examples:
-    | volumeID                       | snapshotName                                  | isiPath                    | errormsg                               |
-    | "volume1=_=_=10=_=_=System"    | "create_snapshot_name"                        | "/ifs/data/csi-isilon"     | "source volume id is invalid"          |
-    | "volume2=_=_=19=_=_=System"    | "existent_snapshot_name"                      | "/ifs/data/csi-isilon"     | "already exists but is incompatible"   |
-    | "volume2=_=_=19=_=_=System"    | "existent_comp_snapshot_name"                 | "/ifs/data/csi-isilon"     | "none"                                 |
-    | "volume2=_=_=19=_=_=System"    | "existent_comp_snapshot_name"                 | "/ifs/data/csi-isilon"     | "none"                                 |
-    | "volume2=_=_=19=_=_=System"    | "existent_comp_snapshot_name_longer_than_max" | "/ifs/data/csi-isilon"     | "already exists but is incompatible"   |
-    | "volume2=_=_=19"               | "existent_comp_snapshot_name"                 | "/ifs/data/csi-isilon"     | "cannot be split into tokens"            |
-    | "volume2=_=_=19=_=_=System"    | "create_snapshot_name"                        | ""                         | "none"                                 |
-    | "volume2=_=_=19=_=_=System"    | "create_snapshot_name"                        | "none"                     | "none"                                 |
-    | "volume2=_=_=19=_=_=System"    | ""                                            | "/ifs/data/csi-isilon"     | "name cannot be empty"                 |
+Examples:
+    | volumeID                       | snapshotName                                  | errormsg                             |
+    | "volume1=_=_=10=_=_=System"    | "create_snapshot_name"                        | "source volume id is invalid"        |
+    | "volume2=_=_=19=_=_=System"    | "existent_snapshot_name"                      | "already exists but is incompatible" |
+    | "volume2=_=_=19=_=_=System"    | "existent_comp_snapshot_name"                 | "none"                               |
+    | "volume2=_=_=19=_=_=System"    | "existent_comp_snapshot_name"                 | "none"                               |
+    | "volume2=_=_=19=_=_=System"    | "existent_comp_snapshot_name_longer_than_max" | "already exists but is incompatible" |
+    | "volume2=_=_=19"               | "existent_comp_snapshot_name"                 | "cannot be split into tokens"        |
+    | "volume2=_=_=19=_=_=System"    | "create_snapshot_name"                        | "none"                               |
+    | "volume2=_=_=19=_=_=System"    | "create_snapshot_name"                        | "none"                               |
+    | "volume2=_=_=19=_=_=System"    | ""                                            | "name cannot be empty"               |
 
 @todo
 @createROVolumeFromSnapshot
