@@ -2005,7 +2005,7 @@ func (f *feature) iCallDeleteSnapshot(snapshotID string) error {
 
 func getCreateSnapshotRequest(srcVolumeID, name string) *csi.CreateSnapshotRequest {
 	req := new(csi.CreateSnapshotRequest)
-	req.SourceVolumeId = "volume2=_=_=19=_=_=System"
+	req.SourceVolumeId = srcVolumeID
 	req.Name = name
 	return req
 }
