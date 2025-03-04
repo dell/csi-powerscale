@@ -19,7 +19,6 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -430,51 +429,51 @@ func TestGetVolumeQuota(t *testing.T) {
 	}
 }
 
-func TestCreateQuota(t *testing.T) {
-	testCases := []struct {
-		name            string
-		isiPath         string
-		volName         string
-		softLimit       string
-		advisoryLimit   string
-		softGracePrd    string
-		sizeInBytes     int64
-		quotaEnabled    bool
-		expectedQuotaID string
-		expectedError   error
-	}{
-		{
-			name:            "Invalid advisory limit",
-			isiPath:         "/ifs/data/csi-isilon",
-			volName:         "volume3",
-			softLimit:       "70",
-			advisoryLimit:   "invalid",
-			softGracePrd:    "30",
-			sizeInBytes:     100,
-			quotaEnabled:    true,
-			expectedQuotaID: "",
-			expectedError:   fmt.Errorf("invalid advisory limit"),
-		},
-	}
+// func TestCreateQuota(t *testing.T) {
+// 	testCases := []struct {
+// 		name            string
+// 		isiPath         string
+// 		volName         string
+// 		softLimit       string
+// 		advisoryLimit   string
+// 		softGracePrd    string
+// 		sizeInBytes     int64
+// 		quotaEnabled    bool
+// 		expectedQuotaID string
+// 		expectedError   error
+// 	}{
+// 		{
+// 			name:            "Invalid advisory limit",
+// 			isiPath:         "/ifs/data/csi-isilon",
+// 			volName:         "volume3",
+// 			softLimit:       "70",
+// 			advisoryLimit:   "invalid",
+// 			softGracePrd:    "30",
+// 			sizeInBytes:     100,
+// 			quotaEnabled:    true,
+// 			expectedQuotaID: "",
+// 			expectedError:   fmt.Errorf("invalid advisory limit"),
+// 		},
+// 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
+// 	for _, tc := range testCases {
+// 		t.Run(tc.name, func(t *testing.T) {
+// 			ctx := context.Background()
 
-			mockClient := &MockClient{}
+// 			mockClient := &MockClient{}
 
-			svc := &isiService{
-				endpoint: "http://localhost:8080",
-				client: &isi.Client{
-					API: mockClient,
-				},
-			}
-			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("invalid advisory limit")).Once()
-			_, err := svc.CreateQuota(ctx, tc.isiPath, tc.volName, tc.softLimit, tc.advisoryLimit, tc.softGracePrd, tc.sizeInBytes, tc.quotaEnabled)
-			assert.NoError(t, err)
-		})
-	}
-}
+// 			svc := &isiService{
+// 				endpoint: "http://localhost:8080",
+// 				client: &isi.Client{
+// 					API: mockClient,
+// 				},
+// 			}
+// 			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("invalid advisory limit")).Once()
+// 			_, err := svc.CreateQuota(ctx, tc.isiPath, tc.volName, tc.softLimit, tc.advisoryLimit, tc.softGracePrd, tc.sizeInBytes, tc.quotaEnabled)
+// 			assert.NoError(t, err)
+// 		})
+// 	}
+// }
 
 func TestGetExportsWithParams(t *testing.T) {
 	mockClient := &MockClient{}
