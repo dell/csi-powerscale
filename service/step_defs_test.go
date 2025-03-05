@@ -358,7 +358,7 @@ func FeatureContext(s *godog.ScenarioContext) {
 	s.Step(`^I call NodeUnpublishVolume$`, f.iCallNodeUnpublishVolume)
 	s.Step(`^I call EphemeralNodeUnpublishVolume$`, f.iCallEphemeralNodeUnpublishVolume)
 	s.Step(`^a valid NodeUnpublishVolumeResponse is returned$`, f.aValidNodeUnpublishVolumeResponseIsReturned)
-	s.Step(`^I call CreateSnapshot "([^"]*)" "([^"]*)"$`, f.iCallCreateSnapshot)
+	s.Step(`^I call CreateSnapshot "([^"]*)" "([^"]*)" "([^"]*)"$`, f.iCallCreateSnapshot)
 	s.Step(`^a valid CreateSnapshotResponse is returned$`, f.aValidCreateSnapshotResponseIsReturned)
 	s.Step(`^I call DeleteSnapshot "([^"]*)"$`, f.iCallDeleteSnapshot)
 	s.Step(`^I call CreateVolumeFromSnapshot "([^"]*)" "([^"]*)"$`, f.iCallCreateVolumeFromSnapshot)
@@ -2010,32 +2010,32 @@ func getCreateSnapshotRequest(srcVolumeID, name string) *csi.CreateSnapshotReque
 	return req
 }
 
-func (f *feature) iCallCreateSnapshot(srcVolumeID, name string) error {
+func (f *feature) iCallCreateSnapshot(volName, srcVolumeID, name string) error {
 	client := fake.NewSimpleClientset()
 	f.service.k8sclient = client
 
 	// Check if the PersistentVolume already exists
-	_, err := f.service.k8sclient.CoreV1().PersistentVolumes().Get(context.Background(), "volume2", metav1.GetOptions{})
+	_, err := f.service.k8sclient.CoreV1().PersistentVolumes().Get(context.Background(), volName, metav1.GetOptions{})
 	if err == nil {
 		// PersistentVolume exists, delete it
-		err = f.service.k8sclient.CoreV1().PersistentVolumes().Delete(context.Background(), "volume2", metav1.DeleteOptions{})
+		err = f.service.k8sclient.CoreV1().PersistentVolumes().Delete(context.Background(), volName, metav1.DeleteOptions{})
 		if err != nil {
 			log.Printf("Failed to delete existing PersistentVolume: %s\n", err.Error())
 			return err
 		}
-		log.Printf("Existing PersistentVolume 'volume2' deleted successfully")
+		log.Printf("Existing PersistentVolume %s deleted successfully", volName)
 	}
 
 	// Create the PersistentVolume
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "volume2",
+			Name: volName,
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				CSI: &v1.CSIPersistentVolumeSource{
 					VolumeAttributes: map[string]string{
-						"Path": "/ifs/data/csi-isilon/volume2",
+						"Path": "/ifs/data/csi-isilon/" + volName,
 					},
 				},
 			},
@@ -2061,12 +2061,12 @@ func (f *feature) iCallCreateSnapshot(srcVolumeID, name string) error {
 		log.Printf("snapshot id %s\n", f.createSnapshotResponse.GetSnapshot().SnapshotId)
 	}
 	// Delete the PersistentVolume after snapshot creation
-	err = f.service.k8sclient.CoreV1().PersistentVolumes().Delete(context.Background(), "volume2", metav1.DeleteOptions{})
+	err = f.service.k8sclient.CoreV1().PersistentVolumes().Delete(context.Background(), volName, metav1.DeleteOptions{})
 	if err != nil {
 		log.Printf("Failed to delete PersistentVolume: %s\n", err.Error())
 		return err
 	}
-	log.Printf("PersistentVolume 'volume2' deleted successfully")
+	log.Printf("PersistentVolume '%s' deleted successfully", volName)
 
 	return nil
 }
