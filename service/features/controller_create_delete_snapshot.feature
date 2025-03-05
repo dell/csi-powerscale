@@ -35,7 +35,7 @@ Feature: Isilon CSI interface
     When I call CreateSnapshot <volumeID> <snapshotName> <isiPath>
     Then the error contains <errormsg>
 
-Examples:
+    Examples:
     | volumeID                       | snapshotName                                  | errormsg                             |
     | "volume1=_=_=10=_=_=System"    | "create_snapshot_name"                        | "source volume id is invalid"        |
     | "volume2=_=_=19=_=_=System"    | "existent_snapshot_name"                      | "already exists but is incompatible" |
