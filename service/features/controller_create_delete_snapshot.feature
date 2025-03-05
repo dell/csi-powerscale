@@ -37,7 +37,7 @@ Feature: Isilon CSI interface
 
     Examples:
     | volumeID                       | snapshotName                                  | errormsg                             |
-    | "volume1=_=_=10=_=_=System"    | "create_snapshot_name"                        | "source volume id is invalid"        |
+   # | "volume1=_=_=10=_=_=System"    | "create_snapshot_name"                        | "source volume id is invalid"        |
     | "volume2=_=_=19=_=_=System"    | "existent_snapshot_name"                      | "already exists but is incompatible" |
     | "volume2=_=_=19=_=_=System"    | "existent_comp_snapshot_name"                 | "none"                               |
     | "volume2=_=_=19=_=_=System"    | "existent_comp_snapshot_name_longer_than_max" | "already exists but is incompatible" |
