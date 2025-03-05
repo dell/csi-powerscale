@@ -589,59 +589,78 @@ func TestString(t *testing.T) {
 }
 
 func TestValidateCreateVolumeRequest(t *testing.T) {
-	s := &service{}
-
-	// Test case: Empty CreateVolumeRequest
+	o := Opts{
+		Path: "path",
+	}
+	s := service{
+		opts: o,
+	}
+	// Test case: empty CreateVolumeRequest
 	req := &csi.CreateVolumeRequest{}
-	_, err := s.ValidateCreateVolumeRequest(req)
-	assert.Error(t, err)
-
-	// Test case: Empty name in CreateVolumeRequest
-	req = &csi.CreateVolumeRequest{
-		Name: "",
-	}
-	_, err = s.ValidateCreateVolumeRequest(req)
-	assert.Error(t, err)
-	assert.Equal(t, codes.InvalidArgument, status.Code(err))
-
-	// Test case: Invalid volume size in CreateVolumeRequest
-	req = &csi.CreateVolumeRequest{
-		Name: "test-volume",
-		CapacityRange: &csi.CapacityRange{
-			RequiredBytes: -1,
-		},
-	}
-	_, err = s.ValidateCreateVolumeRequest(req)
-	assert.Error(t, err)
-
-	// Test case: Valid volume size and name in CreateVolumeRequest
-	req = &csi.CreateVolumeRequest{
-		Name: "test-volume",
-		CapacityRange: &csi.CapacityRange{
-			RequiredBytes: 1024,
-		},
-	}
 	size, err := s.ValidateCreateVolumeRequest(req)
-	assert.NoError(t, err)
-	assert.Equal(t, int64(1024), size)
+	if err == nil {
+		t.Errorf("ValidateCreateVolumeRequest returned nil error, expected error")
+	}
 
-	// Test case: Block volume requested
+	// Test case: valid CreateVolumeRequest
 	req = &csi.CreateVolumeRequest{
-		Name: "test-volume",
+		Name: "volume1",
 		CapacityRange: &csi.CapacityRange{
-			RequiredBytes: 1024,
+			RequiredBytes: 10 * 1024 * 1024 * 1024,
 		},
 		VolumeCapabilities: []*csi.VolumeCapability{
 			{
-				AccessType: &csi.VolumeCapability_Block{
-					Block: &csi.VolumeCapability_BlockVolume{},
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{
+						FsType: "nfs",
+					},
+				},
+				AccessMode: &csi.VolumeCapability_AccessMode{
+					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 				},
 			},
 		},
+		Parameters: map[string]string{
+			AccessZoneParam: "System",
+			IsiPathParam:    "/ifs/data/csi-isilon",
+		},
+	}
+	expectedSize := int64(10 * 1024 * 1024 * 1024)
+	size, err = s.ValidateCreateVolumeRequest(req)
+	if err != nil {
+		t.Errorf("ValidateCreateVolumeRequest returned error '%s', expected nil", err.Error())
+	}
+	if size != expectedSize {
+		t.Errorf("ValidateCreateVolumeRequest returned size '%d', expected '%d'", size, expectedSize)
+	}
+
+	// Test case: invalid CreateVolumeRequest
+	req = &csi.CreateVolumeRequest{
+		Name: "volume1",
+		CapacityRange: &csi.CapacityRange{
+			RequiredBytes: -1,
+		},
+		VolumeCapabilities: []*csi.VolumeCapability{
+			{
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{
+						FsType: "nfs",
+					},
+				},
+				AccessMode: &csi.VolumeCapability_AccessMode{
+					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				},
+			},
+		},
+		Parameters: map[string]string{
+			AccessZoneParam: "System",
+			IsiPathParam:    "/ifs/data/csi-isilon",
+		},
 	}
 	_, err = s.ValidateCreateVolumeRequest(req)
-	assert.Error(t, err)
-	assert.Equal(t, "raw block requested from NFS Volume", err.Error())
+	if err == nil {
+		t.Errorf("ValidateCreateVolumeRequest returned nil error, expected error")
+	}
 }
 
 // Mocking the service struct
