@@ -821,4 +821,11 @@ func TestTrimVolumePath(t *testing.T) {
 		result := TrimVolumePath(volPath)
 		assert.Equal(t, expected, result, "Expected the trimmed path to be an empty string")
 	})
+
+	t.Run("Path with underscores", func(t *testing.T) {
+		volPath := "/path/to/volume/volume_with_underscores"
+		expected := "/path/to/volume/"
+		result := TrimVolumePath(volPath)
+		assert.Equal(t, expected, result, "Expected the trimmed path to be '/path/to/volume/'")
+	})
 }
