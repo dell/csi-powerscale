@@ -32,7 +32,7 @@ Feature: Isilon CSI interface
 
   Scenario Outline: Create snapshot with negative or idempotent arguments
     Given a Isilon service
-    When I call CreateSnapshot <volumeID> <snapshotName> <isiPath>
+    When I call CreateSnapshot <volumeID> <snapshotName>
     Then the error contains <errormsg>
 
     Examples:
