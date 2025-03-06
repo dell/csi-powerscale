@@ -11,9 +11,3 @@ driver: csi-isilon.dellemc.com
 #   Delete: the underlying storage snapshot will be deleted along with the VolumeSnapshotContent object.
 #   Retain: both the underlying snapshot and VolumeSnapshotContent remain.
 deletionPolicy: Delete
-
-parameters:
-  # The base path of the volumes on Isilon cluster for which snapshot is being created.
-  # This path should be same as the IsiPath from the storageClass.
-  # Optional: false
-  IsiPath: /ifs/data/csi
