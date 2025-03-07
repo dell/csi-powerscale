@@ -1,8 +1,8 @@
 module github.com/dell/csi-isilon/v2
 
-go 1.23.0
+go 1.24
 
-toolchain go1.23.5
+toolchain go1.24.1
 
 require (
 	github.com/Showmax/go-fqdn v1.0.0
@@ -12,12 +12,12 @@ require (
 	github.com/cucumber/godog v0.15.0
 	github.com/dell/csi-metadata-retriever v1.10.0
 	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250226203203-5dcd46c607b9
-	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250226203203-5dcd46c607b9
+	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250306062548-1cc178c422f1
 	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250226203203-5dcd46c607b9
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.2-0.20250226203203-5dcd46c607b9
 	github.com/dell/gocsi v1.13.1-0.20250226203119-f6c4e42fab09
 	github.com/dell/gofsutil v1.18.0
-	github.com/dell/goisilon v1.18.2-0.20250226203141-ef35bfd90f23
+	github.com/dell/goisilon v1.18.2-0.20250306204322-b2f5db3372e6
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
