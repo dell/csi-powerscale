@@ -14,4 +14,4 @@ jobs:
 
   common:
     name: Quality Checks
-    uses: dell/common-github-actions/.github/workflows/go-common.yml@main
+    uses: dell/common-github-actions/.github/workflows/go-common.yml@add-setup-go
