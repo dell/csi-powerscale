@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright © 2020-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
 #
 # verify-csi-isilon method
 function verify-csi-isilon() {
-  verify_k8s_versions "1.26" "1.32"
-  verify_openshift_versions "4.17" "4.18"
+  verify_k8s_versions "1.27" "1.33"
+  verify_openshift_versions "4.18" "4.19"
   verify_namespace "${NS}"
   verify_required_secrets "${RELEASE}-creds"
   verify_optional_secrets "${RELEASE}-certs"
