@@ -745,7 +745,7 @@ func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteI
 	// Create a new local policy based on previous remote policy's parameters
 	log.Info("Creating new local SyncIQ policy")
 	err = localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
-		remotePolicy.TargetPath, remotePolicy.SourcePath, remoteIsiConfig.Endpoint, localIsiConfig.ReplicationCertificateID, true)
+		remotePolicy.TargetPath, remotePolicy.SourcePath, remoteIsiConfig.Endpoint, remoteIsiConfig.ReplicationCertificateID, true)
 	if err != nil {
 		return status.Errorf(codes.Internal, "reprotect: create protection policy on the local site failed %s", err.Error())
 	}
