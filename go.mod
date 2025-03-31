@@ -9,12 +9,12 @@ require (
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/cucumber/godog v0.15.0
 	github.com/dell/csi-metadata-retriever v1.10.0
-	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250321180109-ff9405f3dbef
-	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250321180109-ff9405f3dbef
-	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250321180109-ff9405f3dbef
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.2-0.20250321180109-ff9405f3dbef
-	github.com/dell/gocsi v1.13.1-0.20250226203119-f6c4e42fab09
-	github.com/dell/gofsutil v1.18.0
+	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250325135746-bee5d830cdce
+	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250325135746-bee5d830cdce
+	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250325135746-bee5d830cdce
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.2-0.20250325135746-bee5d830cdce
+	github.com/dell/gocsi v1.13.1-0.20250327070427-854e59aaa95d
+	github.com/dell/gofsutil v1.18.1-0.20250327105432-7491c13030fd
 	github.com/dell/goisilon v1.18.2-0.20250317112212-b8bae60754d5
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/google/uuid v1.6.0
@@ -23,7 +23,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.20.0
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/net v0.37.0
+	golang.org/x/net v0.38.0
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.4
 	gopkg.in/yaml.v3 v3.0.1
