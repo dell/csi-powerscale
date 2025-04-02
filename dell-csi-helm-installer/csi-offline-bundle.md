@@ -90,28 +90,28 @@ For example, here is the output of a request to build an offline bundle for the 
 
    quay.io/dell/container-storage-modules/csi-isilon:v2.14.0
    quay.io/dell/container-storage-modules/csi-metadata-retriever:v1.10.0
-   quay.io/dell/container-storage-modules/csipowermax-reverseproxy:v2.6.0
+   quay.io/dell/container-storage-modules/csipowermax-reverseproxy:v2.13.0
    quay.io/dell/container-storage-modules/csi-powermax:v2.14.0
    quay.io/dell/container-storage-modules/csi-powerstore:v2.14.0
    quay.io/dell/container-storage-modules/csi-unity:v2.14.0
    quay.io/dell/container-storage-modules/csi-vxflexos:v2.14.0
    quay.io/dell/container-storage-modules/csm-authorization-sidecar:v1.14.0
-   quay.io/dell/container-storage-modules/csm-metrics-powerflex:v1.5.0
-   quay.io/dell/container-storage-modules/csm-metrics-powerscale:v1.8.0
-   quay.io/dell/container-storage-modules/csm-topology:v1.5.0
-   quay.io/dell/container-storage-modules/dell-csi-replicator:v1.7.0
-   quay.io/dell/container-storage-modules/dell-replication-controller:v1.7.0
-   quay.io/dell/container-storage-modules/sdc:4.5
-   quay.io/dell/container-storage-modules/dell-csm-operator:v1.3.0
-   gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
-   nginxinc/nginx-unprivileged:1.20
+   quay.io/dell/container-storage-modules/csm-metrics-powerflex:v1.12.0
+   quay.io/dell/container-storage-modules/csm-metrics-powerscale:v1.9.0
+   quay.io/dell/container-storage-modules/csm-topology:v1.12.0
+   quay.io/dell/container-storage-modules/dell-csi-replicator:v1.12.0
+   quay.io/dell/container-storage-modules/dell-replication-controller:v1.12.0
+   quay.io/dell/container-storage-modules/sdc:4.5.2.1
+   quay.io/dell/container-storage-modules/dell-csm-operator:v1.9.0
+   registry.redhat.io/openshift4/ose-kube-rbac-proxy-rhel9:v4.16.0-202409051837.p0.g8ea2c99.assembly.stream.el9
+   nginxinc/nginx-unprivileged:1.27
    otel/opentelemetry-collector:0.42.0
-   registry.k8s.io/sig-storage/csi-attacher:v4.3.0
-   registry.k8s.io/sig-storage/csi-external-health-monitor-controller:v0.9.0
-   registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.8.0
-   registry.k8s.io/sig-storage/csi-provisioner:v3.5.0
-   registry.k8s.io/sig-storage/csi-resizer:v1.8.0
-   registry.k8s.io/sig-storage/csi-snapshotter:v6.2.2
+   registry.k8s.io/sig-storage/csi-attacher:v4.8.0
+   registry.k8s.io/sig-storage/csi-external-health-monitor-controller:v0.14.0
+   registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0
+   registry.k8s.io/sig-storage/csi-provisioner:v5.1.0
+   registry.k8s.io/sig-storage/csi-resizer:v1.13.1
+   registry.k8s.io/sig-storage/csi-snapshotter:v8.2.0
 
 *
 * Copying necessary files
