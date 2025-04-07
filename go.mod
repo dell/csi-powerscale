@@ -16,7 +16,7 @@ require (
 	github.com/dell/gocsi v1.13.1-0.20250327070427-854e59aaa95d
 	github.com/dell/gofsutil v1.18.1-0.20250402125640-883e291241f3
 	github.com/dell/goisilon v1.18.2-0.20250402032605-cec00a11cb0c
-	github.com/fsnotify/fsnotify v1.8.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/kubernetes-csi/csi-lib-utils v0.11.0
