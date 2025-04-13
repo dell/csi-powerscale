@@ -9,12 +9,12 @@ require (
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/cucumber/godog v0.15.0
 	github.com/dell/csi-metadata-retriever v1.10.0
-	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250404130030-01c3966b4bf6
-	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250404130030-01c3966b4bf6
-	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250404130030-01c3966b4bf6
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.2-0.20250404130030-01c3966b4bf6
+	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250409134836-11639e1ca9bc
+	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250409134836-11639e1ca9bc
+	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250409134836-11639e1ca9bc
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.2-0.20250409134836-11639e1ca9bc
 	github.com/dell/gocsi v1.13.1-0.20250327070427-854e59aaa95d
-	github.com/dell/gofsutil v1.18.1-0.20250402125640-883e291241f3
+	github.com/dell/gofsutil v1.18.1-0.20250411160933-31c9602b5620
 	github.com/dell/goisilon v1.18.2-0.20250402032605-cec00a11cb0c
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/google/uuid v1.6.0
@@ -90,7 +90,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
