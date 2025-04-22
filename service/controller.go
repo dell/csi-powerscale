@@ -280,6 +280,8 @@ func (s *service) CreateVolume(
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
+	log.Infof("Volume size in bytes: %d", sizeInBytes)
+
 	if _, ok := params[AccessZoneParam]; ok {
 		if params[AccessZoneParam] == "" {
 			accessZone = s.opts.AccessZone
@@ -1837,7 +1839,7 @@ func (s *service) getCSISnapshot(snapshotID string, sourceVolumeID string, creat
 	}
 
 	vi := &csi.Snapshot{
-		SizeBytes:      int64(cylinderSizeInBytes * vol.CapacityCYL),
+		SizeBytes:      sizeInBytes,
 		SnapshotId:     snapshotID,
 		SourceVolumeId: sourceVolumeID,
 		CreationTime:   ts,
