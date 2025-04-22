@@ -1837,7 +1837,7 @@ func (s *service) getCSISnapshot(snapshotID string, sourceVolumeID string, creat
 	}
 
 	vi := &csi.Snapshot{
-		SizeBytes:      sizeInBytes,
+		SizeBytes:      int64(cylinderSizeInBytes * vol.CapacityCYL),
 		SnapshotId:     snapshotID,
 		SourceVolumeId: sourceVolumeID,
 		CreationTime:   ts,
