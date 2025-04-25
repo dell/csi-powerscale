@@ -1735,6 +1735,8 @@ func (s *service) CreateSnapshot(
 		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
 	}
 
+	log.Error("avengers:::srcVolumeID received from RetrieveVolNameUsingPrefix", srcVolumeID)
+
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
