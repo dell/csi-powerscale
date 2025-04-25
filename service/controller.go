@@ -1730,6 +1730,11 @@ func (s *service) CreateSnapshot(
 		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
 	}
 
+	srcVolumeID, err = utils.RetrieveVolNameUsingPrefix(s.opts.csiVolPrefix, srcVolumeID)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
+	}
+
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
