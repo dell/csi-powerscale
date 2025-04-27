@@ -13,8 +13,8 @@ require (
 	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250417144221-6fcddedebf59
 	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250417144221-6fcddedebf59
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.2-0.20250417144221-6fcddedebf59
-	github.com/dell/gocsi v1.13.1-0.20250415161134-3f269fd9a084
-	github.com/dell/gofsutil v1.18.1-0.20250411160933-31c9602b5620
+	github.com/dell/gocsi v1.13.1-0.20250423132914-5966abd5770a
+	github.com/dell/gofsutil v1.18.1-0.20250424071242-3e01ce487273
 	github.com/dell/goisilon v1.18.2-0.20250417122624-0464a4f1cf2f
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/google/uuid v1.6.0
