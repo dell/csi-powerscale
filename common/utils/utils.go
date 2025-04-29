@@ -476,7 +476,7 @@ func TrimVolumePath(volPath string) string {
 }
 
 func RetrieveVolNameUsingPrefix(volPrefix, volName string) (string, error) {
-	startPos := strings.Index(volName, volPrefix)
+	startPos := strings.LastIndex(volName, volPrefix)
 
 	if startPos == -1 {
 		return "", fmt.Errorf("csiVolPrefix is not found in the volume name %s", volName)
