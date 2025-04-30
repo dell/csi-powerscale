@@ -70,4 +70,6 @@ const (
 
 	// DefaultPodmonPollRate is the default polling frequency to check for array connectivity
 	DefaultPodmonPollRate = 60
+
+	DefaultCsiVolumePrefix = "csivol"
 )

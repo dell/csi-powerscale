@@ -234,7 +234,12 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 	opts.allowedNetworks = allowedNetworks
 
 	if csiVolPrefix, ok := csictx.LookupEnv(ctx, constants.EnvCsiVolPrefix); ok {
+		if csiVolPrefix == "" {
+			csiVolPrefix = constants.DefaultCsiVolumePrefix
+		}
 		opts.csiVolPrefix = csiVolPrefix
+	} else {
+		opts.csiVolPrefix = constants.DefaultCsiVolumePrefix
 	}
 
 	opts.QuotaEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvQuotaEnabled)
