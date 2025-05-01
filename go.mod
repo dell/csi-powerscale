@@ -2,7 +2,7 @@ module github.com/dell/csi-isilon/v2
 
 go 1.24.0
 
-toolchain go1.24.1
+toolchain go1.24.2
 
 require (
 	github.com/Showmax/go-fqdn v1.0.0
