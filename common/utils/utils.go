@@ -481,7 +481,6 @@ func RetrieveVolNameUsingPrefix(volPrefix, volName string) (string, error) {
 
 	if prefixIndex == -1 {
 		return "", fmt.Errorf("csiVolPrefix %s is not found in the volume name %s", volPrefix, volName)
-
 	}
 	return volName[prefixIndex:], nil
 }
