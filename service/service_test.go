@@ -197,6 +197,7 @@ func TestServiceInitializeServiceOpts(t *testing.T) {
 		replicationContextPrefix: "prefix/",
 		replicationPrefix:        "prefix",
 		IgnoreUnresolvableHosts:  false,
+		csiVolPrefix:             "vol",
 	}
 
 	wantEnvNodeName := "node"
@@ -213,6 +214,7 @@ func TestServiceInitializeServiceOpts(t *testing.T) {
 	os.Setenv(constants.EnvIsilonConfigFile, wantEnvIsilonConfigFile)
 	os.Setenv(constants.EnvReplicationContextPrefix, "prefix")
 	os.Setenv(constants.EnvReplicationPrefix, wantOps.replicationPrefix)
+	os.Setenv(constants.EnvCsiVolPrefix, "vol")
 
 	defer func() {
 		os.Unsetenv(constants.EnvPort)
@@ -225,6 +227,7 @@ func TestServiceInitializeServiceOpts(t *testing.T) {
 		os.Unsetenv(constants.EnvIsilonConfigFile)
 		os.Unsetenv(constants.EnvReplicationContextPrefix)
 		os.Unsetenv(constants.EnvReplicationPrefix)
+		os.Unsetenv(constants.EnvCsiVolPrefix)
 	}()
 
 	serviceInstance := &service{}
@@ -259,6 +262,10 @@ func TestServiceInitializeServiceOpts(t *testing.T) {
 	os.Unsetenv(constants.EnvAccessZone)
 	serviceInstance.initializeServiceOpts(ctx)
 	assert.Equal(t, constants.DefaultAccessZone, serviceInstance.opts.AccessZone)
+
+	os.Unsetenv(constants.EnvCsiVolPrefix)
+	serviceInstance.initializeServiceOpts(ctx)
+	assert.Equal(t, constants.DefaultCsiVolumePrefix, serviceInstance.opts.csiVolPrefix)
 
 	// parsing error
 	os.Setenv(constants.EnvMaxVolumesPerNode, "test!@#$")
