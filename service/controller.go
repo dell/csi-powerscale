@@ -1730,13 +1730,10 @@ func (s *service) CreateSnapshot(
 		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
 	}
 
-	log.Infof("avengers:::srcVolumeID before RetrieveVolNameUsingPrefix() %s", srcVolumeID)
 	srcVolumeID, err = utils.RetrieveVolNameUsingPrefix(s.opts.csiVolPrefix, srcVolumeID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
 	}
-
-	log.Errorf("avengers:::srcVolumeID received from RetrieveVolNameUsingPrefix %s", srcVolumeID)
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {

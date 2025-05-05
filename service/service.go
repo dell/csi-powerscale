@@ -48,7 +48,6 @@ import (
 	isi "github.com/dell/goisilon"
 	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -1109,14 +1108,11 @@ func (s *service) GetIsiPathByName(ctx context.Context, volName string) (string,
 		return "", fmt.Errorf("no k8s clientset")
 	}
 
-	log.Infof(fmt.Sprintf("avengers::: inside GetIsiPathByName: volName %s", volName))
-
 	pv, err := s.k8sclient.CoreV1().PersistentVolumes().Get(ctx, volName, v1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("unable to get PersistentVolume: %w", err)
 	}
 
-	log.Infof(fmt.Sprintf("avengers::: inside GetIsiPathByName: pv %+v", pv))
 	// Extract the Path parameter from the PV VolumeAttributes
 	path, ok := pv.Spec.CSI.VolumeAttributes["Path"]
 	if !ok || path == "" {

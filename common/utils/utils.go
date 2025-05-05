@@ -475,12 +475,13 @@ func TrimVolumePath(volPath string) string {
 	return volPath
 }
 
+// RetrieveVolNameUsingPrefix returns the substring of a volume name starting from the last occurrence of a given prefix, or an error if the prefix is not found.
 func RetrieveVolNameUsingPrefix(volPrefix, volName string) (string, error) {
-	startPos := strings.LastIndex(volName, volPrefix)
+	prefixIndex := strings.LastIndex(volName, volPrefix)
 
-	if startPos == -1 {
-		return "", fmt.Errorf("csiVolPrefix is not found in the volume name %s", volName)
+	if prefixIndex == -1 {
+		return "", fmt.Errorf("csiVolPrefix %s is not found in the volume name %s", volPrefix, volName)
 
 	}
-	return volName[startPos:], nil
+	return volName[prefixIndex:], nil
 }
