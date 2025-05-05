@@ -106,6 +106,6 @@ const (
 	// EnvMetadataRetrieverEndpoint specifies the endpoint address for csi-metadata-retriever sidecar
 	EnvMetadataRetrieverEndpoint = "CSI_RETRIEVER_ENDPOINT"
 
-	// EnvCsiVolPrefix specifies the volume prefix for the names of PersistentVolumes created
+	// EnvCsiVolPrefix specifies the volume prefix used for the names of PersistentVolumes created
 	EnvCsiVolPrefix = "X_CSI_VOL_PREFIX"
 )
