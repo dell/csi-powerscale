@@ -2054,7 +2054,6 @@ func (f *feature) iCallCreateSnapshot(volName, srcVolumeID, name string) error {
 		log.Printf("Failed to create PersistentVolume: %s\n", err.Error())
 		return err
 	}
-	// os.Setenv("X_CSI_VOL_PREFIX", "vol")
 
 	f.createSnapshotRequest = getCreateSnapshotRequest(srcVolumeID, name)
 	req := f.createSnapshotRequest
