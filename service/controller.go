@@ -1730,7 +1730,7 @@ func (s *service) CreateSnapshot(
 		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
 	}
 
-	srcVolumeID, err = utils.RetrieveVolNameUsingPrefix(s.opts.csiVolPrefix, srcVolumeID)
+	srcVolumeID, err = utils.RemoveAuthorizationVolPrefix(s.opts.csiVolPrefix, srcVolumeID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
 	}

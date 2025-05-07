@@ -830,12 +830,12 @@ func TestTrimVolumePath(t *testing.T) {
 	})
 }
 
-func TestRetrieveVolNameUsingPrefix(t *testing.T) {
+func TestRemoveAuthorizationVolPrefix(t *testing.T) {
 	t.Run("Prefix found in volume name", func(t *testing.T) {
 		volPrefix := "csi"
 		volName := "my-volume-csi-xyz"
 		expected := "csi-xyz"
-		result, err := RetrieveVolNameUsingPrefix(volPrefix, volName)
+		result, err := RemoveAuthorizationVolPrefix(volPrefix, volName)
 		assert.NoError(t, err, "Expected no error")
 		assert.Equal(t, expected, result, "Expected the result to be 'csi-xyz'")
 	})
@@ -844,7 +844,7 @@ func TestRetrieveVolNameUsingPrefix(t *testing.T) {
 		volPrefix := "tn1"
 		volName := "tn1-tn1-xyz"
 		expected := "tn1-xyz"
-		result, err := RetrieveVolNameUsingPrefix(volPrefix, volName)
+		result, err := RemoveAuthorizationVolPrefix(volPrefix, volName)
 		assert.NoError(t, err, "Expected no error")
 		assert.Equal(t, expected, result, "Expected the result to be 'tn1-xyz'")
 	})
@@ -853,7 +853,7 @@ func TestRetrieveVolNameUsingPrefix(t *testing.T) {
 		volPrefix := "csi"
 		volName := ""
 		expectedError := "csiVolPrefix csi is not found in the volume name "
-		result, err := RetrieveVolNameUsingPrefix(volPrefix, volName)
+		result, err := RemoveAuthorizationVolPrefix(volPrefix, volName)
 		assert.Error(t, err, "Expected an error")
 		assert.EqualError(t, err, expectedError, "Expected the error message to match")
 		assert.Equal(t, "", result, "Expected the result to be an empty string")

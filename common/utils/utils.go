@@ -475,8 +475,8 @@ func TrimVolumePath(volPath string) string {
 	return volPath
 }
 
-// RetrieveVolNameUsingPrefix returns the substring of a volume name starting from the last occurrence of a given prefix, or an error if the prefix is not found.
-func RetrieveVolNameUsingPrefix(volPrefix, volName string) (string, error) {
+// RemoveAuthorizationVolPrefix returns the volume name by removing the authorization prefix if it exists, or returns an error if the prefix is not found.
+func RemoveAuthorizationVolPrefix(volPrefix, volName string) (string, error) {
 	prefixIndex := strings.LastIndex(volName, volPrefix)
 
 	if prefixIndex == -1 {
