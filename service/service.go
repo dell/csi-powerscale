@@ -105,6 +105,7 @@ type Opts struct {
 	IgnoreUnresolvableHosts   bool
 	replicationContextPrefix  string
 	replicationPrefix         string
+	csiVolPrefix              string
 }
 
 type service struct {
@@ -230,6 +231,13 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 		return err
 	}
 	opts.allowedNetworks = allowedNetworks
+
+	opts.csiVolPrefix = constants.DefaultCsiVolumePrefix
+	if csiVolPrefix, ok := csictx.LookupEnv(ctx, constants.EnvCsiVolPrefix); ok {
+		if csiVolPrefix != "" {
+			opts.csiVolPrefix = csiVolPrefix
+		}
+	}
 
 	opts.QuotaEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvQuotaEnabled)
 	opts.SkipCertificateValidation = utils.ParseBooleanFromContext(ctx, constants.EnvSkipCertificateValidation)

@@ -70,4 +70,7 @@ const (
 
 	// DefaultPodmonPollRate is the default polling frequency to check for array connectivity
 	DefaultPodmonPollRate = 60
+
+	// DefaultCsiVolumePrefix defines the default volume prefix used for the names of PersistentVolumes created
+	DefaultCsiVolumePrefix = "csivol"
 )

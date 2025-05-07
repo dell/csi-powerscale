@@ -230,6 +230,7 @@ func (f *feature) getService() *service {
 	opts.isiAuthType = 0
 	opts.Verbose = 1
 	opts.KubeConfigPath = "mock/k8s/admin.conf"
+	opts.csiVolPrefix = "vol"
 
 	newConfig := IsilonClusterConfig{}
 	newConfig.ClusterName = clusterName1
@@ -258,6 +259,9 @@ func (f *feature) getService() *service {
 	}
 	if os.Getenv("CSI_ISILON_ZONE") != "" {
 		opts.AccessZone = os.Getenv("CSI_ISILON_ZONE")
+	}
+	if os.Getenv("X_CSI_VOL_PREFIX") != "" {
+		opts.csiVolPrefix = os.Getenv("X_CSI_VOL_PREFIX")
 	}
 
 	svc.opts = opts

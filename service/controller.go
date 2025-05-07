@@ -1730,6 +1730,13 @@ func (s *service) CreateSnapshot(
 		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
 	}
 
+	// When authorization is enabled, the volume ID will be prefixed with an authorization prefix, e.g., tn1-csivol-1c8b13cadd.
+	// This function is called to remove the authorization prefix from the volume ID.
+	srcVolumeID, err = utils.RemoveAuthorizationVolPrefix(s.opts.csiVolPrefix, srcVolumeID)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
+	}
+
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		log.Error("Failed to get Isilon config with error ", err.Error())
