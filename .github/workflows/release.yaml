@@ -19,6 +19,8 @@ on:  # yamllint disable-line rule:truthy
         description: "Patch version to release. example: 2.1.x (Use this only if n-1/n-2 patch is selected)"
         required: false
         type: string
+  repository_dispatch:
+    types: [auto-release-workflow]
 jobs:
   process-inputs:
     name: Process Inputs
@@ -30,6 +32,11 @@ jobs:
         id: set-version
         shell: bash
         run: |
+          echo "Triggered by: ${{ github.event_name }}"
+          if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+            echo "versionEnv=minor" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           if [[ "${{ github.event.inputs.version }}" != "" && "${{ github.event.inputs.option }}" == "n-1/n-2 patch (Provide input in the below box)" ]]; then
             # if both version and option are provided, then version takes precedence i.e. patch release for n-1/n-2
             echo "versionEnv=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
