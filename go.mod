@@ -11,13 +11,13 @@ require (
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/cucumber/godog v0.15.0
 	github.com/dell/csi-metadata-retriever v1.10.0
-	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250505133644-1c9a32b5c0d0
-	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250505133644-1c9a32b5c0d0
-	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250505133644-1c9a32b5c0d0
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.2-0.20250417144221-6fcddedebf59
-	github.com/dell/gocsi v1.13.1-0.20250429191623-c3d2d8e59834
-	github.com/dell/gofsutil v1.18.1-0.20250424071242-3e01ce487273
-	github.com/dell/goisilon v1.18.2-0.20250417122624-0464a4f1cf2f
+	github.com/dell/dell-csi-extensions/common v1.8.0
+	github.com/dell/dell-csi-extensions/podmon v1.8.0
+	github.com/dell/dell-csi-extensions/replication v1.11.0
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.1
+	github.com/dell/gocsi v1.14.0
+	github.com/dell/gofsutil v1.19.0
+	github.com/dell/goisilon v1.19.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
