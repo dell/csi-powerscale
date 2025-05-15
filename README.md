@@ -24,8 +24,6 @@ This project may be compiled as a stand-alone binary using Golang that, when run
 * [Security](https://github.com/dell/csm/blob/main/docs/SECURITY.md)
 * [Building](#building)
 * [Runtime Dependecies](#runtime-dependencies)
-* [Driver Installation](#driver-installation)
-* [Using Driver](#using-driver)
 * [Documentation](#documentation)
 
 ## Support
@@ -48,14 +46,6 @@ You can run an integration test on a Linux system by populating the env files at
 ## Runtime Dependencies
 
 Both the Controller and the Node portions of the driver can only be run on nodes which have network connectivity to a “`PowerScale Cluster`” (which is used by the driver).
-
-## Driver Installation
-
-Please consult the [Installation Guide](https://dell.github.io/csm-docs/docs/deployment/) to install the driver via various methods.
-
-## Using driver
-
-Please refer to the section `Testing Drivers` in the [Documentation](https://dell.github.io/csm-docs/docs/csidriver/test/) for more info.
 
 ## Documentation
 
