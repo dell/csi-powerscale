@@ -27,8 +27,7 @@ This project may be compiled as a stand-alone binary using Golang that, when run
 * [Documentation](#documentation)
 
 ## Support
-
-For any CSI driver issues, questions or feedback, please follow our [support process](https://github.com/dell/csm/blob/main/docs/SUPPORT.md)
+For any issues, questions or feedback, please contact [Dell support](https://www.dell.com/support/incidents-online/en-us/contactus/product/container-storage-modules).
 
 ## Building
 
