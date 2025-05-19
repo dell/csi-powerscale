@@ -10,7 +10,7 @@ require (
 	github.com/akutz/gournal v0.5.0
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/cucumber/godog v0.15.0
-	github.com/dell/csi-metadata-retriever v1.10.0
+	github.com/dell/csi-metadata-retriever v1.11.0
 	github.com/dell/dell-csi-extensions/common v1.8.0
 	github.com/dell/dell-csi-extensions/podmon v1.8.0
 	github.com/dell/dell-csi-extensions/replication v1.11.0
