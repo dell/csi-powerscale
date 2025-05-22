@@ -4,9 +4,11 @@
 
 | Name    | Usage |
 |---------|-------|
+|1vol     | Creates 1 filesystem mount   |
 |2vols    | Creates 2 filesystem mounts  |
 |7vols    | Creates 7 filesystem mounts  |
 |10vols   | Creates 10 filesystem mounts |
+|2vols+restore | Upgraded version of 2vols that also mounts a volume created from snap |
 
 ## Scripts
 
@@ -18,6 +20,7 @@
 | starttest.sh   | Used to instantiate one of the Helm charts above. Requires argument of Helm chart |
 | stoptest.sh    | Stops currently running Helm chart and deletes all PVCS |
 | snaptest.sh    | Script to create volume and snapshot from volume |
+| snaprestoretest.sh    | Script to instantiate 2vols; then upgrade to 2vols+restore (with volume from snapshot) |
 
 ## Usage
 
