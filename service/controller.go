@@ -1727,7 +1727,7 @@ func (s *service) CreateSnapshot(
 	// parse the input volume id and fetch it's components
 	srcVolumeID, _, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
+		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
 	}
 
 	// When authorization is enabled, the volume ID will be prefixed with an authorization prefix, e.g., tn1-csivol-1c8b13cadd.
@@ -1863,7 +1863,7 @@ func (s *service) DeleteSnapshot(
 	ctx, log, runID := GetRunIDLog(ctx)
 	log.Infof("DeleteSnapshot started")
 	if req.GetSnapshotId() == "" {
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "snapshot id to be deleted is required"))
+		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "snapshot id to be deleted is required"))
 	}
 	// parse the input snapshot id and fetch it's components
 	snapshotID, clusterName, accessZone, err := utils.ParseNormalizedSnapshotID(ctx, req.GetSnapshotId())
