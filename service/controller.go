@@ -1886,7 +1886,7 @@ func (s *service) DeleteSnapshot(
 
 	id, err := strconv.ParseInt(snapshotID, 10, 64)
 	if err != nil {
-		log.Warn("snapshot ID '%s' is not a valid integer", snapshotID)
+		log.Warnf("snapshot ID '%s' is not a valid integer", snapshotID)
 		return &csi.DeleteSnapshotResponse{}, nil
 	}
 	snapshot, err := isiConfig.isiSvc.GetSnapshot(ctx, snapshotID)
