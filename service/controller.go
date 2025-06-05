@@ -888,7 +888,8 @@ func (s *service) DeleteVolume(
 
 	// validate request
 	if err := s.ValidateDeleteVolumeRequest(ctx, req); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		log.Error(status.Error(codes.InvalidArgument, err.Error()))
+		return &csi.DeleteVolumeResponse{}, nil
 	}
 
 	// parse the input volume id and fetch it's components
