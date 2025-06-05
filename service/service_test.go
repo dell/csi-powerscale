@@ -978,30 +978,26 @@ func TestGetIsiPathByName(t *testing.T) {
 	t.Run("Valid volume name with path", func(t *testing.T) {
 		volName := "test-pv-with-path"
 		expectedPath := "/ifs/data"
-		path, err := s.GetIsiPathByName(ctx, volName)
-		assert.NoError(t, err, "expected no error")
+		path := s.GetIsiPathByName(ctx, volName)
 		assert.Equal(t, expectedPath, path, "expected path to be '/ifs/data'")
 	})
 
 	t.Run("Valid volume name without path", func(t *testing.T) {
 		volName := "test-pv-without-path"
-		path, err := s.GetIsiPathByName(ctx, volName)
-		assert.Error(t, err, "expected an error for missing path attribute")
+		path := s.GetIsiPathByName(ctx, volName)
 		assert.Empty(t, path, "expected empty path for missing path attribute")
 	})
 
 	t.Run("Invalid volume name", func(t *testing.T) {
 		volName := "invalid-pv"
-		path, err := s.GetIsiPathByName(ctx, volName)
-		assert.Error(t, err, "expected an error for invalid volume name")
+		path := s.GetIsiPathByName(ctx, volName)
 		assert.Empty(t, path, "expected empty path for invalid volume name")
 	})
 
 	t.Run("No k8s clientset", func(t *testing.T) {
 		s.k8sclient = nil
 		volName := "test-pv-with-path"
-		path, err := s.GetIsiPathByName(ctx, volName)
-		assert.Error(t, err, "expected an error for no k8s clientset")
+		path := s.GetIsiPathByName(ctx, volName)
 		assert.Empty(t, path, "expected empty path for no k8s clientset")
 	})
 }
