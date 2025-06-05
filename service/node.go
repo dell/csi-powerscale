@@ -241,13 +241,17 @@ func (s *service) NodeUnpublishVolume(
 	if !isExportIDEmpty {
 		export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
 		if err != nil {
-			return nil, err
-		}
-		exportPath := (*export.Paths)[0]
-		isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(exportPath, accessZone)
-		// If it is a RO volume from snapshot
-		if isROVolumeFromSnapshot {
-			volName = exportPath
+			// Export doesn't exist - this is OK during unpublish
+			// Log it but don't fail the operation
+			log.Infof("Export ID %d not found during unpublish (may already be cleaned up): %v", exportID, err)
+			// Continue with unpublish using just the volume name
+		} else if export != nil && export.Paths != nil && len(*export.Paths) > 0 {
+			exportPath := (*export.Paths)[0]
+			isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(exportPath, accessZone)
+			// If it is a RO volume from snapshot
+			if isROVolumeFromSnapshot {
+				volName = exportPath
+			}
 		}
 	}
 
