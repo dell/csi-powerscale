@@ -1886,7 +1886,8 @@ func (s *service) DeleteSnapshot(
 
 	id, err := strconv.ParseInt(snapshotID, 10, 64)
 	if err != nil {
-		return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "cannot convert snapshot to integer: %s", err.Error()))
+		log.Warn("snapshot ID '%s' is not a valid integer", snapshotID)
+		return &csi.DeleteSnapshotResponse{}, nil
 	}
 	snapshot, err := isiConfig.isiSvc.GetSnapshot(ctx, snapshotID)
 	// Idempotency check
