@@ -1110,7 +1110,7 @@ func (s *service) GetIsiPathByName(ctx context.Context, volName string) string {
 
 	pv, err := s.k8sclient.CoreV1().PersistentVolumes().Get(ctx, volName, v1.GetOptions{})
 	if err != nil {
-		log.Warnf("Unable to get PersistentVolume: %w", err)
+		log.Warnf("Unable to get PersistentVolume: %v", err)
 		return ""
 	}
 
