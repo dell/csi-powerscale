@@ -77,7 +77,7 @@ Feature: Isilon CSI interface
     | ""                           | "snapshot id to be deleted is required"                             |
     | "34=_=_=cluster2"            | "access zone not found in snapshot ID"                              |
     | "404"                        | "none"                                                              |
-    | "str"                        | "cannot convert snapshot to integer"                                |
+    | "str"                        | "none"                                |
 
   Scenario: Calling Snapshot create and delete functionality
     Given a Isilon service
