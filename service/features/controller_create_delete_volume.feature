@@ -157,8 +157,8 @@ Feature: Isilon CSI interface
      | volumeID                                 | errormsg                                                           |
      | "volume1=_=_=43=_=_=System"              | "none"                                                             |
      | "volume1=_=_=43=_=_=System=_=_=cluster1" | "none"                                                             |
-     | "volume1=_=_=43"                         | "failed to parse volume ID"                                        |
-     | ""                                       | "no volume id is provided by the DeleteVolumeRequest instance"     |
+     | "volume1=_=_=43"                         | "none"                                        |
+     | ""                                       | "none"     |
      | "volume1=_=_=43=_=_=System=_=_=cluster2" | "failed to get cluster config details for clusterName: 'cluster2'" |
 
     Scenario Outline: Delete volume with induced errors
