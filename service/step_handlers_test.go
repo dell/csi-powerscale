@@ -61,6 +61,7 @@ var (
 		DeleteQuotaError              bool
 		QuotaNotFoundError            bool
 		InvalidQuotaError             bool
+		QuotaDifferentSize            bool
 		DeleteVolumeError             bool
 		GetJobsInternalError          bool
 		GetPolicyInternalError        bool
@@ -416,7 +417,11 @@ func handleGetQuotaByID(w http.ResponseWriter, _ *http.Request) {
 		w.Write(readFromFile("mock/quota/quota_not_found.txt"))
 		return
 	}
-	w.Write(readFromFile("mock/quota/get_quota_by_id.txt"))
+	mockQuota := "mock/quota/get_quota_by_id_8gb.txt"
+	if stepHandlersErrors.QuotaDifferentSize {
+		mockQuota = "mock/quota/get_quota_by_id_4gb.txt"
+	}
+	w.Write(readFromFile(mockQuota))
 }
 
 // handleGetQuota implements GET /platform/1/quota/quotas?path=/ifs/data/csi-isilon/volume1/
@@ -434,7 +439,7 @@ func handleGetQuotaByPath(w http.ResponseWriter, _ *http.Request) {
 		w.Write(readFromFile("mock/quota/invalid_quota.txt"))
 		return
 	}
-	w.Write(readFromFile("mock/quota/get_quota_by_id.txt"))
+	w.Write(readFromFile("mock/quota/get_quota_by_id_8gb.txt"))
 }
 
 // handleUpdateQuotaByID implements PUT /platform/1/quota/quotas/AABpAQEAAAAAAAAAAAAAQA0AAAAAAAAA
