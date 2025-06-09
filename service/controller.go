@@ -563,6 +563,18 @@ func (s *service) CreateVolume(
 		log.Debugf("id of the corresponding nfs export of existing volume '%s' has been resolved to '%d'", req.GetName(), exportID)
 		if exportID != 0 {
 			if foundVol || isROVolumeFromSnapshot {
+				// When Quota is enabled, validate the requested size against the quota
+				if s.opts.QuotaEnabled {
+					quota, err := isiConfig.isiSvc.GetVolumeQuota(ctx, req.GetName(), exportID, accessZone)
+					if err != nil {
+						return nil, status.Errorf(codes.NotFound, "can't find quota for volume '%s': %s", req.GetName(), err.Error())
+					}
+
+					if sizeInBytes != quota.Thresholds.Hard {
+						return nil, status.Errorf(codes.AlreadyExists, "volume '%s' exists, but at different size than requested", req.GetName())
+					}
+				}
+
 				return s.getCreateVolumeResponse(ctx, exportID, req.GetName(), path, export.Zone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
 			}
 			// in case the export exists but no related volume (directory)
@@ -888,7 +900,8 @@ func (s *service) DeleteVolume(
 
 	// validate request
 	if err := s.ValidateDeleteVolumeRequest(ctx, req); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		log.Error("invalid volume id ", err.Error())
+		return &csi.DeleteVolumeResponse{}, nil
 	}
 
 	// parse the input volume id and fetch it's components
