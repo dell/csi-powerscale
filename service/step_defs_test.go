@@ -872,6 +872,8 @@ func (f *feature) iInduceError(errtype string) error {
 		stepHandlersErrors.QuotaNotFoundError = true
 	case "InvalidQuotaError":
 		stepHandlersErrors.InvalidQuotaError = true
+	case "QuotaDifferentSize":
+		stepHandlersErrors.QuotaDifferentSize = true
 	case "DeleteVolumeError":
 		stepHandlersErrors.DeleteVolumeError = true
 	case "GetPolicyInternalError":

@@ -177,9 +177,16 @@ func unpublishVolume(
 	}
 	if err := gofsutil.Unmount(context.Background(), target); err != nil {
 		return status.Errorf(codes.Internal,
-			"error unmounting target'%s': '%s'", target, err.Error())
+			"error unmounting target '%s': '%s'", target, err.Error())
 	}
 	log.Debugf("unmounting '%s' succeeded", target)
+
+	// Remove the target path after unmounting
+	if err := os.RemoveAll(target); err != nil {
+		return status.Errorf(codes.Internal,
+			"error removing target path '%s': '%s'", target, err.Error())
+	}
+	log.Debugf("removing target path '%s' succeeded", target)
 
 	return nil
 }
