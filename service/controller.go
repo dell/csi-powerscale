@@ -563,6 +563,18 @@ func (s *service) CreateVolume(
 		log.Debugf("id of the corresponding nfs export of existing volume '%s' has been resolved to '%d'", req.GetName(), exportID)
 		if exportID != 0 {
 			if foundVol || isROVolumeFromSnapshot {
+				// When Quota is enabled, validate the requested size against the quota
+				if s.opts.QuotaEnabled {
+					quota, err := isiConfig.isiSvc.GetVolumeQuota(ctx, req.GetName(), exportID, accessZone)
+					if err != nil {
+						return nil, status.Errorf(codes.NotFound, "can't find quota for volume '%s': %s", req.GetName(), err.Error())
+					}
+
+					if sizeInBytes != quota.Thresholds.Hard {
+						return nil, status.Errorf(codes.AlreadyExists, "volume '%s' exists, but at different size than requested", req.GetName())
+					}
+				}
+
 				return s.getCreateVolumeResponse(ctx, exportID, req.GetName(), path, export.Zone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
 			}
 			// in case the export exists but no related volume (directory)
@@ -888,7 +900,8 @@ func (s *service) DeleteVolume(
 
 	// validate request
 	if err := s.ValidateDeleteVolumeRequest(ctx, req); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		log.Error("invalid volume id ", err.Error())
+		return &csi.DeleteVolumeResponse{}, nil
 	}
 
 	// parse the input volume id and fetch it's components
@@ -1727,7 +1740,7 @@ func (s *service) CreateSnapshot(
 	// parse the input volume id and fetch it's components
 	srcVolumeID, _, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
+		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
 	}
 
 	// When authorization is enabled, the volume ID will be prefixed with an authorization prefix, e.g., tn1-csivol-1c8b13cadd.
@@ -1861,7 +1874,7 @@ func (s *service) DeleteSnapshot(
 	ctx, log, runID := GetRunIDLog(ctx)
 	log.Infof("DeleteSnapshot started")
 	if req.GetSnapshotId() == "" {
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "snapshot id to be deleted is required"))
+		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "snapshot id to be deleted is required"))
 	}
 	// parse the input snapshot id and fetch it's components
 	snapshotID, clusterName, accessZone, err := utils.ParseNormalizedSnapshotID(ctx, req.GetSnapshotId())
@@ -1884,7 +1897,8 @@ func (s *service) DeleteSnapshot(
 
 	id, err := strconv.ParseInt(snapshotID, 10, 64)
 	if err != nil {
-		return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "cannot convert snapshot to integer: %s", err.Error()))
+		log.Warnf("snapshot ID '%s' is not a valid integer", snapshotID)
+		return &csi.DeleteSnapshotResponse{}, nil
 	}
 	snapshot, err := isiConfig.isiSvc.GetSnapshot(ctx, snapshotID)
 	// Idempotency check
