@@ -1389,7 +1389,7 @@ func (s *service) ValidateVolumeCapabilities(
 
 	volumeContext := req.GetVolumeContext()
 	if exportPath = volumeContext[ExportPathParam]; exportPath == "" {
-		exportPath = utils.GetPathForVolume(s.opts.Path, volName)
+		exportPath = utils.GetPathForVolume(isiConfig.IsiPath, volName)
 	}
 	isiPath = utils.GetIsiPathFromExportPath(exportPath)
 
