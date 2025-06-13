@@ -1101,21 +1101,24 @@ func (s *service) validateIsiPath(ctx context.Context, volName string) (string, 
 	return isiPath, nil
 }
 
-func (s *service) GetIsiPathByName(ctx context.Context, volName string) (string, error) {
+func (s *service) GetIsiPathByName(ctx context.Context, volName string) string {
+	log := utils.GetLogger()
 	if s.k8sclient == nil {
-		return "", fmt.Errorf("no k8s clientset")
+		log.Warn("no k8s clientset")
+		return ""
 	}
 
 	pv, err := s.k8sclient.CoreV1().PersistentVolumes().Get(ctx, volName, v1.GetOptions{})
 	if err != nil {
-		return "", fmt.Errorf("unable to get PersistentVolume: %w", err)
+		log.Warnf("Unable to get PersistentVolume: %v", err)
+		return ""
 	}
 
 	// Extract the Path parameter from the PV VolumeAttributes
-	path, ok := pv.Spec.CSI.VolumeAttributes["Path"]
-	if !ok || path == "" {
-		return "", fmt.Errorf("Path parameter not found in PV VolumeAttributes")
+	path := pv.Spec.CSI.VolumeAttributes["Path"]
+	if path == "" {
+		log.Warn("Path parameter not found in PV VolumeAttributes")
+		return ""
 	}
-
-	return path, nil
+	return path
 }

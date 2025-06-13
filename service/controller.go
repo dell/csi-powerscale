@@ -1745,10 +1745,7 @@ func (s *service) CreateSnapshot(
 
 	// When authorization is enabled, the volume ID will be prefixed with an authorization prefix, e.g., tn1-csivol-1c8b13cadd.
 	// This function is called to remove the authorization prefix from the volume ID.
-	srcVolumeID, err = utils.RemoveAuthorizationVolPrefix(s.opts.csiVolPrefix, srcVolumeID)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
-	}
+	srcVolumeID = utils.RemoveAuthorizationVolPrefix(s.opts.csiVolPrefix, srcVolumeID)
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
@@ -1773,12 +1770,13 @@ func (s *service) CreateSnapshot(
 	)
 
 	// get isipath directly from pv
-	volPath, err := s.GetIsiPathByName(ctx, srcVolumeID)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
-	}
+	volPath := s.GetIsiPathByName(ctx, srcVolumeID)
 
-	isiPath = utils.TrimVolumePath(volPath)
+	if volPath == "" {
+		isiPath = isiConfig.IsiPath
+	} else {
+		isiPath = utils.TrimVolumePath(volPath)
+	}
 
 	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
 	if err != nil {

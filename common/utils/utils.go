@@ -475,12 +475,13 @@ func TrimVolumePath(volPath string) string {
 	return volPath
 }
 
-// RemoveAuthorizationVolPrefix returns the volume name by removing the authorization prefix if it exists, or returns an error if the prefix is not found.
-func RemoveAuthorizationVolPrefix(volPrefix, volName string) (string, error) {
+// RemoveAuthorizationVolPrefix returns the volume name by removing the authorization prefix if it exists; otherwise, returns the original volume name unchanged.
+func RemoveAuthorizationVolPrefix(volPrefix, volName string) string {
 	prefixIndex := strings.LastIndex(volName, volPrefix)
 
+	// If the prefix is not found, return the original volume name
 	if prefixIndex == -1 {
-		return "", fmt.Errorf("csiVolPrefix %s is not found in the volume name %s", volPrefix, volName)
+		return volName
 	}
-	return volName[prefixIndex:], nil
+	return volName[prefixIndex:]
 }
