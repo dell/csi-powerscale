@@ -33,10 +33,6 @@ import (
 	"github.com/dell/csi-isilon/v2/service/mock/k8s"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"google.golang.org/grpc"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/fake"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
@@ -230,7 +226,6 @@ func (f *feature) getService() *service {
 	opts.isiAuthType = 0
 	opts.Verbose = 1
 	opts.KubeConfigPath = "mock/k8s/admin.conf"
-	opts.csiVolPrefix = "vol"
 
 	newConfig := IsilonClusterConfig{}
 	newConfig.ClusterName = clusterName1
@@ -259,9 +254,6 @@ func (f *feature) getService() *service {
 	}
 	if os.Getenv("CSI_ISILON_ZONE") != "" {
 		opts.AccessZone = os.Getenv("CSI_ISILON_ZONE")
-	}
-	if os.Getenv("X_CSI_VOL_PREFIX") != "" {
-		opts.csiVolPrefix = os.Getenv("X_CSI_VOL_PREFIX")
 	}
 
 	svc.opts = opts
@@ -2017,46 +2009,6 @@ func getCreateSnapshotRequest(srcVolumeID, name string) *csi.CreateSnapshotReque
 }
 
 func (f *feature) iCallCreateSnapshot(volName, srcVolumeID, name string) error {
-	client := fake.NewSimpleClientset()
-	f.service.k8sclient = client
-
-	// Check if the PersistentVolume already exists
-	_, err := f.service.k8sclient.CoreV1().PersistentVolumes().Get(context.Background(), volName, metav1.GetOptions{})
-	if err == nil {
-		// PersistentVolume exists, delete it
-		err = f.service.k8sclient.CoreV1().PersistentVolumes().Delete(context.Background(), volName, metav1.DeleteOptions{})
-		if err != nil {
-			log.Printf("Failed to delete existing PersistentVolume: %s\n", err.Error())
-			return err
-		}
-		log.Printf("Existing PersistentVolume %s deleted successfully", volName)
-	}
-
-	// Create the PersistentVolume
-	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: volName,
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				CSI: &v1.CSIPersistentVolumeSource{
-					VolumeAttributes: map[string]string{
-						"Path": "/ifs/data/csi-isilon/" + volName,
-					},
-				},
-			},
-			Capacity: v1.ResourceList{
-				v1.ResourceStorage: resource.MustParse("1Gi"),
-			},
-		},
-	}
-
-	_, err = f.service.k8sclient.CoreV1().PersistentVolumes().Create(context.Background(), pv, metav1.CreateOptions{})
-	if err != nil {
-		log.Printf("Failed to create PersistentVolume: %s\n", err.Error())
-		return err
-	}
-
 	f.createSnapshotRequest = getCreateSnapshotRequest(srcVolumeID, name)
 	req := f.createSnapshotRequest
 	f.createSnapshotResponse, f.err = f.service.CreateSnapshot(context.Background(), req)
@@ -2066,13 +2018,6 @@ func (f *feature) iCallCreateSnapshot(volName, srcVolumeID, name string) error {
 	if f.createSnapshotResponse != nil {
 		log.Printf("snapshot id %s\n", f.createSnapshotResponse.GetSnapshot().SnapshotId)
 	}
-	// Delete the PersistentVolume after snapshot creation
-	err = f.service.k8sclient.CoreV1().PersistentVolumes().Delete(context.Background(), volName, metav1.DeleteOptions{})
-	if err != nil {
-		log.Printf("Failed to delete PersistentVolume: %s\n", err.Error())
-		return err
-	}
-	log.Printf("PersistentVolume '%s' deleted successfully", volName)
 
 	return nil
 }
