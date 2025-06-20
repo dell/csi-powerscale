@@ -8,41 +8,41 @@ Feature: Isilon CSI interface
   Scenario: Create snapshot good scenario
     Given a Isilon service
     When I call Probe
-    And I call CreateSnapshot "volume2" "volume2=_=_=19=_=_=System" "create_snapshot_name"
+    And I call CreateSnapshot "volume2=_=_=19=_=_=System" "create_snapshot_name"
     Then a valid CreateSnapshotResponse is returned
 
   Scenario: Create snapshot with cluster name in volume id good scenario
     Given a Isilon service
     When I call Probe
-    And I call CreateSnapshot "volume2" "volume2=_=_=19=_=_=System=_=_=cluster1" "create_snapshot_name"
+    And I call CreateSnapshot "volume2=_=_=19=_=_=System=_=_=cluster1" "create_snapshot_name"
     Then a valid CreateSnapshotResponse is returned
 
   Scenario: Create snapshot with cluster name in volume id whose config doesn't exists
     Given a Isilon service
     When I call Probe
-    And I call CreateSnapshot "volume2" "volume2=_=_=19=_=_=System=_=_=cluster2" "create_snapshot_name"
+    And I call CreateSnapshot "volume2=_=_=19=_=_=System=_=_=cluster2" "create_snapshot_name"
     Then the error contains "failed to get cluster config details for clusterName: 'cluster2'"
 
   Scenario: Create snapshot with internal server error
     Given a Isilon service
     When I call Probe
     And I induce error "CreateSnapshotError"
-    And I call CreateSnapshot "volume2" "volume2=_=_=19=_=_=System" "create_snapshot_name"
+    And I call CreateSnapshot "volume2=_=_=19=_=_=System" "create_snapshot_name"
     Then the error contains "EOF"
 
   Scenario Outline: Create snapshot with negative or idempotent arguments
     Given a Isilon service
-    When I call CreateSnapshot <volName> <volumeID> <snapshotName>
+    When I call CreateSnapshot <volumeID> <snapshotName>
     Then the error contains <errormsg>
 
     Examples:
-    | volName        | volumeID                       | snapshotName                                  | errormsg                             |
-    | "volume1"      | "volume1=_=_=10=_=_=System"    | "create_snapshot_name"                        | "source volume id is invalid"        |
-    | "volume2"      | "volume2=_=_=19=_=_=System"    | "existent_snapshot_name"                      | "already exists but is incompatible" |
-    | "volume2"      | "volume2=_=_=19=_=_=System"    | "existent_comp_snapshot_name"                 | "none"                               |
-    | "volume2"      | "volume2=_=_=19=_=_=System"    | "existent_comp_snapshot_name_longer_than_max" | "already exists but is incompatible" |
-    | "volume2"      | "volume2=_=_=19"               | "existent_comp_snapshot_name"                 | "cannot be split into tokens"        |
-    | "volume2"      | "volume2=_=_=19=_=_=System"    | ""                                            | "name cannot be empty"               |
+    | volumeID                       | snapshotName                                  | errormsg                             |
+    | "volume1=_=_=10=_=_=System"    | "create_snapshot_name"                        | "source volume id is invalid"        |
+    | "volume2=_=_=19=_=_=System"    | "existent_snapshot_name"                      | "already exists but is incompatible" |
+    | "volume2=_=_=19=_=_=System"    | "existent_comp_snapshot_name"                 | "none"                               |
+    | "volume2=_=_=19=_=_=System"    | "existent_comp_snapshot_name_longer_than_max" | "already exists but is incompatible" |
+    | "volume2=_=_=19"               | "existent_comp_snapshot_name"                 | "cannot be split into tokens"        |
+    | "volume2=_=_=19=_=_=System"    | ""                                            | "name cannot be empty"               |
 
 @todo
 @createROVolumeFromSnapshot
@@ -86,7 +86,7 @@ Feature: Isilon CSI interface
     And I call DeleteVolume "volume2=_=_=43=_=_=System"
     And I call ValidateVolumeCapabilities with voltype "mount" access "single-writer"
     And I call GetCapacity
-    And I call CreateSnapshot "volume2=_=_=43=_=_=System" "existent_comp_snapshot_name" "/ifs/data/csi-isilon"
+    And I call CreateSnapshot "volume2=_=_=43=_=_=System" "existent_comp_snapshot_name"
     And I call DeleteSnapshot "34"
     And I call NodePublishVolume
     And I call NodeUnpublishVolume
