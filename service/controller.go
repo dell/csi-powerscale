@@ -381,7 +381,7 @@ func (s *service) CreateVolume(
 
 			// Get snapshot path
 			if snapshotSourceVolumeIsiPath, err = isiConfig.isiSvc.GetSnapshotSourceVolumeIsiPath(ctx, sourceSnapshotID); err != nil {
-				return nil, status.Error(codes.Internal, err.Error())
+				return nil, status.Error(codes.NotFound, err.Error())
 			}
 			log.Infof("Snapshot source volume isiPath is '%s' accessZone '%s'", snapshotSourceVolumeIsiPath, accessZone)
 
@@ -819,6 +819,9 @@ func (s *service) createVolumeFromSource(
 		// create volume from source volume
 		srcVolumeName, _, _, _, err := getUtilsParseNormalizedVolumeID(ctx, contentVolume.GetVolumeId())
 		if err != nil {
+			if strings.Contains(err.Error(), "cannot be split into tokens") {
+				return status.Error(codes.NotFound, "volume ID is invalid or not found")
+			}
 			return status.Error(codes.Internal, err.Error())
 		}
 		if err := createVolumeFromVolumeFunc(s)(ctx, isiConfig, isiPath, srcVolumeName, req.GetName(), sizeInBytes); err != nil {
