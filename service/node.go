@@ -203,9 +203,8 @@ func (s *service) stageVolume(
 
 	mountFlags = append(mountFlags, "rw")
 
-	mountWithRetry(ctx, nfsExportURL, stagingTargetPath, mountFlags)
-	if err != nil {
-		return status.Error(codes.Internal, utils.GetMessageWithRunID(runID, err.Error()))
+	if err = mountWithRetry(ctx, nfsExportURL, stagingTargetPath, mountFlags); err != nil {
+		return status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "mount failed with error: %v", err))
 	}
 	return nil
 }
