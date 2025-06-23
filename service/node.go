@@ -30,6 +30,7 @@ import (
 	"github.com/dell/csi-isilon/v2/common/k8sutils"
 	"github.com/dell/csi-isilon/v2/common/utils"
 	csiutils "github.com/dell/csi-isilon/v2/csi-utils"
+	"github.com/dell/gofsutil"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
@@ -60,14 +61,234 @@ func (s *service) NodeExpandVolume(
 }
 
 func (s *service) NodeStageVolume(
-	_ context.Context,
-	_ *csi.NodeStageVolumeRequest) (
-	*csi.NodeStageVolumeResponse, error,
-) {
-	// TODO - Need to have logic for staging path of export
-	s.logStatistics()
+	ctx context.Context,
+	req *csi.NodeStageVolumeRequest,
+) (*csi.NodeStageVolumeResponse, error) {
+	// Fetch log handler
+	ctx, log, runID := GetRunIDLog(ctx)
+
+	// Get volume context
+	volumeContext := req.GetVolumeContext()
+	if volumeContext == nil {
+		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "VolumeContext is nil, skip NodeStageVolume"))
+	}
+	utils.LogMap(ctx, "VolumeContext", volumeContext)
+
+	// Get cluster name from volume context
+	clusterName := volumeContext["ClusterName"]
+	if clusterName == "" {
+		// Parse the input volume id and fetch it's components
+		_, _, _, clusterName, _ = utils.ParseNormalizedVolumeID(ctx, req.GetVolumeId())
+	}
+
+	// Get Isilon config for the cluster
+	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set cluster context
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
+
+	// Probe the node if required and make sure startup called
+	if err := s.autoProbe(ctx, isiConfig); err != nil {
+		log.Error("nodeProbe failed with error :" + err.Error())
+		return nil, err
+	}
+
+	// Get volume name from volume context
+	volName := volumeContext["Name"]
+	if volName == "" {
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no entry keyed by 'Name' found in VolumeContext of volume id : '%s', skip NodeStageVolume", req.GetVolumeId()))
+	}
+
+	// Get path from volume context
+	path := volumeContext["Path"]
+	if path == "" {
+		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no entry keyed by 'Path' found in VolumeContext of volume id : '%s', skip NodeStageVolume", req.GetVolumeId()))
+	}
+
+	// Get access zone from volume context
+	accessZone := volumeContext["AccessZone"]
+	isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(path, accessZone)
+	if isROVolumeFromSnapshot {
+		log.Info("Volume source is snapshot")
+		if export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, path, accessZone); err != nil || export == nil {
+			return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "error retrieving export for %s", path))
+		}
+	} else {
+		// Parse the target path and empty volume name to get the volume
+		isiPath := utils.GetIsiPathFromExportPath(path)
+
+		if _, err := s.getVolByName(ctx, isiPath, volName, isiConfig); err != nil {
+			log.Errorf("Error in getting '%s' Volume '%v'", volName, err)
+			return nil, err
+		}
+	}
+
+	if err := s.stageVolume(ctx, isiConfig, path, req); err != nil {
+		return nil, err
+	}
 
 	return &csi.NodeStageVolumeResponse{}, nil
+}
+
+func (s *service) stageVolume(
+	ctx context.Context,
+	isiConfig *IsilonClusterConfig,
+	path string,
+	req *csi.NodeStageVolumeRequest,
+) error {
+	ctx, log, runID := GetRunIDLog(ctx)
+
+	volumeContext := req.GetVolumeContext()
+
+	stagingTargetPath := req.GetStagingTargetPath()
+	if stagingTargetPath == "" {
+		return status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "StagingTargetPath is required, skip NodeStageVolume"))
+	}
+
+	volCap := req.GetVolumeCapability()
+	if volCap == nil {
+		return status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "Volume Capability is required"))
+	}
+
+	accMode := volCap.GetAccessMode()
+	if accMode == nil {
+		return status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "Volume Access Mode is required"))
+	}
+
+	mntVol := volCap.GetMount()
+	if mntVol == nil {
+		return status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "Invalid access type"))
+	}
+
+	azServiceIP := getAzServiceIP(s, volumeContext, isiConfig)
+
+	nfsExportURL := isiConfig.isiSvc.GetNFSExportURLForPath(azServiceIP, path)
+
+	f := map[string]interface{}{
+		"ID":                req.VolumeId,
+		"Name":              volumeContext["Name"],
+		"ExportPath":        nfsExportURL,
+		"StagingTargetPath": req.GetStagingTargetPath(),
+		"AzServiceIP":       azServiceIP,
+	}
+	log.WithFields(f).Info("Staging volume to the node")
+
+	isStaged, err := isMountAlreadyInPlace(ctx, nfsExportURL, stagingTargetPath, "rw", accMode)
+	if err != nil {
+		log.WithFields(f).Errorf("failed to check if device already staged: %v", err)
+		return err
+	}
+
+	if isStaged {
+		log.WithFields(f).Info("device already staged")
+		return nil
+	}
+
+	// Create the staging target directory if it doesn't exist
+	if _, err := mkdir(ctx, stagingTargetPath); err != nil {
+		return status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "failed to create staging target directory: %v", err))
+	}
+	log.WithFields(f).Info("stage path successfully created")
+
+	// Mount the volume to the staging target path
+	mountFlags := mntVol.GetMountFlags()
+	if mountFlags == nil {
+		mountFlags = []string{}
+	}
+	log.WithFields(f).Infof("The mountFlags received are: %s", mountFlags)
+
+	mountFlags = append(mountFlags, "rw")
+
+	mountWithRetry(ctx, nfsExportURL, stagingTargetPath, mountFlags)
+	if err != nil {
+		return status.Error(codes.Internal, utils.GetMessageWithRunID(runID, err.Error()))
+	}
+	return nil
+}
+
+// Returns the AzServiceIP from the volume context, or isiConfig.MountEndpoint if it contains "localhost"
+func getAzServiceIP(
+	s *service,
+	volumeContext map[string]string,
+	isiConfig *IsilonClusterConfig,
+) string {
+	// When custom topology is enabled it takes precedence over the current default behavior
+	// Set azServiceIP to updated endpoint when custom topology is enabled
+	var azServiceIP string
+	if s.opts.CustomTopologyEnabled {
+		azServiceIP = isiConfig.Endpoint
+	} else {
+		azServiceIP = volumeContext[AzServiceIPParam]
+	}
+
+	if strings.Contains(azServiceIP, "localhost") {
+		azServiceIP = isiConfig.MountEndpoint
+	}
+	return azServiceIP
+}
+
+func isMountAlreadyInPlace(ctx context.Context, nfsExportURL string, target string, rwMode string, accMode *csi.VolumeCapability_AccessMode) (bool, error) {
+	mnts, err := gofsutil.GetMounts(ctx)
+	if err != nil {
+		return false, status.Errorf(codes.Internal, "could not reliably determine existing mount status: '%s'", err.Error())
+	}
+
+	if len(mnts) != 0 {
+		for _, m := range mnts {
+			if m.Device == nfsExportURL {
+				if m.Path == target {
+					if contains(m.Opts, rwMode) {
+						return true, nil
+					}
+					return true, status.Error(codes.AlreadyExists, "mount point already in use by device with different options")
+				}
+				if accMode != nil {
+					mode := accMode.GetMode()
+					if mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER ||
+						mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY ||
+						mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER {
+						return true, status.Error(codes.FailedPrecondition, "mount point already in use for same device")
+					}
+				}
+			}
+		}
+	}
+
+	return false, nil
+}
+
+// mountWithRetry attempts to mount an NFS export with retry logic for known transient errors.
+func mountWithRetry(ctx context.Context, nfsExportURL, target string, mntOptions []string) error {
+	ctx, log := GetLogger(ctx)
+	const maxRetries = 5
+	var err error
+	err = gofsutil.Mount(context.Background(), nfsExportURL, target, "nfs", mntOptions...)
+	if err == nil {
+		return nil
+	}
+
+	count := 0
+	errmsg := err.Error()
+	for (strings.Contains(strings.ToLower(errmsg), "access denied by server while mounting") ||
+		strings.Contains(strings.ToLower(errmsg), "no such file or directory")) && count < maxRetries {
+		time.Sleep(2 * time.Second)
+		log.Infof("Mount re-trial attempt-%d", count+1)
+		err = gofsutil.Mount(context.Background(), nfsExportURL, target, "nfs", mntOptions...)
+		if err == nil {
+			return nil
+		}
+		errmsg = err.Error()
+		count++
+	}
+
+	if err != nil {
+		log.Errorf("Mount failed after %d attempts: %v", count, err)
+	}
+	return err
 }
 
 func (s *service) NodeUnstageVolume(
@@ -150,18 +371,7 @@ func (s *service) NodePublishVolume(
 		}
 	}
 
-	// When custom topology is enabled it takes precedence over the current default behavior
-	// Set azServiceIP to updated endpoint when custom topology is enabled
-	var azServiceIP string
-	if s.opts.CustomTopologyEnabled {
-		azServiceIP = isiConfig.Endpoint
-	} else {
-		azServiceIP = volumeContext[AzServiceIPParam]
-	}
-
-	if strings.Contains(azServiceIP, "localhost") {
-		azServiceIP = isiConfig.MountEndpoint
-	}
+	azServiceIP := getAzServiceIP(s, volumeContext, isiConfig)
 
 	f := map[string]interface{}{
 		"ID":          req.VolumeId,
@@ -311,6 +521,13 @@ func (s *service) NodeGetCapabilities(
 			Type: &csi.NodeServiceCapability_Rpc{
 				Rpc: &csi.NodeServiceCapability_RPC{
 					Type: csi.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
+				},
+			},
+		},
+		{
+			Type: &csi.NodeServiceCapability_Rpc{
+				Rpc: &csi.NodeServiceCapability_RPC{
+					Type: csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
 				},
 			},
 		},
