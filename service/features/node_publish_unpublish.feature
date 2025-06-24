@@ -85,8 +85,8 @@ Feature: Isilon CSI interface
     Examples:
     | voltype      | access                         | errormsg                                             |
     | "mount"      | "multiple-reader"              | "none"                                               |
-    | "mount"      | "single-writer"                | "Mount point already in use for same device"         |
-    | "mount"      | "single-node-single-writer"    | "Mount point already in use for same device"         |
+    | "mount"      | "single-writer"                | "mount point already in use for same device"         |
+    | "mount"      | "single-node-single-writer"    | "mount point already in use for same device"         |
     | "mount"      | "multiple-writer"              | "none"                                               |
     | "mount"      | "single-node-multiple-writer"  | "none"                                               |
     | "block"      | "single-writer"                | "Invalid access type"                                |
@@ -110,9 +110,9 @@ Feature: Isilon CSI interface
 
     Examples:
     | voltype      | access                         | errormsg                                     |
-    | "mount"      | "single-reader"                | "Mount point already in use for same device" |
+    | "mount"      | "single-reader"                | "mount point already in use for same device" |
     | "mount"      | "multiple-reader"              | "none"                                       |
-    | "mount"      | "single-writer"                | "Mount point already in use for same device" |
+    | "mount"      | "single-writer"                | "mount point already in use for same device" |
     | "mount"      | "multiple-writer"              | "none"                                       |
     | "block"      | "multiple-reader"              | "Invalid access type"                        |
 
@@ -131,10 +131,10 @@ Feature: Isilon CSI interface
 
     Examples:
     | voltype      | access                         | errormsg                                     |
-    | "mount"      | "single-reader"                | "Mount point already in use for same device" |
+    | "mount"      | "single-reader"                | "mount point already in use for same device" |
     | "mount"      | "multiple-reader"              | "none"                                       |
-    | "mount"      | "single-writer"                | "Mount point already in use for same device" |
-    | "mount"      | "single-node-single-writer"    | "Mount point already in use for same device" |
+    | "mount"      | "single-writer"                | "mount point already in use for same device" |
+    | "mount"      | "single-node-single-writer"    | "mount point already in use for same device" |
     | "mount"      | "multiple-writer"              | "none"                                       |
     | "mount"      | "single-node-multiple-writer"  | "none"                                       |
     | "block"      | "multiple-reader"              | "Invalid access type"                        |
@@ -153,12 +153,12 @@ Feature: Isilon CSI interface
 
     Examples:
     | voltype      | access                         | errormsg                                                                                             |
-    | "mount"      | "single-reader"                | "Mount point already in use by device with different options"                                        |
-    | "mount"      | "multiple-reader"              | "Mount point already in use by device with different options"                                        |
-    | "mount"      | "single-writer"                | "Mount point already in use by device with different options"                                        |
-    | "mount"      | "single-node-single-writer"    | "Mount point already in use by device with different options"                                        |
-    | "mount"      | "single-node-multiple-writer"  | "Mount point already in use by device with different options"                                        |
-    | "mount"      | "multiple-writer"              | "Mount point already in use by device with different options"                                        |
+    | "mount"      | "single-reader"                | "mount point already in use by device with different options"                                        |
+    | "mount"      | "multiple-reader"              | "mount point already in use by device with different options"                                        |
+    | "mount"      | "single-writer"                | "mount point already in use by device with different options"                                        |
+    | "mount"      | "single-node-single-writer"    | "mount point already in use by device with different options"                                        |
+    | "mount"      | "single-node-multiple-writer"  | "mount point already in use by device with different options"                                        |
+    | "mount"      | "multiple-writer"              | "mount point already in use by device with different options"                                        |
     | "block"      | "multiple-reader"              | "Invalid access type"                                                                                |
 
   Scenario Outline: Node publish various use cases from examples when already published volume changed with same target(T1==T2, P1==P2)

@@ -144,11 +144,6 @@ func (s *service) stageVolume(
 
 	volumeContext := req.GetVolumeContext()
 
-	stagingTargetPath := req.GetStagingTargetPath()
-	if stagingTargetPath == "" {
-		return status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "StagingTargetPath is required, skip NodeStageVolume"))
-	}
-
 	volCap := req.GetVolumeCapability()
 	if volCap == nil {
 		return status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "Volume Capability is required"))
@@ -162,6 +157,11 @@ func (s *service) stageVolume(
 	mntVol := volCap.GetMount()
 	if mntVol == nil {
 		return status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "Invalid access type"))
+	}
+
+	stagingTargetPath := req.GetStagingTargetPath()
+	if stagingTargetPath == "" {
+		return status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "StagingTargetPath is required, skip NodeStageVolume"))
 	}
 
 	azServiceIP := getAzServiceIP(s, volumeContext, isiConfig)

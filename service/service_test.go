@@ -198,6 +198,8 @@ func TestServiceInitializeServiceOpts(t *testing.T) {
 		replicationPrefix:        "prefix",
 		IgnoreUnresolvableHosts:  false,
 		csiVolPrefix:             "vol",
+		QuotaEnabled:             true,
+		MaxVolumesPerNode:        1,
 	}
 
 	wantEnvNodeName := "node"
@@ -215,6 +217,8 @@ func TestServiceInitializeServiceOpts(t *testing.T) {
 	os.Setenv(constants.EnvReplicationContextPrefix, "prefix")
 	os.Setenv(constants.EnvReplicationPrefix, wantOps.replicationPrefix)
 	os.Setenv(constants.EnvCsiVolPrefix, "vol")
+	os.Setenv(constants.EnvQuotaEnabled, "true")
+	os.Setenv(constants.EnvMaxVolumesPerNode, "1")
 
 	defer func() {
 		os.Unsetenv(constants.EnvPort)

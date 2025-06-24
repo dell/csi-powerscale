@@ -342,6 +342,12 @@ func FeatureContext(s *godog.ScenarioContext) {
 	s.Step(`^a valid ControllerPublishVolumeResponse is returned$`, f.aValidControllerPublishVolumeResponseIsReturned)
 	s.Step(`^a controller published volume$`, f.aControllerPublishedVolume)
 	s.Step(`^a capability with voltype "([^"]*)" access "([^"]*)"$`, f.aCapabilityWithVoltypeAccess)
+	s.Step(`^I call NodeStageVolume$`, f.iCallNodeStageVolume)
+	s.Step(`^get Node Stage Volume Request$`, f.getNodeStageVolumeRequest)
+	s.Step(`^get Node Stage Volume Request with Volume Name "([^"]*)"$`, f.getNodeStageVolumeRequestWithVolumeName)
+	s.Step(`^get Node Stage Volume Request with Volume Name "([^"]*)" and path "([^"]*)"$`, f.getNodeStageVolumeRequestWithVolumeNameAndPath)
+	s.Step(`^get Node Stage Volume Request with no volume context$`, f.getNodeStageVolumeRequestWithNoVolumeContext)
+	s.Step(`^I change the staging target path$`, f.iChangeTheStagingTargetPath)
 	s.Step(`^I call NodePublishVolume$`, f.iCallNodePublishVolume)
 	s.Step(`^I call EphemeralNodePublishVolume$`, f.iCallEphemeralNodePublishVolume)
 	s.Step(`^get Node Publish Volume Request$`, f.getNodePublishVolumeRequest)
@@ -350,7 +356,6 @@ func FeatureContext(s *godog.ScenarioContext) {
 	s.Step(`^get Node Publish Volume Request with no volume context$`, f.getNodePublishVolumeRequestWithNoVolumeContext)
 	s.Step(`^I change the target path$`, f.iChangeTheTargetPath)
 	s.Step(`^I mark request read only$`, f.iMarkRequestReadOnly)
-	s.Step(`^I call NodeStageVolume with name "([^"]*)" and access type "([^"]*)"$`, f.iCallNodeStageVolume)
 	s.Step(`^I call ControllerPublishVolume with name "([^"]*)" and access type "([^"]*)" to "([^"]*)"$`, f.iCallControllerPublishVolume)
 	s.Step(`^a valid NodeStageVolumeResponse is returned$`, f.aValidNodeStageVolumeResponseIsReturned)
 	s.Step(`^I call NodeUnstageVolume with name "([^"]*)"$`, f.iCallNodeUnstageVolume)
@@ -804,6 +809,16 @@ func (f *feature) iInduceError(errtype string) error {
 		gofsutil.GOFSMock.InduceWWNToDevicePathError = true
 	case "GOFSRmoveBlockDeviceError":
 		gofsutil.GOFSMock.InduceRemoveBlockDeviceError = true
+	case "NodeStageNoStagingTargetPath":
+		f.nodeStageVolumeRequest.StagingTargetPath = ""
+	case "NodeStageNoVolumeCapability":
+		f.nodeStageVolumeRequest.VolumeCapability = nil
+	case "NodeStageNoAccessMode":
+		f.nodeStageVolumeRequest.VolumeCapability.AccessMode = nil
+	case "NodeStageNoAccessType":
+		f.nodeStageVolumeRequest.VolumeCapability.AccessType = nil
+	case "NodeStageFileTargetNotDir":
+		f.nodeStageVolumeRequest.StagingTargetPath = datafile
 	case "NodePublishNoTargetPath":
 		f.nodePublishVolumeRequest.TargetPath = ""
 	case "NodeUnpublishNoTargetPath":
@@ -818,6 +833,8 @@ func (f *feature) iInduceError(errtype string) error {
 		f.nodePublishVolumeRequest.TargetPath = datafile
 	case "BadVolumeIdentifier":
 		inducedErrors.badVolumeIdentifier = true
+	case "TargetNotCreatedForNodeStage":
+		fallthrough
 	case "TargetNotCreatedForNodePublish":
 		err := os.Remove(datafile)
 		if err != nil {
@@ -1344,11 +1361,11 @@ func (f *feature) aValidNodeGetCapabilitiesResponseIsReturned() error {
 				return fmt.Errorf("Received unexpected capability: %v", rpcType)
 			}
 		}
-		if f.service.opts.IsHealthMonitorEnabled && count != 3 {
+		if f.service.opts.IsHealthMonitorEnabled && count != 4 {
 			// Set default value
 			f.service.opts.IsHealthMonitorEnabled = false
 			return errors.New("Did not retrieve all the expected capabilities")
-		} else if !f.service.opts.IsHealthMonitorEnabled && count != 1 {
+		} else if !f.service.opts.IsHealthMonitorEnabled && count != 2 {
 			return errors.New("Did not retrieve all the expected capabilities")
 		}
 		// Set default value
@@ -1625,6 +1642,7 @@ func (f *feature) aCapabilityWithVoltypeAccess(voltype, access string) error {
 	f.capabilities = make([]*csi.VolumeCapability, 0)
 	f.capabilities = append(f.capabilities, capability)
 	f.capability = capability
+	f.nodeStageVolumeRequest = nil
 	f.nodePublishVolumeRequest = nil
 	return nil
 }
@@ -1807,6 +1825,38 @@ func (f *feature) iChangeTheTargetPath() error {
 	return nil
 }
 
+func (f *feature) iChangeTheStagingTargetPath() error {
+	// Make the target directory if required
+	_, err := os.Stat(datadir2)
+	if err != nil {
+		err = os.MkdirAll(datadir2, 0o777)
+		if err != nil {
+			fmt.Printf("Couldn't make datadir: %s\n", datadir2)
+		}
+	}
+
+	// Make the target file if required
+	_, err = os.Stat(datafile2)
+	if err != nil {
+		file, err := os.Create(datafile2)
+		if err != nil {
+			fmt.Printf("Couldn't make datafile: %s\n", datafile2)
+		} else {
+			file.Close()
+		}
+	}
+	req := f.nodeStageVolumeRequest
+	block := f.capability.GetBlock()
+	if block != nil {
+		req.StagingTargetPath = datafile2
+	}
+	mount := f.capability.GetMount()
+	if mount != nil {
+		req.StagingTargetPath = datadir2
+	}
+	return nil
+}
+
 func (f *feature) iMarkRequestReadOnly() error {
 	f.nodePublishVolumeRequest.Readonly = true
 	return nil
@@ -1935,24 +1985,91 @@ func (f *feature) iCallControllerUnPublishVolume(volID string, accessMode string
 	return nil
 }
 
-func (f *feature) iCallNodeStageVolume(volID string, accessType string) error {
-	req := getTypicalNodeStageVolumeRequest(accessType)
+func (f *feature) iCallNodeStageVolume() error {
+	header := metadata.New(map[string]string{"csi.requestid": "1"})
+	ctx := metadata.NewIncomingContext(context.Background(), header)
+	req := f.nodeStageVolumeRequest
+	if req == nil {
+		_ = f.getNodeStageVolumeRequest()
+		req = f.nodeStageVolumeRequest
+	}
+	if inducedErrors.badVolumeIdentifier {
+		req.VolumeId = "bad volume identifier"
+	}
+	fmt.Printf("Calling NodeStageVolume\n")
+	_, err := f.service.NodeStageVolume(ctx, req)
+	if err != nil {
+		fmt.Printf("NodeStageVolume failed: %s\n", err.Error())
+		if f.err == nil {
+			f.err = err
+		}
+	} else {
+		fmt.Printf("NodeStageVolume completed successfully\n")
+	}
+	return nil
+}
+
+func (f *feature) getNodeStageVolumeRequest() error {
+	req := new(csi.NodeStageVolumeRequest)
+	req.VolumeId = Volume1
+	req.VolumeCapability = f.capability
+	mount := f.capability.GetMount()
+	if mount != nil {
+		req.StagingTargetPath = datadir
+	}
+	attributes := map[string]string{
+		"Name":       req.VolumeId,
+		"AccessZone": "",
+		"Path":       f.service.opts.Path + "/" + req.VolumeId,
+	}
+	req.VolumeContext = attributes
+
 	f.nodeStageVolumeRequest = req
+	return nil
+}
 
-	// a customized volume ID can be specified to overwrite the default one
-	if volID != "" {
-		req.VolumeId = volID
+func (f *feature) getNodeStageVolumeRequestWithNoVolumeContext() error {
+	req := new(csi.NodeStageVolumeRequest)
+	req.VolumeId = Volume1
+	req.StagingTargetPath = datadir
+
+	f.nodeStageVolumeRequest = req
+	return nil
+}
+
+func (f *feature) getNodeStageVolumeRequestWithVolumeName(volumeName string) error {
+	req := new(csi.NodeStageVolumeRequest)
+	req.VolumeId = Volume1
+	req.VolumeCapability = f.capability
+	mount := f.capability.GetMount()
+	if mount != nil {
+		req.StagingTargetPath = datadir
 	}
 
-	f.nodeStageVolumeResponse, f.err = f.service.NodeStageVolume(context.Background(), req)
-	if f.err != nil {
-		log.Printf("NodeStageVolume call failed: %s\n", f.err.Error())
-	}
+	f.nodeStageVolumeRequest = req
+	return nil
+}
 
-	if f.nodeStageVolumeResponse != nil {
-		log.Printf("a NodeStageVolumeResponse has been returned\n")
+func (f *feature) getNodeStageVolumeRequestWithVolumeNameAndPath(volumeName string, path string) error {
+	req := new(csi.NodeStageVolumeRequest)
+	if volumeName != "" {
+		req.VolumeId = volumeName
+	} else {
+		req.VolumeId = Volume1
 	}
+	req.VolumeCapability = f.capability
+	mount := f.capability.GetMount()
+	if mount != nil {
+		req.StagingTargetPath = datadir
+	}
+	attributes := map[string]string{
+		"Name":       volumeName,
+		"AccessZone": "",
+		"Path":       path,
+	}
+	req.VolumeContext = attributes
 
+	f.nodeStageVolumeRequest = req
 	return nil
 }
 
