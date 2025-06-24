@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2023 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -162,6 +162,7 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/{volume_id}", handleGetVolumeSize).Methods("GET").Queries("detail", "size", "max-depth", "-1")
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/volume1", handleGetExistentVolumeMetadata).Methods("GET").Queries("metadata", "")
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/volume2", handleGetExistentVolume).Methods("GET")
+	isilonRouter.HandleFunc("/namespace/volume2/test/tmp/datadir", handleGetExistentVolumePath).Methods("GET")
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/volume1", handleCopySnapshot).Methods("PUT").
 		Headers("X-Isi-Ifs-Copy-Source", "/namespace/ifs/.snapshot/existent_snapshot_name/data/csi-isilon/nfs_1").Queries("merge", "True")
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/volume1", handleCopySnapshot).Methods("PUT").
@@ -352,6 +353,17 @@ func handleGetVolume(w http.ResponseWriter, _ *http.Request) {
 
 // handleGetExistentVolume implements GET /namespace/ifs/data/csi-isilon/volume2?metadata
 func handleGetExistentVolume(w http.ResponseWriter, _ *http.Request) {
+	if testControllerHasNoConnection {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(readFromFile("mock/volume/get_volume2_without_metadata.txt"))
+}
+
+// handleGetExistentVolume implements GET  /namespace/volume2/test/tmp/datadir
+func handleGetExistentVolumePath(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
 		w.WriteHeader(http.StatusRequestTimeout)
 		return

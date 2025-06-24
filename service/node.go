@@ -442,11 +442,11 @@ func (s *service) NodeGetVolumeStats(
 
 	volID := req.GetVolumeId()
 	if volID == "" {
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no VolumeID found in request"))
+		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "no VolumeID found in request"))
 	}
 	volPath := req.GetVolumePath()
 	if volPath == "" {
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no Volume Path found in request"))
+		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "no Volume Path found in request"))
 	}
 
 	volName, _, _, clusterName, _ := utils.ParseNormalizedVolumeID(ctx, volID)
@@ -482,43 +482,19 @@ func (s *service) NodeGetVolumeStats(
 	isVolumeExistent := isVolumeExistentFunc(ctx, volName, volPath, "")
 
 	if !isVolumeExistent {
-		abnormal = true
-		message = fmt.Sprintf("volume %v does not exists at this path %v", volName, isiPath)
+		return nil, status.Error(codes.NotFound, utils.GetMessageWithRunID(runID, "volume %v does not exist at path %v", volName, volPath))
 	}
 
 	// check whether the original volume is mounted
-	if !abnormal {
-		isMounted, err := getIsVolumeMounted(ctx, volName, volPath)
-		if !isMounted {
-			abnormal = true
-			message = fmt.Sprintf("no volume is mounted at path: %s", err)
-		}
+	isMounted, err := getIsVolumeMounted(ctx, volName, volPath)
+	if !isMounted {
+		return nil, status.Error(codes.NotFound, utils.GetMessageWithRunID(runID, "no volume is mounted at path: %s", volPath))
 	}
 
 	// check whether volume path is accessible
-	if !abnormal {
-		_, err = getOsReadDir(volPath)
-		if err != nil {
-			abnormal = true
-			message = fmt.Sprintf("volume Path is not accessible: %s", err)
-		}
-	}
-
-	if abnormal {
-		return &csi.NodeGetVolumeStatsResponse{
-			Usage: []*csi.VolumeUsage{
-				{
-					Unit:      csi.VolumeUsage_UNKNOWN,
-					Available: 0,
-					Total:     0,
-					Used:      0,
-				},
-			},
-			VolumeCondition: &csi.VolumeCondition{
-				Abnormal: abnormal,
-				Message:  message,
-			},
-		}, nil
+	_, err = getOsReadDir(volPath)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, utils.GetMessageWithRunID(runID, "volume path is not accessible: %s", err))
 	}
 
 	// Get Volume stats metrics

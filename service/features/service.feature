@@ -427,17 +427,17 @@ Feature: Isilon CSI interface
       And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1"
       Then the error contains "no Volume Path found in request"
 
-    Scenario: NodeGetVolumeStats volume does not exist scenario
+    Scenario: NodeGetVolumeStats volume does not mount scenario
       Given a Isilon service
       When I call Probe
       And I call NodeGetVolumeStats with name "volume2=_=_=43=_=_=System=_=_=cluster1"
-      Then a NodeGetVolumeResponse is returned
+      Then the error contains "no volume is mounted at path"
 
     Scenario: NodeGetVolumeStats volume does not exist at path scenario
       Given a Isilon service
       When I call Probe
       And I call NodeGetVolumeStats with name "volume3=_=_=43=_=_=System=_=_=cluster1"
-      Then a NodeGetVolumeResponse is returned
+      Then the error contains "volume3 does not exist at path"
 
     Scenario: NodeGetVolumeStats cluster does not exist scenario
       Given a Isilon service

@@ -143,21 +143,8 @@ func TestNodeGetVolumeStats(t *testing.T) {
 					return false, errors.New("test error msg")
 				}
 			},
-			wantResponse: &csi.NodeGetVolumeStatsResponse{
-				Usage: []*csi.VolumeUsage{
-					{
-						Unit:      csi.VolumeUsage_UNKNOWN,
-						Available: 0,
-						Total:     0,
-						Used:      0,
-					},
-				},
-				VolumeCondition: &csi.VolumeCondition{
-					Abnormal: true,
-					Message:  "no volume is mounted at path: test error msg",
-				},
-			},
-			wantErr: false,
+			wantResponse: nil,
+			wantErr:      true,
 		},
 		{
 			name: "Volume Path is not accessible",
@@ -181,21 +168,8 @@ func TestNodeGetVolumeStats(t *testing.T) {
 					return []os.DirEntry{}, errors.New("volume Path is not accessible")
 				}
 			},
-			wantResponse: &csi.NodeGetVolumeStatsResponse{
-				Usage: []*csi.VolumeUsage{
-					{
-						Unit:      csi.VolumeUsage_UNKNOWN,
-						Available: 0,
-						Total:     0,
-						Used:      0,
-					},
-				},
-				VolumeCondition: &csi.VolumeCondition{
-					Abnormal: true,
-					Message:  "volume Path is not accessible: volume Path is not accessible",
-				},
-			},
-			wantErr: false,
+			wantResponse: nil,
+			wantErr:      true,
 		},
 		{
 			name: "Success in NodeGetVolumeStats",
