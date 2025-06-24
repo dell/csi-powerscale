@@ -381,7 +381,7 @@ func (s *service) CreateVolume(
 
 			// Get snapshot path
 			if snapshotSourceVolumeIsiPath, err = isiConfig.isiSvc.GetSnapshotSourceVolumeIsiPath(ctx, sourceSnapshotID); err != nil {
-				return nil, status.Error(codes.Internal, err.Error())
+				return nil, status.Error(codes.NotFound, err.Error())
 			}
 			log.Infof("Snapshot source volume isiPath is '%s' accessZone '%s'", snapshotSourceVolumeIsiPath, accessZone)
 
@@ -819,6 +819,9 @@ func (s *service) createVolumeFromSource(
 		// create volume from source volume
 		srcVolumeName, _, _, _, err := getUtilsParseNormalizedVolumeID(ctx, contentVolume.GetVolumeId())
 		if err != nil {
+			if strings.Contains(err.Error(), "cannot be split into tokens") {
+				return status.Error(codes.NotFound, "volume ID is invalid or not found")
+			}
 			return status.Error(codes.Internal, err.Error())
 		}
 		if err := createVolumeFromVolumeFunc(s)(ctx, isiConfig, isiPath, srcVolumeName, req.GetName(), sizeInBytes); err != nil {
@@ -1389,7 +1392,7 @@ func (s *service) ValidateVolumeCapabilities(
 
 	volumeContext := req.GetVolumeContext()
 	if exportPath = volumeContext[ExportPathParam]; exportPath == "" {
-		exportPath = utils.GetPathForVolume(s.opts.Path, volName)
+		exportPath = utils.GetPathForVolume(isiConfig.IsiPath, volName)
 	}
 	isiPath = utils.GetIsiPathFromExportPath(exportPath)
 
@@ -1738,16 +1741,9 @@ func (s *service) CreateSnapshot(
 
 	log.Infof("CreateSnapshot started")
 	// parse the input volume id and fetch it's components
-	srcVolumeID, _, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
+	_, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
-	}
-
-	// When authorization is enabled, the volume ID will be prefixed with an authorization prefix, e.g., tn1-csivol-1c8b13cadd.
-	// This function is called to remove the authorization prefix from the volume ID.
-	srcVolumeID, err = utils.RemoveAuthorizationVolPrefix(s.opts.csiVolPrefix, srcVolumeID)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, " runid=%s %s", runID, err.Error())
 	}
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
@@ -1764,22 +1760,27 @@ func (s *service) CreateSnapshot(
 		return nil, status.Errorf(codes.FailedPrecondition, " runid=%s %s", runID, err.Error())
 	}
 
-	// validate request and get details of the request
-	// srcVolumeID: source volume name
-	// snapshotName: name of the snapshot that need to be created
 	var (
 		snapshotNew isi.Snapshot
 		isiPath     string
 	)
 
-	// get isipath directly from pv
-	volPath, err := s.GetIsiPathByName(ctx, srcVolumeID)
+	// Get isiPath for the source volume from its export
+	export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
+		return nil, status.Error(codes.NotFound, err.Error())
 	}
 
-	isiPath = utils.TrimVolumePath(volPath)
+	if len(*export.Paths) == 0 {
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("can't find paths for export with ID %d", exportID))
+	}
+	exportPath := (*export.Paths)[0]
 
+	isiPath = utils.GetIsiPathFromExportPath(exportPath)
+
+	// validate request and get details of the request
+	// srcVolumeID: source volume ID
+	// snapshotName: name of the snapshot that need to be created
 	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())

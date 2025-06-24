@@ -465,22 +465,3 @@ func GetMessageWithRunID(runid string, format string, args ...interface{}) strin
 	str := fmt.Sprintf(format, args...)
 	return fmt.Sprintf(" runid=%s %s", runid, str)
 }
-
-// TrimVolumePath trims the last part of a volume path after the last forward slash ("/") character.
-func TrimVolumePath(volPath string) string {
-	lastSeparatorIndex := strings.LastIndex(volPath, "/")
-	if lastSeparatorIndex != -1 {
-		volPath = volPath[:lastSeparatorIndex+1]
-	}
-	return volPath
-}
-
-// RemoveAuthorizationVolPrefix returns the volume name by removing the authorization prefix if it exists, or returns an error if the prefix is not found.
-func RemoveAuthorizationVolPrefix(volPrefix, volName string) (string, error) {
-	prefixIndex := strings.LastIndex(volName, volPrefix)
-
-	if prefixIndex == -1 {
-		return "", fmt.Errorf("csiVolPrefix %s is not found in the volume name %s", volPrefix, volName)
-	}
-	return volName[prefixIndex:], nil
-}
