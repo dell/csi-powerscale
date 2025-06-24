@@ -344,7 +344,7 @@ Feature: Isilon CSI interface
       And I call DeleteVolume "volume2=_=_=43=_=_=System"
       And I call ValidateVolumeCapabilities with voltype "mount" access "single-writer"
       And I call GetCapacity
-      And I call CreateSnapshot "volume2=_=_=19=_=_=System" "existent_comp_snapshot_name" "/ifs/data/csi-isilon"
+      And I call CreateSnapshot "volume2=_=_=19=_=_=System" "existent_comp_snapshot_name"
       And I call DeleteSnapshot "34"
       And I call NodePublishVolume
       And I call NodeUnpublishVolume
