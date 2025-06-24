@@ -119,7 +119,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 					},
 				},
 				VolumeCondition: &csi.VolumeCondition{
-					Abnormal: false,
+					Abnormal: true,
 					Message:  "failed to get volume stats metrics : failed to get volume stats metrics",
 				},
 			},
