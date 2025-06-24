@@ -505,6 +505,9 @@ func TestCreateVolumeFromSource(t *testing.T) {
 		if contentSource.GetVolume() != nil && contentSource.GetVolume().VolumeId == "errorVolume" {
 			return &csi.VolumeContentSource_VolumeSource{VolumeId: "errorVolume"}
 		}
+		if contentSource.GetVolume() != nil && contentSource.GetVolume().VolumeId == "invalidVolumeID" {
+			return &csi.VolumeContentSource_VolumeSource{VolumeId: "invalidVolumeID"}
+		}
 		return nil
 	}
 
@@ -530,6 +533,9 @@ func TestCreateVolumeFromSource(t *testing.T) {
 	getUtilsParseNormalizedVolumeID = func(_ context.Context, volumeID string) (string, int, string, string, error) {
 		if volumeID == "validVolume" {
 			return "clusterName", 0, "volumePath", "volumeName", nil
+		}
+		if volumeID == "invalidVolumeID" {
+			return "", 0, "", "", errors.New("volume ID 'invalidVolumeID' cannot be split into tokens")
 		}
 		return "", 0, "", "", errors.New("volume error")
 	}
@@ -589,6 +595,17 @@ func TestCreateVolumeFromSource(t *testing.T) {
 			&csi.CreateVolumeRequest{Name: "newVolume"},
 			200,
 			status.Error(codes.Internal, "volume error"),
+		},
+		{
+			"InvalidVolumeID",
+			&csi.VolumeContentSource{
+				Type: &csi.VolumeContentSource_Volume{
+					Volume: &csi.VolumeContentSource_VolumeSource{VolumeId: "invalidVolumeID"},
+				},
+			},
+			&csi.CreateVolumeRequest{Name: "newVolume"},
+			200,
+			status.Error(codes.NotFound, "volume ID is invalid or not found"),
 		},
 	}
 
