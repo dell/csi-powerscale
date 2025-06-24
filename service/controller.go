@@ -1741,14 +1741,10 @@ func (s *service) CreateSnapshot(
 
 	log.Infof("CreateSnapshot started")
 	// parse the input volume id and fetch it's components
-	srcVolumeID, _, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
+	_, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
 	}
-
-	// When authorization is enabled, the volume ID will be prefixed with an authorization prefix, e.g., tn1-csivol-1c8b13cadd.
-	// This function is called to remove the authorization prefix from the volume ID.
-	srcVolumeID = utils.RemoveAuthorizationVolPrefix(s.opts.csiVolPrefix, srcVolumeID)
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
@@ -1764,23 +1760,27 @@ func (s *service) CreateSnapshot(
 		return nil, status.Errorf(codes.FailedPrecondition, " runid=%s %s", runID, err.Error())
 	}
 
-	// validate request and get details of the request
-	// srcVolumeID: source volume name
-	// snapshotName: name of the snapshot that need to be created
 	var (
 		snapshotNew isi.Snapshot
 		isiPath     string
 	)
 
-	// get isipath directly from pv
-	volPath := s.GetIsiPathByName(ctx, srcVolumeID)
-
-	if volPath == "" {
-		isiPath = isiConfig.IsiPath
-	} else {
-		isiPath = utils.TrimVolumePath(volPath)
+	// Get isiPath for the source volume from its export
+	export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, err.Error())
 	}
 
+	if len(*export.Paths) == 0 {
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("can't find paths for export with ID %d", exportID))
+	}
+	exportPath := (*export.Paths)[0]
+
+	isiPath = utils.GetIsiPathFromExportPath(exportPath)
+
+	// validate request and get details of the request
+	// srcVolumeID: source volume ID
+	// snapshotName: name of the snapshot that need to be created
 	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
