@@ -437,9 +437,6 @@ func (s *service) NodeGetVolumeStats(
 	// Fetch log handler
 	ctx, log, runID := GetRunIDLog(ctx)
 
-	abnormal := false
-	message := ""
-
 	volID := req.GetVolumeId()
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "no VolumeID found in request"))
@@ -510,7 +507,7 @@ func (s *service) NodeGetVolumeStats(
 				},
 			},
 			VolumeCondition: &csi.VolumeCondition{
-				Abnormal: false,
+				Abnormal: true,
 				Message:  fmt.Sprintf("failed to get volume stats metrics : %s", err),
 			},
 		}, nil
@@ -532,8 +529,8 @@ func (s *service) NodeGetVolumeStats(
 			},
 		},
 		VolumeCondition: &csi.VolumeCondition{
-			Abnormal: abnormal,
-			Message:  message,
+			Abnormal: false,
+			Message:  "",
 		},
 	}, nil
 }
