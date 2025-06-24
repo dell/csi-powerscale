@@ -2020,28 +2020,6 @@ func (f *feature) getNodeStageVolumeRequest() error {
 	return nil
 }
 
-func (f *feature) getNodeStageVolumeRequestWithNoVolumeContext() error {
-	req := new(csi.NodeStageVolumeRequest)
-	req.VolumeId = Volume1
-	req.StagingTargetPath = datadir
-
-	f.nodeStageVolumeRequest = req
-	return nil
-}
-
-func (f *feature) getNodeStageVolumeRequestWithVolumeName(volumeName string) error {
-	req := new(csi.NodeStageVolumeRequest)
-	req.VolumeId = Volume1
-	req.VolumeCapability = f.capability
-	mount := f.capability.GetMount()
-	if mount != nil {
-		req.StagingTargetPath = datadir
-	}
-
-	f.nodeStageVolumeRequest = req
-	return nil
-}
-
 func (f *feature) getNodeStageVolumeRequestWithVolumeNameAndPath(volumeName string, path string) error {
 	req := new(csi.NodeStageVolumeRequest)
 	if volumeName != "" {
@@ -2060,6 +2038,39 @@ func (f *feature) getNodeStageVolumeRequestWithVolumeNameAndPath(volumeName stri
 		"Path":       path,
 	}
 	req.VolumeContext = attributes
+
+	f.nodeStageVolumeRequest = req
+	return nil
+}
+
+func (f *feature) getNodeStageVolumeRequestWithVolumeName(volumeName string) error {
+	req := new(csi.NodeStageVolumeRequest)
+
+	req.VolumeId, _, _, _, _ = utils.ParseNormalizedVolumeID(context.Background(), volumeName)
+	req.VolumeCapability = f.capability
+	mount := f.capability.GetMount()
+	if mount != nil {
+		req.StagingTargetPath = datadir
+	}
+	attributes := map[string]string{
+		"Name":       req.VolumeId,
+		"AccessZone": "",
+		"Path":       f.service.opts.Path + "/" + req.VolumeId,
+	}
+	req.VolumeContext = attributes
+
+	f.nodeStageVolumeRequest = req
+	return nil
+}
+
+func (f *feature) getNodeStageVolumeRequestWithNoVolumeContext() error {
+	req := new(csi.NodeStageVolumeRequest)
+	req.VolumeId = Volume1
+	req.VolumeCapability = f.capability
+	mount := f.capability.GetMount()
+	if mount != nil {
+		req.StagingTargetPath = datadir
+	}
 
 	f.nodeStageVolumeRequest = req
 	return nil
