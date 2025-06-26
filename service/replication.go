@@ -749,9 +749,9 @@ func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteI
 	if err != nil {
 		return status.Errorf(codes.Internal, "reprotect: create protection policy on the local site failed %s", err.Error())
 	}
-	err = localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.FINISHED)
+	err = localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.RUNNING)
 	if err != nil {
-		return status.Errorf(codes.Internal, "reprotect: policy job couldn't reach FINISHED state %s", err.Error())
+		return status.Errorf(codes.Internal, "reprotect: policy job couldn't reach RUNNING state %s", err.Error())
 	}
 
 	log.Info("Reprotect action completed")
@@ -985,32 +985,29 @@ func getRemoteCSIVolume(ctx context.Context, exportID int, volName, accessZone s
   - (Target side) If the local policy is NIL, remote policy is enabled, local TP is write enabled and remote TP is NIL
 */
 func getGroupLinkState(localP isi.Policy, localTP isi.TargetPolicy, remoteP isi.Policy, remoteTP isi.TargetPolicy, isSyncInProgress bool) csiext.StorageProtectionGroupStatus_State {
-	var state csiext.StorageProtectionGroupStatus_State
-	if (localP != nil && localP.Enabled && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesDisabled) || // Synchronized state - source side
+	if isSyncInProgress { // sync-in-progress state
+		return csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS
+	} else if (localP != nil && localP.Enabled && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesDisabled) || // Synchronized state - source side
 		(localP == nil && remoteP != nil && remoteP.Enabled && localTP != nil && localTP.FailoverFailbackState == WritesDisabled && remoteTP == nil) { // target side
-		state = csiext.StorageProtectionGroupStatus_SYNCHRONIZED
+		return csiext.StorageProtectionGroupStatus_SYNCHRONIZED
 	} else if (localP != nil && !localP.Enabled && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesDisabled) || // Suspended state - source side
 		(localP == nil && remoteP != nil && !remoteP.Enabled && localTP != nil && localTP.FailoverFailbackState == WritesDisabled && remoteTP == nil) { // target side
-		state = csiext.StorageProtectionGroupStatus_SUSPENDED
+		return csiext.StorageProtectionGroupStatus_SUSPENDED
 	} else if (localP != nil && !localP.Enabled && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesEnabled) || // planned failover - source side
 		(localP == nil && remoteP != nil && !remoteP.Enabled && localTP != nil && localTP.FailoverFailbackState == WritesEnabled && remoteTP == nil) { // target side
-		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
+		return csiext.StorageProtectionGroupStatus_FAILEDOVER
 	} else if localP == nil && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesEnabled { // unplanned failover & source down - source side
-		state = csiext.StorageProtectionGroupStatus_UNKNOWN // report UNKNOWN and maintain isSource when source is down on failedover
+		return csiext.StorageProtectionGroupStatus_UNKNOWN // report UNKNOWN and maintain isSource when source is down on failedover
 	} else if localP == nil && remoteP == nil && localTP != nil && localTP.FailoverFailbackState == WritesEnabled && remoteTP == nil { // unplanned failover & source down - target side
-		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
+		return csiext.StorageProtectionGroupStatus_FAILEDOVER
 	} else if (localP != nil && localP.Enabled && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesEnabled) || // unplanned failover & source up now - source side
 		(localP == nil && remoteP != nil && remoteP.Enabled && localTP != nil && localTP.FailoverFailbackState == WritesEnabled && remoteTP == nil) { // target side
-		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
-	} else if isSyncInProgress { // sync-in-progress state
-		state = csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS
+		return csiext.StorageProtectionGroupStatus_FAILEDOVER
 	} else if (remoteTP != nil && remoteTP.LastJobState == "failed") || (localTP != nil && localTP.LastJobState == "failed") { // invalid state, sync job failed
-		state = csiext.StorageProtectionGroupStatus_INVALID
-	} else { // unknown state
-		state = csiext.StorageProtectionGroupStatus_UNKNOWN
+		return csiext.StorageProtectionGroupStatus_INVALID
 	}
 
-	return state
+	return csiext.StorageProtectionGroupStatus_UNKNOWN
 }
 
 func getRpoInt(vgName string) int {
