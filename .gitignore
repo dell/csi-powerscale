@@ -21,3 +21,4 @@ semver.mk
 goisilon
 gocsi
 .idea
+csm-common.mk
