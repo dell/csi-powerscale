@@ -1224,7 +1224,7 @@ func (s *service) ControllerPublishVolume(
 
 	volName, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, volID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "failed to parse volume ID '%s', error : '%v'", volID, err))
+		return nil, status.Error(codes.NotFound, utils.GetMessageWithRunID(runID, "failed to parse volume ID '%s', error : '%v'", volID, err))
 	}
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
@@ -1334,7 +1334,7 @@ func (s *service) ControllerPublishVolume(
 			break
 		}
 		if isiConfig.isiSvc.OtherClientsAlreadyAdded(ctx, exportID, accessZone, nodeID) {
-			return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID,
+			return nil, status.Error(codes.NotFound, utils.GetMessageWithRunID(runID,
 				"export %d in access zone %s already has other clients added to it, and the access mode is %s, thus the request fails", exportID, accessZone, am.Mode))
 		}
 
