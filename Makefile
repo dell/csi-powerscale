@@ -56,7 +56,7 @@ dev-build-image-push: dev-build
 
 # Windows or Linux; requires no hardware
 unit-test:
-	( cd service; go test -coverprofile=c.out ./... )
+	( cd service; go test -race -coverprofile=c.out ./... )
 
 coverage:
 	cd service; go tool cover -html=c.out -o coverage.html
