@@ -30,6 +30,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+const testTargetPath = "/tmp/csi-powerscale-test"
+
 func TestNodeGetVolumeStats(t *testing.T) {
 	// Original function references
 	originalGetIsVolumeExistentFunc := getIsVolumeExistentFunc
@@ -337,6 +339,7 @@ func TestEphemeralNodePublish(t *testing.T) {
 				VolumeContext: map[string]string{
 					"csi.storage.k8s.io/ephemeral": "true",
 				},
+				TargetPath: testTargetPath,
 			},
 			setup: func() {
 				getCreateVolumeFunc = func(_ *service) func(_ context.Context, _ *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
@@ -360,6 +363,7 @@ func TestEphemeralNodePublish(t *testing.T) {
 				VolumeContext: map[string]string{
 					"csi.storage.k8s.io/ephemeral": "true",
 				},
+				TargetPath: testTargetPath,
 			},
 			setup: func() {
 				// make s a service with no nodeID
@@ -397,6 +401,7 @@ func TestEphemeralNodePublish(t *testing.T) {
 				VolumeContext: map[string]string{
 					"csi.storage.k8s.io/ephemeral": "true",
 				},
+				TargetPath: testTargetPath,
 			},
 			setup: func() {
 				getCreateVolumeFunc = func(_ *service) func(_ context.Context, _ *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
@@ -427,6 +432,7 @@ func TestEphemeralNodePublish(t *testing.T) {
 				VolumeContext: map[string]string{
 					"csi.storage.k8s.io/ephemeral": "true",
 				},
+				TargetPath: testTargetPath,
 			},
 			setup: func() {
 				getCreateVolumeFunc = func(_ *service) func(_ context.Context, _ *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
@@ -460,6 +466,7 @@ func TestEphemeralNodePublish(t *testing.T) {
 				VolumeContext: map[string]string{
 					"csi.storage.k8s.io/ephemeral": "true",
 				},
+				TargetPath: testTargetPath,
 			},
 			setup: func() {
 				getControllerPublishVolume = func(_ *service) func(_ context.Context, _ *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
@@ -496,6 +503,7 @@ func TestEphemeralNodePublish(t *testing.T) {
 				VolumeContext: map[string]string{
 					"csi.storage.k8s.io/ephemeral": "true",
 				},
+				TargetPath: testTargetPath,
 			},
 			setup: func() {
 				getControllerPublishVolume = func(_ *service) func(_ context.Context, _ *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
@@ -535,6 +543,7 @@ func TestEphemeralNodePublish(t *testing.T) {
 				VolumeContext: map[string]string{
 					"csi.storage.k8s.io/ephemeral": "true",
 				},
+				TargetPath: testTargetPath,
 			},
 			setup: func() {
 				publishVolumeFunc = func(_ context.Context, _ *csi.NodePublishVolumeRequest, _ string) error {
@@ -579,6 +588,7 @@ func TestEphemeralNodePublish(t *testing.T) {
 				VolumeContext: map[string]string{
 					"csi.storage.k8s.io/ephemeral": "true",
 				},
+				TargetPath: testTargetPath,
 			},
 			setup: func() {
 				statFileFunc = func(_ string) (fs.FileInfo, error) {
@@ -633,6 +643,7 @@ func TestEphemeralNodePublish(t *testing.T) {
 				VolumeContext: map[string]string{
 					"csi.storage.k8s.io/ephemeral": "true",
 				},
+				TargetPath: testTargetPath,
 			},
 			setup: func() {
 				statFileFunc = func(_ string) (fs.FileInfo, error) {
@@ -687,6 +698,7 @@ func TestEphemeralNodePublish(t *testing.T) {
 				VolumeContext: map[string]string{
 					"csi.storage.k8s.io/ephemeral": "true",
 				},
+				TargetPath: testTargetPath,
 			},
 			setup: func() {
 				publishVolumeFunc = func(_ context.Context, _ *csi.NodePublishVolumeRequest, _ string) error {
@@ -738,6 +750,7 @@ func TestEphemeralNodePublish(t *testing.T) {
 				VolumeContext: map[string]string{
 					"csi.storage.k8s.io/ephemeral": "true",
 				},
+				TargetPath: testTargetPath,
 			},
 			setup: func() {
 				publishVolumeFunc = func(_ context.Context, _ *csi.NodePublishVolumeRequest, _ string) error {
@@ -789,6 +802,7 @@ func TestEphemeralNodePublish(t *testing.T) {
 				VolumeContext: map[string]string{
 					"csi.storage.k8s.io/ephemeral": "true",
 				},
+				TargetPath: testTargetPath,
 			},
 			setup: func() {
 				closeFileFunc = func(_ *os.File) error {
