@@ -21,7 +21,6 @@ import (
 	"io/fs"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -95,60 +94,21 @@ var publishVolumeFunc = func(
 		"AccessMode": accMode.GetMode(),
 	}
 	logrus.WithFields(f).Info("Node publish volume params ")
-	mnts, err := gofsutil.GetMounts(ctx)
+
+	isPublished, err := isMountAlreadyInPlace(ctx, nfsExportURL, target, rwOption, accMode)
 	if err != nil {
-		return status.Errorf(codes.Internal,
-			"could not reliably determine existing mount status: '%s'",
-			err.Error())
+		log.WithFields(f).Errorf("failed to check if device already staged: %v", err)
+		return err
 	}
 
-	if len(mnts) != 0 {
-		for _, m := range mnts {
-			// check for idempotency
-			// same volume
-			if m.Device == nfsExportURL {
-				if m.Path == target {
-					// as per specs, T1=T2, P1=P2 - return OK
-					if contains(m.Opts, rwOption) {
-						logrus.WithFields(f).Debug(
-							"mount already in place with same options")
-						return nil
-					}
-					// T1=T2, P1!=P2 - return AlreadyExists
-					logrus.WithFields(f).Error("Mount point already in use by device with different options")
-					return status.Error(codes.AlreadyExists, "Mount point already in use by device with different options")
-				}
-				// T1!=T2, P1==P2 || P1 != P2 - return FailedPrecondition for single node
-				if accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER ||
-					accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY ||
-					accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER {
-					logrus.WithFields(f).Error("Mount point already in use for same device")
-					return status.Error(codes.FailedPrecondition, "Mount point already in use for same device")
-				}
-			}
-		}
+	if isPublished {
+		log.WithFields(f).Info("device already published")
+		return nil
 	}
 
 	log.Infof("The mountOptions being used for mount are: %s", mntOptions)
-	if err := gofsutil.Mount(context.Background(), nfsExportURL, target, "nfs", mntOptions...); err != nil {
-		count := 0
-		errmsg := err.Error()
-		// Both substring validation is for NFSv3 and NFSv4 errors resp.
-		for (strings.Contains(strings.ToLower(errmsg), "access denied by server while mounting") || (strings.Contains(strings.ToLower(errmsg), "no such file or directory"))) && count < 5 {
-			time.Sleep(2 * time.Second)
-			log.Infof("Mount re-trial attempt-%d", count)
-			err = gofsutil.Mount(context.Background(), nfsExportURL, target, "nfs", mntOptions...)
-			if err != nil {
-				errmsg = err.Error()
-			} else {
-				break
-			}
-			count++
-		}
-		if err != nil {
-			log.Errorf("%v", err)
-			return err
-		}
+	if err = mountWithRetry(ctx, nfsExportURL, target, mntOptions); err != nil {
+		return status.Error(codes.Internal, fmt.Sprintf("failed to mount with error: %v", err))
 	}
 	return nil
 }
