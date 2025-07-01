@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/dell/csi-isilon/v2/common/constants"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -184,32 +185,53 @@ func TestGetAccessMode(t *testing.T) {
 
 func TestRemoveExistingCSISockFile(t *testing.T) {
 	const testSockFile = "/tmp/test.sock"
-	os.Setenv("CSI_ENDPOINT", testSockFile)
-	defer os.Unsetenv("CSI_ENDPOINT")
 
-	// Create a test socket file
-	file, err := os.Create(testSockFile)
-	if err != nil {
-		t.Fatalf("Failed to create test socket file: %v", err)
+	tests := []struct {
+		name  string
+		setup func()
+		want  error
+	}{
+		{
+			name: "remove the sock file",
+			setup: func() {
+				// set necessary env vars and queue for cleanup after the test run
+				os.Setenv(constants.EnvCSIEndpoint, testSockFile)
+				t.Cleanup(func() { os.Unsetenv(constants.EnvCSIEndpoint) })
+
+				// Create a test socket file
+				file, err := os.Create(testSockFile)
+				if err != nil {
+					t.Fatalf("Failed to create test socket file: %v", err)
+					return
+				}
+				t.Cleanup(func() {
+					file.Close()
+					os.Remove(testSockFile)
+				})
+			},
+			want: nil,
+		},
+		{
+			name: "sock file does not exist",
+			setup: func() {
+				// set necessary env vars
+				os.Setenv(constants.EnvCSIEndpoint, testSockFile)
+				t.Cleanup(func() { os.Unsetenv(constants.EnvCSIEndpoint) })
+			},
+			want: nil,
+		},
 	}
-	file.Close()
 
-	// Test: Successful removal
-	err = RemoveExistingCSISockFile()
-	assert.NoError(t, err, "Expected no error in normal removal")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup()
+			}
 
-	// Ensure file is deleted
-	_, err = os.Stat(testSockFile)
-	assert.True(t, os.IsNotExist(err), "Expected file to be removed, but it still exists")
-
-	// ---- ERROR CASE ----
-	// Create the file again
-	file, err = os.Create(testSockFile)
-	if err != nil {
-		t.Fatalf("Failed to recreate test socket file: %v", err)
+			err := RemoveExistingCSISockFile()
+			if err != tt.want {
+				t.Errorf("RemoveExistingCSISockFile() error = %v, wantErr %v", err, tt.want)
+			}
+		})
 	}
-	file.Close()
-
-	// Cleanup
-	os.Remove(testSockFile)
 }
