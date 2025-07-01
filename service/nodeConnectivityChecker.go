@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/dell/csi-isilon/v2/common/constants"
-	"github.com/dell/csi-isilon/v2/common/utils"
+	fromctx "github.com/dell/csi-isilon/v2/common/utils/fromcontext"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
@@ -55,7 +55,7 @@ type ArrayConnectivityStatus struct {
 }
 
 func setAPIPort(ctx context.Context) {
-	port := utils.ParseUintFromContext(ctx, constants.EnvPodmonAPIPORT)
+	port := fromctx.ParseUint(ctx, constants.EnvPodmonAPIPORT)
 	if port == 0 {
 		// If the port number cannot be fetched, set it to default
 		apiPort = ":" + constants.DefaultPodmonAPIPortNumber
@@ -68,7 +68,7 @@ func setAPIPort(ctx context.Context) {
 
 // reads the pollingFrequency from Env, sets default if not found
 func setPollingFrequency(ctx context.Context) int64 {
-	pollRate, err := utils.ParseInt64FromContext(ctx, constants.EnvPodmonArrayConnectivityPollRate)
+	pollRate, err := fromctx.ParseInt64(ctx, constants.EnvPodmonArrayConnectivityPollRate)
 	if err != nil || pollRate == 0 {
 		log.Debugf("use default pollingFrequency %d seconds, err %v", constants.DefaultPodmonPollRate, err)
 		return constants.DefaultPodmonPollRate
@@ -93,7 +93,7 @@ var MarshalSyncMapToJSON = func(m *sync.Map) ([]byte, error) {
 
 // startAPIService reads nodes to array status periodically
 func (s *service) startAPIService(ctx context.Context) {
-	isPodmonEnabled := utils.ParseBooleanFromContext(ctx, constants.EnvPodmonEnabled)
+	isPodmonEnabled := fromctx.ParseBoolean(ctx, constants.EnvPodmonEnabled)
 	if !isPodmonEnabled {
 		log.Info("podmon is not enabled")
 		return
