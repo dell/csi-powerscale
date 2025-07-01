@@ -219,28 +219,28 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 	if replicationPrefix, ok := csictx.LookupEnv(ctx, constants.EnvReplicationPrefix); ok {
 		opts.replicationPrefix = replicationPrefix
 	}
-	if MaxVolumesPerNode, err := fromctx.ParseInt64(ctx, constants.EnvMaxVolumesPerNode); err != nil {
+	if MaxVolumesPerNode, err := fromctx.GetInt64(ctx, constants.EnvMaxVolumesPerNode); err != nil {
 		log.Warnf("error while parsing env variable '%s', %s, defaulting to 0", constants.EnvMaxVolumesPerNode, err)
 		opts.MaxVolumesPerNode = 0
 	} else {
 		opts.MaxVolumesPerNode = MaxVolumesPerNode
 	}
 
-	allowedNetworks, err := fromctx.ParseArray(ctx, constants.EnvAllowedNetworks)
+	allowedNetworks, err := fromctx.GetArray(ctx, constants.EnvAllowedNetworks)
 	if err != nil {
 		log.Errorf("error while parsing allowedNetworks, %v", err)
 		return err
 	}
 	opts.allowedNetworks = allowedNetworks
 
-	opts.QuotaEnabled = fromctx.ParseBoolean(ctx, constants.EnvQuotaEnabled)
-	opts.SkipCertificateValidation = fromctx.ParseBoolean(ctx, constants.EnvSkipCertificateValidation)
-	opts.isiAuthType = uint8(fromctx.ParseUint(ctx, constants.EnvIsiAuthType)) // #nosec G115 -- This is a false positive
-	opts.AutoProbe = fromctx.ParseBoolean(ctx, constants.EnvAutoProbe)
-	opts.Verbose = fromctx.ParseUint(ctx, constants.EnvVerbose)
-	opts.CustomTopologyEnabled = fromctx.ParseBoolean(ctx, constants.EnvCustomTopologyEnabled)
-	opts.IsHealthMonitorEnabled = fromctx.ParseBoolean(ctx, constants.EnvIsHealthMonitorEnabled)
-	opts.IgnoreUnresolvableHosts = fromctx.ParseBoolean(ctx, constants.EnvIgnoreUnresolvableHosts)
+	opts.QuotaEnabled = fromctx.GetBoolean(ctx, constants.EnvQuotaEnabled)
+	opts.SkipCertificateValidation = fromctx.GetBoolean(ctx, constants.EnvSkipCertificateValidation)
+	opts.isiAuthType = uint8(fromctx.GetUint(ctx, constants.EnvIsiAuthType)) // #nosec G115 -- This is a false positive
+	opts.AutoProbe = fromctx.GetBoolean(ctx, constants.EnvAutoProbe)
+	opts.Verbose = fromctx.GetUint(ctx, constants.EnvVerbose)
+	opts.CustomTopologyEnabled = fromctx.GetBoolean(ctx, constants.EnvCustomTopologyEnabled)
+	opts.IsHealthMonitorEnabled = fromctx.GetBoolean(ctx, constants.EnvIsHealthMonitorEnabled)
+	opts.IgnoreUnresolvableHosts = fromctx.GetBoolean(ctx, constants.EnvIgnoreUnresolvableHosts)
 
 	s.opts = opts
 
@@ -366,7 +366,7 @@ func (s *service) probeOnStart(ctx context.Context) error {
 
 func (s *service) setNoProbeOnStart(ctx context.Context) {
 	ctx, log := GetLogger(ctx)
-	if fromctx.ParseBoolean(ctx, constants.EnvNoProbeOnStart) {
+	if fromctx.GetBoolean(ctx, constants.EnvNoProbeOnStart) {
 		log.Debug("X_CSI_ISI_NO_PROBE_ON_START is true, set noProbeOnStart to true")
 		noProbeOnStart = true
 		return

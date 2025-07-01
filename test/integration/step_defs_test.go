@@ -261,7 +261,7 @@ func createIsilonClient() (*isi.Client, error) {
 		os.Getenv(constants.EnvPath),
 		os.Getenv(constants.DefaultIsiVolumePathPermissions),
 		ignoreUnresolvableHosts,
-		uint8(fromctx.ParseUint(ctx, constants.EnvIsiAuthType))) // #nosec G115 -- This is a false positive
+		uint8(fromctx.GetUint(ctx, constants.EnvIsiAuthType))) // #nosec G115 -- This is a false positive
 	if err != nil {
 		fmt.Printf("error creating isilon client: '%s'\n", err.Error())
 	}

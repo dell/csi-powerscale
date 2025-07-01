@@ -14,7 +14,7 @@ func TestParseArrayFromContext(t *testing.T) {
 	os.Setenv("TEST_ARRAY", arrYAML)
 	defer os.Unsetenv("TEST_ARRAY")
 
-	val, err := ParseArray(ctx, "TEST_ARRAY")
+	val, err := GetArray(ctx, "TEST_ARRAY")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -28,7 +28,7 @@ func TestParseInt64FromContext(t *testing.T) {
 	os.Setenv("TEST_INT64", "-100")
 	defer os.Unsetenv("TEST_INT64")
 
-	val, err := ParseInt64(ctx, "TEST_INT64")
+	val, err := GetInt64(ctx, "TEST_INT64")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -44,18 +44,18 @@ func TestParseUnitFromContext(t *testing.T) {
 	os.Setenv("TEST_UINT", "42")
 	defer os.Unsetenv("TEST_UINT")
 
-	val := ParseUint(ctx, "TEST_UINT")
+	val := GetUint(ctx, "TEST_UINT")
 	assert.Equal(t, uint(42), val, "Expected 42, got %v", val)
 
 	// Test case: Invalid integer value (error case)
 	os.Setenv("TEST_UINT_INVALID", "not_a_number")
 	defer os.Unsetenv("TEST_UINT_INVALID")
 
-	val = ParseUint(ctx, "TEST_UINT_INVALID")
+	val = GetUint(ctx, "TEST_UINT_INVALID")
 	assert.Equal(t, uint(0), val, "Expected 0 due to parsing error, got %v", val)
 
 	// Test case: Missing environment variable
-	val = ParseUint(ctx, "NON_EXISTENT_KEY")
+	val = GetUint(ctx, "NON_EXISTENT_KEY")
 	assert.Equal(t, uint(0), val, "Expected 0 for non-existent key, got %v", val)
 }
 
@@ -67,7 +67,7 @@ func TestParseBooleanFromContext(t *testing.T) {
 		os.Setenv("TEST_BOOL", "true")
 		defer os.Unsetenv("TEST_BOOL")
 
-		result := ParseBoolean(ctx, "TEST_BOOL")
+		result := GetBoolean(ctx, "TEST_BOOL")
 		assert.True(t, result, "Expected true")
 	})
 
@@ -76,7 +76,7 @@ func TestParseBooleanFromContext(t *testing.T) {
 		os.Setenv("TEST_BOOL", "false")
 		defer os.Unsetenv("TEST_BOOL")
 
-		result := ParseBoolean(ctx, "TEST_BOOL")
+		result := GetBoolean(ctx, "TEST_BOOL")
 		assert.False(t, result, "Expected false")
 	})
 
@@ -85,7 +85,7 @@ func TestParseBooleanFromContext(t *testing.T) {
 		os.Setenv("TEST_BOOL", "notaboolean") // Invalid input
 		defer os.Unsetenv("TEST_BOOL")
 
-		result := ParseBoolean(ctx, "TEST_BOOL")
+		result := GetBoolean(ctx, "TEST_BOOL")
 		assert.False(t, result, "Expected false due to invalid boolean value")
 	})
 
@@ -93,7 +93,7 @@ func TestParseBooleanFromContext(t *testing.T) {
 	t.Run("Missing environment variable", func(t *testing.T) {
 		os.Unsetenv("TEST_BOOL") // Ensure the variable is not set
 
-		result := ParseBoolean(ctx, "TEST_BOOL")
+		result := GetBoolean(ctx, "TEST_BOOL")
 		assert.False(t, result, "Expected false when the environment variable is missing")
 	})
 }
@@ -106,7 +106,7 @@ func TestParseInt64FromContext1(t *testing.T) {
 		os.Setenv("TEST_INT", "123456789")
 		defer os.Unsetenv("TEST_INT")
 
-		result, err := ParseInt64(ctx, "TEST_INT")
+		result, err := GetInt64(ctx, "TEST_INT")
 		assert.NoError(t, err, "Expected no error for valid int64 value")
 		assert.Equal(t, int64(123456789), result, "Expected parsed int64 value")
 	})
@@ -116,7 +116,7 @@ func TestParseInt64FromContext1(t *testing.T) {
 		os.Setenv("TEST_INT", "notanumber") // Invalid input
 		defer os.Unsetenv("TEST_INT")
 
-		result, err := ParseInt64(ctx, "TEST_INT")
+		result, err := GetInt64(ctx, "TEST_INT")
 		assert.Error(t, err, "Expected error for invalid int64 value")
 		assert.Equal(t, int64(0), result, "Expected default int64 value (0) on error")
 	})
@@ -125,7 +125,7 @@ func TestParseInt64FromContext1(t *testing.T) {
 	t.Run("Missing environment variable", func(t *testing.T) {
 		os.Unsetenv("TEST_INT") // Ensure the variable is not set
 
-		result, err := ParseInt64(ctx, "TEST_INT")
+		result, err := GetInt64(ctx, "TEST_INT")
 		assert.NoError(t, err, "Expected no error when environment variable is missing")
 		assert.Equal(t, int64(0), result, "Expected default int64 value (0) when env variable is not set")
 	})
@@ -139,7 +139,7 @@ func TestParseArrayFromContext1(t *testing.T) {
 		os.Setenv("TEST_ARRAY", arrYAML)
 		defer os.Unsetenv("TEST_ARRAY")
 
-		val, err := ParseArray(ctx, "TEST_ARRAY")
+		val, err := GetArray(ctx, "TEST_ARRAY")
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"item1", "item2", "item3"}, val)
 	})
@@ -149,7 +149,7 @@ func TestParseArrayFromContext1(t *testing.T) {
 		os.Setenv("TEST_ARRAY", invalidYAML)
 		defer os.Unsetenv("TEST_ARRAY")
 
-		val, err := ParseArray(ctx, "TEST_ARRAY")
+		val, err := GetArray(ctx, "TEST_ARRAY")
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "invalid array value for 'TEST_ARRAY'")
 		assert.Empty(t, val)
@@ -158,7 +158,7 @@ func TestParseArrayFromContext1(t *testing.T) {
 	t.Run("Key not found", func(t *testing.T) {
 		os.Unsetenv("TEST_ARRAY")
 
-		val, err := ParseArray(ctx, "TEST_ARRAY")
+		val, err := GetArray(ctx, "TEST_ARRAY")
 		assert.Nil(t, err)
 		assert.Empty(t, val)
 	})

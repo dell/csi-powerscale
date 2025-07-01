@@ -25,8 +25,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ParseBoolean parses an environment variable into a boolean value. If an error is encountered, default is set to false, and error is logged
-func ParseBoolean(ctx context.Context, key string) bool {
+// GetBoolean parses an environment variable into a boolean value. If an error is encountered, default is set to false, and error is logged
+func GetBoolean(ctx context.Context, key string) bool {
 	log := logging.GetRunIDLogger(ctx)
 	if val, ok := csictx.LookupEnv(ctx, key); ok {
 		b, err := strconv.ParseBool(val)
@@ -40,8 +40,8 @@ func ParseBoolean(ctx context.Context, key string) bool {
 	return false
 }
 
-// ParseArray parses an environment variable into an array of string
-func ParseArray(ctx context.Context, key string) ([]string, error) {
+// GetArray parses an environment variable into an array of string
+func GetArray(ctx context.Context, key string) ([]string, error) {
 	var values []string
 
 	if val, ok := csictx.LookupEnv(ctx, key); ok {
@@ -53,8 +53,8 @@ func ParseArray(ctx context.Context, key string) ([]string, error) {
 	return values, nil
 }
 
-// ParseUint parses an environment variable into a uint value. If an error is encountered, default is set to 0, and error is logged
-func ParseUint(ctx context.Context, key string) uint {
+// GetUint parses an environment variable into a uint value. If an error is encountered, default is set to 0, and error is logged
+func GetUint(ctx context.Context, key string) uint {
 	log := logging.GetRunIDLogger(ctx)
 	if val, ok := csictx.LookupEnv(ctx, key); ok {
 		i, err := strconv.ParseUint(val, 10, 0)
@@ -68,8 +68,8 @@ func ParseUint(ctx context.Context, key string) uint {
 	return 0
 }
 
-// ParseInt64 parses an environment variable into an int64 value.
-func ParseInt64(ctx context.Context, key string) (int64, error) {
+// GetInt64 parses an environment variable into an int64 value.
+func GetInt64(ctx context.Context, key string) (int64, error) {
 	if val, ok := csictx.LookupEnv(ctx, key); ok {
 		i, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
