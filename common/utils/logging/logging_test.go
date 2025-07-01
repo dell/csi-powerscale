@@ -18,7 +18,13 @@ package logging
 
 import (
 	"context"
+	"reflect"
+	"runtime"
+	"sync"
 	"testing"
+	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 func TestGetMessageWithRunID(t *testing.T) {
@@ -50,4 +56,156 @@ func TestLogMap(_ *testing.T) {
 	ctx := context.Background()
 	m := map[string]string{"key1": "value1", "key2": "value2"}
 	LogMap(ctx, "testMap", m) // Ensure this runs without panic
+}
+
+func TestParseLogLevel(t *testing.T) {
+	type args struct {
+		lvl string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    logrus.Level
+		wantErr bool
+	}{
+		{
+			name: "success",
+			args: args{
+				lvl: "info",
+			},
+			want:    logrus.InfoLevel,
+			wantErr: false,
+		},
+		{
+			name: "fail",
+			args: args{
+				lvl: "test",
+			},
+			want:    logrus.PanicLevel,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseLogLevel(tt.args.lvl)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseLogLevel() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ParseLogLevel() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUpdateLogLevel(t *testing.T) {
+	singletonLog = logrus.New()
+
+	type args struct {
+		lvl logrus.Level
+		mu  *sync.Mutex
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "update log level",
+			args: args{
+				lvl: logrus.ErrorLevel,
+				mu:  &sync.Mutex{},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			UpdateLogLevel(tt.args.lvl, tt.args.mu)
+			if singletonLog.Level != tt.args.lvl {
+				t.Errorf("Expected log level %v, got %v", tt.args.lvl, singletonLog.Level)
+			}
+		})
+	}
+}
+
+func TestGetCurrentLogLevel(t *testing.T) {
+	singletonLog = logrus.New()
+	singletonLog.SetLevel(logrus.InfoLevel)
+
+	tests := []struct {
+		name string
+		want logrus.Level
+	}{
+		{
+			name: "return current log level",
+			want: logrus.InfoLevel,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetCurrentLogLevel(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetCurrentLogLevel() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatter_Format(t *testing.T) {
+	type fields struct {
+		TimestampFormat  string
+		LogFormat        string
+		CallerPrettyfier func(*runtime.Frame) (function string, file string)
+	}
+	type args struct {
+		entry *logrus.Entry
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    []byte
+		wantErr bool
+	}{
+		{
+			name: "has keyed data",
+			fields: fields{
+				TimestampFormat:  "",
+				LogFormat:        "%time%, %lvl%, %stringkey%, %intkey%, %boolkey%, %msg%, %runid%, %clusterName%",
+				CallerPrettyfier: nil,
+			},
+			args: args{
+				entry: &logrus.Entry{
+					Time:    time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+					Level:   logrus.InfoLevel,
+					Message: "some message",
+					Data: logrus.Fields{
+						RunID:       "",
+						ClusterName: "some-cluster",
+						"stringkey": "stringvalue",
+						"intkey":    1,
+						"boolkey":   true,
+					},
+				},
+			},
+			want:    []byte("1970-01-01T00:00:00Z, info, stringvalue, 1, true, some message, runid=, clusterName=some-cluster\n"),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &Formatter{
+				TimestampFormat:  tt.fields.TimestampFormat,
+				LogFormat:        tt.fields.LogFormat,
+				CallerPrettyfier: tt.fields.CallerPrettyfier,
+			}
+			got, err := f.Format(tt.args.entry)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Formatter.Format() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Formatter.Format() = \"%v\", want \"%v\"", string(got), string(tt.want))
+			}
+		})
+	}
 }
