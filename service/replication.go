@@ -750,9 +750,9 @@ func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteI
 	if err != nil {
 		return status.Errorf(codes.Internal, "reprotect: create protection policy on the local site failed %s", err.Error())
 	}
-	err = localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.RUNNING, isi.FINISHED, isi.RUNNING)
+	err = localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.RUNNING, isi.FINISHED)
 	if err != nil {
-		return status.Errorf(codes.Internal, "reprotect: policy job couldn't reach RUNNING state %s", err.Error())
+		return status.Errorf(codes.Internal, "reprotect: policy job did not return one of RUNNING or FINISHED state %s", err.Error())
 	}
 
 	log.Info("Reprotect action completed")
