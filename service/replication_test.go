@@ -654,7 +654,7 @@ func Test_reprotect(t *testing.T) {
 				log:    logrus.NewEntry(logrus.New()),
 			},
 			setMocks: func() {
-				// localTP, err := localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
 				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(
 						errors.New("not found"),
@@ -678,7 +678,7 @@ func Test_reprotect(t *testing.T) {
 				log:    logrus.NewEntry(logrus.New()),
 			},
 			setMocks: func() {
-				// localTP, err := localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
 				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(**v11.TargetPolicies)
@@ -711,7 +711,7 @@ func Test_reprotect(t *testing.T) {
 				log:    logrus.NewEntry(logrus.New()),
 			},
 			setMocks: func() {
-				// localTP, err := localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
 				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(**v11.TargetPolicies)
 					*resp = &v11.TargetPolicies{
@@ -725,7 +725,7 @@ func Test_reprotect(t *testing.T) {
 					}
 				}).Once()
 
-				// remotePolicy, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+				// mocks function: remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 				remoteSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(errors.New("not found")).Once()
 			},
@@ -747,7 +747,7 @@ func Test_reprotect(t *testing.T) {
 				log:    logrus.NewEntry(logrus.New()),
 			},
 			setMocks: func() {
-				// localTP, err := localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
 				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(**v11.TargetPolicies)
 					*resp = &v11.TargetPolicies{
@@ -761,7 +761,7 @@ func Test_reprotect(t *testing.T) {
 					}
 				}).Once()
 
-				// remotePolicy, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+				// mocks function: remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 				remoteSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(**v11.Policies)
 					*resp = &v11.Policies{
@@ -777,7 +777,7 @@ func Test_reprotect(t *testing.T) {
 					}
 				}).Once()
 
-				// err = remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+				// mocks function: remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
 				remoteSvc.client.API.(*mocks.Client).On("Delete", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(errors.New("error: unable to delete policy")).Once()
 			},
@@ -799,7 +799,7 @@ func Test_reprotect(t *testing.T) {
 				log:    logrus.NewEntry(logrus.New()),
 			},
 			setMocks: func() {
-				// localTP, err := localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
 				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(**v11.TargetPolicies)
 					*resp = &v11.TargetPolicies{
@@ -813,7 +813,7 @@ func Test_reprotect(t *testing.T) {
 					}
 				}).Once()
 
-				// remotePolicy, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+				// mocks function: remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 				remoteSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(**v11.Policies)
 					*resp = &v11.Policies{
@@ -829,11 +829,11 @@ func Test_reprotect(t *testing.T) {
 					}
 				}).Once()
 
-				// err = remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+				// mocks function: remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
 				remoteSvc.client.API.(*mocks.Client).On("Delete", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil).Once()
 
-				// err = localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
+				// mocks function: localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
 				localSvc.client.API.(*mocks.Client).On("Post", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(errors.New("error: unable to create policy")).Once()
 			},
@@ -855,7 +855,7 @@ func Test_reprotect(t *testing.T) {
 				log:    logrus.NewEntry(logrus.New()),
 			},
 			setMocks: func() {
-				// localTP, err := localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
 				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(**v11.TargetPolicies)
 					*resp = &v11.TargetPolicies{
@@ -869,7 +869,7 @@ func Test_reprotect(t *testing.T) {
 					}
 				}).Once()
 
-				// remotePolicy, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+				// mocks function: remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 				remoteSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(**v11.Policies)
 					*resp = &v11.Policies{
@@ -885,15 +885,15 @@ func Test_reprotect(t *testing.T) {
 					}
 				}).Once()
 
-				// err = remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+				// mocks function: remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
 				remoteSvc.client.API.(*mocks.Client).On("Delete", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil).Once()
 
-				// err = localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
+				// mocks function: localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
 				localSvc.client.API.(*mocks.Client).On("Post", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil).Once()
 
-				// err = localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.RUNNING)
+				// mocks function: localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.RUNNING)
 				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(errors.New("error: failed to get policy")).Once()
 			},
@@ -915,7 +915,7 @@ func Test_reprotect(t *testing.T) {
 				log:    logrus.NewEntry(logrus.New()),
 			},
 			setMocks: func() {
-				// localTP, err := localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
 				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(**v11.TargetPolicies)
 					*resp = &v11.TargetPolicies{
@@ -929,7 +929,7 @@ func Test_reprotect(t *testing.T) {
 					}
 				}).Once()
 
-				// remotePolicy, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+				// mocks function: remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 				remoteSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(**v11.Policies)
 					*resp = &v11.Policies{
@@ -945,15 +945,15 @@ func Test_reprotect(t *testing.T) {
 					}
 				}).Once()
 
-				// err = remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+				// mocks function: remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
 				remoteSvc.client.API.(*mocks.Client).On("Delete", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil).Once()
 
-				// err = localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
+				// mocks function: localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
 				localSvc.client.API.(*mocks.Client).On("Post", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil).Once()
 
-				// err = localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.RUNNING)
+				// mocks function: localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.RUNNING)
 				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(**v11.Policies)
 					*resp = &v11.Policies{
