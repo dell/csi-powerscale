@@ -17,7 +17,8 @@ package provider
 */
 
 import (
-	"github.com/dell/csi-isilon/v2/common/utils"
+	"github.com/dell/csi-isilon/v2/common/utils/logging"
+	csiutils "github.com/dell/csi-isilon/v2/csi-utils"
 	"github.com/dell/csi-isilon/v2/service"
 	"github.com/dell/csi-isilon/v2/service/interceptor"
 	"github.com/dell/gocsi"
@@ -26,14 +27,14 @@ import (
 
 // New returns a new Storage Plug-in Provider.
 func New() gocsi.StoragePluginProvider {
-	log := utils.GetLogger()
+	log := logging.GetLogger()
 
 	// TODO during the test, for some reason, when the controller & node pods start,
 	// the sock files always exist right from the beginning, even if you manually
 	// remove them prior to using helm to install the csi driver. Need to find out why.
 	// For the time being, manually remove the sock files right at the beginning to
 	// avoid the "...address is in use..." error
-	if err := utils.RemoveExistingCSISockFile(); err != nil {
+	if err := csiutils.RemoveExistingCSISockFile(); err != nil {
 		log.Error("failed to call utils.RemoveExistingCSISockFile")
 	}
 	// Get the MaxConcurrentStreams server option and configure it.

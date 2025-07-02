@@ -19,8 +19,13 @@ package csiutils
 import (
 	"fmt"
 	"net"
+	"os"
 
-	"github.com/dell/csi-isilon/v2/common/utils"
+	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/dell/csi-isilon/v2/common/utils/logging"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var interfaceAddrs = func() ([]net.Addr, error) {
@@ -31,10 +36,42 @@ var parseCIDR = func(s string) (net.IP, *net.IPNet, error) {
 	return net.ParseCIDR(s)
 }
 
+// RemoveExistingCSISockFile When the sock file that the gRPC server is going to be listening on already exists, error will be thrown saying the address is already in use, thus remove it first
+var RemoveExistingCSISockFile = func() error {
+	log := logging.GetLogger()
+	protoAddr := os.Getenv(constants.EnvCSIEndpoint)
+
+	log.Debugf("check if sock file '%s' has already been created", protoAddr)
+
+	if protoAddr == "" {
+		return nil
+	}
+
+	if _, err := os.Stat(protoAddr); !os.IsNotExist(err) {
+
+		log.Debugf("sock file '%s' already exists, remove it", protoAddr)
+
+		if err := os.RemoveAll(protoAddr); err != nil {
+
+			log.WithError(err).Debugf("error removing sock file '%s'", protoAddr)
+
+			return fmt.Errorf(
+				"failed to remove sock file: '%s', error '%v'", protoAddr, err)
+		}
+
+		log.Debugf("sock file '%s' removed", protoAddr)
+
+	} else {
+		log.Debugf("sock file '%s' does not exist yet, move along", protoAddr)
+	}
+
+	return nil
+}
+
 // GetNFSClientIP is used to fetch IP address from networks on which NFS traffic is allowed
 func GetNFSClientIP(allowedNetworks []string) (string, error) {
 	var nodeIP string
-	log := utils.GetLogger()
+	log := logging.GetLogger()
 	addrs, err := interfaceAddrs()
 	if err != nil {
 		log.Errorf("Encountered error while fetching system IP addresses: %+v\n", err.Error())
@@ -73,4 +110,26 @@ func GetNFSClientIP(allowedNetworks []string) (string, error) {
 	}
 
 	return nodeIP, nil
+}
+
+// GetAccessMode extracts the access mode from the given *csi.ControllerPublishVolumeRequest instance
+func GetAccessMode(req *csi.ControllerPublishVolumeRequest) (*csi.VolumeCapability_AccessMode_Mode, error) {
+	vc := req.GetVolumeCapability()
+	if vc == nil {
+		return nil, status.Error(codes.InvalidArgument,
+			"volume capability is required")
+	}
+
+	am := vc.GetAccessMode()
+	if am == nil {
+		return nil, status.Error(codes.InvalidArgument,
+			"access mode is required")
+	}
+
+	if am.Mode == csi.VolumeCapability_AccessMode_UNKNOWN {
+		return nil, status.Error(codes.InvalidArgument,
+			"unknown access mode")
+	}
+
+	return &(am.Mode), nil
 }

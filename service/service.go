@@ -37,7 +37,9 @@ import (
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/v2/common/constants"
-	"github.com/dell/csi-isilon/v2/common/utils"
+	fromctx "github.com/dell/csi-isilon/v2/common/utils/fromcontext"
+	id "github.com/dell/csi-isilon/v2/common/utils/identifiers"
+	"github.com/dell/csi-isilon/v2/common/utils/logging"
 	"github.com/dell/csi-isilon/v2/core"
 	commonext "github.com/dell/dell-csi-extensions/common"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
@@ -154,7 +156,7 @@ func New() Service {
 }
 
 func (s *service) initializeServiceOpts(ctx context.Context) error {
-	log := utils.GetLogger()
+	log := logging.GetLogger()
 	// Get the SP's operating mode.
 	s.mode = csictx.Getenv(ctx, gocsi.EnvVarMode)
 
@@ -217,28 +219,28 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 	if replicationPrefix, ok := csictx.LookupEnv(ctx, constants.EnvReplicationPrefix); ok {
 		opts.replicationPrefix = replicationPrefix
 	}
-	if MaxVolumesPerNode, err := utils.ParseInt64FromContext(ctx, constants.EnvMaxVolumesPerNode); err != nil {
+	if MaxVolumesPerNode, err := fromctx.GetInt64(ctx, constants.EnvMaxVolumesPerNode); err != nil {
 		log.Warnf("error while parsing env variable '%s', %s, defaulting to 0", constants.EnvMaxVolumesPerNode, err)
 		opts.MaxVolumesPerNode = 0
 	} else {
 		opts.MaxVolumesPerNode = MaxVolumesPerNode
 	}
 
-	allowedNetworks, err := utils.ParseArrayFromContext(ctx, constants.EnvAllowedNetworks)
+	allowedNetworks, err := fromctx.GetArray(ctx, constants.EnvAllowedNetworks)
 	if err != nil {
 		log.Errorf("error while parsing allowedNetworks, %v", err)
 		return err
 	}
 	opts.allowedNetworks = allowedNetworks
 
-	opts.QuotaEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvQuotaEnabled)
-	opts.SkipCertificateValidation = utils.ParseBooleanFromContext(ctx, constants.EnvSkipCertificateValidation)
-	opts.isiAuthType = uint8(utils.ParseUintFromContext(ctx, constants.EnvIsiAuthType)) // #nosec G115 -- This is a false positive
-	opts.AutoProbe = utils.ParseBooleanFromContext(ctx, constants.EnvAutoProbe)
-	opts.Verbose = utils.ParseUintFromContext(ctx, constants.EnvVerbose)
-	opts.CustomTopologyEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvCustomTopologyEnabled)
-	opts.IsHealthMonitorEnabled = utils.ParseBooleanFromContext(ctx, constants.EnvIsHealthMonitorEnabled)
-	opts.IgnoreUnresolvableHosts = utils.ParseBooleanFromContext(ctx, constants.EnvIgnoreUnresolvableHosts)
+	opts.QuotaEnabled = fromctx.GetBoolean(ctx, constants.EnvQuotaEnabled)
+	opts.SkipCertificateValidation = fromctx.GetBoolean(ctx, constants.EnvSkipCertificateValidation)
+	opts.isiAuthType = uint8(fromctx.GetUint(ctx, constants.EnvIsiAuthType)) // #nosec G115 -- This is a false positive
+	opts.AutoProbe = fromctx.GetBoolean(ctx, constants.EnvAutoProbe)
+	opts.Verbose = fromctx.GetUint(ctx, constants.EnvVerbose)
+	opts.CustomTopologyEnabled = fromctx.GetBoolean(ctx, constants.EnvCustomTopologyEnabled)
+	opts.IsHealthMonitorEnabled = fromctx.GetBoolean(ctx, constants.EnvIsHealthMonitorEnabled)
+	opts.IgnoreUnresolvableHosts = fromctx.GetBoolean(ctx, constants.EnvIgnoreUnresolvableHosts)
 
 	s.opts = opts
 
@@ -292,7 +294,7 @@ func (s *service) ValidateDeleteVolumeRequest(ctx context.Context,
 			"no volume id is provided by the DeleteVolumeRequest instance")
 	}
 
-	_, _, _, _, err := utils.ParseNormalizedVolumeID(ctx, req.GetVolumeId())
+	_, _, _, _, err := id.ParseNormalizedVolumeID(ctx, req.GetVolumeId())
 	if err != nil {
 		return status.Error(codes.InvalidArgument, fmt.Sprintf("failed to parse volume ID '%s', error : '%v'", req.GetVolumeId(), err))
 	}
@@ -364,7 +366,7 @@ func (s *service) probeOnStart(ctx context.Context) error {
 
 func (s *service) setNoProbeOnStart(ctx context.Context) {
 	ctx, log := GetLogger(ctx)
-	if utils.ParseBooleanFromContext(ctx, constants.EnvNoProbeOnStart) {
+	if fromctx.GetBoolean(ctx, constants.EnvNoProbeOnStart) {
 		log.Debug("X_CSI_ISI_NO_PROBE_ON_START is true, set noProbeOnStart to true")
 		noProbeOnStart = true
 		return
@@ -508,7 +510,7 @@ func (s *service) logServiceStats() {
 func (s *service) BeforeServe(
 	ctx context.Context, _ *gocsi.StoragePlugin, _ net.Listener,
 ) error {
-	log := utils.GetLogger()
+	log := logging.GetLogger()
 
 	if err := s.initializeServiceOpts(ctx); err != nil {
 		return err
@@ -663,8 +665,8 @@ func unmarshalYAMLContent(configBytes []byte) (*IsilonClusters, error) {
 func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (map[interface{}]interface{}, string, error) {
 	var noOfDefaultClusters int
 	var defaultIsiClusterName string
-	logLevel := utils.GetCurrentLogLevel()
-	log := utils.GetLogger()
+	logLevel := logging.GetCurrentLogLevel()
+	log := logging.GetLogger()
 
 	var inputConfigs *IsilonClusters
 	var yamlErr error
@@ -809,20 +811,20 @@ func (s *service) getIsilonClusters() []*IsilonClusterConfig {
 
 // Update configurable params from configmap
 func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) error {
-	log := utils.GetLogger()
+	log := logging.GetLogger()
 	logLevel := constants.DefaultLogLevel
 	if v.IsSet(constants.ParamCSILogLevel) {
 		inputLogLevel := v.GetString(constants.ParamCSILogLevel)
 		if inputLogLevel != "" {
 			inputLogLevel = strings.ToLower(inputLogLevel)
 			var err error
-			logLevel, err = utils.ParseLogLevel(inputLogLevel)
+			logLevel, err = logging.ParseLogLevel(inputLogLevel)
 			if err != nil {
 				return fmt.Errorf("input log level %q is not valid", inputLogLevel)
 			}
 		}
 	}
-	utils.UpdateLogLevel(logLevel, &updateMutex)
+	logging.UpdateLogLevel(logLevel, &updateMutex)
 	log.Infof("log level set to '%s'", logLevel)
 
 	err := s.syncIsilonConfigs(ctx)
@@ -893,12 +895,12 @@ func (s *service) getIsiPathForVolumeFromClusterConfig(clusterConfig *IsilonClus
 
 // Set cluster name in log messages and re-initialize the context
 func setClusterContext(ctx context.Context, clusterName string) (context.Context, *logrus.Entry) {
-	return setLogFieldsInContext(ctx, clusterName, utils.ClusterName)
+	return setLogFieldsInContext(ctx, clusterName, logging.ClusterName)
 }
 
 // Set runID in log messages and re-initialize the context
 func setRunIDContext(ctx context.Context, runID string) (context.Context, *logrus.Entry) {
-	return setLogFieldsInContext(ctx, runID, utils.RunID)
+	return setLogFieldsInContext(ctx, runID, logging.RunID)
 }
 
 var logMutex sync.Mutex
@@ -909,7 +911,7 @@ func setLogFieldsInContext(ctx context.Context, logParam string, logType string)
 	defer logMutex.Unlock()
 
 	fields := logrus.Fields{}
-	fields, ok := ctx.Value(utils.LogFields).(logrus.Fields)
+	fields, ok := ctx.Value(logging.LogFields).(logrus.Fields)
 	if !ok {
 		fields = logrus.Fields{}
 	}
@@ -917,13 +919,13 @@ func setLogFieldsInContext(ctx context.Context, logParam string, logType string)
 		fields = logrus.Fields{}
 	}
 	fields[logType] = logParam
-	ulog, ok := ctx.Value(utils.PowerScaleLogger).(*logrus.Entry)
+	ulog, ok := ctx.Value(logging.PowerScaleLogger).(*logrus.Entry)
 	if !ok {
-		ulog = utils.GetLogger().WithFields(fields)
+		ulog = logging.GetLogger().WithFields(fields)
 	}
 	ulog = ulog.WithFields(fields)
-	ctx = context.WithValue(ctx, utils.PowerScaleLogger, ulog)
-	ctx = context.WithValue(ctx, utils.LogFields, fields)
+	ctx = context.WithValue(ctx, logging.PowerScaleLogger, ulog)
+	ctx = context.WithValue(ctx, logging.LogFields, fields)
 	return ctx, ulog
 }
 
@@ -932,7 +934,7 @@ func GetLogger(ctx context.Context) (context.Context, *logrus.Entry) {
 	var rid string
 	fields := logrus.Fields{}
 	if ctx == nil {
-		return ctx, utils.GetLogger().WithFields(fields)
+		return ctx, logging.GetLogger().WithFields(fields)
 	}
 
 	headers, ok := metadata.FromIncomingContext(ctx)
@@ -943,21 +945,21 @@ func GetLogger(ctx context.Context) (context.Context, *logrus.Entry) {
 		}
 	}
 
-	fields, _ = ctx.Value(utils.LogFields).(logrus.Fields)
+	fields, _ = ctx.Value(logging.LogFields).(logrus.Fields)
 	if fields == nil {
 		fields = logrus.Fields{}
 	}
 
 	if ok {
-		fields[utils.RequestID] = rid
+		fields[logging.RequestID] = rid
 	}
 
 	logMutex.Lock()
 	defer logMutex.Unlock()
-	l := utils.GetLogger()
+	l := logging.GetLogger()
 	logWithFields := l.WithFields(fields)
-	ctx = context.WithValue(ctx, utils.PowerScaleLogger, logWithFields)
-	ctx = context.WithValue(ctx, utils.LogFields, fields)
+	ctx = context.WithValue(ctx, logging.PowerScaleLogger, logWithFields)
+	ctx = context.WithValue(ctx, logging.LogFields, fields)
 	return ctx, logWithFields
 }
 
@@ -966,7 +968,7 @@ func GetRunIDLog(ctx context.Context) (context.Context, *logrus.Entry, string) {
 	var rid string
 	fields := logrus.Fields{}
 	if ctx == nil {
-		return ctx, utils.GetLogger().WithFields(fields), rid
+		return ctx, logging.GetLogger().WithFields(fields), rid
 	}
 
 	headers, ok := metadata.FromIncomingContext(ctx)
@@ -980,21 +982,21 @@ func GetRunIDLog(ctx context.Context) (context.Context, *logrus.Entry, string) {
 		}
 	}
 
-	fields, _ = ctx.Value(utils.LogFields).(logrus.Fields)
+	fields, _ = ctx.Value(logging.LogFields).(logrus.Fields)
 	if fields == nil {
 		fields = logrus.Fields{}
 	}
 
 	if ok {
-		fields[utils.RunID] = rid
+		fields[logging.RunID] = rid
 	}
 
 	logMutex.Lock()
 	defer logMutex.Unlock()
-	l := utils.GetLogger()
+	l := logging.GetLogger()
 	log := l.WithFields(fields)
-	ctx = context.WithValue(ctx, utils.PowerScaleLogger, log)
-	ctx = context.WithValue(ctx, utils.LogFields, fields)
+	ctx = context.WithValue(ctx, logging.PowerScaleLogger, log)
+	ctx = context.WithValue(ctx, logging.LogFields, fields)
 	return ctx, log, rid
 }
 
@@ -1018,7 +1020,7 @@ func (s *service) getIsilonConfig(ctx context.Context, clusterName *string) (*Is
 }
 
 func (s *service) GetNodeLabels() (map[string]string, error) {
-	log := utils.GetLogger()
+	log := logging.GetLogger()
 	k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
 	if err != nil {
 		log.Errorf("init client failed: '%s'", err.Error())

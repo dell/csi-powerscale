@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dell/csi-isilon/v2/common/utils"
+	id "github.com/dell/csi-isilon/v2/common/utils/identifiers"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 )
 
@@ -76,7 +76,7 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 			if clients != nil {
 				for _, c := range clients.ClientsList {
 					if c.Protocol == "nfs3" || c.Protocol == "nfs4" {
-						_, _, clientIP, _ := utils.ParseNodeID(ctx, req.GetNodeId())
+						_, _, clientIP, _ := id.ParseNodeID(ctx, req.GetNodeId())
 						if clientIP == c.RemoteAddr {
 							rep.IosInProgress = true
 						}
@@ -96,7 +96,7 @@ func (s *service) getArrayIDsFromVolumes(ctx context.Context, systemIDs map[stri
 	var foundAtLeastOne bool
 	for _, volumeID := range requestVolumeIDs {
 		// Extract clusterName from the volume ID (if any volumes in the request)
-		if _, _, _, systemID, err = utils.ParseNormalizedVolumeID(ctx, volumeID); err != nil {
+		if _, _, _, systemID, err = id.ParseNormalizedVolumeID(ctx, volumeID); err != nil {
 			log.Warnf("Error getting Cluster Name for %s - %s", volumeID, err.Error())
 		}
 		if systemID != "" {
@@ -120,7 +120,7 @@ func (s *service) checkIfNodeIsConnected(ctx context.Context, arrayID string, no
 	var message string
 	rep.Connected = false
 
-	_, _, nodeIP, err := utils.ParseNodeID(ctx, nodeID)
+	_, _, nodeIP, err := id.ParseNodeID(ctx, nodeID)
 	if err != nil {
 		log.Errorf("failed to parse node ID '%s'", nodeID)
 		return fmt.Errorf("failed to parse node ID")
