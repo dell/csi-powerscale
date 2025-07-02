@@ -21,7 +21,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/dell/csi-isilon/v2/common/utils"
+	csiutils "github.com/dell/csi-isilon/v2/csi-utils"
 	"github.com/dell/gocsi"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -60,7 +60,7 @@ func TestNew(t *testing.T) {
 	assert.Len(t, plugin.EnvVars, 2)
 
 	// Test case: Removing existing CSI sock file succeeds
-	utils.RemoveExistingCSISockFile = func() error {
+	csiutils.RemoveExistingCSISockFile = func() error {
 		return errors.New("failed to remove existing CSI sock file")
 	}
 

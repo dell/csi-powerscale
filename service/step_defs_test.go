@@ -29,7 +29,8 @@ import (
 	"time"
 
 	"github.com/dell/csi-isilon/v2/common/constants"
-	"github.com/dell/csi-isilon/v2/common/utils"
+	ident "github.com/dell/csi-isilon/v2/common/utils/identifiers"
+	"github.com/dell/csi-isilon/v2/common/utils/logging"
 	"github.com/dell/csi-isilon/v2/service/mock/k8s"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"google.golang.org/grpc"
@@ -1716,7 +1717,7 @@ func (f *feature) getNodePublishVolumeRequestwithVolumeNameandPath(volName strin
 
 func (f *feature) getNodePublishVolumeRequestwithVolumeName(volName string) error {
 	req := new(csi.NodePublishVolumeRequest)
-	req.VolumeId, _, _, _, _ = utils.ParseNormalizedVolumeID(context.Background(), volName)
+	req.VolumeId, _, _, _, _ = ident.ParseNormalizedVolumeID(context.Background(), volName)
 
 	req.Readonly = false
 	req.VolumeCapability = f.capability
@@ -3412,7 +3413,7 @@ func (f *feature) iCallProbeController() error {
 }
 
 func (f *feature) iCallDynamicLogChange(file string) error {
-	log.Printf("level before change: %s", utils.GetCurrentLogLevel())
+	log.Printf("level before change: %s", logging.GetCurrentLogLevel())
 	DriverConfigParamsFile = "mock/loglevel/" + file
 	log.Printf("wait for config change %s", DriverConfigParamsFile)
 	f.iCallBeforeServe()
@@ -3421,9 +3422,9 @@ func (f *feature) iCallDynamicLogChange(file string) error {
 }
 
 func (f *feature) aValidDynamicLogChangeOccurs(_, expectedLevel string) error {
-	log.Printf("level after change: %s", utils.GetCurrentLogLevel())
-	if utils.GetCurrentLogLevel().String() != expectedLevel {
-		err := fmt.Errorf("level was expected to be %s, but was %s instead", expectedLevel, utils.GetCurrentLogLevel().String())
+	log.Printf("level after change: %s", logging.GetCurrentLogLevel())
+	if logging.GetCurrentLogLevel().String() != expectedLevel {
+		err := fmt.Errorf("level was expected to be %s, but was %s instead", expectedLevel, logging.GetCurrentLogLevel().String())
 		return err
 	}
 	log.Printf("Reverting log changes made")

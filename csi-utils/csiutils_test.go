@@ -19,7 +19,14 @@ package csiutils
 import (
 	"errors"
 	"net"
+	"os"
 	"testing"
+
+	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestGetNFSClientIP(t *testing.T) {
@@ -120,6 +127,110 @@ func TestGetNFSClientIP(t *testing.T) {
 					t.Fatalf("Unexpected error: %v", err)
 				}
 				t.Logf("Detected IP: %s", ip)
+			}
+		})
+	}
+}
+
+func TestGetAccessMode(t *testing.T) {
+	// Case 1: Valid access mode
+	req := &csi.ControllerPublishVolumeRequest{
+		VolumeCapability: &csi.VolumeCapability{
+			AccessMode: &csi.VolumeCapability_AccessMode{
+				Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+			},
+		},
+	}
+	mode, err := GetAccessMode(req)
+	assert.NoError(t, err)
+	assert.NotNil(t, mode)
+	assert.Equal(t, csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER, *mode)
+
+	// Case 2: Nil VolumeCapability
+	req = &csi.ControllerPublishVolumeRequest{
+		VolumeCapability: nil,
+	}
+	mode, err = GetAccessMode(req)
+	assert.Nil(t, mode)
+	assert.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), "volume capability is required")
+
+	// Case 3: Nil AccessMode
+	req = &csi.ControllerPublishVolumeRequest{
+		VolumeCapability: &csi.VolumeCapability{
+			AccessMode: nil,
+		},
+	}
+	mode, err = GetAccessMode(req)
+	assert.Nil(t, mode)
+	assert.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), "access mode is required")
+
+	// Case 4: Unknown AccessMode
+	req = &csi.ControllerPublishVolumeRequest{
+		VolumeCapability: &csi.VolumeCapability{
+			AccessMode: &csi.VolumeCapability_AccessMode{
+				Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
+			},
+		},
+	}
+	mode, err = GetAccessMode(req)
+	assert.Nil(t, mode)
+	assert.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), "unknown access mode")
+}
+
+func TestRemoveExistingCSISockFile(t *testing.T) {
+	const testSockFile = "/tmp/test.sock"
+
+	tests := []struct {
+		name  string
+		setup func()
+		want  error
+	}{
+		{
+			name: "remove the sock file",
+			setup: func() {
+				// set necessary env vars and queue for cleanup after the test run
+				os.Setenv(constants.EnvCSIEndpoint, testSockFile)
+				t.Cleanup(func() { os.Unsetenv(constants.EnvCSIEndpoint) })
+
+				// Create a test socket file
+				file, err := os.Create(testSockFile)
+				if err != nil {
+					t.Fatalf("Failed to create test socket file: %v", err)
+					return
+				}
+				t.Cleanup(func() {
+					file.Close()
+					os.Remove(testSockFile)
+				})
+			},
+			want: nil,
+		},
+		{
+			name: "sock file does not exist",
+			setup: func() {
+				// set necessary env vars
+				os.Setenv(constants.EnvCSIEndpoint, testSockFile)
+				t.Cleanup(func() { os.Unsetenv(constants.EnvCSIEndpoint) })
+			},
+			want: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup()
+			}
+
+			err := RemoveExistingCSISockFile()
+			if err != tt.want {
+				t.Errorf("RemoveExistingCSISockFile() error = %v, wantErr %v", err, tt.want)
 			}
 		})
 	}
