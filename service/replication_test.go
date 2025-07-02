@@ -900,7 +900,7 @@ func Test_reprotect(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "success",
+			name: "success when policy last job state is RUNNING",
 			args: args{
 				ctx: context.Background(),
 				localIsiConfig: &IsilonClusterConfig{
@@ -965,6 +965,79 @@ func Test_reprotect(t *testing.T) {
 								TargetPath:   "target-path",
 								SourcePath:   "source-path",
 								LastJobState: isi.RUNNING,
+							},
+						},
+					}
+				})
+			},
+			wantErr: false,
+		},
+		{
+			name: "success when policy last job state is FINISHED",
+			args: args{
+				ctx: context.Background(),
+				localIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  localSvc,
+				},
+				remoteIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  remoteSvc,
+				},
+				vgName: "csi-vg-test",
+				log:    logrus.NewEntry(logrus.New()),
+			},
+			setMocks: func() {
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.TargetPolicies)
+					*resp = &v11.TargetPolicies{
+						Policy: []v11.TargetPolicy{
+							{
+								ID:                    "test-id",
+								Name:                  "test-name",
+								FailoverFailbackState: isi.WritesEnabled,
+							},
+						},
+					}
+				}).Once()
+
+				// mocks function: remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+				remoteSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.Policies)
+					*resp = &v11.Policies{
+						Policy: []v11.Policy{
+							{
+								ID:         "test-id",
+								Name:       "test-name",
+								JobDelay:   5,
+								TargetPath: "target-path",
+								SourcePath: "source-path",
+							},
+						},
+					}
+				}).Once()
+
+				// mocks function: remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+				remoteSvc.client.API.(*mocks.Client).On("Delete", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil).Once()
+
+				// mocks function: localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
+				localSvc.client.API.(*mocks.Client).On("Post", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil).Once()
+
+				// mocks function: localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.RUNNING)
+				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.Policies)
+					*resp = &v11.Policies{
+						Policy: []v11.Policy{
+							{
+								ID:           "test-id",
+								Name:         "test-name",
+								JobDelay:     5,
+								TargetPath:   "target-path",
+								SourcePath:   "source-path",
+								LastJobState: isi.FINISHED,
 							},
 						},
 					}
