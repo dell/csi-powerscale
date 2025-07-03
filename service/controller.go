@@ -1209,7 +1209,7 @@ func (s *service) ControllerPublishVolume(
 	ctx, log, runID := GetRunIDLog(ctx)
 	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
-
+	export, err := isiConfig.isiSvc.GetExportsCountAttachedToNode(ctx, node_ip)
 	volumeContext := req.GetVolumeContext()
 	if volumeContext != nil {
 		log.Printf("VolumeContext:")
