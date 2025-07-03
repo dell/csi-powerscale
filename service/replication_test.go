@@ -25,6 +25,7 @@ import (
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	isi "github.com/dell/goisilon"
 	v11 "github.com/dell/goisilon/api/v11"
+	"github.com/dell/goisilon/mocks"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -604,6 +605,453 @@ func Test_getGroupLinkState(t *testing.T) {
 
 			if got := getGroupLinkState(isiLocalp, isiLocalTP, isiRemoteP, isiRemoteTP, false); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("getGroupLinkState returned state: %v, expected state to be: %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_reprotect(t *testing.T) {
+	// Create a new instance of the isiService struct
+	localSvc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: &mocks.Client{},
+		},
+	}
+	remoteSvc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: &mocks.Client{},
+		},
+	}
+
+	type args struct {
+		ctx             context.Context
+		localIsiConfig  *IsilonClusterConfig
+		remoteIsiConfig *IsilonClusterConfig
+		vgName          string
+		log             *logrus.Entry
+	}
+	tests := []struct {
+		name     string
+		args     args
+		setMocks func()
+		wantErr  bool
+	}{
+		{
+			name: "cannot get local target policy",
+			args: args{
+				ctx: context.Background(),
+				localIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  localSvc,
+				},
+				remoteIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  remoteSvc,
+				},
+				vgName: "csi-vg-test",
+				log:    logrus.NewEntry(logrus.New()),
+			},
+			setMocks: func() {
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(
+						errors.New("not found"),
+					).Once()
+			},
+			wantErr: true,
+		},
+		{
+			name: "local target policy is not write-enabled",
+			args: args{
+				ctx: context.Background(),
+				localIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  localSvc,
+				},
+				remoteIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  remoteSvc,
+				},
+				vgName: "csi-vg-test",
+				log:    logrus.NewEntry(logrus.New()),
+			},
+			setMocks: func() {
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.TargetPolicies)
+					*resp = &v11.TargetPolicies{
+						Policy: []v11.TargetPolicy{
+							{
+								ID:                    "test-id",
+								Name:                  "test-name",
+								FailoverFailbackState: isi.WritesDisabled,
+							},
+						},
+					}
+				}).Once()
+			},
+			wantErr: true,
+		},
+		{
+			name: "cannot get remote SyncIQ policy",
+			args: args{
+				ctx: context.Background(),
+				localIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  localSvc,
+				},
+				remoteIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  remoteSvc,
+				},
+				vgName: "csi-vg-test",
+				log:    logrus.NewEntry(logrus.New()),
+			},
+			setMocks: func() {
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.TargetPolicies)
+					*resp = &v11.TargetPolicies{
+						Policy: []v11.TargetPolicy{
+							{
+								ID:                    "test-id",
+								Name:                  "test-name",
+								FailoverFailbackState: isi.WritesEnabled,
+							},
+						},
+					}
+				}).Once()
+
+				// mocks function: remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+				remoteSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(errors.New("not found")).Once()
+			},
+			wantErr: true,
+		},
+		{
+			name: "fail to delete remote SyncIQ policy",
+			args: args{
+				ctx: context.Background(),
+				localIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  localSvc,
+				},
+				remoteIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  remoteSvc,
+				},
+				vgName: "csi-vg-test",
+				log:    logrus.NewEntry(logrus.New()),
+			},
+			setMocks: func() {
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.TargetPolicies)
+					*resp = &v11.TargetPolicies{
+						Policy: []v11.TargetPolicy{
+							{
+								ID:                    "test-id",
+								Name:                  "test-name",
+								FailoverFailbackState: isi.WritesEnabled,
+							},
+						},
+					}
+				}).Once()
+
+				// mocks function: remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+				remoteSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.Policies)
+					*resp = &v11.Policies{
+						Policy: []v11.Policy{
+							{
+								ID:         "test-id",
+								Name:       "test-name",
+								JobDelay:   5,
+								TargetPath: "target-path",
+								SourcePath: "source-path",
+							},
+						},
+					}
+				}).Once()
+
+				// mocks function: remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+				remoteSvc.client.API.(*mocks.Client).On("Delete", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(errors.New("error: unable to delete policy")).Once()
+			},
+			wantErr: true,
+		},
+		{
+			name: "fail to create new local SyncIQ policy",
+			args: args{
+				ctx: context.Background(),
+				localIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  localSvc,
+				},
+				remoteIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  remoteSvc,
+				},
+				vgName: "csi-vg-test",
+				log:    logrus.NewEntry(logrus.New()),
+			},
+			setMocks: func() {
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.TargetPolicies)
+					*resp = &v11.TargetPolicies{
+						Policy: []v11.TargetPolicy{
+							{
+								ID:                    "test-id",
+								Name:                  "test-name",
+								FailoverFailbackState: isi.WritesEnabled,
+							},
+						},
+					}
+				}).Once()
+
+				// mocks function: remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+				remoteSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.Policies)
+					*resp = &v11.Policies{
+						Policy: []v11.Policy{
+							{
+								ID:         "test-id",
+								Name:       "test-name",
+								JobDelay:   5,
+								TargetPath: "target-path",
+								SourcePath: "source-path",
+							},
+						},
+					}
+				}).Once()
+
+				// mocks function: remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+				remoteSvc.client.API.(*mocks.Client).On("Delete", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil).Once()
+
+				// mocks function: localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
+				localSvc.client.API.(*mocks.Client).On("Post", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(errors.New("error: unable to create policy")).Once()
+			},
+			wantErr: true,
+		},
+		{
+			name: "fail to get initial sync status",
+			args: args{
+				ctx: context.Background(),
+				localIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  localSvc,
+				},
+				remoteIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  remoteSvc,
+				},
+				vgName: "csi-vg-test",
+				log:    logrus.NewEntry(logrus.New()),
+			},
+			setMocks: func() {
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.TargetPolicies)
+					*resp = &v11.TargetPolicies{
+						Policy: []v11.TargetPolicy{
+							{
+								ID:                    "test-id",
+								Name:                  "test-name",
+								FailoverFailbackState: isi.WritesEnabled,
+							},
+						},
+					}
+				}).Once()
+
+				// mocks function: remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+				remoteSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.Policies)
+					*resp = &v11.Policies{
+						Policy: []v11.Policy{
+							{
+								ID:         "test-id",
+								Name:       "test-name",
+								JobDelay:   5,
+								TargetPath: "target-path",
+								SourcePath: "source-path",
+							},
+						},
+					}
+				}).Once()
+
+				// mocks function: remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+				remoteSvc.client.API.(*mocks.Client).On("Delete", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil).Once()
+
+				// mocks function: localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
+				localSvc.client.API.(*mocks.Client).On("Post", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil).Once()
+
+				// mocks function: localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.RUNNING)
+				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(errors.New("error: failed to get policy")).Once()
+			},
+			wantErr: true,
+		},
+		{
+			name: "success when policy last job state is RUNNING",
+			args: args{
+				ctx: context.Background(),
+				localIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  localSvc,
+				},
+				remoteIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  remoteSvc,
+				},
+				vgName: "csi-vg-test",
+				log:    logrus.NewEntry(logrus.New()),
+			},
+			setMocks: func() {
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.TargetPolicies)
+					*resp = &v11.TargetPolicies{
+						Policy: []v11.TargetPolicy{
+							{
+								ID:                    "test-id",
+								Name:                  "test-name",
+								FailoverFailbackState: isi.WritesEnabled,
+							},
+						},
+					}
+				}).Once()
+
+				// mocks function: remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+				remoteSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.Policies)
+					*resp = &v11.Policies{
+						Policy: []v11.Policy{
+							{
+								ID:         "test-id",
+								Name:       "test-name",
+								JobDelay:   5,
+								TargetPath: "target-path",
+								SourcePath: "source-path",
+							},
+						},
+					}
+				}).Once()
+
+				// mocks function: remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+				remoteSvc.client.API.(*mocks.Client).On("Delete", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil).Once()
+
+				// mocks function: localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
+				localSvc.client.API.(*mocks.Client).On("Post", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil).Once()
+
+				// mocks function: localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.RUNNING)
+				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.Policies)
+					*resp = &v11.Policies{
+						Policy: []v11.Policy{
+							{
+								ID:           "test-id",
+								Name:         "test-name",
+								JobDelay:     5,
+								TargetPath:   "target-path",
+								SourcePath:   "source-path",
+								LastJobState: isi.RUNNING,
+							},
+						},
+					}
+				})
+			},
+			wantErr: false,
+		},
+		{
+			name: "success when policy last job state is FINISHED",
+			args: args{
+				ctx: context.Background(),
+				localIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  localSvc,
+				},
+				remoteIsiConfig: &IsilonClusterConfig{
+					IsiPath: "/ifs/data",
+					isiSvc:  remoteSvc,
+				},
+				vgName: "csi-vg-test",
+				log:    logrus.NewEntry(logrus.New()),
+			},
+			setMocks: func() {
+				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
+				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/target/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.TargetPolicies)
+					*resp = &v11.TargetPolicies{
+						Policy: []v11.TargetPolicy{
+							{
+								ID:                    "test-id",
+								Name:                  "test-name",
+								FailoverFailbackState: isi.WritesEnabled,
+							},
+						},
+					}
+				}).Once()
+
+				// mocks function: remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
+				remoteSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.Policies)
+					*resp = &v11.Policies{
+						Policy: []v11.Policy{
+							{
+								ID:         "test-id",
+								Name:       "test-name",
+								JobDelay:   5,
+								TargetPath: "target-path",
+								SourcePath: "source-path",
+							},
+						},
+					}
+				}).Once()
+
+				// mocks function: remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
+				remoteSvc.client.API.(*mocks.Client).On("Delete", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil).Once()
+
+				// mocks function: localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
+				localSvc.client.API.(*mocks.Client).On("Post", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil).Once()
+
+				// mocks function: localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.RUNNING)
+				localSvc.client.API.(*mocks.Client).On("Get", mock.Anything, "/platform/11/sync/policies/", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**v11.Policies)
+					*resp = &v11.Policies{
+						Policy: []v11.Policy{
+							{
+								ID:           "test-id",
+								Name:         "test-name",
+								JobDelay:     5,
+								TargetPath:   "target-path",
+								SourcePath:   "source-path",
+								LastJobState: isi.FINISHED,
+							},
+						},
+					}
+				})
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setMocks()
+
+			if err := reprotect(tt.args.ctx, tt.args.localIsiConfig, tt.args.remoteIsiConfig, tt.args.vgName, tt.args.log); (err != nil) != tt.wantErr {
+				t.Errorf("reprotect() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

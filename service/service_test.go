@@ -60,8 +60,17 @@ func TestMain(m *testing.M) {
 	configFile := "mock/secret/secret.yaml"
 	os.Setenv(constants.EnvIsilonConfigFile, configFile)
 
+	format := "progress" // does not print godog steps
+	// if verbosity has been passed to 'go test', pass that to godog.
+	for _, arg := range os.Args[1:] {
+		if arg == "-test.v=true" { // go test transforms -v option
+			format = "pretty"
+			break
+		}
+	}
+
 	opts := godog.Options{
-		Format: "pretty",
+		Format: format,
 		Paths:  []string{"features"},
 		Tags:   "~todo",
 	}
