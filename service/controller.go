@@ -1209,7 +1209,25 @@ func (s *service) ControllerPublishVolume(
 	ctx, log, runID := GetRunIDLog(ctx)
 	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
-	export, err := isiConfig.isiSvc.GetExportsCountAttachedToNode(ctx, node_ip)
+	
+	nodeID := req.GetNodeId()
+	if nodeID == "" {
+		return nil, status.Error(codes.InvalidArgument,
+			logging.GetMessageWithRunID(runID, "node ID is required"))
+	}
+
+	_, _, nodeIP, err := id.ParseNodeID(ctx, nodeID)
+	if err != nil {
+		log.Errorf("failed to parse node ID '%s'", nodeID)
+		return fmt.Errorf("failed to parse node ID")
+	}
+
+	export, err := isiConfig.isiSvc.GetExportsCountAttachedToNode(ctx,nodeIP)
+	if err != nil{
+		log.Errorf("failed to fetch node ip for node id : '%s'", nodeID)
+		return fmt.Errorf("failed to parse node ip")
+	}
+
 	volumeContext := req.GetVolumeContext()
 	if volumeContext != nil {
 		log.Printf("VolumeContext:")
