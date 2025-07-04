@@ -1222,10 +1222,15 @@ func (s *service) ControllerPublishVolume(
 		return fmt.Errorf("failed to parse node ID")
 	}
 
-	export, err := isiConfig.isiSvc.GetExportsCountAttachedToNode(ctx,nodeIP)
+	export_count, err := isiConfig.isiSvc.GetExportsCountAttachedToNode(ctx,nodeIP)
 	if err != nil{
 		log.Errorf("failed to fetch node ip for node id : '%s'", nodeID)
 		return fmt.Errorf("failed to parse node ip")
+	}
+
+	if export_count >= s.opts.MaxVolumesPerNode && s.opts.MaxVolumesPerNode > 0 {
+		log.Errorf("Maximum volume limit reached for node : '%s'", nodeID)
+		return fmt.Errorf("Maximum volume limit reached for node")
 	}
 
 	volumeContext := req.GetVolumeContext()
