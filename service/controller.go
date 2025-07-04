@@ -1209,29 +1209,6 @@ func (s *service) ControllerPublishVolume(
 	ctx, log, runID := GetRunIDLog(ctx)
 	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
-	
-	nodeID := req.GetNodeId()
-	if nodeID == "" {
-		return nil, status.Error(codes.InvalidArgument,
-			logging.GetMessageWithRunID(runID, "node ID is required"))
-	}
-
-	_, _, nodeIP, err := id.ParseNodeID(ctx, nodeID)
-	if err != nil {
-		log.Errorf("failed to parse node ID '%s'", nodeID)
-		return fmt.Errorf("failed to parse node ID")
-	}
-
-	export_count, err := isiConfig.isiSvc.GetExportsCountAttachedToNode(ctx,nodeIP)
-	if err != nil{
-		log.Errorf("failed to fetch node ip for node id : '%s'", nodeID)
-		return fmt.Errorf("failed to parse node ip")
-	}
-
-	if export_count >= s.opts.MaxVolumesPerNode && s.opts.MaxVolumesPerNode > 0 {
-		log.Errorf("Maximum volume limit reached for node : '%s'", nodeID)
-		return fmt.Errorf("Maximum volume limit reached for node")
-	}
 
 	volumeContext := req.GetVolumeContext()
 	if volumeContext != nil {
@@ -1252,19 +1229,7 @@ func (s *service) ControllerPublishVolume(
 		return nil, status.Error(codes.NotFound, logging.GetMessageWithRunID(runID, "failed to parse volume ID '%s', error : '%v'", volID, err))
 	}
 
-	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
-	if err != nil {
-		log.Error("Failed to get Isilon config with error ", err.Error())
-		return nil, err
-	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
-	log.Debugf("Cluster Name: %v", clusterName)
-
-	if err := s.autoProbe(ctx, isiConfig); err != nil {
-		log.Error("Failed to probe with error: " + err.Error())
-		return nil, err
-	}
 
 	if exportID == 0 {
 		return nil, status.Error(codes.InvalidArgument, "invalid export ID")
@@ -1325,6 +1290,24 @@ func (s *service) ControllerPublishVolume(
 	if err == nil {
 		rootClientEnabled = val
 	}
+
+	_, _, nodeIP, err := id.ParseNodeID(ctx, nodeID)
+	if err != nil {
+		log.Errorf("failed to parse node ID '%s'", nodeID)
+		return fmt.Errorf("failed to parse node ID")
+	}
+
+	exportCount, err := isiConfig.isiSvc.GetExportsCountAttachedToNode(ctx,nodeIP)
+	if err != nil{
+		log.Errorf("failed to fetch node ip for node id : '%s'", nodeID)
+		return fmt.Errorf("failed to parse node ip")
+	}
+
+	if s.opts.MaxVolumesPerNode > 0 && exportCount >= s.opts.MaxVolumesPerNode {
+		log.Errorf("Maximum volume limit reached for node : '%s'", nodeID)
+		return fmt.Errorf("Maximum volume limit reached for node")
+	}
+
 
 	addClientFunc := s.getAddClientFunc(rootClientEnabled, isiConfig)
 
