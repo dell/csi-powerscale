@@ -146,16 +146,16 @@ func (svc *isiService) GetExportByIDWithZone(ctx context.Context, exportID int, 
 	return export, nil
 }
 
-func (svc *isiService) GetExportsCountAttachedToNode(ctx context.Context, nodeip string) (int, error) {
+func (svc *isiService) GetExportsCountAttachedToNode(ctx context.Context, nodeip string) (int64, error) {
 	// Fetch log handler
 	log := logging.GetRunIDLogger(ctx)
 
-	//log.Debugf("begin getting export by id '%d' with access zone '%s' for Isilon", exportID, accessZone)
-
+	log.Debugf("begin getting export count for nodeip '%s' for Isilon", nodeip)
+    var count int64
 	var err error
-	if count, err := svc.client.GetExportsCountAttachedToNode(ctx, nodeip); err != nil {
+	if count, err = svc.client.GetExportsCountAttachedToNode(ctx, nodeip); err != nil {
 		log.Error("failed to get export by id with access zone")
-		return nil, err
+		return 0, err
 	}
 	return count, nil
 }
