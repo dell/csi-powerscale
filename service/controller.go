@@ -1229,7 +1229,19 @@ func (s *service) ControllerPublishVolume(
 		return nil, status.Error(codes.NotFound, logging.GetMessageWithRunID(runID, "failed to parse volume ID '%s', error : '%v'", volID, err))
 	}
 
+	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
+	if err != nil {
+		log.Error("Failed to get Isilon config with error ", err.Error())
+		return nil, err
+	}
 
+	ctx, log = setClusterContext(ctx, clusterName)
+	log.Debugf("Cluster Name: %v", clusterName)
+
+	if err := s.autoProbe(ctx, isiConfig); err != nil {
+		log.Error("Failed to probe with error: " + err.Error())
+		return nil, err
+	}
 
 	if exportID == 0 {
 		return nil, status.Error(codes.InvalidArgument, "invalid export ID")
