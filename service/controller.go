@@ -1306,18 +1306,22 @@ func (s *service) ControllerPublishVolume(
 	_, _, nodeIP, err := id.ParseNodeID(ctx, nodeID)
 	if err != nil {
 		log.Errorf("failed to parse node ID '%s'", nodeID)
-		return fmt.Errorf("failed to parse node ID")
+		return nil, status.Error(codes.InvalidArgument,
+			logging.GetMessageWithRunID(runID, "failed to parse node ID"))
 	}
 
 	exportCount, err := isiConfig.isiSvc.GetExportsCountAttachedToNode(ctx,nodeIP)
 	if err != nil{
 		log.Errorf("failed to fetch node ip for node id : '%s'", nodeID)
-		return fmt.Errorf("failed to parse node ip")
+		return nil, status.Error(codes.InvalidArgument,
+			logging.GetMessageWithRunID(runID, "failed to parse node ip"))
 	}
+
 
 	if s.opts.MaxVolumesPerNode > 0 && exportCount >= s.opts.MaxVolumesPerNode {
 		log.Errorf("Maximum volume limit reached for node : '%s'", nodeID)
-		return fmt.Errorf("Maximum volume limit reached for node")
+		return nil, status.Error(codes.InvalidArgument,
+			logging.GetMessageWithRunID(runID, "Maximum volume limit reached for node"))
 	}
 
 
