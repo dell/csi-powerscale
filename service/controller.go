@@ -1310,7 +1310,7 @@ func (s *service) ControllerPublishVolume(
 			logging.GetMessageWithRunID(runID, "failed to parse node ID"))
 	}
 
-	exportCount, err := isiConfig.isiSvc.GetExportsCountAttachedToNode(ctx,nodeIP)
+	exportCount, err := s.isiSvc.GetExportsCountAttachedToNode(ctx,nodeIP)
 	if err != nil{
 		log.Errorf("failed to fetch node ip for node id : '%s'", nodeID)
 		return nil, status.Error(codes.InvalidArgument,
