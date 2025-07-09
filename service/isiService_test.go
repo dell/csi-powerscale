@@ -25,6 +25,8 @@ import (
 
 	isi "github.com/dell/goisilon"
 	"github.com/dell/goisilon/api"
+	apiv1 "github.com/dell/goisilon/api/v1"
+	isimocks "github.com/dell/goisilon/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -1065,6 +1067,84 @@ func TestIsHostAlreadyAdded(t *testing.T) {
 
 			if result != tc.expectedBool {
 				t.Errorf("Expected '%v', but got '%v'", tc.expectedBool, result)
+			}
+		})
+	}
+}
+
+func TestGetExportsCountAttachedToNode(t *testing.T) {
+	mockClient := &isimocks.Client{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	tests := []struct {
+		name      string
+		nodeip    string
+		wantCount int64
+		wantErr   bool
+	}{
+		{
+			name:      "Failed to get exports count",
+			nodeip:    "1.1.1.1",
+			wantCount: 0,
+			wantErr:   true,
+		},
+		{
+			name: "Context cancelled",
+			nodeip: func() string {
+				_, cancel := context.WithCancel(context.Background())
+				cancel()
+				return "1.1.1.1"
+			}(),
+			wantCount: 0,
+			wantErr:   true,
+		},
+		{
+			name:      "Get exports count successfully",
+			nodeip:    "10.0.0.1",
+			wantCount: 1,
+			wantErr:   false,
+		},
+	}
+
+	// Run the test cases
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			if tt.name == "Context cancelled" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+
+			// Adjust the mock setup based on the test case
+			if tt.wantErr {
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			} else {
+				svc.client.API.(*isimocks.Client).ExpectedCalls = nil
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs[0:6]...).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**apiv1.GetIsiExportsResp)
+					*resp = &apiv1.GetIsiExportsResp{
+						ExportList: []*apiv1.IsiExport{
+							{Clients: []string{"10.0.0.1"}},
+						},
+					}
+				}).Once()
+			}
+
+			got, err := svc.GetExportsCountAttachedToNode(ctx, tt.nodeip)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetExportsCountAttachedToNode() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.wantCount {
+				t.Errorf("GetExportsCountAttachedToNode() = %v, want %v", got, tt.wantCount)
 			}
 		})
 	}

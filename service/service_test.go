@@ -830,6 +830,8 @@ func TestGetGournalLevel(t *testing.T) {
 }
 
 func TestValidateIsiPath(t *testing.T) {
+	var mu sync.Mutex
+
 	// Create a new instance of the service struct
 	client := fake.NewSimpleClientset()
 	s := &service{
@@ -859,11 +861,15 @@ func TestValidateIsiPath(t *testing.T) {
 	}
 
 	// Add the PersistentVolume and StorageClass to the fake clientset
+	mu.Lock()
 	_, err := s.k8sclient.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
+	mu.Unlock()
 	if err != nil {
 		t.Fatalf("failed to create PersistentVolume: %v", err)
 	}
+	mu.Lock()
 	_, err = s.k8sclient.StorageV1().StorageClasses().Create(ctx, sc, metav1.CreateOptions{})
+	mu.Unlock()
 	if err != nil {
 		t.Fatalf("failed to create StorageClass: %v", err)
 	}
@@ -871,7 +877,9 @@ func TestValidateIsiPath(t *testing.T) {
 	// Test case: valid isiPath
 	volName := "test-pv"
 	expectedIsiPath := "/ifs/data"
+	mu.Lock()
 	isiPath, err := s.validateIsiPath(ctx, volName)
+	mu.Unlock()
 	if err != nil {
 		t.Errorf("expected no error, got: %v", err)
 	}
@@ -881,11 +889,15 @@ func TestValidateIsiPath(t *testing.T) {
 
 	// Test case: no isiPath
 	sc.Parameters = map[string]string{}
+	mu.Lock()
 	_, err = s.k8sclient.StorageV1().StorageClasses().Update(ctx, sc, metav1.UpdateOptions{})
+	mu.Unlock()
 	if err != nil {
 		t.Fatalf("failed to update StorageClass: %v", err)
 	}
+	mu.Lock()
 	isiPath, err = s.validateIsiPath(ctx, volName)
+	mu.Unlock()
 	if err != nil {
 		t.Errorf("expected no error, got: %v", err)
 	}
@@ -895,11 +907,15 @@ func TestValidateIsiPath(t *testing.T) {
 
 	// Test case: storage class does not exist
 	pv.Spec.StorageClassName = "nonexistent-sc"
+	mu.Lock()
 	_, err = s.k8sclient.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
+	mu.Unlock()
 	if err != nil {
 		t.Fatalf("failed to update PersistentVolume: %v", err)
 	}
+	mu.Lock()
 	isiPath, err = s.validateIsiPath(ctx, volName)
+	mu.Unlock()
 	if err == nil {
 		t.Errorf("expected error, got: %v", err)
 	}
@@ -909,11 +925,15 @@ func TestValidateIsiPath(t *testing.T) {
 
 	// Test case: empty storage class
 	pv.Spec.StorageClassName = ""
+	mu.Lock()
 	_, err = s.k8sclient.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
+	mu.Unlock()
 	if err != nil {
 		t.Fatalf("failed to update PersistentVolume: %v", err)
 	}
+	mu.Lock()
 	isiPath, err = s.validateIsiPath(ctx, volName)
+	mu.Unlock()
 	if err != nil {
 		t.Errorf("expected no error, got: %v", err)
 	}
@@ -922,8 +942,12 @@ func TestValidateIsiPath(t *testing.T) {
 	}
 
 	// Test case: error getting PersistentVolume
+	mu.Lock()
 	s.k8sclient.CoreV1().PersistentVolumes().Delete(ctx, "test-pv", metav1.DeleteOptions{})
+	mu.Unlock()
+	mu.Lock()
 	_, err = s.validateIsiPath(ctx, volName)
+	mu.Unlock()
 	if err == nil {
 		t.Errorf("expected error, got nil")
 	}

@@ -1303,6 +1303,26 @@ func (s *service) ControllerPublishVolume(
 		rootClientEnabled = val
 	}
 
+	_, _, nodeIP, err := id.ParseNodeID(ctx, nodeID)
+	if err != nil {
+		log.Errorf("failed to parse node id '%s' with error : %s", nodeID, err.Error())
+		return nil, status.Error(codes.InvalidArgument,
+			logging.GetMessageWithRunID(runID, "failed to parse node id '%s'", nodeID))
+	}
+
+	exportCount, err := isiConfig.isiSvc.GetExportsCountAttachedToNode(ctx, nodeIP)
+	if err != nil {
+		log.Errorf("failed to export count for node id '%s' with error : %s", nodeID, err.Error())
+		return nil, status.Error(codes.InvalidArgument,
+			logging.GetMessageWithRunID(runID, "failed to export count for node id '%s'", nodeID))
+	}
+
+	if s.opts.MaxVolumesPerNode > 0 && exportCount >= s.opts.MaxVolumesPerNode {
+		log.Errorf("maximum volume limit reached for node : '%s'", nodeID)
+		return nil, status.Error(codes.InvalidArgument,
+			logging.GetMessageWithRunID(runID, "maximum volume limit reached for node : '%s'", nodeID))
+	}
+
 	addClientFunc := s.getAddClientFunc(rootClientEnabled, isiConfig)
 
 	switch am.Mode {
