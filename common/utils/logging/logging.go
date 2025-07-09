@@ -14,7 +14,7 @@
  limitations under the License.
 */
 
-package utils
+package logging
 
 import (
 	"context"
@@ -179,4 +179,19 @@ func UpdateLogLevel(lvl logrus.Level, mu *sync.Mutex) {
 // GetCurrentLogLevel updates the log level
 func GetCurrentLogLevel() logrus.Level {
 	return singletonLog.Level
+}
+
+// LogMap logs the key-value entries of a given map
+func LogMap(ctx context.Context, mapName string, m map[string]string) {
+	log := GetRunIDLogger(ctx)
+	log.Debugf("map '%s':", mapName)
+	for key, value := range m {
+		log.Debugf("    [%s]='%s'", key, value)
+	}
+}
+
+// GetMessageWithRunID returns message with runID information
+func GetMessageWithRunID(runid string, format string, args ...interface{}) string {
+	str := fmt.Sprintf(format, args...)
+	return fmt.Sprintf(" runid=%s %s", runid, str)
 }

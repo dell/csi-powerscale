@@ -28,7 +28,9 @@ import (
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/v2/common/constants"
 	"github.com/dell/csi-isilon/v2/common/k8sutils"
-	"github.com/dell/csi-isilon/v2/common/utils"
+	id "github.com/dell/csi-isilon/v2/common/utils/identifiers"
+	"github.com/dell/csi-isilon/v2/common/utils/logging"
+	isilonfs "github.com/dell/csi-isilon/v2/common/utils/powerscale-fs"
 	csiutils "github.com/dell/csi-isilon/v2/csi-utils"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -48,7 +50,7 @@ var (
 	getControllerPublishVolume = func(s *service) func(context.Context, *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 		return s.ControllerPublishVolume
 	}
-	getUtilsGetFQDNByIP = utils.GetFQDNByIP
+	getUtilsGetFQDNByIP = id.GetFQDNByIP
 	getK8sutilsGetStats = k8sutils.GetStats
 )
 
@@ -93,9 +95,9 @@ func (s *service) NodePublishVolume(
 
 	volumeContext := req.GetVolumeContext()
 	if volumeContext == nil {
-		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "VolumeContext is nil, skip NodePublishVolume"))
+		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "VolumeContext is nil, skip NodePublishVolume"))
 	}
-	utils.LogMap(ctx, "VolumeContext", volumeContext)
+	logging.LogMap(ctx, "VolumeContext", volumeContext)
 
 	isEphemeralVolume := volumeContext["csi.storage.k8s.io/ephemeral"] == "true"
 	var clusterName string
@@ -104,7 +106,7 @@ func (s *service) NodePublishVolume(
 		clusterName = volumeContext["ClusterName"]
 	} else {
 		// parse the input volume id and fetch it's components
-		_, _, _, clusterName, _ = utils.ParseNormalizedVolumeID(ctx, req.GetVolumeId())
+		_, _, _, clusterName, _ = id.ParseNormalizedVolumeID(ctx, req.GetVolumeId())
 	}
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
@@ -127,22 +129,22 @@ func (s *service) NodePublishVolume(
 	path := volumeContext["Path"]
 
 	if path == "" {
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no entry keyed by 'Path' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
+		return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "no entry keyed by 'Path' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
 	}
 	volName := volumeContext["Name"]
 	if volName == "" {
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no entry keyed by 'Name' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
+		return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "no entry keyed by 'Name' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
 	}
 	accessZone := volumeContext["AccessZone"]
 	isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(path, accessZone)
 	if isROVolumeFromSnapshot {
 		log.Info("Volume source is snapshot")
 		if export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, path, accessZone); err != nil || export == nil {
-			return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "error retrieving export for %s", path))
+			return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error retrieving export for %s", path))
 		}
 	} else {
 		// Parse the target path and empty volume name to get the volume
-		isiPath := utils.GetIsiPathFromExportPath(path)
+		isiPath := isilonfs.GetIsiPathFromExportPath(path)
 
 		if _, err := s.getVolByName(ctx, isiPath, volName, isiConfig); err != nil {
 			log.Errorf("Error in getting '%s' Volume '%v'", volName, err)
@@ -191,11 +193,11 @@ func (s *service) NodeUnpublishVolume(
 	noProbeOnStart = false
 	volID := req.GetVolumeId()
 	if volID == "" {
-		return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "no VolumeID found in request"))
+		return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "no VolumeID found in request"))
 	}
 	log.Infof("The volume ID fetched from NodeUnPublish req is %s", volID)
 
-	volName, exportID, accessZone, clusterName, _ := utils.ParseNormalizedVolumeID(ctx, req.GetVolumeId())
+	volName, exportID, accessZone, clusterName, _ := id.ParseNormalizedVolumeID(ctx, req.GetVolumeId())
 	if volName == "" {
 		volName = volID
 	}
@@ -280,7 +282,7 @@ func (s *service) nodeProbe(ctx context.Context, isiConfig *IsilonClusterConfig)
 	}
 
 	if isiConfig.isiSvc == nil {
-		logLevel := utils.GetCurrentLogLevel()
+		logLevel := logging.GetCurrentLogLevel()
 		var err error
 		isiConfig.isiSvc, err = s.GetIsiService(ctx, isiConfig, logLevel)
 		if isiConfig.isiSvc == nil {
@@ -439,14 +441,14 @@ func (s *service) NodeGetVolumeStats(
 
 	volID := req.GetVolumeId()
 	if volID == "" {
-		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "no VolumeID found in request"))
+		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "no VolumeID found in request"))
 	}
 	volPath := req.GetVolumePath()
 	if volPath == "" {
-		return nil, status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "no Volume Path found in request"))
+		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "no Volume Path found in request"))
 	}
 
-	volName, _, _, clusterName, _ := utils.ParseNormalizedVolumeID(ctx, volID)
+	volName, _, _, clusterName, _ := id.ParseNormalizedVolumeID(ctx, volID)
 	if volName == "" {
 		volName = volID
 	}
@@ -479,19 +481,19 @@ func (s *service) NodeGetVolumeStats(
 	isVolumeExistent := isVolumeExistentFunc(ctx, volName, volPath, "")
 
 	if !isVolumeExistent {
-		return nil, status.Error(codes.NotFound, utils.GetMessageWithRunID(runID, "volume %v does not exist at path %v", volName, volPath))
+		return nil, status.Error(codes.NotFound, logging.GetMessageWithRunID(runID, "volume %v does not exist at path %v", volName, volPath))
 	}
 
 	// check whether the original volume is mounted
 	isMounted, err := getIsVolumeMounted(ctx, volName, volPath)
 	if !isMounted {
-		return nil, status.Error(codes.NotFound, utils.GetMessageWithRunID(runID, "no volume is mounted at path: %s", volPath))
+		return nil, status.Error(codes.NotFound, logging.GetMessageWithRunID(runID, "no volume is mounted at path: %s", volPath))
 	}
 
 	// check whether volume path is accessible
 	_, err = getOsReadDir(volPath)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, utils.GetMessageWithRunID(runID, "volume path is not accessible: %s", err))
+		return nil, status.Error(codes.NotFound, logging.GetMessageWithRunID(runID, "volume path is not accessible: %s", err))
 	}
 
 	// Get Volume stats metrics
@@ -692,7 +694,7 @@ var ephemeralNodeUnpublishFunc = func(s *service, ctx context.Context,
 	volumeID := req.GetVolumeId()
 	log.Infof("The volID is %s", volumeID)
 	if volumeID == "" {
-		return status.Error(codes.InvalidArgument, utils.GetMessageWithRunID(runID, "volume ID is required"))
+		return status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "volume ID is required"))
 	}
 
 	nodeID, nodeIDErr := s.getPowerScaleNodeID(ctx)
@@ -712,7 +714,7 @@ var ephemeralNodeUnpublishFunc = func(s *service, ctx context.Context,
 
 	// Before deleting the volume on PowerScale,
 	// Cleaning up the directories we created.
-	volName, _, _, _, err := utils.ParseNormalizedVolumeID(ctx, req.GetVolumeId())
+	volName, _, _, _, err := id.ParseNormalizedVolumeID(ctx, req.GetVolumeId())
 	if err != nil {
 		return err
 	}
@@ -769,7 +771,7 @@ func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	nodeID = nodeID + utils.NodeIDSeparator + nodeFQDN + utils.NodeIDSeparator + nodeIP
+	nodeID = nodeID + id.NodeIDSeparator + nodeFQDN + id.NodeIDSeparator + nodeIP
 
 	return nodeID, nil
 }

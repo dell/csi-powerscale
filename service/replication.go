@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2023 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -23,7 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dell/csi-isilon/v2/common/utils"
+	id "github.com/dell/csi-isilon/v2/common/utils/identifiers"
+	isilonfs "github.com/dell/csi-isilon/v2/common/utils/powerscale-fs"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	isi "github.com/dell/goisilon"
 	isiApi "github.com/dell/goisilon/api"
@@ -52,7 +53,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
 
-	volName, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, volID)
+	volName, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, volID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
@@ -99,7 +100,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	}
 	exportPath := (*export.Paths)[0]
 
-	isiPath := utils.GetIsiPathFromExportPath(exportPath)
+	isiPath := isilonfs.GetIsiPathFromExportPath(exportPath)
 	pathToStrip := ""
 	storageClassIsi, ok := req.Parameters["IsiPath"]
 	if !ok {
@@ -158,13 +159,13 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 		} else {
 			quotaID = quota.ID
 		}
-		if remoteExportID, err = remoteIsiConfig.isiSvc.ExportVolumeWithZone(ctx, isiPath, volName, remoteAccessZone, utils.GetQuotaIDWithCSITag(quotaID)); err == nil && remoteExportID != 0 {
+		if remoteExportID, err = remoteIsiConfig.isiSvc.ExportVolumeWithZone(ctx, isiPath, volName, remoteAccessZone, isilonfs.GetQuotaIDWithCSITag(quotaID)); err == nil && remoteExportID != 0 {
 			// get the export and retry if not found to ensure the export has been created
 			for i := 0; i < MaxRetries; i++ {
 				if export, _ := remoteIsiConfig.isiSvc.GetExportByIDWithZone(ctx, remoteExportID, remoteAccessZone); export != nil {
 					// Add dummy localhost entry for pvc security
-					if !remoteIsiConfig.isiSvc.IsHostAlreadyAdded(ctx, remoteExportID, remoteAccessZone, utils.DummyHostNodeID) {
-						err = remoteIsiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, remoteClusterName, remoteExportID, remoteAccessZone, utils.DummyHostNodeID, *remoteIsiConfig.IgnoreUnresolvableHosts, remoteIsiConfig.isiSvc.AddExportClientByIDWithZone)
+					if !remoteIsiConfig.isiSvc.IsHostAlreadyAdded(ctx, remoteExportID, remoteAccessZone, id.DummyHostNodeID) {
+						err = remoteIsiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, remoteClusterName, remoteExportID, remoteAccessZone, id.DummyHostNodeID, *remoteIsiConfig.IgnoreUnresolvableHosts, remoteIsiConfig.isiSvc.AddExportClientByIDWithZone)
 						if err != nil {
 							log.Debugf("Error while adding dummy localhost entry to export '%d'", remoteExportID)
 						}
@@ -218,7 +219,7 @@ func (s *service) CreateStorageProtectionGroup(ctx context.Context,
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
 
-	volName, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, volID)
+	volName, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, volID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
@@ -266,9 +267,9 @@ func (s *service) CreateStorageProtectionGroup(ctx context.Context,
 
 	exportPath := (*export.Paths)[0]
 
-	isiPath := utils.GetIsiPathFromExportPath(exportPath)
+	isiPath := isilonfs.GetIsiPathFromExportPath(exportPath)
 
-	vgName := utils.GetVolumeNameFromExportPath(isiPath)
+	vgName := isilonfs.GetVolumeNameFromExportPath(isiPath)
 
 	localParams := map[string]string{
 		s.opts.replicationContextPrefix + "systemName":              clusterName,
@@ -305,7 +306,7 @@ func (s *service) DeleteLocalVolume(ctx context.Context,
 	log.Infof("Deleting export for volume %s per request from remote replication controller", volumeID)
 
 	// Parse the input volume ID and fetch its components
-	volName, exportID, accessZone, clusterName, err := utils.ParseNormalizedVolumeID(ctx, volumeID)
+	volName, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, volumeID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to parse volume ID '%s', error: '%s'", volumeID, err.Error()))
 	}
@@ -331,7 +332,7 @@ func (s *service) DeleteLocalVolume(ctx context.Context,
 		return nil, err
 	}
 
-	isiPath := utils.GetIsiPathFromExportPath((*export.Paths)[0])
+	isiPath := isilonfs.GetIsiPathFromExportPath((*export.Paths)[0])
 	if isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", volName) {
 		log.Debugf("Local volume %s still exists, SyncIQ job has not run yet.", volName)
 	}
@@ -356,7 +357,7 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 	ctx, log, _ := GetRunIDLog(ctx)
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
-	isiPath := utils.GetIsiPathFromPgID(groupID) // includes both replication IsiPath AND replication directory name
+	isiPath := isilonfs.GetIsiPathFromPgID(groupID) // includes both replication IsiPath AND replication directory name
 	log.Infof("IsiPath: %s", isiPath)
 	if isiPath == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "Error: Can't obtain valid isiPath from PG")
@@ -749,9 +750,9 @@ func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteI
 	if err != nil {
 		return status.Errorf(codes.Internal, "reprotect: create protection policy on the local site failed %s", err.Error())
 	}
-	err = localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.FINISHED)
+	err = localIsiConfig.isiSvc.client.WaitForPolicyLastJobState(ctx, ppName, isi.RUNNING, isi.FINISHED)
 	if err != nil {
-		return status.Errorf(codes.Internal, "reprotect: policy job couldn't reach FINISHED state %s", err.Error())
+		return status.Errorf(codes.Internal, "reprotect: policy job did not return one of RUNNING or FINISHED state %s", err.Error())
 	}
 
 	log.Info("Reprotect action completed")
@@ -958,7 +959,7 @@ func resume(ctx context.Context, localIsiConfig *IsilonClusterConfig, _ *IsilonC
 
 func getRemoteCSIVolume(ctx context.Context, exportID int, volName, accessZone string, sizeInBytes int64, clusterName string) *csiext.Volume {
 	volume := &csiext.Volume{
-		VolumeId:      utils.GetNormalizedVolumeID(ctx, volName, exportID, accessZone, clusterName),
+		VolumeId:      id.GetNormalizedVolumeID(ctx, volName, exportID, accessZone, clusterName),
 		CapacityBytes: sizeInBytes,
 		VolumeContext: nil, // TODO: add values to volume context if needed
 	}
@@ -986,7 +987,9 @@ func getRemoteCSIVolume(ctx context.Context, exportID int, volName, accessZone s
 */
 func getGroupLinkState(localP isi.Policy, localTP isi.TargetPolicy, remoteP isi.Policy, remoteTP isi.TargetPolicy, isSyncInProgress bool) csiext.StorageProtectionGroupStatus_State {
 	var state csiext.StorageProtectionGroupStatus_State
-	if (localP != nil && localP.Enabled && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesDisabled) || // Synchronized state - source side
+	if isSyncInProgress { // sync-in-progress state
+		state = csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS
+	} else if (localP != nil && localP.Enabled && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesDisabled) || // Synchronized state - source side
 		(localP == nil && remoteP != nil && remoteP.Enabled && localTP != nil && localTP.FailoverFailbackState == WritesDisabled && remoteTP == nil) { // target side
 		state = csiext.StorageProtectionGroupStatus_SYNCHRONIZED
 	} else if (localP != nil && !localP.Enabled && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesDisabled) || // Suspended state - source side
@@ -1002,11 +1005,9 @@ func getGroupLinkState(localP isi.Policy, localTP isi.TargetPolicy, remoteP isi.
 	} else if (localP != nil && localP.Enabled && remoteP == nil && localTP == nil && remoteTP != nil && remoteTP.FailoverFailbackState == WritesEnabled) || // unplanned failover & source up now - source side
 		(localP == nil && remoteP != nil && remoteP.Enabled && localTP != nil && localTP.FailoverFailbackState == WritesEnabled && remoteTP == nil) { // target side
 		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
-	} else if isSyncInProgress { // sync-in-progress state
-		state = csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS
 	} else if (remoteTP != nil && remoteTP.LastJobState == "failed") || (localTP != nil && localTP.LastJobState == "failed") { // invalid state, sync job failed
 		state = csiext.StorageProtectionGroupStatus_INVALID
-	} else { // unknown state
+	} else {
 		state = csiext.StorageProtectionGroupStatus_UNKNOWN
 	}
 
