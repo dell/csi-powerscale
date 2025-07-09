@@ -42,11 +42,11 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	v1 "k8s.io/api/core/v1"
-	storagev1 "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	// v1 "k8s.io/api/core/v1"
+	// storagev1 "k8s.io/api/storage/v1"
+	// metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"k8s.io/client-go/kubernetes/fake"
+	// "k8s.io/client-go/kubernetes/fake"
 )
 
 // commenting this out for now, as it is an integration test
