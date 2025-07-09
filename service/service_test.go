@@ -42,11 +42,11 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	// v1 "k8s.io/api/core/v1"
-	// storagev1 "k8s.io/api/storage/v1"
-	// metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	// "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 // commenting this out for now, as it is an integration test
@@ -829,102 +829,126 @@ func TestGetGournalLevel(t *testing.T) {
 	assert.Equal(t, gournal.ParseLevel(logLevel.String()), level)
 }
 
-// func TestValidateIsiPath(t *testing.T) {
-// 	// Create a new instance of the service struct
-// 	client := fake.NewSimpleClientset()
-// 	s := &service{
-// 		k8sclient: client,
-// 	}
-// 	s.k8sclient = client
+func TestValidateIsiPath(t *testing.T) {
+	var mu sync.Mutex
 
-// 	// Create a context.Context
-// 	ctx := context.Background()
+	// Create a new instance of the service struct
+	client := fake.NewSimpleClientset()
+	s := &service{
+		k8sclient: client,
+	}
+	s.k8sclient = client
 
-// 	// Create a fake PersistentVolume and StorageClass
-// 	pv := &v1.PersistentVolume{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name: "test-pv",
-// 		},
-// 		Spec: v1.PersistentVolumeSpec{
-// 			StorageClassName: "test-sc",
-// 		},
-// 	}
-// 	sc := &storagev1.StorageClass{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name: "test-sc",
-// 		},
-// 		Parameters: map[string]string{
-// 			IsiPathParam: "/ifs/data",
-// 		},
-// 	}
+	// Create a context.Context
+	ctx := context.Background()
 
-// 	// Add the PersistentVolume and StorageClass to the fake clientset
-// 	_, err := s.k8sclient.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
-// 	if err != nil {
-// 		t.Fatalf("failed to create PersistentVolume: %v", err)
-// 	}
-// 	_, err = s.k8sclient.StorageV1().StorageClasses().Create(ctx, sc, metav1.CreateOptions{})
-// 	if err != nil {
-// 		t.Fatalf("failed to create StorageClass: %v", err)
-// 	}
+	// Create a fake PersistentVolume and StorageClass
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pv",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			StorageClassName: "test-sc",
+		},
+	}
+	sc := &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-sc",
+		},
+		Parameters: map[string]string{
+			IsiPathParam: "/ifs/data",
+		},
+	}
 
-// 	// Test case: valid isiPath
-// 	volName := "test-pv"
-// 	expectedIsiPath := "/ifs/data"
-// 	isiPath, err := s.validateIsiPath(ctx, volName)
-// 	if err != nil {
-// 		t.Errorf("expected no error, got: %v", err)
-// 	}
-// 	if isiPath != expectedIsiPath {
-// 		t.Errorf("expected isiPath %q, got %q", expectedIsiPath, isiPath)
-// 	}
+	// Add the PersistentVolume and StorageClass to the fake clientset
+	mu.Lock()
+	_, err := s.k8sclient.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
+	mu.Unlock()
+	if err != nil {
+		t.Fatalf("failed to create PersistentVolume: %v", err)
+	}
+	mu.Lock()
+	_, err = s.k8sclient.StorageV1().StorageClasses().Create(ctx, sc, metav1.CreateOptions{})
+	mu.Unlock()
+	if err != nil {
+		t.Fatalf("failed to create StorageClass: %v", err)
+	}
 
-// 	// Test case: no isiPath
-// 	sc.Parameters = map[string]string{}
-// 	_, err = s.k8sclient.StorageV1().StorageClasses().Update(ctx, sc, metav1.UpdateOptions{})
-// 	if err != nil {
-// 		t.Fatalf("failed to update StorageClass: %v", err)
-// 	}
-// 	isiPath, err = s.validateIsiPath(ctx, volName)
-// 	if err != nil {
-// 		t.Errorf("expected no error, got: %v", err)
-// 	}
-// 	if isiPath != "" {
-// 		t.Errorf("expected empty isiPath, got %q", isiPath)
-// 	}
+	// Test case: valid isiPath
+	volName := "test-pv"
+	expectedIsiPath := "/ifs/data"
+	mu.Lock()
+	isiPath, err := s.validateIsiPath(ctx, volName)
+	mu.Unlock()
+	if err != nil {
+		t.Errorf("expected no error, got: %v", err)
+	}
+	if isiPath != expectedIsiPath {
+		t.Errorf("expected isiPath %q, got %q", expectedIsiPath, isiPath)
+	}
 
-// 	// Test case: storage class does not exist
-// 	pv.Spec.StorageClassName = "nonexistent-sc"
-// 	_, err = s.k8sclient.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
-// 	if err != nil {
-// 		t.Fatalf("failed to update PersistentVolume: %v", err)
-// 	}
-// 	isiPath, err = s.validateIsiPath(ctx, volName)
-// 	if err == nil {
-// 		t.Errorf("expected error, got: %v", err)
-// 	}
-// 	if isiPath != "" {
-// 		t.Errorf("expected empty isiPath, got %q", isiPath)
-// 	}
+	// Test case: no isiPath
+	sc.Parameters = map[string]string{}
+	mu.Lock()
+	_, err = s.k8sclient.StorageV1().StorageClasses().Update(ctx, sc, metav1.UpdateOptions{})
+	mu.Unlock()
+	if err != nil {
+		t.Fatalf("failed to update StorageClass: %v", err)
+	}
+	mu.Lock()
+	isiPath, err = s.validateIsiPath(ctx, volName)
+	mu.Unlock()
+	if err != nil {
+		t.Errorf("expected no error, got: %v", err)
+	}
+	if isiPath != "" {
+		t.Errorf("expected empty isiPath, got %q", isiPath)
+	}
 
-// 	// Test case: empty storage class
-// 	pv.Spec.StorageClassName = ""
-// 	_, err = s.k8sclient.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
-// 	if err != nil {
-// 		t.Fatalf("failed to update PersistentVolume: %v", err)
-// 	}
-// 	isiPath, err = s.validateIsiPath(ctx, volName)
-// 	if err != nil {
-// 		t.Errorf("expected no error, got: %v", err)
-// 	}
-// 	if isiPath != "" {
-// 		t.Errorf("expected empty isiPath, got %q", isiPath)
-// 	}
+	// Test case: storage class does not exist
+	pv.Spec.StorageClassName = "nonexistent-sc"
+	mu.Lock()
+	_, err = s.k8sclient.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
+	mu.Unlock()
+	if err != nil {
+		t.Fatalf("failed to update PersistentVolume: %v", err)
+	}
+	mu.Lock()
+	isiPath, err = s.validateIsiPath(ctx, volName)
+	mu.Unlock()
+	if err == nil {
+		t.Errorf("expected error, got: %v", err)
+	}
+	if isiPath != "" {
+		t.Errorf("expected empty isiPath, got %q", isiPath)
+	}
 
-// 	// Test case: error getting PersistentVolume
-// 	s.k8sclient.CoreV1().PersistentVolumes().Delete(ctx, "test-pv", metav1.DeleteOptions{})
-// 	_, err = s.validateIsiPath(ctx, volName)
-// 	if err == nil {
-// 		t.Errorf("expected error, got nil")
-// 	}
-// }
+	// Test case: empty storage class
+	pv.Spec.StorageClassName = ""
+	mu.Lock()
+	_, err = s.k8sclient.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
+	mu.Unlock()
+	if err != nil {
+		t.Fatalf("failed to update PersistentVolume: %v", err)
+	}
+	mu.Lock()
+	isiPath, err = s.validateIsiPath(ctx, volName)
+	mu.Unlock()
+	if err != nil {
+		t.Errorf("expected no error, got: %v", err)
+	}
+	if isiPath != "" {
+		t.Errorf("expected empty isiPath, got %q", isiPath)
+	}
+
+	// Test case: error getting PersistentVolume
+	mu.Lock()
+	s.k8sclient.CoreV1().PersistentVolumes().Delete(ctx, "test-pv", metav1.DeleteOptions{})
+	mu.Unlock()
+	mu.Lock()
+	_, err = s.validateIsiPath(ctx, volName)
+	mu.Unlock()
+	if err == nil {
+		t.Errorf("expected error, got nil")
+	}
+}
