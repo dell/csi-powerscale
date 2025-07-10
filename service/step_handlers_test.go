@@ -153,6 +153,7 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetExportsWithLimit).Methods("GET").Queries("limit", "")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetExportsWithResume).Methods("GET").Queries("resume", "")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetSnapshotExportWithPathAndZone).Methods("GET").Queries("path", "/ifs/.snapshot/existent_snapshot_name/data/yian/nfs_1", "zone", "System")
+	isilonRouter.HandleFunc("/platform/1/protocols/nfs/exports/", handleGetExports).Methods("GET")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetExports).Methods("GET")
 	isilonRouter.HandleFunc("/platform/3/statistics/current", handleStatistics)
 	isilonRouter.HandleFunc("/platform/3/statistics/summary/client", handleIOInProgress).Methods("GET")
