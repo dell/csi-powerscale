@@ -25,11 +25,16 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/dell/csi-isilon/v2/common/utils/identifiers"
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	isi "github.com/dell/goisilon"
+	apiv1 "github.com/dell/goisilon/api/v1"
 	v1 "github.com/dell/goisilon/api/v1"
 	v2 "github.com/dell/goisilon/api/v2"
+	isimocks "github.com/dell/goisilon/mocks"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -1365,4 +1370,75 @@ func TestGetCapacity(t *testing.T) {
 	_, err := s.GetCapacity(ctx, req)
 
 	assert.NotEqual(t, nil, err)
+}
+
+func TestControllerPublishVolume_MaxVolumesPerNode(t *testing.T) {
+	fmt.Println("TestControllerPublishVolume_MaxVolumesPerNode")
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	s := &service{
+		nodeID:                identifiers.DummyHostNodeID,
+		nodeIP:                "127.0.0.1",
+		defaultIsiClusterName: "system",
+		opts:                  Opts{MaxVolumesPerNode: 5},
+		isiClusters:           &sync.Map{},
+	}
+	mockClient := &isimocks.Client{}
+	isiConfig := &IsilonClusterConfig{
+		ClusterName: "system",
+		isiSvc: &isiService{
+			client: &isi.Client{
+				API: mockClient,
+			},
+		},
+	}
+	s.isiClusters.Store("system", isiConfig)
+
+	ctx := context.Background()
+	req := &csi.ControllerPublishVolumeRequest{
+		VolumeId: "k8s-e89c9d089e=_=_=19=_=_=csi0zone=_=_=system",
+		NodeId:   identifiers.DummyHostNodeID,
+		VolumeCapability: &csi.VolumeCapability{
+			AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER},
+			AccessType: &csi.VolumeCapability_Mount{Mount: &csi.VolumeCapability_MountVolume{}},
+		},
+	}
+
+	// Mock the necessary calls
+	isiConfig.isiSvc.client.API.(*isimocks.Client).ExpectedCalls = nil
+	isiConfig.isiSvc.client.API.(*isimocks.Client).On("Get", anyArgs[0:6]...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(**apiv1.GetIsiVolumeAttributesResp)
+		*resp = &apiv1.GetIsiVolumeAttributesResp{}
+	}).Once()
+	isiConfig.isiSvc.client.API.(*isimocks.Client).On("Get", anyArgs[0:6]...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(**apiv1.GetIsiExportsResp)
+		*resp = &apiv1.GetIsiExportsResp{
+			ExportList: []*apiv1.IsiExport{
+				{Clients: []string{"127.0.0.1", "127.0.0.1"}},
+				{Clients: []string{"127.0.0.1"}},
+				{Clients: []string{"127.0.0.1"}},
+				{Clients: []string{"127.0.0.1"}},
+				{Clients: []string{"127.0.0.1"}},
+			},
+		}
+	}).Once()
+	isiConfig.isiSvc.client.API.(*isimocks.Client).On("Get", anyArgs[0:6]...).Return(nil)
+	_, err := s.ControllerPublishVolume(ctx, req)
+	assert.NotNil(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), "maximum volume limit reached for node")
+
+	// Error Scenario
+	isiConfig.isiSvc.client.API.(*isimocks.Client).ExpectedCalls = nil
+	isiConfig.isiSvc.client.API.(*isimocks.Client).On("Get", anyArgs[0:6]...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(**apiv1.GetIsiVolumeAttributesResp)
+		*resp = &apiv1.GetIsiVolumeAttributesResp{}
+	}).Once()
+	isiConfig.isiSvc.client.API.(*isimocks.Client).On("Get", anyArgs[0:6]...).Return(fmt.Errorf("failed to get exports")).Once()
+	_, err = s.ControllerPublishVolume(ctx, req)
+	assert.NotNil(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), "failed to export count for node id")
 }

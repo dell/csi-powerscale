@@ -146,6 +146,20 @@ func (svc *isiService) GetExportByIDWithZone(ctx context.Context, exportID int, 
 	return export, nil
 }
 
+func (svc *isiService) GetExportsCountAttachedToNode(ctx context.Context, nodeip string) (int64, error) {
+	// Fetch log handler
+	log := logging.GetRunIDLogger(ctx)
+
+	log.Debugf("begin getting export count for nodeip '%s' for Isilon", nodeip)
+	var count int64
+	var err error
+	if count, err = svc.client.GetExportsCountAttachedToNode(ctx, nodeip); err != nil {
+		log.Errorf("failed to get export count for node ip %s err %s", nodeip, err.Error())
+		return 0, err
+	}
+	return count, nil
+}
+
 func (svc *isiService) ExportVolumeWithZone(ctx context.Context, isiPath, volName, accessZone, description string) (int, error) {
 	// Fetch log handler
 	log := logging.GetRunIDLogger(ctx)
