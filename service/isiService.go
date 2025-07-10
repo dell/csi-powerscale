@@ -55,6 +55,22 @@ func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSource
 	return volumeNew, nil
 }
 
+func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSourceVolumeIsiPath string, srcSnapshotID int64, dstVolumeName string, accessZone string) (isi.Volume, error) {
+	// Fetch log handler
+	log := logging.GetRunIDLogger(ctx)
+
+	log.Debugf("begin to copy snapshot '%d'", srcSnapshotID)
+
+	var volumeNew isi.Volume
+	var err error
+	if volumeNew, err = svc.client.CopySnapshotWithIsiPath(ctx, isiPath, snapshotSourceVolumeIsiPath, srcSnapshotID, "", dstVolumeName, accessZone); err != nil {
+		log.Errorf("copy snapshot failed, '%s'", err.Error())
+		return nil, err
+	}
+
+	return volumeNew, nil
+}
+
 func (svc *isiService) CopyVolume(ctx context.Context, isiPath, srcVolumeName, dstVolumeName string) (isi.Volume, error) {
 	// Fetch log handler
 	log := logging.GetRunIDLogger(ctx)
@@ -774,6 +790,21 @@ func (svc *isiService) GetSnapshot(ctx context.Context, identity string) (isi.Sn
 	}
 
 	return snapshot, nil
+}
+
+func (svc *isiService) GetSnapshots(ctx context.Context) ([]api.IsiSnapshot, error) {
+	// Fetch log handler
+	log := logging.GetRunIDLogger(ctx)
+
+	log.Debugf("begin getting all the snapshot  for Isilon")
+	var snapshotList []api.IsiSnapshot
+	var err error
+	if snapshotList, err = svc.client.GetSnapshots(ctx); err != nil {
+		log.Errorf("failed to get snapshots '%s'", err.Error())
+		return nil, err
+	}
+
+	return snapshotList, nil
 }
 
 func (svc *isiService) GetSnapshotSize(ctx context.Context, isiPath, name string, accessZone string) int64 {
