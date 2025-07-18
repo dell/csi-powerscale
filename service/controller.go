@@ -1550,40 +1550,28 @@ func (s *service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 	// Process the source volumes and make CSI Volumes
 	entries := make([]*csi.ListSnapshotsResponse_Entry, len(source))
 	for i, snapshot := range source {
-		id, _ := extractNumber(snapshotID)
-		fmt.Println("Extracted ID:", id)
-
-		// Format number back
-		snapshotIDFormated := formatSnapshotID(id)
+		// converting to normalized snapshot ID
+		_, clusterName, accessZone, _ := id.ParseNormalizedSnapshotID(ctx, req.SnapshotId)
+		temp := strconv.FormatInt(snapshot.ID, 10)
+		normalisedSnapshotID := id.GetNormalizedSnapshotID(ctx, temp, clusterName, accessZone)
 
 		log.Info("Listsnap entries", "snapshotName", snapshot.Name, "snapshotID", snapshot.ID, "snapshotPath", snapshot.Path, "snapshotState", snapshot.State)
 		entries[i] = &csi.ListSnapshotsResponse_Entry{
-			Snapshot: s.getCSISnapshot(snapshotIDFormated, snapshotIDFormated, snapshot.Created, snapshot.Size),
+			Snapshot: s.getCSISnapshot(normalisedSnapshotID, normalisedSnapshotID, snapshot.Created, snapshot.Size),
 		}
 	}
-
 	return &csi.ListSnapshotsResponse{
 		Entries:   entries,
 		NextToken: nextToken,
 	}, nil
 }
 
-func extractNumber(input string) (int64, error) {
-	parts := strings.SplitN(input, "=", 2)
-	return strconv.ParseInt(parts[0], 10, 64)
-}
-
-// Formats a number into the custom pattern
-func formatSnapshotID(id int64) string {
-	return fmt.Sprintf("%d=_=_=echo=_=_=System", id)
-}
-
 // listPowerScaleSnapshots retrieves a list of snapshots from Isilon clusters.
 func (s *service) listPowerScaleSnapshots(ctx context.Context, startToken, maxEntries int, snapID, srcID string) (isi.SnapshotList, string, error) {
 	ctx, log, _ := GetRunIDLog(ctx)
-
+	// initialize an empty slice to hold all snapshots
 	var allSnapshots isi.SnapshotList
-
+	// Fetch the list of Isilon cluster configurations.
 	isilonClusterConfigs := s.getIsilonClusters()
 	log.Info("snap id" + snapID + "src id " + srcID)
 	if snapID == "" && srcID == "" {
@@ -1635,41 +1623,13 @@ func (s *service) listPowerScaleSnapshots(ctx context.Context, startToken, maxEn
 		for _, isiConfig := range isilonClusterConfigs {
 			// Fetch the list of snapshots for the current cluster.
 			snapshotList, err := isiConfig.isiSvc.GetSnapshots(ctx)
-			for _, isiSnapshotBySnapID := range snapshotList {
-				log.Info("snap id" + srcID)
-				log.Info("isiSnapshotBySnapID", isiSnapshotBySnapID.ID)
-				log.Info("isiSnapshotBySnap name", isiSnapshotBySnapID.Name)
-				log.Info("isiSnapshotBySnapID TargetID", isiSnapshotBySnapID.TargetID)
-				log.Info("isiSnapshotBySnapNAme TargetName", isiSnapshotBySnapID.TargetName)
-
-				// numericPart := extractNumericPrefix(snapID)
-				// log.Infof("numericPart: %s", numericPart)
-
-				// numericPart = strings.TrimSpace(numericPart)
-				// log.Info("Trimmed numericPart: %s", numericPart)
-				// snapIDnew, err := strconv.ParseInt(numericPart, 10, 64)
-				// if err != nil {
-				// 	log.Info("failed to parse snapshot ID '%s' with error : %s", snapID, err.Error())
-				// }
-				// log.Infof("Beforeif: Found snapshot with ID %d in str %d", snapIDnew, isiSnapshotBySnapID.ID)
-
-				// if isiSnapshotBySnapID.ID == snapIDnew {
-				// 	log.Infof("Found snapshot with ID %s in cluster %s", snapIDnew, isiConfig.ClusterName)
-				// 	allSnapshots = append(allSnapshots, isiSnapshotBySnapID)
-				// }
-			}
 			if err != nil {
 				log.Errorf("unable to list snapshots for cluster : %s with error : %s", isiConfig.ClusterName, err.Error())
 				continue
 			}
-
-			// Filter snapshots by source ID and normalize snapshot IDs.
-			// for _, isiSnapshot := range isiSnapshotList {
-			// 	if strconv.FormatInt(isiSnapshot.SourceID, 10) == srcID {
-			// 		isiSnapshot.Name = getUtilsGetNormalizedSnapshotID(ctx, strconv.FormatInt(isiSnapshot.ID, 10), isiConfig.ClusterName, isiConfig.accessZone)
-			// 		allSnapshots = append(allSnapshots, isiSnapshot)
-			// 	}
-			// }
+			for _, isiSnapshotBySnapID := range snapshotList {
+				log.Info(isiSnapshotBySnapID)
+			}
 		}
 	}
 	nextTokenStr := ""
