@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
+Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import (
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
 	"github.com/dell/csi-isilon/v2/provider"
-	"github.com/dell/gocsi/utils"
+	csiutils "github.com/dell/gocsi/utils/csi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -150,7 +150,7 @@ func applyNodeLabel(host, endpoint string) (result bool) {
 func startServer(ctx context.Context) (*grpc.ClientConn, func()) {
 	// Create a new SP instance and serve it with a piped connection.
 	sp := provider.New()
-	lis, err := utils.GetCSIEndpointListener()
+	lis, err := csiutils.GetCSIEndpointListener()
 	if err != nil {
 		fmt.Printf("couldn't open listener: '%s'\n", err.Error())
 		return nil, nil
@@ -181,7 +181,7 @@ func startServer(ctx context.Context) (*grpc.ClientConn, func()) {
 			fmt.Printf("http: Server closed")
 		}
 	}()
-	network, addr, err := utils.GetCSIEndpoint()
+	network, addr, err := csiutils.GetCSIEndpoint()
 	if err != nil {
 		return nil, nil
 	}

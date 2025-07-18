@@ -17,7 +17,7 @@ import (
 
 	controller "github.com/dell/csi-isilon/v2/service"
 	csictx "github.com/dell/gocsi/context"
-	mwtypes "github.com/dell/gocsi/middleware/serialvolume/types"
+	mwtypes "github.com/dell/gocsi/middleware/serialvolume/lockprovider"
 	log "github.com/sirupsen/logrus"
 	xctx "golang.org/x/net/context"
 

@@ -107,8 +107,8 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dell/csi-metadata-retriever v1.11.1-0.20250609125910-c5c6a0a1f521 h1:eQlMjB+lYR7DuBR/WtjHG+E7ROIFUYLVys9bNdLl+yI=
-github.com/dell/csi-metadata-retriever v1.11.1-0.20250609125910-c5c6a0a1f521/go.mod h1:ZMDh47pc2rNob+qTUOtv17nR5CtpO0i35bQR5B2+DPk=
+github.com/dell/csi-metadata-retriever v1.11.1-0.20250718153414-fd2c3f002226 h1:J3pyPMRZSVZsqWd23yq/C//3hCOSmEnzqLxiyrlPaXQ=
+github.com/dell/csi-metadata-retriever v1.11.1-0.20250718153414-fd2c3f002226/go.mod h1:EEPFcVCYiJ4CAWy0+N7ypVeRgpdb7u3n+nlfOQkmZN4=
 github.com/dell/dell-csi-extensions/common v1.8.1-0.20250514175456-5ddd200c5e5c h1:FFYqKddDMmaLzsVth8OOc83TyS7u4OcCj2YcKPHKj2k=
 github.com/dell/dell-csi-extensions/common v1.8.1-0.20250514175456-5ddd200c5e5c/go.mod h1:0cJvgNiPOosCJujd60aV9ZTujsHbRJNXX0ARRMDyjfw=
 github.com/dell/dell-csi-extensions/podmon v1.8.0 h1:393bE3EKmV3oYJk1pNwW733rh+j562X6IVV9XnDhbBs=
@@ -117,8 +117,8 @@ github.com/dell/dell-csi-extensions/replication v1.11.0 h1:Fn/4Xa6Up7Duz5P8MxiMJ
 github.com/dell/dell-csi-extensions/replication v1.11.0/go.mod h1:4ckSKNS4P2PnPXtscOFeHdbjemjnh4tdbNWtJTbbwsQ=
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.1 h1:NnS/P2OpwMlQ70fwls/KVVfe8z8op4b7nXArv8CDsqk=
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.1/go.mod h1:rlJGlmp1NI8gU52HYKY2cy13TbSWvt9p5VAG2RLbkQs=
-github.com/dell/gocsi v1.14.1-0.20250701150109-1da4fb20c6c5 h1:oYexrwxjXsVh/XkpYx3kPZogAitO8Uq4hlzXrl30UH8=
-github.com/dell/gocsi v1.14.1-0.20250701150109-1da4fb20c6c5/go.mod h1:pzoyfeOJy5+FZ/uYxCO08MWai/qWtTSSNUfHrhm9/vI=
+github.com/dell/gocsi v1.14.1-0.20250717201424-c79f876a35fe h1:PYK4WxFpgGwofB/WrZWiW0HPd17h+DSJ8NVrcU5Acoc=
+github.com/dell/gocsi v1.14.1-0.20250717201424-c79f876a35fe/go.mod h1:pzoyfeOJy5+FZ/uYxCO08MWai/qWtTSSNUfHrhm9/vI=
 github.com/dell/gofsutil v1.19.0 h1:41Hx24Tlie37UbOwatHgNAV0nq+KQysrhABXCnpOs+E=
 github.com/dell/gofsutil v1.19.0/go.mod h1:yOuHhBa+iI/QXhZGm7BgCEdf+ji1nIFXzkObv1x0SRs=
 github.com/dell/goisilon v1.19.1-0.20250708120138-0d938924b4df h1:nZiv8H1LnxbPSVWIV9t6lMEJt8sKVoYUcGxFzXHeB/M=
