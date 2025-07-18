@@ -1552,8 +1552,8 @@ func (s *service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 	for i, snapshot := range source {
 		// converting to normalized snapshot ID
 		_, clusterName, accessZone, _ := id.ParseNormalizedSnapshotID(ctx, req.SnapshotId)
-		temp := strconv.FormatInt(snapshot.ID, 10)
-		normalisedSnapshotID := id.GetNormalizedSnapshotID(ctx, temp, clusterName, accessZone)
+		normalisedSnapshotID := strconv.FormatInt(snapshot.ID, 10)
+		normalisedSnapshotID = id.GetNormalizedSnapshotID(ctx, normalisedSnapshotID, clusterName, accessZone)
 
 		log.Info("Listsnap entries", "snapshotName", snapshot.Name, "snapshotID", snapshot.ID, "snapshotPath", snapshot.Path, "snapshotState", snapshot.State)
 		entries[i] = &csi.ListSnapshotsResponse_Entry{
