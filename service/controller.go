@@ -26,6 +26,7 @@ import (
 	"time"
 
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
+	log "github.com/sirupsen/logrus"
 
 	fPath "path"
 
@@ -1513,10 +1514,176 @@ func (s *service) ListVolumes(_ context.Context,
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (s *service) ListSnapshots(context.Context,
-	*csi.ListSnapshotsRequest,
-) (*csi.ListSnapshotsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+// ListSnapshots list all accessible snapshots from the storage array.
+func (s *service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
+	var (
+		startToken  int
+		maxEntries  = int(req.GetMaxEntries())
+		snapshotID  string
+		sourceVolID string
+	)
+
+	if req.SnapshotId != "" {
+		snapshotID = req.SnapshotId
+	}
+
+	if req.SourceVolumeId != "" {
+		sourceVolID = req.SourceVolumeId
+	}
+	log.Info("ListSnapshots ", "snapshotID", snapshotID, "sourceVolID", sourceVolID)
+	if v := req.GetStartingToken(); v != "" {
+		i, err := strconv.ParseInt(v, 10, 32)
+		if err != nil {
+			return nil, status.Errorf(codes.Aborted, "unable to parse StartingToken: %v into uint32", v)
+		}
+		startToken = int(i)
+	}
+	// Call the common listVolumes code
+	source, nextToken, err := s.listPowerScaleSnapshots(ctx, startToken, maxEntries, snapshotID, sourceVolID)
+	if err != nil {
+		return nil, err
+	}
+	if len(source) == 0 {
+		return &csi.ListSnapshotsResponse{}, nil
+	}
+
+	// Process the source volumes and make CSI Volumes
+	entries := make([]*csi.ListSnapshotsResponse_Entry, len(source))
+	for i, snapshot := range source {
+		id, _ := extractNumber(snapshotID)
+		fmt.Println("Extracted ID:", id)
+
+		// Format number back
+		snapshotIDFormated := formatSnapshotID(id)
+
+		log.Info("Listsnap entries", "snapshotName", snapshot.Name, "snapshotID", snapshot.ID, "snapshotPath", snapshot.Path, "snapshotState", snapshot.State)
+		entries[i] = &csi.ListSnapshotsResponse_Entry{
+			Snapshot: s.getCSISnapshot(snapshotIDFormated, snapshotIDFormated, snapshot.Created, snapshot.Size),
+		}
+	}
+
+	return &csi.ListSnapshotsResponse{
+		Entries:   entries,
+		NextToken: nextToken,
+	}, nil
+}
+
+func extractNumber(input string) (int64, error) {
+	parts := strings.SplitN(input, "=", 2)
+	return strconv.ParseInt(parts[0], 10, 64)
+}
+
+// Formats a number into the custom pattern
+func formatSnapshotID(id int64) string {
+	return fmt.Sprintf("%d=_=_=echo=_=_=System", id)
+}
+
+// listPowerScaleSnapshots retrieves a list of snapshots from Isilon clusters.
+func (s *service) listPowerScaleSnapshots(ctx context.Context, startToken, maxEntries int, snapID, srcID string) (isi.SnapshotList, string, error) {
+	ctx, log, _ := GetRunIDLog(ctx)
+
+	var allSnapshots isi.SnapshotList
+
+	isilonClusterConfigs := s.getIsilonClusters()
+	log.Info("snap id" + snapID + "src id " + srcID)
+	if snapID == "" && srcID == "" {
+		// Iterate over the list of Isilon clusters.
+		for _, isiConfig := range isilonClusterConfigs {
+			log.Info("Inside if loop")
+			isiSnapshotList, err := isiConfig.isiSvc.GetSnapshots(ctx)
+			if err != nil {
+				log.Errorf("unable to list snapshots for cluster : %s with error : %s", isiConfig.ClusterName, err.Error())
+				continue
+			}
+			log.Info("isiSnapshotList", isiSnapshotList)
+			log.Info("lenght of isiSnapshotList", len(isiSnapshotList))
+
+			allSnapshots = append(allSnapshots, isiSnapshotList...)
+		}
+	} else if snapID != "" {
+
+		// Iterate over the list of Isilon clusters.
+		for _, isiConfig := range isilonClusterConfigs {
+			// Fetch the list of snapshots for the current cluster.
+			snapshotList, err := isiConfig.isiSvc.GetSnapshots(ctx)
+			if err != nil {
+				log.Errorf("unable to list snapshots for cluster : %s with error : %s", isiConfig.ClusterName, err.Error())
+				continue
+			}
+			for _, isiSnapshotBySnapID := range snapshotList {
+				log.Info("snap id" + snapID)
+
+				//numericPart := extractNumericPrefix(snapID)
+				snapshotNormalisedId, _, _, _ := id.ParseNormalizedSnapshotID(ctx, snapID)
+				log.Infof("numericPart: %s", snapshotNormalisedId)
+				snapIDnew, err := strconv.ParseInt(snapshotNormalisedId, 10, 64)
+				if err != nil {
+					log.Info("failed to parse snapshot ID '%s' with error : %s", snapID, err.Error())
+				}
+				log.Infof("Beforeif: Found snapshot with ID %d in str %d", snapIDnew, isiSnapshotBySnapID.ID)
+
+				if isiSnapshotBySnapID.ID == snapIDnew {
+					log.Infof("Found snapshot with ID %s in cluster %s", snapIDnew, isiConfig.ClusterName)
+					allSnapshots = append(allSnapshots, isiSnapshotBySnapID)
+				}
+			}
+
+		}
+	} else {
+		log.Info("Inside else loop")
+		// Iterate over the list of Isilon clusters.
+		for _, isiConfig := range isilonClusterConfigs {
+			// Fetch the list of snapshots for the current cluster.
+			snapshotList, err := isiConfig.isiSvc.GetSnapshots(ctx)
+			for _, isiSnapshotBySnapID := range snapshotList {
+				log.Info("snap id" + srcID)
+				log.Info("isiSnapshotBySnapID", isiSnapshotBySnapID.ID)
+				log.Info("isiSnapshotBySnap name", isiSnapshotBySnapID.Name)
+				log.Info("isiSnapshotBySnapID TargetID", isiSnapshotBySnapID.TargetID)
+				log.Info("isiSnapshotBySnapNAme TargetName", isiSnapshotBySnapID.TargetName)
+
+				// numericPart := extractNumericPrefix(snapID)
+				// log.Infof("numericPart: %s", numericPart)
+
+				// numericPart = strings.TrimSpace(numericPart)
+				// log.Info("Trimmed numericPart: %s", numericPart)
+				// snapIDnew, err := strconv.ParseInt(numericPart, 10, 64)
+				// if err != nil {
+				// 	log.Info("failed to parse snapshot ID '%s' with error : %s", snapID, err.Error())
+				// }
+				// log.Infof("Beforeif: Found snapshot with ID %d in str %d", snapIDnew, isiSnapshotBySnapID.ID)
+
+				// if isiSnapshotBySnapID.ID == snapIDnew {
+				// 	log.Infof("Found snapshot with ID %s in cluster %s", snapIDnew, isiConfig.ClusterName)
+				// 	allSnapshots = append(allSnapshots, isiSnapshotBySnapID)
+				// }
+			}
+			if err != nil {
+				log.Errorf("unable to list snapshots for cluster : %s with error : %s", isiConfig.ClusterName, err.Error())
+				continue
+			}
+
+			// Filter snapshots by source ID and normalize snapshot IDs.
+			// for _, isiSnapshot := range isiSnapshotList {
+			// 	if strconv.FormatInt(isiSnapshot.SourceID, 10) == srcID {
+			// 		isiSnapshot.Name = getUtilsGetNormalizedSnapshotID(ctx, strconv.FormatInt(isiSnapshot.ID, 10), isiConfig.ClusterName, isiConfig.accessZone)
+			// 		allSnapshots = append(allSnapshots, isiSnapshot)
+			// 	}
+			// }
+		}
+	}
+	nextTokenStr := ""
+	log.Info("allSnapshots length", len(allSnapshots))
+	for i, snap := range allSnapshots {
+		log.Info("Snapshot #%d:\n", i+1)
+		log.Info("  ID: %d\n", snap.ID)
+		log.Info("  Name: %s\n", snap.Name)
+		log.Info("  Path: %s\n", snap.Path)
+		log.Info("  State: %s\n", snap.State)
+		log.Info("---------------------------")
+	}
+
+	return allSnapshots, nextTokenStr, nil
 }
 
 func (s *service) ControllerUnpublishVolume(
@@ -1665,13 +1832,13 @@ func (s *service) ControllerGetCapabilities(
 				},
 			},
 		},
-		/*{
+		{
 			Type: &csi.ControllerServiceCapability_Rpc{
 				Rpc: &csi.ControllerServiceCapability_RPC{
 					Type: csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
 				},
 			},
-		},*/
+		},
 		{
 			Type: &csi.ControllerServiceCapability_Rpc{
 				Rpc: &csi.ControllerServiceCapability_RPC{

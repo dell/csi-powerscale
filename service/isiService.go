@@ -776,6 +776,19 @@ func (svc *isiService) GetSnapshot(ctx context.Context, identity string) (isi.Sn
 	return snapshot, nil
 }
 
+func (svc *isiService) GetSnapshots(ctx context.Context) (isi.SnapshotList, error) {
+	// Fetch log handler
+	log := logging.GetRunIDLogger(ctx)
+	log.Debugf("begin getting all the snapshot  for Isilon")
+	var snapshotList isi.SnapshotList
+	var err error
+	if snapshotList, err = svc.client.GetSnapshots(ctx); err != nil {
+		log.Errorf("failed to get snapshots '%s'", err.Error())
+		return nil, err
+	}
+	return snapshotList, nil
+}
+
 func (svc *isiService) GetSnapshotSize(ctx context.Context, isiPath, name string, accessZone string) int64 {
 	// Fetch log handler
 	log := logging.GetRunIDLogger(ctx)
