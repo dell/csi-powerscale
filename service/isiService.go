@@ -818,6 +818,21 @@ func (svc *isiService) GetExportWithPathAndZone(ctx context.Context, path, acces
 	return export, nil
 }
 
+func (svc *isiService) GetExportWithPath(ctx context.Context, path string) (isi.Export, error) {
+	// Fetch log handler
+	log := logging.GetRunIDLogger(ctx)
+
+	log.Debugf("begin getting export with target path '%s' for Isilon", path)
+	var export isi.Export
+	var err error
+	if export, err = svc.client.GetExportWithPath(ctx, path); err != nil {
+		log.Error("failed to get export with target path '" + path + "' : '" + err.Error() + "'")
+		return nil, err
+	}
+
+	return export, nil
+}
+
 func (svc *isiService) GetSnapshotIsiPath(ctx context.Context, isiPath string, sourceSnapshotID string, accessZone string) (string, error) {
 	return svc.client.GetSnapshotIsiPath(ctx, isiPath, sourceSnapshotID, accessZone)
 }

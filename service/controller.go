@@ -1550,14 +1550,10 @@ func (s *service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 	// Process the source volumes and make CSI Volumes
 	entries := make([]*csi.ListSnapshotsResponse_Entry, len(source))
 	for i, snapshot := range source {
-		// converting to normalized snapshot ID
-		_, clusterName, accessZone, _ := id.ParseNormalizedSnapshotID(ctx, req.SnapshotId)
-		normalisedSnapshotID := strconv.FormatInt(snapshot.ID, 10)
-		normalisedSnapshotID = id.GetNormalizedSnapshotID(ctx, normalisedSnapshotID, clusterName, accessZone)
 
 		log.Info("Listsnap entries", "snapshotName", snapshot.Name, "snapshotID", snapshot.ID, "snapshotPath", snapshot.Path, "snapshotState", snapshot.State)
 		entries[i] = &csi.ListSnapshotsResponse_Entry{
-			Snapshot: s.getCSISnapshot(normalisedSnapshotID, normalisedSnapshotID, snapshot.Created, snapshot.Size),
+			Snapshot: s.getCSISnapshot(snapshot.Name, snapshot.Path, snapshot.Created, snapshot.Size),
 		}
 	}
 	return &csi.ListSnapshotsResponse{
@@ -1569,67 +1565,77 @@ func (s *service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 // listPowerScaleSnapshots retrieves a list of snapshots from Isilon clusters.
 func (s *service) listPowerScaleSnapshots(ctx context.Context, startToken, maxEntries int, snapID, srcID string) (isi.SnapshotList, string, error) {
 	ctx, log, _ := GetRunIDLog(ctx)
-	// initialize an empty slice to hold all snapshots
 	var allSnapshots isi.SnapshotList
 	// Fetch the list of Isilon cluster configurations.
 	isilonClusterConfigs := s.getIsilonClusters()
 	log.Info("snap id" + snapID + "src id " + srcID)
 	if snapID == "" && srcID == "" {
-		// Iterate over the list of Isilon clusters.
 		for _, isiConfig := range isilonClusterConfigs {
-			log.Info("Inside if loop")
 			isiSnapshotList, err := isiConfig.isiSvc.GetSnapshots(ctx)
 			if err != nil {
 				log.Errorf("unable to list snapshots for cluster : %s with error : %s", isiConfig.ClusterName, err.Error())
 				continue
 			}
-			log.Info("isiSnapshotList", isiSnapshotList)
-			log.Info("lenght of isiSnapshotList", len(isiSnapshotList))
+
+			for _, isiSnapshot := range isiSnapshotList {
+				isiSnapshot.Name = id.GetNormalizedSnapshotID(ctx, strconv.FormatInt(isiSnapshot.ID, 10), isiConfig.ClusterName, s.opts.AccessZone)
+				srcVolNameFromPath := isilonfs.GetVolumeNameFromExportPath(isiSnapshot.Path)
+				srcVolumeExport, _ := isiConfig.isiSvc.GetExportWithPath(ctx, isiSnapshot.Path)
+				if srcVolumeExport != nil {
+					isiSnapshot.Path = id.GetNormalizedVolumeID(ctx, srcVolNameFromPath, srcVolumeExport.ID, s.opts.AccessZone, isiConfig.ClusterName)
+				} else {
+					isiSnapshot.Path = id.GetNormalizedVolumeID(ctx, srcVolNameFromPath, int(isiSnapshot.ID), s.opts.AccessZone, isiConfig.ClusterName)
+				}
+			}
 
 			allSnapshots = append(allSnapshots, isiSnapshotList...)
 		}
 	} else if snapID != "" {
-
-		// Iterate over the list of Isilon clusters.
 		for _, isiConfig := range isilonClusterConfigs {
-			// Fetch the list of snapshots for the current cluster.
 			snapshotList, err := isiConfig.isiSvc.GetSnapshots(ctx)
 			if err != nil {
 				log.Errorf("unable to list snapshots for cluster : %s with error : %s", isiConfig.ClusterName, err.Error())
 				continue
 			}
-			for _, isiSnapshotBySnapID := range snapshotList {
+
+			for _, isiSnapshot := range snapshotList {
 				log.Info("snap id" + snapID)
-
-				//numericPart := extractNumericPrefix(snapID)
-				snapshotNormalisedId, _, _, _ := id.ParseNormalizedSnapshotID(ctx, snapID)
-				log.Infof("numericPart: %s", snapshotNormalisedId)
-				snapIDnew, err := strconv.ParseInt(snapshotNormalisedId, 10, 64)
-				if err != nil {
-					log.Info("failed to parse snapshot ID '%s' with error : %s", snapID, err.Error())
-				}
-				log.Infof("Beforeif: Found snapshot with ID %d in str %d", snapIDnew, isiSnapshotBySnapID.ID)
-
-				if isiSnapshotBySnapID.ID == snapIDnew {
-					log.Infof("Found snapshot with ID %s in cluster %s", snapIDnew, isiConfig.ClusterName)
-					allSnapshots = append(allSnapshots, isiSnapshotBySnapID)
+				snapshotNormalisedId, clusterName, accessZone, _ := id.ParseNormalizedSnapshotID(ctx, snapID)
+				if snapshotNormalisedId == strconv.FormatInt(isiSnapshot.ID, 10) {
+					isiSnapshot.Name = id.GetNormalizedSnapshotID(ctx, strconv.FormatInt(isiSnapshot.ID, 10), clusterName, accessZone)
+					srcVolNameFromPath := isilonfs.GetVolumeNameFromExportPath(isiSnapshot.Path)
+					srcVolumeExport, _ := isiConfig.isiSvc.GetExportWithPath(ctx, isiSnapshot.Path)
+					if srcVolumeExport != nil {
+						isiSnapshot.Path = id.GetNormalizedVolumeID(ctx, srcVolNameFromPath, srcVolumeExport.ID, accessZone, clusterName)
+					} else {
+						isiSnapshot.Path = id.GetNormalizedVolumeID(ctx, srcVolNameFromPath, int(isiSnapshot.ID), accessZone, clusterName)
+					}
+					allSnapshots = append(allSnapshots, isiSnapshot)
+					break
 				}
 			}
 
 		}
 	} else {
-		log.Info("Inside else loop")
-		// Iterate over the list of Isilon clusters.
 		for _, isiConfig := range isilonClusterConfigs {
-			// Fetch the list of snapshots for the current cluster.
-			snapshotList, err := isiConfig.isiSvc.GetSnapshots(ctx)
+			isiSnapshotList, err := isiConfig.isiSvc.GetSnapshots(ctx)
 			if err != nil {
 				log.Errorf("unable to list snapshots for cluster : %s with error : %s", isiConfig.ClusterName, err.Error())
 				continue
 			}
-			for _, isiSnapshotBySnapID := range snapshotList {
-				log.Info(isiSnapshotBySnapID)
+
+			srcName, _, accessZone, clusterName, _ := id.ParseNormalizedVolumeID(ctx, srcID)
+			for _, isiSnapshot := range isiSnapshotList {
+				srcVolNameFromPath := isilonfs.GetVolumeNameFromExportPath(isiSnapshot.Path)
+				log.Infof("srcName %v sourceVolumeName %v", srcName, srcVolNameFromPath)
+				if strings.EqualFold(srcName, srcVolNameFromPath) {
+					isiSnapshot.Name = id.GetNormalizedSnapshotID(ctx, strconv.FormatInt(isiSnapshot.ID, 10), clusterName, accessZone)
+					isiSnapshot.Path = srcID
+					allSnapshots = append(allSnapshots, isiSnapshot)
+					break
+				}
 			}
+
 		}
 	}
 	nextTokenStr := ""
