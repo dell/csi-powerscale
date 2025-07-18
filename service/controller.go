@@ -1270,7 +1270,7 @@ func (s *service) ControllerPublishVolume(
 
 	nodeID := req.GetNodeId()
 	if nodeID == "" {
-		return nil, status.Error(codes.InvalidArgument,
+		return nil, status.Error(codes.NotFound,
 			logging.GetMessageWithRunID(runID, "node ID is required"))
 	}
 
@@ -1307,7 +1307,7 @@ func (s *service) ControllerPublishVolume(
 	_, _, nodeIP, err := id.ParseNodeID(ctx, nodeID)
 	if err != nil {
 		log.Errorf("failed to parse node id '%s' with error : %s", nodeID, err.Error())
-		return nil, status.Error(codes.InvalidArgument,
+		return nil, status.Error(codes.NotFound,
 			logging.GetMessageWithRunID(runID, "failed to parse node id '%s'", nodeID))
 	}
 
