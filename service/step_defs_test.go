@@ -1018,11 +1018,11 @@ func (f *feature) aValidControllerGetCapabilitiesResponseIsReturned() error {
 			}
 		}
 
-		if f.service.opts.IsHealthMonitorEnabled && count != 9 {
+		if f.service.opts.IsHealthMonitorEnabled && count != 10 {
 			// Set default value
 			f.service.opts.IsHealthMonitorEnabled = false
 			return errors.New("Did not retrieve all the expected capabilities")
-		} else if !f.service.opts.IsHealthMonitorEnabled && count != 7 {
+		} else if !f.service.opts.IsHealthMonitorEnabled && count != 8 {
 			return errors.New("Did not retrieve all the expected capabilities")
 		}
 
@@ -1097,6 +1097,8 @@ func (f *feature) iCallValidateVolumeCapabilitiesWithVoltypeAccess(voltype, acce
 }
 
 func clearErrors() {
+	stepHandlersErrors.counterMutex.Lock()
+	defer stepHandlersErrors.counterMutex.Unlock()
 	stepHandlersErrors.ExportNotFoundError = true
 	stepHandlersErrors.VolumeNotExistError = true
 	stepHandlersErrors.InstancesError = false

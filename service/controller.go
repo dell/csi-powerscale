@@ -1269,7 +1269,7 @@ func (s *service) ControllerPublishVolume(
 
 	nodeID := req.GetNodeId()
 	if nodeID == "" {
-		return nil, status.Error(codes.InvalidArgument,
+		return nil, status.Error(codes.NotFound,
 			logging.GetMessageWithRunID(runID, "node ID is required"))
 	}
 
@@ -1306,7 +1306,7 @@ func (s *service) ControllerPublishVolume(
 	_, _, nodeIP, err := id.ParseNodeID(ctx, nodeID)
 	if err != nil {
 		log.Errorf("failed to parse node id '%s' with error : %s", nodeID, err.Error())
-		return nil, status.Error(codes.InvalidArgument,
+		return nil, status.Error(codes.NotFound,
 			logging.GetMessageWithRunID(runID, "failed to parse node id '%s'", nodeID))
 	}
 
@@ -1513,10 +1513,147 @@ func (s *service) ListVolumes(_ context.Context,
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (s *service) ListSnapshots(context.Context,
-	*csi.ListSnapshotsRequest,
-) (*csi.ListSnapshotsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+func (s *service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
+	ctx, log, runID := GetRunIDLog(ctx)
+	var (
+		startToken  int
+		maxEntries  = int(req.GetMaxEntries())
+		snapshotID  = req.GetSnapshotId()
+		sourceVolID = req.GetSourceVolumeId()
+	)
+
+	log.Infof("Request received: snapshotID=%s, sourceVolID=%s, startToken=%s, maxEntries=%d", snapshotID, sourceVolID, req.GetStartingToken(), maxEntries)
+
+	if token := req.GetStartingToken(); token != "" {
+		i, err := strconv.ParseInt(token, 10, 64)
+		if err != nil {
+			log.Errorf("Failed to parse starting token: %s, error=%v", token, err)
+			return nil, status.Error(codes.Aborted, logging.GetMessageWithRunID(runID, "unable to parse StartingToken: %v into uint32", token))
+		}
+		startToken = int(i)
+		log.Debugf("Parsed starting token: startToken=%d", startToken)
+	}
+
+	snapshots, nextToken, err := s.listPowerScaleSnapshots(ctx, startToken, maxEntries, snapshotID, sourceVolID)
+	if err != nil {
+		log.Errorf("Failed to list snapshots: %v", err)
+		return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "failed to list snapshots: %v", err.Error()))
+	}
+
+	if len(snapshots) == 0 {
+		log.Info("No snapshots found")
+		return &csi.ListSnapshotsResponse{}, nil
+	}
+
+	entries := make([]*csi.ListSnapshotsResponse_Entry, len(snapshots))
+	for i, snap := range snapshots {
+		log.Debugf("Snapshot entry: index=%d, ID=%d, Name=%s, Path=%s, State=%s", i, snap.ID, snap.Name, snap.Path, snap.State)
+		entries[i] = &csi.ListSnapshotsResponse_Entry{
+			Snapshot: s.getCSISnapshot(snap.Name, snap.Path, snap.Created, snap.Size),
+		}
+	}
+
+	log.Debugf("Returning snapshot list: count=%d, nextToken=%s", len(entries), nextToken)
+	return &csi.ListSnapshotsResponse{
+		Entries:   entries,
+		NextToken: nextToken,
+	}, nil
+}
+
+func (s *service) listPowerScaleSnapshots(ctx context.Context, startToken, maxEntries int, snapID, srcID string) (isi.SnapshotList, string, error) {
+	ctx, log, _ := GetRunIDLog(ctx)
+	log.Infof("Entering listPowerScaleSnapshots: snapID=%s, srcID=%s", snapID, srcID)
+
+	var filteredSnapshots isi.SnapshotList
+	var totalSnapshots int
+
+	for _, config := range s.getIsilonClusters() {
+		log := log.WithField("cluster", config.ClusterName)
+		snapshots, err := config.isiSvc.GetSnapshots(ctx)
+		if err != nil {
+			log.Errorf("Failed to get snapshots: %v", err)
+			continue
+		}
+		log.Debugf("Fetched snapshots: count=%d", len(snapshots))
+
+		totalSnapshots += len(snapshots)
+
+		if startToken < totalSnapshots {
+			var snapsToProcess int
+			if maxEntries == 0 {
+				snapsToProcess = len(snapshots)
+			} else {
+				snapsToProcess = maxEntries - len(filteredSnapshots)
+			}
+
+			processedSnaps := 0
+			for _, snap := range snapshots {
+				if shouldIncludeSnapshot(ctx, snap, snapID, srcID) {
+					log.Debugf("Including snapshot: ID=%d", snap.ID)
+					normalizeSnapshot(ctx, snap, config, s)
+					filteredSnapshots = append(filteredSnapshots, snap)
+					processedSnaps++
+
+					if processedSnaps == snapsToProcess {
+						break
+					}
+				}
+			}
+
+			if len(filteredSnapshots) >= startToken+maxEntries {
+				break
+			}
+		}
+	}
+
+	if startToken > totalSnapshots {
+		err := fmt.Errorf("startingToken=%d > totalSnapshots=%d", startToken, totalSnapshots)
+		log.Errorf("Invalid starting token: %v", err)
+		return nil, "", status.Errorf(codes.Aborted, "invalid starting token, error: %s", err.Error())
+	}
+
+	remaining := totalSnapshots - startToken
+	if maxEntries == 0 || maxEntries > remaining {
+		maxEntries = remaining
+	}
+
+	nextToken := ""
+	if startToken+maxEntries < totalSnapshots {
+		nextToken = fmt.Sprintf("%d", startToken+len(filteredSnapshots))
+	}
+
+	log.Infof("Returning snapshot slice: start=%d, count=%d, nextToken=%s", startToken, len(filteredSnapshots), nextToken)
+	return filteredSnapshots[startToken:], nextToken, nil
+}
+
+func shouldIncludeSnapshot(ctx context.Context, snap isi.Snapshot, snapID, srcID string) bool {
+	if snapID != "" {
+		id, _, _, _ := id.ParseNormalizedSnapshotID(ctx, snapID)
+		return strconv.FormatInt(snap.ID, 10) == id
+	}
+	if srcID != "" {
+		srcName, _, _, _, _ := id.ParseNormalizedVolumeID(ctx, srcID)
+		return strings.EqualFold(srcName, isilonfs.GetVolumeNameFromExportPath(snap.Path))
+	}
+	return true
+}
+
+// normalizeSnapshot updates the snapshot name and path with normalized IDs to convert isi snapshot into csi snapshot.
+// It replaces the snapshot name with a normalized snapshot ID (e.g. 12345=_=_=cluster1=_=_=zone1)
+// and the snapshot path with a normalized volume ID of the source volume (e.g. k8s-e89c9d089e=_=_=19=_=_=csi0zone=_=_=cluster1).
+func normalizeSnapshot(ctx context.Context, snap isi.Snapshot, config *IsilonClusterConfig, s *service) {
+	ctx, log, _ := GetRunIDLog(ctx)
+	log = log.WithField("snapshotID", snap.ID)
+	log.Debugf("Normalizing snapshot: ID=%d", snap.ID)
+
+	snap.Name = id.GetNormalizedSnapshotID(ctx, strconv.FormatInt(snap.ID, 10), config.ClusterName, s.opts.AccessZone)
+	volName := isilonfs.GetVolumeNameFromExportPath(snap.Path)
+	export, _ := config.isiSvc.GetExportWithPath(ctx, snap.Path)
+
+	if export != nil {
+		snap.Path = id.GetNormalizedVolumeID(ctx, volName, export.ID, export.Zone, config.ClusterName)
+		log.Debugf("Normalized with export: exportID=%d, zone=%s", export.ID, export.Zone)
+	}
 }
 
 func (s *service) ControllerUnpublishVolume(
@@ -1665,13 +1802,13 @@ func (s *service) ControllerGetCapabilities(
 				},
 			},
 		},
-		/*{
+		{
 			Type: &csi.ControllerServiceCapability_Rpc{
 				Rpc: &csi.ControllerServiceCapability_RPC{
 					Type: csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
 				},
 			},
-		},*/
+		},
 		{
 			Type: &csi.ControllerServiceCapability_Rpc{
 				Rpc: &csi.ControllerServiceCapability_RPC{
