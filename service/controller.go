@@ -1525,7 +1525,7 @@ func (s *service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 	log.Infof("Request received: snapshotID=%s, sourceVolID=%s, startToken=%s, maxEntries=%d", snapshotID, sourceVolID, req.GetStartingToken(), maxEntries)
 
 	if token := req.GetStartingToken(); token != "" {
-		i, err := strconv.ParseInt(token, 10, 32)
+		i, err := strconv.ParseInt(token, 10, 64)
 		if err != nil {
 			log.Errorf("Failed to parse starting token: %s, error=%v", token, err)
 			return nil, status.Error(codes.Aborted, logging.GetMessageWithRunID(runID, "unable to parse StartingToken: %v into uint32", token))
