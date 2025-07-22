@@ -1522,21 +1522,21 @@ func (s *service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 		sourceVolID = req.GetSourceVolumeId()
 	)
 
-	log.Info("Request received", "snapshotID", snapshotID, "sourceVolID", sourceVolID, "maxEntries", maxEntries)
+	log.Infof("Request received: snapshotID=%s, sourceVolID=%s, startToken=%s, maxEntries=%d", snapshotID, sourceVolID, req.GetStartingToken(), maxEntries)
 
 	if token := req.GetStartingToken(); token != "" {
 		i, err := strconv.ParseInt(token, 10, 32)
 		if err != nil {
-			log.Error(err, "Failed to parse starting token", "token", token)
+			log.Errorf("Failed to parse starting token: %s, error=%v", token, err)
 			return nil, status.Error(codes.Aborted, logging.GetMessageWithRunID(runID, "unable to parse StartingToken: %v into uint32", token))
 		}
 		startToken = int(i)
-		log.Debug("Parsed starting token", "startToken", startToken)
+		log.Debugf("Parsed starting token: startToken=%d", startToken)
 	}
 
 	snapshots, nextToken, err := s.listPowerScaleSnapshots(ctx, startToken, maxEntries, snapshotID, sourceVolID)
 	if err != nil {
-		log.Error(err, "Failed to list snapshots")
+		log.Errorf("Failed to list snapshots: %v", err)
 		return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "failed to list snapshots: %v", err.Error()))
 	}
 
@@ -1564,7 +1564,8 @@ func (s *service) listPowerScaleSnapshots(ctx context.Context, startToken, maxEn
 	ctx, log, _ := GetRunIDLog(ctx)
 	log.Infof("Entering listPowerScaleSnapshots: snapID=%s, srcID=%s", snapID, srcID)
 
-	var allSnapshots isi.SnapshotList
+	var filteredSnapshots isi.SnapshotList
+	var totalSnapshots int
 
 	for _, config := range s.getIsilonClusters() {
 		log := log.WithField("cluster", config.ClusterName)
@@ -1575,33 +1576,54 @@ func (s *service) listPowerScaleSnapshots(ctx context.Context, startToken, maxEn
 		}
 		log.Debugf("Fetched snapshots: count=%d", len(snapshots))
 
-		for _, snap := range snapshots {
-			if shouldIncludeSnapshot(ctx, snap, snapID, srcID) {
-				log.Debugf("Including snapshot: ID=%d", snap.ID)
-				normalizeSnapshot(ctx, snap, config, s)
-				allSnapshots = append(allSnapshots, snap)
+		totalSnapshots += len(snapshots)
+
+		if startToken < totalSnapshots {
+			var snapsToProcess int
+			if maxEntries == 0 {
+				snapsToProcess = len(snapshots)
+			} else {
+				snapsToProcess = maxEntries - len(filteredSnapshots)
+			}
+
+			processedSnaps := 0
+			for _, snap := range snapshots {
+				if shouldIncludeSnapshot(ctx, snap, snapID, srcID) {
+					log.Debugf("Including snapshot: ID=%d", snap.ID)
+					normalizeSnapshot(ctx, snap, config, s)
+					filteredSnapshots = append(filteredSnapshots, snap)
+					processedSnaps++
+
+					if processedSnaps == snapsToProcess {
+						break
+					}
+				}
+			}
+
+			if len(filteredSnapshots) >= startToken+maxEntries {
+				break
 			}
 		}
 	}
 
-	if startToken > len(allSnapshots) {
-		err := fmt.Errorf("startingToken=%d > len(allSnapshots)=%d", startToken, len(allSnapshots))
+	if startToken > totalSnapshots {
+		err := fmt.Errorf("startingToken=%d > totalSnapshots=%d", startToken, totalSnapshots)
 		log.Errorf("Invalid starting token: %v", err)
 		return nil, "", status.Errorf(codes.Aborted, "invalid starting token, error: %s", err.Error())
 	}
 
-	remaining := len(allSnapshots) - startToken
+	remaining := totalSnapshots - startToken
 	if maxEntries == 0 || maxEntries > remaining {
 		maxEntries = remaining
 	}
 
 	nextToken := ""
-	if startToken+maxEntries < len(allSnapshots) {
-		nextToken = fmt.Sprintf("%d", startToken+maxEntries)
+	if startToken+maxEntries < totalSnapshots {
+		nextToken = fmt.Sprintf("%d", startToken+len(filteredSnapshots))
 	}
 
-	log.Infof("Returning snapshot slice: start=%d, count=%d, nextToken=%s", startToken, maxEntries, nextToken)
-	return allSnapshots[startToken : startToken+maxEntries], nextToken, nil
+	log.Infof("Returning snapshot slice: start=%d, count=%d, nextToken=%s", startToken, len(filteredSnapshots), nextToken)
+	return filteredSnapshots[startToken:], nextToken, nil
 }
 
 func shouldIncludeSnapshot(ctx context.Context, snap isi.Snapshot, snapID, srcID string) bool {
@@ -1616,6 +1638,9 @@ func shouldIncludeSnapshot(ctx context.Context, snap isi.Snapshot, snapID, srcID
 	return true
 }
 
+// normalizeSnapshot updates the snapshot name and path with normalized IDs to convert isi snapshot into csi snapshot.
+// It replaces the snapshot name with a normalized snapshot ID (e.g. 12345=_=_=cluster1=_=_=zone1)
+// and the snapshot path with a normalized volume ID of the source volume (e.g. k8s-e89c9d089e=_=_=19=_=_=csi0zone=_=_=cluster1).
 func normalizeSnapshot(ctx context.Context, snap isi.Snapshot, config *IsilonClusterConfig, s *service) {
 	ctx, log, _ := GetRunIDLog(ctx)
 	log = log.WithField("snapshotID", snap.ID)

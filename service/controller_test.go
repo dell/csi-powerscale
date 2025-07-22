@@ -584,7 +584,7 @@ func TestListSnapshots(t *testing.T) {
 		resp, err := s.ListSnapshots(context.Background(), req)
 		assert.Error(t, err)
 		assert.Equal(t, codes.Internal, status.Code(err))
-		assert.ErrorContains(t, err, "invalid starting token, error: startingToken=10 > len(allSnapshots)=2")
+		assert.ErrorContains(t, err, "invalid starting token, error: startingToken=10 > totalSnapshots=2")
 		assert.Nil(t, resp)
 	})
 
