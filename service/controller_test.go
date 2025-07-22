@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/v2/common/utils/identifiers"
@@ -455,24 +456,172 @@ func TestToInt(t *testing.T) {
 }
 
 func TestListSnapshots(t *testing.T) {
-	// Creating a mock service
-	srv := &service{}
-
-	// Creating a test request
-	request := &csi.ListSnapshotsRequest{}
-
-	// Calling ListSnapshots method
-	_, err := srv.ListSnapshots(context.Background(), request)
-
-	// Check if the error is as expected
-	if err == nil {
-		t.Fatalf("Expected error but got nil")
+	s := &service{
+		nodeID:                identifiers.DummyHostNodeID,
+		nodeIP:                "127.0.0.1",
+		defaultIsiClusterName: "system",
+		opts:                  Opts{AccessZone: "testZone"},
+		isiClusters:           &sync.Map{},
 	}
 
-	// Check if the error is of type Unimplemented
-	if status.Code(err) != codes.Unimplemented {
-		t.Errorf("Expected error code %v, got %v", codes.Unimplemented, status.Code(err))
+	mockClient := &isimocks.Client{}
+	isiConfig := &IsilonClusterConfig{
+		ClusterName: "system",
+		isiSvc: &isiService{
+			client: &isi.Client{API: mockClient},
+		},
 	}
+	s.isiClusters.Store("system", isiConfig)
+
+	getSnapshotArgs := mock.Arguments{mock.Anything, "platform/1/snapshot/snapshots", mock.Anything, mock.Anything, mock.Anything, mock.Anything}
+	getExportArgs := mock.Arguments{mock.Anything, "platform/2/protocols/nfs/exports", mock.Anything, mock.Anything, mock.Anything, mock.Anything}
+
+	setupSnapshots := func(snapshots []apiv1.IsiSnapshot) {
+		mockClient.ExpectedCalls = nil
+		mockClient.On("Get", getSnapshotArgs...).Return(nil).Run(func(args mock.Arguments) {
+			resp := args.Get(5).(**v1.GetIsiSnapshotsResp)
+			tmpResp := apiv1.GetIsiSnapshotsResp{}
+			for _, snapshot := range snapshots {
+				tmpSnap := snapshot
+				tmpResp.SnapshotList = append(tmpResp.SnapshotList, &tmpSnap)
+			}
+			*resp = &tmpResp
+		})
+	}
+
+	setupExports := func(ids ...int) {
+		for _, id := range ids {
+			mockClient.On("Get", getExportArgs...).Return(nil).Run(func(args mock.Arguments) {
+				resp := args.Get(5).(*v2.ExportList)
+				*resp = v2.ExportList{&v2.Export{ID: id, Zone: s.opts.AccessZone}}
+			}).Once()
+		}
+	}
+
+	snapshots := []apiv1.IsiSnapshot{
+		v1.IsiSnapshot{ID: 101, Name: "snapshot1", Path: "/ifs/data/snapshot1", Created: time.Now().Unix(), State: "STATE_SUCCESSFUL", Size: 100},
+		v1.IsiSnapshot{ID: 102, Name: "snapshot2", Path: "/ifs/data/snapshot2", Created: time.Now().Unix(), State: "STATE_SUCCESSFUL", Size: 200},
+	}
+
+	t.Run("No snapshots found", func(t *testing.T) {
+		setupSnapshots(nil)
+		setupExports(1, 2)
+		req := &csi.ListSnapshotsRequest{}
+		resp, err := s.ListSnapshots(context.Background(), req)
+		assert.NoError(t, err)
+		assert.Nil(t, resp.Entries)
+		assert.Empty(t, resp.NextToken)
+	})
+
+	t.Run("Error in GetSnapshot", func(t *testing.T) {
+		mockClient.ExpectedCalls = nil
+		mockClient.On("Get", getSnapshotArgs...).Return(fmt.Errorf("powerscale api error")).Once()
+		req := &csi.ListSnapshotsRequest{}
+		resp, err := s.ListSnapshots(context.Background(), req)
+		assert.NoError(t, err)
+		assert.Nil(t, resp.Entries)
+		assert.Empty(t, resp.NextToken)
+	})
+
+	t.Run("Successful snapshot listing", func(t *testing.T) {
+		setupSnapshots(snapshots)
+		setupExports(1, 2)
+		req := &csi.ListSnapshotsRequest{MaxEntries: 0}
+		resp, err := s.ListSnapshots(context.Background(), req)
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Len(t, resp.Entries, 2)
+		assert.Equal(t, "101=_=_=system=_=_=testZone", resp.Entries[0].Snapshot.SnapshotId)
+		assert.Equal(t, "102=_=_=system=_=_=testZone", resp.Entries[1].Snapshot.SnapshotId)
+		assert.Equal(t, "snapshot1=_=_=1=_=_=testZone=_=_=system", resp.Entries[0].Snapshot.SourceVolumeId)
+		assert.Equal(t, "snapshot2=_=_=2=_=_=testZone=_=_=system", resp.Entries[1].Snapshot.SourceVolumeId)
+		assert.Empty(t, resp.NextToken)
+	})
+
+	t.Run("Error in GetExportWithPath", func(t *testing.T) {
+		setupSnapshots(snapshots)
+		mockClient.On("Get", getExportArgs...).Return(fmt.Errorf("powerscale api error")).Twice()
+		req := &csi.ListSnapshotsRequest{MaxEntries: 0}
+		resp, err := s.ListSnapshots(context.Background(), req)
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Len(t, resp.Entries, 2)
+		assert.Equal(t, "101=_=_=system=_=_=testZone", resp.Entries[0].Snapshot.SnapshotId)
+		assert.Equal(t, "102=_=_=system=_=_=testZone", resp.Entries[1].Snapshot.SnapshotId)
+		assert.Empty(t, resp.NextToken)
+	})
+
+	t.Run("MaxEntries less than total snapshots", func(t *testing.T) {
+		setupSnapshots(snapshots)
+		setupExports(1, 2)
+		req := &csi.ListSnapshotsRequest{MaxEntries: 1}
+		resp, err := s.ListSnapshots(context.Background(), req)
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Len(t, resp.Entries, 1)
+		assert.Equal(t, "101=_=_=system=_=_=testZone", resp.Entries[0].Snapshot.SnapshotId)
+		assert.Equal(t, "snapshot1=_=_=1=_=_=testZone=_=_=system", resp.Entries[0].Snapshot.SourceVolumeId)
+		assert.Equal(t, "1", resp.NextToken)
+	})
+
+	t.Run("Valid StartingToken", func(t *testing.T) {
+		setupSnapshots(snapshots)
+		setupExports(1, 2)
+		req := &csi.ListSnapshotsRequest{StartingToken: "1"}
+		resp, err := s.ListSnapshots(context.Background(), req)
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Len(t, resp.Entries, 1)
+		assert.Equal(t, "102=_=_=system=_=_=testZone", resp.Entries[0].Snapshot.SnapshotId)
+		assert.Equal(t, "snapshot2=_=_=2=_=_=testZone=_=_=system", resp.Entries[0].Snapshot.SourceVolumeId)
+		assert.Empty(t, resp.NextToken)
+	})
+
+	t.Run("StartingToken greater than snapshot count", func(t *testing.T) {
+		setupSnapshots(snapshots)
+		setupExports(1, 2)
+		req := &csi.ListSnapshotsRequest{StartingToken: "10"}
+		resp, err := s.ListSnapshots(context.Background(), req)
+		assert.Error(t, err)
+		assert.Equal(t, codes.Internal, status.Code(err))
+		assert.ErrorContains(t, err, "invalid starting token, error: startingToken=10 > len(allSnapshots)=2")
+		assert.Nil(t, resp)
+	})
+
+	t.Run("Invalid StartingToken format", func(t *testing.T) {
+		req := &csi.ListSnapshotsRequest{StartingToken: "invalid"}
+		resp, err := s.ListSnapshots(context.Background(), req)
+		assert.Error(t, err)
+		assert.Equal(t, codes.Aborted, status.Code(err))
+		assert.ErrorContains(t, err, "unable to parse StartingToken")
+		assert.Nil(t, resp)
+	})
+
+	t.Run("ListSnapshots with SnapshotId", func(t *testing.T) {
+		setupSnapshots(snapshots)
+		setupExports(2)
+		req := &csi.ListSnapshotsRequest{SnapshotId: "102=_=_=system=_=_=testZone"}
+		resp, err := s.ListSnapshots(context.Background(), req)
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Len(t, resp.Entries, 1)
+		assert.Equal(t, "102=_=_=system=_=_=testZone", resp.Entries[0].Snapshot.SnapshotId)
+		assert.Equal(t, "snapshot2=_=_=2=_=_=testZone=_=_=system", resp.Entries[0].Snapshot.SourceVolumeId)
+		assert.Empty(t, resp.NextToken)
+	})
+
+	t.Run("ListSnapshots with SourceVolumeId", func(t *testing.T) {
+		setupSnapshots(snapshots)
+		setupExports(2)
+		req := &csi.ListSnapshotsRequest{SourceVolumeId: "snapshot2=_=_=2=_=_=testZone=_=_=system"}
+		resp, err := s.ListSnapshots(context.Background(), req)
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Len(t, resp.Entries, 1)
+		assert.Equal(t, "102=_=_=system=_=_=testZone", resp.Entries[0].Snapshot.SnapshotId)
+		assert.Equal(t, "snapshot2=_=_=2=_=_=testZone=_=_=system", resp.Entries[0].Snapshot.SourceVolumeId)
+		assert.Empty(t, resp.NextToken)
+	})
 }
 
 func TestCreateVolumeFromSource(t *testing.T) {
