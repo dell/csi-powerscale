@@ -414,7 +414,7 @@ func (svc *isiService) GetNFSExportURLForPath(ip string, dirPath string) string 
 	return fmt.Sprintf("%s:%s", ip, dirPath)
 }
 
-func (svc *isiService) GetVolume(ctx context.Context, isiPath, volID, volName string) (isi.Volume, error) {
+func (svc *isiService) GetVolumeWithIsiPath(ctx context.Context, isiPath, volID, volName string) (isi.Volume, error) {
 	// Fetch log handler
 	log := logging.GetRunIDLogger(ctx)
 
@@ -423,6 +423,22 @@ func (svc *isiService) GetVolume(ctx context.Context, isiPath, volID, volName st
 	var vol isi.Volume
 	var err error
 	if vol, err = svc.client.GetVolumeWithIsiPath(ctx, isiPath, volID, volName); err != nil {
+		log.Errorf("failed to get volume '%s'", err)
+		return nil, err
+	}
+
+	return vol, nil
+}
+
+func (svc *isiService) GetVolume(ctx context.Context, volID, volName string) (isi.Volume, error) {
+	// Fetch log handler
+	log := logging.GetRunIDLogger(ctx)
+
+	log.Debugf("begin getting volume with name '%s' for Isilon", volName)
+
+	var vol isi.Volume
+	var err error
+	if vol, err = svc.client.GetVolume(ctx, volID, volName); err != nil {
 		log.Errorf("failed to get volume '%s'", err)
 		return nil, err
 	}
@@ -917,7 +933,7 @@ func (svc *isiService) GetSubDirectoryCount(ctx context.Context, isiPath, direct
 	var totalSubDirectories int64
 	if svc.IsVolumeExistent(ctx, isiPath, "", directory) {
 		// Check if there are any entries for volumes present in snapshot tracking dir
-		dirDetails, err := svc.GetVolume(ctx, isiPath, "", directory)
+		dirDetails, err := svc.GetVolumeWithIsiPath(ctx, isiPath, "", directory)
 		if err != nil {
 			return 0, err
 		}

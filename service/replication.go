@@ -386,7 +386,7 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 
 	log.WithFields(fields).Info("Deleting storage protection group")
 
-	volume, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", "")
+	volume, err := isiConfig.isiSvc.GetVolumeWithIsiPath(ctx, isiPath, "", "")
 	if err != nil {
 		if e, ok := err.(*isiApi.JSONError); ok {
 			if e.StatusCode != 404 {

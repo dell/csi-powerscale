@@ -477,15 +477,13 @@ func (s *service) NodeGetVolumeStats(
 		return nil, err
 	}
 
-	isVolumeExistentFunc := getIsVolumeExistentFunc(isiConfig)
-	isVolumeExistent := isVolumeExistentFunc(ctx, volName, volPath, "")
-
-	if !isVolumeExistent {
+	isiVol, err := isiConfig.isiSvc.GetVolume(ctx, "", volName)
+	if err != nil || isiVol == nil {
 		return nil, status.Error(codes.NotFound, logging.GetMessageWithRunID(runID, "volume %v does not exist at path %v", volName, volPath))
 	}
 
 	// check whether the original volume is mounted
-	isMounted, err := getIsVolumeMounted(ctx, volName, volPath)
+	isMounted, _ := getIsVolumeMounted(ctx, volName, volPath)
 	if !isMounted {
 		return nil, status.Error(codes.NotFound, logging.GetMessageWithRunID(runID, "no volume is mounted at path: %s", volPath))
 	}

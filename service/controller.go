@@ -1259,7 +1259,7 @@ func (s *service) ControllerPublishVolume(
 		}
 	} else {
 		isiPath = isilonfs.GetIsiPathFromExportPath(exportPath)
-		vol, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)
+		vol, err := isiConfig.isiSvc.GetVolumeWithIsiPath(ctx, isiPath, "", volName)
 		if err != nil || vol.Name == "" {
 			return nil, status.Error(codes.Internal,
 				logging.GetMessageWithRunID(runID, "failure checking volume status before controller publish: %s",
@@ -2303,7 +2303,7 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 
 	// Fetch volume details
 	if !abnormal {
-		volume, err = isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)
+		volume, err = isiConfig.isiSvc.GetVolumeWithIsiPath(ctx, isiPath, "", volName)
 		if err != nil {
 			abnormal = true
 			message = fmt.Sprintf("error in getting '%s' volume '%v'", volName, err)

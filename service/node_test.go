@@ -18,6 +18,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"reflect"
@@ -26,7 +27,10 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	isi "github.com/dell/goisilon"
+	apiv1 "github.com/dell/goisilon/api/v1"
+	isimocks "github.com/dell/goisilon/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"golang.org/x/net/context"
 )
 
@@ -48,6 +52,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 	}
 
 	// Mock IsiCluster and service setup
+	mockClient := &isimocks.Client{}
 	IsiClusters := new(sync.Map)
 	testBool := false
 	testIsilonClusterConfig := IsilonClusterConfig{
@@ -67,7 +72,9 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		IgnoreUnresolvableHosts:   &testBool,
 		isiSvc: &isiService{
 			endpoint: "http://testendpoint:8080",
-			client:   &isi.Client{},
+			client: &isi.Client{
+				API: mockClient,
+			},
 		},
 	}
 
@@ -76,7 +83,11 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		defaultIsiClusterName: "TestCluster",
 		isiClusters:           IsiClusters,
 	}
-
+	mockClient.On("VolumesPath").Return("/path/to/volumes")
+	mockClient.On("Get", anyArgs[0:6]...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(**apiv1.GetIsiVolumeAttributesResp)
+		*resp = &apiv1.GetIsiVolumeAttributesResp{}
+	})
 	tests := []struct {
 		name         string
 		ctx          context.Context
@@ -248,6 +259,19 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("Volume does not exists", func(t *testing.T) {
+		mockClient.ExpectedCalls = nil
+		mockClient.On("VolumesPath").Return("/path/to/volumes")
+		mockClient.On("Get", anyArgs[0:6]...).Return(fmt.Errorf("not found"))
+		req := &csi.NodeGetVolumeStatsRequest{
+			VolumeId:   "volume-id",
+			VolumePath: "/path/to/volume",
+		}
+		resp, err := s.NodeGetVolumeStats(context.Background(), req)
+		assert.ErrorContains(t, err, "volume volume-id does not exist at path /path/to/volume")
+		assert.Nil(t, resp)
+	})
 }
 
 func TestEphemeralNodePublish(t *testing.T) {
