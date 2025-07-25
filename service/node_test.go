@@ -18,6 +18,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"reflect"
@@ -258,6 +259,19 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("Volume does not exists", func(t *testing.T) {
+		mockClient.ExpectedCalls = nil
+		mockClient.On("VolumesPath").Return("/path/to/volumes")
+		mockClient.On("Get", anyArgs[0:6]...).Return(fmt.Errorf("not found"))
+		req := &csi.NodeGetVolumeStatsRequest{
+			VolumeId:   "volume-id",
+			VolumePath: "/path/to/volume",
+		}
+		resp, err := s.NodeGetVolumeStats(context.Background(), req)
+		assert.ErrorContains(t, err, "volume volume-id does not exist at path /path/to/volume")
+		assert.Nil(t, resp)
+	})
 }
 
 func TestEphemeralNodePublish(t *testing.T) {
