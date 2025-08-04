@@ -10,7 +10,7 @@ require (
 	github.com/akutz/gournal v0.5.0
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/cucumber/godog v0.15.0
-	github.com/dell/csi-metadata-retriever v1.11.1-0.20250721043443-1ab0d3f4a48e
+	github.com/dell/csi-metadata-retriever v1.11.1-0.20250728054709-02998bccd1ba
 	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250717054012-23ceaf9c9606
 	github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250717054012-23ceaf9c9606
 	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250717054012-23ceaf9c9606
@@ -27,7 +27,7 @@ require (
 	github.com/spf13/viper v1.20.0
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/net v0.42.0
-	google.golang.org/grpc v1.74.0
+	google.golang.org/grpc v1.74.2
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.33.0
