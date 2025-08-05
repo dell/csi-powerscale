@@ -64,6 +64,7 @@ const (
 	DeleteSnapshotMarker          = "DELETE_SNAPSHOT"
 	IgnoreDotAndDotDotSubDirs     = 2
 	ClusterNameParam              = "ClusterName"
+	AZNetwork                     = "AZNetwork"
 	SoftLimitParam                = "SoftLimit"
 	SoftLimitParamDefault         = ""
 	AdvisoryLimitParam            = "AdvisoryLimit"
@@ -245,9 +246,14 @@ func (s *service) CreateVolume(
 		isReplication                     bool
 		VolumeGroupDir                    string
 		snapshotSourceVolumeIsiPath       string
+		azNetwork                         string
 	)
 
 	params := req.GetParameters()
+
+	if _, ok := params[AZNetwork]; ok {
+		azNetwork = params[AZNetwork]
+	}
 
 	if _, ok := params[ClusterNameParam]; ok {
 		if params[ClusterNameParam] == "" {
@@ -577,7 +583,7 @@ func (s *service) CreateVolume(
 					}
 				}
 
-				return s.getCreateVolumeResponse(ctx, exportID, req.GetName(), path, export.Zone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
+				return s.getCreateVolumeResponse(ctx, exportID, req.GetName(), path, export.Zone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork), nil
 			}
 			// in case the export exists but no related volume (directory)
 			if err = isiConfig.isiSvc.UnexportByIDWithZone(ctx, exportID, accessZone); err != nil {
@@ -653,7 +659,7 @@ func (s *service) CreateVolume(
 						}
 					}
 					// return the response
-					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
+					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork), nil
 				}
 				time.Sleep(RetrySleepTime)
 				log.Printf("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
@@ -684,7 +690,7 @@ func (s *service) CreateVolume(
 						}
 					}
 
-					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
+					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork), nil
 				}
 				time.Sleep(RetrySleepTime)
 				log.Printf("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
@@ -834,17 +840,17 @@ func (s *service) createVolumeFromSource(
 }
 
 // Define a variable for the getCSIVolume function
-var getCSIVolumeFunc = func(svc *service) func(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName string) *csi.Volume {
+var getCSIVolumeFunc = func(svc *service) func(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork string) *csi.Volume {
 	return svc.getCSIVolume
 }
 
-func (s *service) getCreateVolumeResponse(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName string) *csi.CreateVolumeResponse {
+func (s *service) getCreateVolumeResponse(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork string) *csi.CreateVolumeResponse {
 	return &csi.CreateVolumeResponse{
-		Volume: getCSIVolumeFunc(s)(ctx, exportID, volName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName),
+		Volume: getCSIVolumeFunc(s)(ctx, exportID, volName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork),
 	}
 }
 
-func (s *service) getCSIVolume(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName string) *csi.Volume {
+func (s *service) getCSIVolume(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork string) *csi.Volume {
 	// Make the additional volume attributes
 	attributes := map[string]string{
 		"ID":                strconv.Itoa(exportID),
@@ -854,7 +860,7 @@ func (s *service) getCSIVolume(ctx context.Context, exportID int, volName, path,
 		"AzServiceIP":       azServiceIP,
 		"RootClientEnabled": rootClientEnabled,
 		"ClusterName":       clusterName,
-		"AZNetwork":         "", // TODO pass in AZNetwork parameter from StorageClass
+		"AZNetwork":         azNetwork,
 	}
 
 	// Fetch log handler
@@ -1274,6 +1280,11 @@ func (s *service) ControllerPublishVolume(
 			logging.GetMessageWithRunID(runID, "node ID is required"))
 	}
 
+	azNetwork := volumeContext[AZNetwork]
+	if azNetwork != "" {
+		// TODO Get node labels from k8s and find matching IP for this network to be used in the export
+	}
+
 	vc := req.GetVolumeCapability()
 	if vc == nil {
 		return nil, status.Error(codes.InvalidArgument,
@@ -1671,10 +1682,15 @@ func (s *service) ControllerUnpublishVolume(
 		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "ControllerUnpublishVolumeRequest.VolumeId is empty"))
 	}
 
-	_, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, req.VolumeId)
+	volumeName, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, req.VolumeId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "failed to parse volume ID %s, error : %s", req.VolumeId, err.Error()))
 	}
+
+	// TODO look up PV with volumeName from k8s and get the context to check if AZNetwork is set. This determines which IP we use for removing from the export.
+	// - if AZNetwork is empty, use existing behavior
+	// - if AZNetwork is not empty, query the node labels from k8s and find the matching IP to remove from the export
+	log.Infof("PV = %s", volumeName)
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
