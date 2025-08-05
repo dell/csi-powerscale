@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -343,6 +344,10 @@ func (s *service) NodeGetCapabilities(
 	}, nil
 }
 
+var interfaceAddrs = func() ([]net.Addr, error) {
+	return net.InterfaceAddrs()
+}
+
 // NodeGetInfo RPC call returns NodeId and AccessibleTopology as part of NodeGetInfoResponse
 func (s *service) NodeGetInfo(
 	ctx context.Context,
@@ -396,6 +401,26 @@ func (s *service) NodeGetInfo(
 		// Create the topology keys
 		// <provisionerName>.dellemc.com/<powerscaleIP>: <provisionerName>
 		topology[constants.PluginName+"/"+isiClusters[cluster].Endpoint] = constants.PluginName
+	}
+
+	addrs, err := interfaceAddrs()
+	for _, addr := range addrs {
+
+		switch v := addr.(type) {
+		case *net.IPNet:
+			if v.IP.To4() != nil {
+
+				ip, cnet, err := net.ParseCIDR(addr.String())
+				if err != nil {
+					log.Errorf("Encountered error while parsing IP address %v", addr)
+				} else {
+					if ip.To4() != nil {
+						sanitizedIP := strings.ReplaceAll(cnet.String(), "/", "_")
+						topology[constants.PluginName+"/aznetwork-"+sanitizedIP] = ip.String()
+					}
+				}
+			}
+		}
 	}
 
 	// Check for node label 'max-isilon-volumes-per-node'. If present set 'MaxVolumesPerNode' to this value.

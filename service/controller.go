@@ -854,6 +854,7 @@ func (s *service) getCSIVolume(ctx context.Context, exportID int, volName, path,
 		"AzServiceIP":       azServiceIP,
 		"RootClientEnabled": rootClientEnabled,
 		"ClusterName":       clusterName,
+		"AZNetwork":         "", // TODO pass in AZNetwork parameter from StorageClass
 	}
 
 	// Fetch log handler
