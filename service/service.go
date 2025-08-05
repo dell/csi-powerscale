@@ -92,6 +92,7 @@ type Service interface {
 type Opts struct {
 	Port                      string
 	AccessZone                string
+	AZNetwork                 string
 	Path                      string
 	IsiVolumePathPermissions  string
 	SkipCertificateValidation bool
@@ -391,7 +392,7 @@ func (s *service) autoProbe(ctx context.Context, isiConfig *IsilonClusterConfig)
 	return s.probe(ctx, isiConfig)
 }
 
-func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClusterConfig, logLevel logrus.Level) (*isi.Client, error) {
+func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClusterConfig, logLevel logrus.Level) (*isi.Client, error) { // could be useful
 	clientCtx, log := GetLogger(clientCtx)
 
 	// First we fetch node labels using kubernetes API and check, if label
@@ -545,6 +546,8 @@ func (s *service) BeforeServe(
 	// Dynamically load the config
 	go s.loadIsilonConfigs(ctx, isilonConfigFile)
 	go s.startAPIService(ctx)
+	// Watch for changes to access zone network node labels
+	go s.reconcileNodeLabels(5 * time.Minute)
 
 	return s.probeOnStart(ctx)
 }
@@ -600,6 +603,19 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 	}
 	<-done
 	return nil
+}
+
+func (s *service) reconcileNodeLabels(interval time.Duration) {
+	_, log := GetLogger(context.Background())
+	go func() {
+		for {
+			err := s.ReconcileNodeLabels(context.Background())
+			if err != nil {
+				log.Errorf("Node label reconciliation failed: %v", err)
+			}
+			time.Sleep(interval)
+		}
+	}()
 }
 
 // Returns the size of arrays
