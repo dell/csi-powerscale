@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -41,6 +42,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // RPOEnum represents valid rpo values
@@ -1677,10 +1679,19 @@ func (s *service) ControllerUnpublishVolume(
 		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "ControllerUnpublishVolumeRequest.VolumeId is empty"))
 	}
 
-	_, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, req.VolumeId)
+	volumeName, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, req.VolumeId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "failed to parse volume ID %s, error : %s", req.VolumeId, err.Error()))
 	}
+
+	// Get the PV with the given volumeName
+	log.Debugf("Getting PV with name: %s", volumeName)
+	pv, err := s.k8sclient.CoreV1().PersistentVolumes().Get(ctx, volumeName, metav1.GetOptions{})
+	if err != nil {
+		log.Errorf("Failed to get PV %s: %v", volumeName, err) // TODO: error or info?
+		return nil, err
+	}
+	log.Debugf("Got PV: %s", pv.Name)
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
@@ -1696,10 +1707,53 @@ func (s *service) ControllerUnpublishVolume(
 		return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
 	}
 
-	nodeID := req.GetNodeId()
-	if nodeID == "" {
-		return nil, status.Error(codes.InvalidArgument,
-			logging.GetMessageWithRunID(runID, "node ID is required"))
+	var nodeID string
+
+	// azNetwork, ok := pv.Annotations["azNetwork"] // TODO: depends on previous implementation to get from volume context and update the condition
+	if true {
+		labels, err := s.GetNodeLabels()
+		if err != nil {
+			log.Error("failed to get Node Labels with error", err.Error())
+			return nil, err
+		}
+
+		pattern := regexp.MustCompile(`^csi-isilon\.dellemc\.com\/aznetwork-([0-9\.]+)_([0-9]+)$`)
+
+		for key, value := range labels {
+			// Found the node with the matching AZNetwork label, get its IP
+			if match := pattern.FindStringSubmatch(key); match != nil {
+				log.Debugf("Key: %s, Value: %s\n", key, value) // TODO: value maybe CSL?
+				log.Debugf("IP: %s, Subnet: %s\n", match[1], match[2])
+
+				nodeIP := match[1]
+
+				// TODO: if IP and subnet match from the network interface in the volume context, proceed
+
+				nodeFQDN, err := getUtilsGetFQDNByIP(ctx, nodeIP)
+				if err != nil {
+					nodeFQDN = nodeIP
+					log.Warnf("Setting nodeFQDN to %s as failed to resolve IP to FQDN due to %v", nodeIP, err)
+				}
+
+				nodeID, err = s.GetCSINodeID(ctx)
+				if err != nil {
+					log.Error("failed to get Node ID with error", err.Error())
+					return nil, err
+				}
+
+				nodeID = nodeID + id.NodeIDSeparator + nodeFQDN + id.NodeIDSeparator + nodeIP
+			}
+		}
+		log.Debugf("Using node ID %s to remove from export", nodeID)
+	} else {
+		// AZNetwork is not set, use existing behavior
+		log.Debugf("Using existing behavior to remove from export")
+
+		nodeID = req.GetNodeId()
+		if nodeID == "" {
+			return nil, status.Error(codes.InvalidArgument,
+				logging.GetMessageWithRunID(runID, "node ID is required"))
+		}
 	}
 
 	log.Debugf("ignoreUnresolvableHosts value is '%t', for clusterName '%s'", *isiConfig.IgnoreUnresolvableHosts, clusterName)
