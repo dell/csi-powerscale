@@ -780,45 +780,56 @@ var interfaceAddrs = func() ([]net.Addr, error) {
 }
 
 func (s *service) ReconcileNodeLabels(ctx context.Context) error {
-	// Fetch log handler
 	ctx, log, _ := GetRunIDLog(ctx)
 
-	labels, err := s.GetNodeLabels()
+	labelsToAdd := make(map[string]string)
+	addrs, err := interfaceAddrs()
 	if err != nil {
-		log.Error("Failed to get node labels", err.Error())
+		log.Errorf("could not get network interface addresses: '%v'", err.Error())
 		return err
 	}
 
-	discoveredLabels := make(map[string]string)
-	addrs, err := interfaceAddrs()
 	for _, addr := range addrs {
 		switch v := addr.(type) {
 		case *net.IPNet:
-			if v.IP.To4() != nil {
+			if v.IP.To4() != nil && !v.IP.IsLoopback() {
 				ip, cnet, err := net.ParseCIDR(addr.String())
 				if err != nil {
-					log.Errorf("Encountered error while parsing IP address %v", addr)
+					log.Errorf("encountered error while parsing IP address %v", addr)
 				} else {
-					if ip.To4() != nil {
-						sanitizedIP := strings.ReplaceAll(cnet.String(), "/", "_")
-						key := fmt.Sprintf("%s/aznetwork-%s", constants.PluginName, sanitizedIP)
-						discoveredLabels[key] = ip.String()
+					sanitizedIP := strings.ReplaceAll(cnet.String(), "/", "_")
+					key := fmt.Sprintf("%s/aznetwork-%s", constants.PluginName, sanitizedIP)
+					if _, ok := labelsToAdd[key]; ok {
+						newValue := labelsToAdd[key] + "," + ip.String()
+						labelsToAdd[key] = newValue
+					} else {
+						labelsToAdd[key] = ip.String()
 					}
+					log.Debugf("discovered label %s -> %s", key, labelsToAdd[key])
 				}
 			}
 		}
 	}
 
-	for key, val := range labels {
-		if strings.HasPrefix(key, constants.PluginName+"/aznetwork-") {
-			log.Infof("Label %s:%s exists on node", key, val)
-			_, exists := discoveredLabels[key]
-			if !exists {
-				delete(labels, key)
-			}
-		}
-	}
+	// Not yet needed until reconcile.
+	// labels, err := s.GetNodeLabels()
+	// if err != nil {
+	// 	log.Error("failed to get node labels", err.Error())
+	// }
+	//
+	// for key, val := range labels {
+	// 	if strings.HasPrefix(key, constants.PluginName+"/aznetwork-") {
+	// 		log.Infof("label %s:%s exists on node", key, val)
+	// 		_, exists := labelsToAdd[key]
+	// 		if !exists {
+	// 			delete(labels, key)
+	// 		}
+	// 	}
+	// }
 
-	log.Infof("Reconciled node network labels")
-	return nil
+	err = s.PatchNodeLabels(labelsToAdd)
+
+	// TODO: log changes
+	log.Infof("reconciled node network labels")
+	return err
 }

@@ -17,6 +17,7 @@ package service
 */
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -54,6 +55,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -1051,6 +1053,31 @@ func (s *service) GetNodeLabels() (map[string]string, error) {
 
 	return node.Labels, nil
 }
+
+func (s *service) PatchNodeLabels(labels map[string]string) (error) {
+	log := logging.GetLogger()
+	k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
+	if err != nil {
+		log.Errorf("init client failed: '%s'", err.Error())
+		return err
+	}
+
+	patchData, err := json.Marshal(labels)
+	if err != nil {
+		log.Errorf("failed to unmarshall labels: '%s'", err.Error())
+		return err
+	}
+
+	node, err := k8sclientset.CoreV1().Nodes().Patch(context.TODO(), s.nodeID, types.StrategicMergePatchType, patchData, v1.PatchOptions{})
+	if err != nil {
+		log.Errorf("failed to patch node labels: '%s'", err.Error())
+		return err
+	}
+
+	log.Debugf("Node %s details\n", node)
+	return err
+}
+
 
 func (s *service) ProbeController(ctx context.Context,
 	_ *commonext.ProbeControllerRequest) (
