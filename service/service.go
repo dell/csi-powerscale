@@ -56,6 +56,7 @@ import (
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -1067,32 +1068,61 @@ func (s *service) GetNodeLabels() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("Node %s details\n", node)
+	log.Debugf("Node details: %s", node)
 
 	return node.Labels, nil
 }
 
 func (s *service) PatchNodeLabels(labels map[string]string) (error) {
 	log := logging.GetLogger()
+	log.Debugf("Patching node labels: %v", labels) // TODO remove when code is stable
+
 	k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
 	if err != nil {
 		log.Errorf("init client failed: '%s'", err.Error())
 		return err
 	}
 
-	patchData, err := json.Marshal(labels)
+	node, err := k8sclientset.CoreV1().Nodes().Get(context.TODO(), s.nodeID, v1.GetOptions{})
 	if err != nil {
-		log.Errorf("failed to unmarshall labels: '%s'", err.Error())
+		log.Errorf("failed to get current node details: '%s'", err.Error())
 		return err
 	}
 
-	node, err := k8sclientset.CoreV1().Nodes().Patch(context.TODO(), s.nodeID, types.StrategicMergePatchType, patchData, v1.PatchOptions{})
+	currentNode, err := json.Marshal(node)
+	if err != nil {
+		log.Errorf("failed to marshal current node details: '%s'", err.Error())
+		return err
+	}
+
+	// TODO: Just an experiment, may want to have a separate parameter to delete label.
+	for k, v := range labels {
+		if strings.HasPrefix(k, "-") || v == "" {
+			delete(node.Labels, k)
+		} else {
+			node.Labels[k] = v
+		}
+	}
+
+	newNode, err := json.Marshal(node)
+	if err != nil {
+		log.Errorf("failed to marshal new node details: '%s'", err.Error())
+		return err
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(currentNode, newNode, node)
+	if err != nil {
+		log.Errorf("failed to create patch: '%s'", err.Error())
+		return err
+	}
+
+	node, err = k8sclientset.CoreV1().Nodes().Patch(context.TODO(), s.nodeID, types.StrategicMergePatchType, patchBytes, v1.PatchOptions{})
 	if err != nil {
 		log.Errorf("failed to patch node labels: '%s'", err.Error())
 		return err
 	}
 
-	log.Debugf("Node %s details\n", node)
+	log.Debugf("Node details: %s", node)
 	return err
 }
 
