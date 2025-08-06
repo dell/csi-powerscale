@@ -1688,7 +1688,7 @@ func (s *service) ControllerUnpublishVolume(
 	log.Debugf("Getting PV with name: %s", volumeName)
 	pv, err := s.k8sclient.CoreV1().PersistentVolumes().Get(ctx, volumeName, metav1.GetOptions{})
 	if err != nil {
-		log.Errorf("Failed to get PV %s: %v", volumeName, err) // TODO: error or info?
+		log.Errorf("Failed to get PV %s: %v", volumeName, err)
 		return nil, err
 	}
 	log.Debugf("Got PV: %s", pv.Name)
@@ -1710,12 +1710,26 @@ func (s *service) ControllerUnpublishVolume(
 	// azNetwork := pv.Spec.CSI.VolumeAttributes.azNetwork; check empty
 	azNetwork := "10.0.0.0/24" // dummy value for testing
 	if azNetwork != "" {
-		ips, err := s.getIpsFromAZNetworkLabel(ctx, azNetwork)
+		ipsStr, err := s.getIpsFromAZNetworkLabel(ctx, azNetwork)
 		if err != nil {
 			return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
 		}
-		log.Debugf("AZNetwork IPS: %s", ips)
+		log.Debugf("AZNetwork IPs: %s", ipsStr)
 		log.Debugf("Using IPs from AZNetwork %s to remove from export", azNetwork)
+
+		// convert IPs separated by "-" in a string to a slice of IPs
+		ips := strings.Split(ipsStr, "-")
+
+		if err := isiConfig.isiSvc.RemoveExportClientByIPsWithZone(ctx, exportID, accessZone, ips, *isiConfig.IgnoreUnresolvableHosts); err != nil {
+			if strings.Contains(err.Error(), "No such file or directory") {
+				_, delErr := s.DeleteVolume(ctx, &csi.DeleteVolumeRequest{VolumeId: req.VolumeId})
+				if delErr != nil {
+					return nil, delErr
+				}
+			} else {
+				return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error encountered when trying to remove clients %s from export %d with access zone %s on cluster %s, error %s", ipsStr, exportID, accessZone, clusterName, err.Error()))
+			}
+		}
 	} else {
 		// AZNetwork is not set, use existing behavior
 		log.Debugf("Using existing behavior to remove from export")
@@ -1748,10 +1762,12 @@ func (s *service) ControllerUnpublishVolume(
 // and returns the corresponding IP(s) if found.
 //
 // Parameters:
+//
 //	ctx (context.Context): The context for the function call
 //	azNetwork (string): The AZNetwork to search for in the node labels. E.g. 10.0.0.0/24
 //
 // Returns:
+//
 //	string: The IP(s) associated with the matching AZNetwork label, or an empty string if not found
 //	error: Any error that occurs during the function call
 func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, azNetwork string) (string, error) {
@@ -1785,7 +1801,7 @@ func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, azNetwork string
 			}
 		}
 	}
-	return "", nil
+	return "", fmt.Errorf("failed to get IPs from AZNetwork %s", azNetwork)
 }
 
 func (s *service) GetCapacity(

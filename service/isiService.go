@@ -736,6 +736,24 @@ func (svc *isiService) RemoveExportClientByIDWithZone(ctx context.Context, expor
 	return nil
 }
 
+func (svc *isiService) RemoveExportClientByIPsWithZone(ctx context.Context, exportID int, accessZone string, clientIPs []string, ignoreUnresolvableHosts bool) error {
+	// Fetch log handler
+	log := logging.GetRunIDLogger(ctx)
+
+	if err := svc.client.RemoveExportClientsByIDWithZone(ctx, exportID, accessZone, clientIPs, ignoreUnresolvableHosts); err != nil {
+		// Return success if export doesn't exist
+		if notFoundErr, ok := err.(*api.JSONError); ok {
+			if notFoundErr.StatusCode == 404 {
+				log.Debugf("Export id '%v' does not exist", exportID)
+				return nil
+			}
+		}
+		return fmt.Errorf("failed to remove clients from export '%d' with access zone '%s' : '%s'", exportID, accessZone, err.Error())
+	}
+
+	return nil
+}
+
 func (svc *isiService) GetExportsWithLimit(ctx context.Context, limit string) (isi.ExportList, string, error) {
 	// Fetch log handler
 	log := logging.GetRunIDLogger(ctx)
