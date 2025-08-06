@@ -1707,69 +1707,85 @@ func (s *service) ControllerUnpublishVolume(
 		return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
 	}
 
-	var nodeID string
-
-	// azNetwork, ok := pv.Annotations["azNetwork"] // TODO: depends on previous implementation to get from volume context and update the condition
-	if true {
-		labels, err := s.GetNodeLabels()
+	// azNetwork := pv.Spec.CSI.VolumeAttributes.azNetwork; check empty
+	azNetwork := "10.0.0.0/24" // dummy value for testing
+	if azNetwork != "" {
+		ips, err := s.getIpsFromAZNetworkLabel(ctx, azNetwork)
 		if err != nil {
-			log.Error("failed to get Node Labels with error", err.Error())
-			return nil, err
+			return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
 		}
-
-		pattern := regexp.MustCompile(`^csi-isilon\.dellemc\.com\/aznetwork-([0-9\.]+)_([0-9]+)$`)
-
-		for key, value := range labels {
-			// Found the node with the matching AZNetwork label, get its IP
-			if match := pattern.FindStringSubmatch(key); match != nil {
-				log.Debugf("Key: %s, Value: %s\n", key, value) // TODO: value maybe CSL?
-				log.Debugf("IP: %s, Subnet: %s\n", match[1], match[2])
-
-				nodeIP := match[1]
-
-				// TODO: if IP and subnet match from the network interface in the volume context, proceed
-
-				nodeFQDN, err := getUtilsGetFQDNByIP(ctx, nodeIP)
-				if err != nil {
-					nodeFQDN = nodeIP
-					log.Warnf("Setting nodeFQDN to %s as failed to resolve IP to FQDN due to %v", nodeIP, err)
-				}
-
-				nodeID, err = s.GetCSINodeID(ctx)
-				if err != nil {
-					log.Error("failed to get Node ID with error", err.Error())
-					return nil, err
-				}
-
-				nodeID = nodeID + id.NodeIDSeparator + nodeFQDN + id.NodeIDSeparator + nodeIP
-			}
-		}
-		log.Debugf("Using node ID %s to remove from export", nodeID)
+		log.Debugf("AZNetwork IPS: %s", ips)
+		log.Debugf("Using IPs from AZNetwork %s to remove from export", azNetwork)
 	} else {
 		// AZNetwork is not set, use existing behavior
 		log.Debugf("Using existing behavior to remove from export")
 
-		nodeID = req.GetNodeId()
+		nodeID := req.GetNodeId()
 		if nodeID == "" {
 			return nil, status.Error(codes.InvalidArgument,
 				logging.GetMessageWithRunID(runID, "node ID is required"))
 		}
-	}
 
-	log.Debugf("ignoreUnresolvableHosts value is '%t', for clusterName '%s'", *isiConfig.IgnoreUnresolvableHosts, clusterName)
+		log.Debugf("ignoreUnresolvableHosts value is '%t', for clusterName '%s'", *isiConfig.IgnoreUnresolvableHosts, clusterName)
 
-	if err := isiConfig.isiSvc.RemoveExportClientByIDWithZone(ctx, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts); err != nil {
-		if strings.Contains(err.Error(), "No such file or directory") {
-			_, delErr := s.DeleteVolume(ctx, &csi.DeleteVolumeRequest{VolumeId: req.VolumeId})
-			if delErr != nil {
-				return nil, delErr
+		if err := isiConfig.isiSvc.RemoveExportClientByIDWithZone(ctx, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts); err != nil {
+			if strings.Contains(err.Error(), "No such file or directory") {
+				_, delErr := s.DeleteVolume(ctx, &csi.DeleteVolumeRequest{VolumeId: req.VolumeId})
+				if delErr != nil {
+					return nil, delErr
+				}
+			} else {
+				return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error encountered when trying to remove client %s from export %d with access zone %s on cluster %s, error %s", nodeID, exportID, accessZone, clusterName, err.Error()))
 			}
-		} else {
-			return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error encountered when trying to remove client %s from export %d with access zone %s on cluster %s, error %s", nodeID, exportID, accessZone, clusterName, err.Error()))
 		}
 	}
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
+}
+
+// getIpsFromAZNetworkLabel retrieves the IP(s) from the AZNetwork label
+// on a node. It searches for a node label that matches the given AZNetwork
+// and returns the corresponding IP(s) if found.
+//
+// Parameters:
+//	ctx (context.Context): The context for the function call
+//	azNetwork (string): The AZNetwork to search for in the node labels. E.g. 10.0.0.0/24
+//
+// Returns:
+//	string: The IP(s) associated with the matching AZNetwork label, or an empty string if not found
+//	error: Any error that occurs during the function call
+func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, azNetwork string) (string, error) {
+	// Fetch log handler
+	_, log, _ := GetRunIDLog(ctx)
+
+	// Get node labels
+	labels, err := s.GetNodeLabels()
+	if err != nil {
+		log.Error("failed to get Node Labels with error", err.Error())
+		return "", err
+	}
+
+	// Find the node label with matching AZNetwork
+	pluginName := regexp.QuoteMeta(constants.PluginName)
+	pattern := regexp.MustCompile(fmt.Sprintf("^%s\\/aznetwork-([0-9\\.]+)_([0-9]+)$", pluginName))
+
+	for key, value := range labels {
+		// Found the node with the matching AZNetwork label, get its IP
+		if match := pattern.FindStringSubmatch(key); match != nil {
+			log.Debugf("Key: %s, Value: %s\n", key, value)
+
+			// getting network interface IP and Subnet
+			ipFromLabel := match[1]
+			subnetFromLabel := match[2]
+			log.Debugf("AZNetwork IP from node label: %s, AZNetwork subnet from node label: %s", ipFromLabel, subnetFromLabel)
+
+			// if matching, return the IP(s)
+			if azNetwork == fmt.Sprintf("%s/%s", ipFromLabel, subnetFromLabel) {
+				return value, nil
+			}
+		}
+	}
+	return "", nil
 }
 
 func (s *service) GetCapacity(
