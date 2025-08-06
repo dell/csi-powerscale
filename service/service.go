@@ -120,6 +120,7 @@ type service struct {
 	statisticsCounter     int
 	isiClusters           *sync.Map
 	defaultIsiClusterName string
+	networkLabelInterval  time.Duration
 	k8sclient             kubernetes.Interface
 }
 
@@ -549,7 +550,7 @@ func (s *service) BeforeServe(
 	go s.loadIsilonConfigs(ctx, isilonConfigFile)
 	go s.startAPIService(ctx)
 	// Watch for changes to access zone network node labels
-	go s.reconcileNodeLabels(5 * time.Minute)
+	go s.reconcileNodeLabels(s.networkLabelInterval)
 
 	return s.probeOnStart(ctx)
 }
@@ -845,12 +846,29 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 	logging.UpdateLogLevel(logLevel, &updateMutex)
 	log.Infof("log level set to '%s'", logLevel)
 
+	// update network label interval
+	s.updateNetworkLabelInterval(log, v)
+
 	err := s.syncIsilonConfigs(ctx)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (s *service) updateNetworkLabelInterval(log *logrus.Logger, v *viper.Viper) {
+	var networkLabelInterval string
+	if v.IsSet(constants.ParamNetworkLabelInterval) {
+		networkLabelInterval = v.GetString(constants.ParamNetworkLabelInterval)
+	}
+	interval, err := time.ParseDuration(networkLabelInterval)
+	if err != nil {
+		log.Error(err, fmt.Sprintf("parsing network label interval %s", networkLabelInterval))
+		interval = constants.DefaultNetworkLabelInterval
+	}
+	log.WithField("network label interval", interval).Info("configuration updated")
+	s.networkLabelInterval = interval
 }
 
 // GetCSINodeID gets the id of the CSI node which regards the node name as node id
