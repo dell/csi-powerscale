@@ -79,5 +79,5 @@ const (
 	ParamNetworkLabelInterval = "NETWORK_LABEL_INTERVAL"
 
 	// DefaultNetworkLabelInterval default interval to monitor and reconcile network interface labels on nodes
-	DefaultNetworkLabelInterval = time.Duration(5 * time.Minute)
+	DefaultNetworkLabelInterval = time.Duration(1 * time.Hour)
 )
