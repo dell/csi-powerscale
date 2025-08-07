@@ -1707,8 +1707,13 @@ func (s *service) ControllerUnpublishVolume(
 		return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
 	}
 
-	// azNetwork := pv.Spec.CSI.VolumeAttributes.azNetwork; check empty
-	azNetwork := "10.0.0.0/24" // dummy value for testing
+	azNetwork, ok := pv.Spec.CSI.VolumeAttributes["AzNetwork"]
+	if !ok {
+		log.Debugf("AZNetwork key not found in PV %s", pv.Name)
+	} else if azNetwork == "" {
+		log.Debugf("AZNetwork value is empty in PV %s", pv.Name)
+	}
+	// azNetwork := "10.0.0.0/24" // dummy value for testing
 	if azNetwork != "" {
 		ipsStr, err := s.getIpsFromAZNetworkLabel(ctx, azNetwork)
 		if err != nil {
@@ -1720,6 +1725,13 @@ func (s *service) ControllerUnpublishVolume(
 		// convert IPs separated by "-" in a string to a slice of IPs
 		ips := strings.Split(ipsStr, "-")
 
+		// get clients before removal
+		export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
+		if err != nil {
+			log.Debugf("error getting export %d with access zone %s on cluster %s, error %s", exportID, accessZone, clusterName, err.Error())
+		}
+		log.Debugf("Export clients before removal: %v", export.Clients)
+
 		if err := isiConfig.isiSvc.RemoveExportClientByIPsWithZone(ctx, exportID, accessZone, ips, *isiConfig.IgnoreUnresolvableHosts); err != nil {
 			if strings.Contains(err.Error(), "No such file or directory") {
 				_, delErr := s.DeleteVolume(ctx, &csi.DeleteVolumeRequest{VolumeId: req.VolumeId})
@@ -1729,6 +1741,12 @@ func (s *service) ControllerUnpublishVolume(
 			} else {
 				return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error encountered when trying to remove clients %s from export %d with access zone %s on cluster %s, error %s", ipsStr, exportID, accessZone, clusterName, err.Error()))
 			}
+			// get clients after removal
+			export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
+			if err != nil {
+				log.Debugf("error getting export %d with access zone %s on cluster %s, error %s", exportID, accessZone, clusterName, err.Error())
+			}
+			log.Debugf("Export clients after removal: %v", export.Clients)
 		}
 	} else {
 		// AZNetwork is not set, use existing behavior
