@@ -1715,15 +1715,13 @@ func (s *service) ControllerUnpublishVolume(
 	}
 	// azNetwork := "10.0.0.0/24" // dummy value for testing
 	if azNetwork != "" {
-		ipsStr, err := s.getIpsFromAZNetworkLabel(ctx, azNetwork)
-		if err != nil {
+		ips, err := s.getIpsFromAZNetworkLabel(ctx, azNetwork)
+		if err != nil || len(ips) == 0 {
+			log.Debugf("No matching IP(s) found in from AZNetwork label %s", azNetwork)
 			return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
 		}
-		log.Debugf("AZNetwork IPs: %s", ipsStr)
+		log.Debugf("AZNetwork IPs: %s", ips)
 		log.Debugf("Using IPs from AZNetwork %s to remove from export", azNetwork)
-
-		// convert IPs separated by "-" in a string to a slice of IPs
-		ips := strings.Split(ipsStr, "-")
 
 		// get clients before removal
 		export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
@@ -1786,9 +1784,9 @@ func (s *service) ControllerUnpublishVolume(
 //
 // Returns:
 //
-//	string: The IP(s) associated with the matching AZNetwork label, or an empty string if not found
+//	[]string: The array of IP(s) associated with the matching AZNetwork label, or nil if not found
 //	error: Any error that occurs during the function call
-func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, azNetwork string) (string, error) {
+func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, azNetwork string) ([]string, error) {
 	// Fetch log handler
 	_, log, _ := GetRunIDLog(ctx)
 
@@ -1796,7 +1794,7 @@ func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, azNetwork string
 	labels, err := s.GetNodeLabels()
 	if err != nil {
 		log.Error("failed to get Node Labels with error", err.Error())
-		return "", err
+		return nil, err
 	}
 
 	// Find the node label with matching AZNetwork
@@ -1815,11 +1813,13 @@ func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, azNetwork string
 
 			// if matching, return the IP(s)
 			if azNetwork == fmt.Sprintf("%s/%s", ipFromLabel, subnetFromLabel) {
-				return value, nil
+				// convert IPs separated by "-" in a string to a slice of IPs
+				ips := strings.Split(value, "-")
+				return ips, nil
 			}
 		}
 	}
-	return "", fmt.Errorf("failed to get IPs from AZNetwork %s", azNetwork)
+	return []string{}, fmt.Errorf("failed to get IPs from AZNetwork %s", azNetwork)
 }
 
 func (s *service) GetCapacity(
