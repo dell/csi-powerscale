@@ -1211,6 +1211,7 @@ func (s *service) ControllerPublishVolume(
 		accessZone             string
 		exportPath             string
 		isiPath                string
+		newExportIP            []string
 		isROVolumeFromSnapshot bool
 	)
 
@@ -1225,7 +1226,23 @@ func (s *service) ControllerPublishVolume(
 		for key, value := range volumeContext {
 			log.Printf("    [%s]=%s", key, value)
 		}
+		// Check for AZNetwork key
+		if azNet, ok := volumeContext["AZNetwork"]; ok && azNet != "" {
+			var err error
+			log.Debugf("***[AZNETWORK] Found AZNetwork key:")
+			newExportIP, err = s.getIpsFromAZNetworkLabel(ctx, req.GetNodeId(), azNet)
+			if err != nil {
+				log.Errorf("***[AZNETWORK] Error checking AZNetwork label match: %v", err)
+				return nil, status.Error(codes.Internal, "AZNetwork label check failed")
+			}
+			log.Debugf("***[AZNETWORK] AZNetwork %s matched a node label IP %s", azNet, newExportIP)
+
+		} else {
+			log.Debugf("***[AZNETWORK] AZNetwork NOT found in volumeContext proceed with default ***")
+		}
 	}
+
+	log.Debugf("***[AZNETWORK] Getting Volume ID ***")
 
 	volID := req.GetVolumeId()
 	if volID == "" {
@@ -1277,6 +1294,7 @@ func (s *service) ControllerPublishVolume(
 	}
 
 	nodeID := req.GetNodeId()
+
 	if nodeID == "" {
 		return nil, status.Error(codes.NotFound,
 			logging.GetMessageWithRunID(runID, "node ID is required"))
@@ -1342,20 +1360,51 @@ func (s *service) ControllerPublishVolume(
 		}
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, id.DummyHostNodeID) {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, id.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			if len(newExportIP) > 0 {
+				log.Debugf("***[AZNETWORK] AddExportClientByIPWithZone - MULTI_NODE_MULTI_WRITER - Host Already Added ***")
+				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, id.DummyHostNodeID, newExportIP, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			} else {
+				log.Debugf("***[NOT FOUND AZNETWORK] - MULTI_NODE_MULTI_WRITER - Host Already Added ***")
+				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, id.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			}
 		}
 
-		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
+		if len(newExportIP) > 0 {
+			log.Debugf("***[AZNETWORK] AddExportClientByIPWithZone - MULTI_NODE_MULTI_WRITER - Adding Export Client with %s***", newExportIP)
+			err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
+		} else {
+			log.Debugf("***[NOT FOUND AZNETWORK] - MULTI_NODE_MULTI_WRITER ***")
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
+		}
+
 		if err == nil && rootClientEnabled {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			if len(newExportIP) > 0 {
+				log.Debugf("***[AZNETWORK] AddExportClientByIPWithZone - MULTI_NODE_MULTI_WRITER - Root client enabled %s***", newExportIP)
+				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			} else {
+				log.Debugf("***[NOT FOUNDAZNETWORK] - MULTI_NODE_MULTI_WRITER - Root client enabled ***")
+				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			}
 		}
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
 		// since read-only has higher privileges than root-clients, add to root-clients in exports on powerscale if root client enabled is set to true
 		if rootClientEnabled && isROVolumeFromSnapshot {
-			log.Info("ROVolumeFromSnapshot & rootClientEnabled is set to true, add to root clients")
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportRootClientByIDWithZone)
+			log.Debugf("ROVolumeFromSnapshot & rootClientEnabled is set to true, add to root clients")
+			if len(newExportIP) > 0 {
+				log.Debugf("***[AZNETWORK] AddExportClientByIPWithZone - MULTI_NODE_READER_ONLY -Root client enabled AND ROVolumeFromSnapshot %s***", newExportIP)
+				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportRootClientByIDWithZone)
+			} else {
+				log.Infof("***[NOT FOUND AZNETWORK] - MULTI_NODE_READER_ONLY -Root client enabled AND ROVolumeFromSnapshot ***")
+				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportRootClientByIDWithZone)
+			}
 		} else {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportReadOnlyClientByIDWithZone)
+			if len(newExportIP) > 0 {
+				log.Debugf("***[AZNETWORK] AddExportClientByIPWithZone - MULTI_NODE_READER_ONLY %s***", newExportIP)
+				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportReadOnlyClientByIDWithZone)
+			} else {
+				log.Debugf("***[NOT FOUND AZNETWORK] - MULTI_NODE_READER_ONLY ***")
+				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportReadOnlyClientByIDWithZone)
+			}
 		}
 	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
@@ -1370,11 +1419,29 @@ func (s *service) ControllerPublishVolume(
 		}
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, id.DummyHostNodeID) {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, id.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			if len(newExportIP) > 0 {
+				log.Debugf("***[AZNETWORK] AddExportClientByIPWithZone - SINGLE_NODE_WRITER - host already added %s***", newExportIP)
+				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, id.DummyHostNodeID, newExportIP, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			} else {
+				log.Debugf("***[NOT FOUND AZNETWORK] - SINGLE_NODE_WRITER - host already added ***")
+				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, id.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			}
 		}
-		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
+		if len(newExportIP) > 0 {
+			log.Debugf("***[AZNETWORK] AddExportClientByIPWithZone - SINGLE_NODE_WRITER - %s***", newExportIP)
+			err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
+		} else {
+			log.Debugf("***[NOT FOUND AZNETWORK] - SINGLE_NODE_WRITER ***")
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
+		}
 		if err == nil && rootClientEnabled {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			if len(newExportIP) > 0 {
+				log.Debugf("***[AZNETWORK] AddExportClientByIPWithZone - SINGLE_NODE_WRITER - Root client enabled - %s***", newExportIP)
+				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			} else {
+				log.Debugf("***[NOT FOUND AZNETWORK]- SINGLE_NODE_WRITER - Root client enabled - **")
+				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			}
 		}
 	default:
 		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "unsupported access mode: %s", am.String()))
