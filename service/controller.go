@@ -57,6 +57,7 @@ const (
 	IsiPathParam                  = "IsiPath"
 	IsiVolumePathPermissionsParam = "IsiVolumePathPermissions"
 	AzServiceIPParam              = "AzServiceIP"
+	AzNetwork                     = "AzNetwork"
 	RootClientEnabledParam        = "RootClientEnabled"
 	RootClientEnabledParamDefault = "false"
 	DeleteSnapshotMarker          = "DELETE_SNAPSHOT"
@@ -224,6 +225,7 @@ func (s *service) CreateVolume(
 		volumePathPermissions             string
 		path                              string
 		azServiceIP                       string
+		azNetwork                         string
 		rootClientEnabled                 string
 		quotaID                           string
 		exportID                          int
@@ -246,6 +248,10 @@ func (s *service) CreateVolume(
 	)
 
 	params := req.GetParameters()
+
+	if _, ok := params[AzNetwork]; ok {
+		azNetwork = params[AzNetwork]
+	}
 
 	if _, ok := params[ClusterNameParam]; ok {
 		if params[ClusterNameParam] == "" {
@@ -563,7 +569,7 @@ func (s *service) CreateVolume(
 		log.Debugf("id of the corresponding nfs export of existing volume '%s' has been resolved to '%d'", req.GetName(), exportID)
 		if exportID != 0 {
 			if foundVol || isROVolumeFromSnapshot {
-				return s.getCreateVolumeResponse(ctx, exportID, req.GetName(), path, export.Zone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
+				return s.getCreateVolumeResponse(ctx, exportID, req.GetName(), path, export.Zone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork), nil
 			}
 			// in case the export exists but no related volume (directory)
 			if err = isiConfig.isiSvc.UnexportByIDWithZone(ctx, exportID, accessZone); err != nil {
@@ -639,7 +645,7 @@ func (s *service) CreateVolume(
 						}
 					}
 					// return the response
-					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
+					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork), nil
 				}
 				time.Sleep(RetrySleepTime)
 				log.Printf("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
@@ -670,7 +676,7 @@ func (s *service) CreateVolume(
 						}
 					}
 
-					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
+					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork), nil
 				}
 				time.Sleep(RetrySleepTime)
 				log.Printf("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
@@ -817,17 +823,17 @@ func (s *service) createVolumeFromSource(
 }
 
 // Define a variable for the getCSIVolume function
-var getCSIVolumeFunc = func(svc *service) func(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName string) *csi.Volume {
+var getCSIVolumeFunc = func(svc *service) func(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork string) *csi.Volume {
 	return svc.getCSIVolume
 }
 
-func (s *service) getCreateVolumeResponse(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName string) *csi.CreateVolumeResponse {
+func (s *service) getCreateVolumeResponse(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork string) *csi.CreateVolumeResponse {
 	return &csi.CreateVolumeResponse{
-		Volume: getCSIVolumeFunc(s)(ctx, exportID, volName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName),
+		Volume: getCSIVolumeFunc(s)(ctx, exportID, volName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork),
 	}
 }
 
-func (s *service) getCSIVolume(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName string) *csi.Volume {
+func (s *service) getCSIVolume(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork string) *csi.Volume {
 	// Make the additional volume attributes
 	attributes := map[string]string{
 		"ID":                strconv.Itoa(exportID),
@@ -835,6 +841,7 @@ func (s *service) getCSIVolume(ctx context.Context, exportID int, volName, path,
 		"Path":              path,
 		"AccessZone":        accessZone,
 		"AzServiceIP":       azServiceIP,
+		"AzNetwork":         azNetwork,
 		"RootClientEnabled": rootClientEnabled,
 		"ClusterName":       clusterName,
 	}
