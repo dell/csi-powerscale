@@ -1737,7 +1737,7 @@ func (s *service) ControllerUnpublishVolume(
 					return nil, delErr
 				}
 			} else {
-				return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error encountered when trying to remove clients %s from export %d with access zone %s on cluster %s, error %s", ipsStr, exportID, accessZone, clusterName, err.Error()))
+				return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error encountered when trying to remove clients %s from export %d with access zone %s on cluster %s, error %s", ips, exportID, accessZone, clusterName, err.Error()))
 			}
 			// get clients after removal
 			export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
@@ -1819,7 +1819,7 @@ func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, azNetwork string
 			}
 		}
 	}
-	return []string{}, fmt.Errorf("failed to get IPs from AZNetwork %s", azNetwork)
+	return []string{}, fmt.Errorf("failed to match AZNetwork to get IPs for export %s", azNetwork)
 }
 
 func (s *service) GetCapacity(
