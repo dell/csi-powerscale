@@ -1011,3 +1011,123 @@ func TestNodeUnpublishVolume(t *testing.T) {
 		})
 	}
 }
+
+func Test_service_nodeLabelsNeedPatching(t *testing.T) {
+	type args struct {
+		labels         map[string]string
+		labelsToAdd    map[string]string
+		labelsToRemove []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "all nil parameters",
+			args: args{
+				labels:         nil,
+				labelsToAdd:    nil,
+				labelsToRemove: nil,
+			},
+			want: false,
+		},
+		{
+			name: "nil node labels but need to add",
+			args: args{
+				labels:         nil,
+				labelsToAdd:    map[string]string{"key1": "value1", "key2": "value2"},
+				labelsToRemove: []string{"key3", "key4"},
+			},
+			want: true,
+		},
+		{
+			name: "nil labels to add",
+			args: args{
+				labels:         map[string]string{"key1": "value1", "key2": "value2"},
+				labelsToAdd:    nil,
+				labelsToRemove: []string{},
+			},
+			want: false,
+		},
+		{
+			name: "nil labels to remove with labels to add",
+			args: args{
+				labels:         map[string]string{"key1": "value1", "key2": "value2"},
+				labelsToAdd:    map[string]string{"key3": "value3"},
+				labelsToRemove: nil,
+			},
+			want: true,
+		},
+		{
+			name: "nil labels to remove with no labels to add",
+			args: args{
+				labels:         map[string]string{"key1": "value1", "key2": "value2"},
+				labelsToAdd:    map[string]string{},
+				labelsToRemove: nil,
+			},
+			want: false,
+		},
+		{
+			name: "no labels to add or remove",
+			args: args{
+				labels:         map[string]string{"key1": "value1", "key2": "value2"},
+				labelsToAdd:    map[string]string{},
+				labelsToRemove: []string{},
+			},
+			want: false,
+		},
+		{
+			name: "labels to add",
+			args: args{
+				labels:         map[string]string{"key1": "value1", "key2": "value2"},
+				labelsToAdd:    map[string]string{"key3": "value3", "key4": "value4"},
+				labelsToRemove: []string{},
+			},
+			want: true,
+		},
+		{
+			name: "labels to remove",
+			args: args{
+				labels:         map[string]string{"key1": "value1", "key2": "value2"},
+				labelsToAdd:    map[string]string{},
+				labelsToRemove: []string{"key1", "key2"},
+			},
+			want: true,
+		},
+		{
+			name: "labels to add and remove",
+			args: args{
+				labels:         map[string]string{"key1": "value1", "key2": "value2"},
+				labelsToAdd:    map[string]string{"key3": "value3", "key4": "value4"},
+				labelsToRemove: []string{"key1", "key2"},
+			},
+			want: true,
+		},
+		{
+			name: "labels to add already exist",
+			args: args{
+				labels:         map[string]string{"key1": "value1", "key2": "value2"},
+				labelsToAdd:    map[string]string{"key1": "value1", "key2": "value2"},
+				labelsToRemove: []string{},
+			},
+			want: false,
+		},
+		{
+			name: "labels to remove do not exist",
+			args: args{
+				labels:         map[string]string{"key1": "value1", "key2": "value2"},
+				labelsToAdd:    map[string]string{},
+				labelsToRemove: []string{"key3", "key4"},
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := nodeLabelsNeedPatching(tt.args.labels, tt.args.labelsToAdd, tt.args.labelsToRemove); got != tt.want {
+				t.Errorf("nodeLabelsNeedPatching() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

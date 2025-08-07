@@ -53,6 +53,16 @@ var (
 	}
 	getUtilsGetFQDNByIP = id.GetFQDNByIP
 	getK8sutilsGetStats = k8sutils.GetStats
+	getNodeLabelsFunc   = func(s *service) func() (map[string]string, error) {
+		return s.GetNodeLabels
+	}
+	getPatchNodeLabelsFunc = func(s *service) func(map[string]string, []string) error {
+		return s.PatchNodeLabels
+	}
+    getInterfaceAddrsFunc = func() func()([]net.Addr, error) {
+		return net.InterfaceAddrs
+	}
+
 )
 
 func (s *service) NodeExpandVolume(
@@ -775,14 +785,10 @@ func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
 	return nodeID, nil
 }
 
-var interfaceAddrs = func() ([]net.Addr, error) {
-	return net.InterfaceAddrs()
-}
-
 func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
 	ctx, log, _ := GetRunIDLog(ctx)
 
-	addrs, err := interfaceAddrs()
+	addrs, err := getInterfaceAddrsFunc()()
 	if err != nil {
 		log.Errorf("could not get network interface addresses: '%v'", err.Error())
 		return err
@@ -799,8 +805,12 @@ func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
 				} else {
 					sanitizedIP := strings.ReplaceAll(cnet.String(), "/", "_")
 					key := fmt.Sprintf("%s/aznetwork-%s", constants.PluginName, sanitizedIP)
-					if _, ok := labelsToAdd[key]; ok {
-						labelsToAdd[key] = labelsToAdd[key] + "-" + ip.String()
+					if val, ok := labelsToAdd[key]; ok {
+						if len(key) + len(val) + len(ip.String()) < 63 {
+							labelsToAdd[key] = labelsToAdd[key] + "-" + ip.String()
+						} else {
+							log.Warnf("label %s will exceed 63 characters, skipping update of this label", key)
+						}
 					} else {
 						labelsToAdd[key] = ip.String()
 					}
@@ -810,7 +820,7 @@ func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
 		}
 	}
 
-	labels, err := s.GetNodeLabels()
+	labels, err := getNodeLabelsFunc(s)()
 	if err != nil {
 		log.Error("failed to get node labels", err.Error())
 	}
@@ -824,11 +834,29 @@ func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
 		}
 	}
 
-	err = s.PatchNodeLabels(labelsToAdd, labelsToRemove)
-	if err != nil {
-		log.Error("failed to patch node labels", err.Error())
+	if nodeLabelsNeedPatching(labels, labelsToAdd, labelsToRemove) {
+		err = getPatchNodeLabelsFunc(s)(labelsToAdd, labelsToRemove)
+		if err != nil {
+			log.Error("failed to patch node labels", err.Error())
+			return err
+		}
+		log.Debugf("reconciled node network labels, added: %v, removed: %v", labelsToAdd, labelsToRemove)
 	}
 
-	log.Debugf("reconciled node network labels, added: %v, removed: %v", labelsToAdd, labelsToRemove)
 	return nil
+}
+
+func nodeLabelsNeedPatching(labels, labelsToAdd map[string]string, labelsToRemove []string) bool {
+	for k, v := range labelsToAdd {
+		if labels[k] != v {
+			return true
+		}
+	}
+
+	for _, k := range labelsToRemove {
+		if _, ok := labels[k]; ok {
+			return true
+		}
+	}
+	return false
 }
