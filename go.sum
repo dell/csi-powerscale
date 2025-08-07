@@ -107,8 +107,8 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dell/csi-metadata-retriever v1.11.1-0.20250721043443-1ab0d3f4a48e h1:c1Piz9Zt4gom5KUF/xpKrcP89tfZJaRjzhhptXvLh6M=
-github.com/dell/csi-metadata-retriever v1.11.1-0.20250721043443-1ab0d3f4a48e/go.mod h1:1UmUeWn+D60Nz6KcHk0pBl9bqfqhfMrbpUJ6BgIE4zE=
+github.com/dell/csi-metadata-retriever v1.11.1-0.20250728054709-02998bccd1ba h1:Sbhg0Guof2ie6Bi9WXbvZ0TQYdloSz0/KX5V+t2CqJE=
+github.com/dell/csi-metadata-retriever v1.11.1-0.20250728054709-02998bccd1ba/go.mod h1:okwR0tG9fJkaGe+rqprTxg2ZlOKfaBh9Q4smknH1TiE=
 github.com/dell/dell-csi-extensions/common v1.8.1-0.20250717054012-23ceaf9c9606 h1:kYmBdohoJ3rHDhRxLO4BIjDl4CupBnedIH6rhbDhLhw=
 github.com/dell/dell-csi-extensions/common v1.8.1-0.20250717054012-23ceaf9c9606/go.mod h1:BS94dd2/oGCkWqZW4XeXHf6J/DssSy9vYUd4sb2VDB0=
 github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250717054012-23ceaf9c9606 h1:BKJ2dof1dydFgxO33dTO+Yx6T7OPCQPeRIQ+1M3N0MU=
@@ -889,8 +889,8 @@ google.golang.org/grpc v1.33.1/go.mod h1:fr5YgcSWrqhRRxogOsw7RzIpsmvOZ6IcH4kBYTp
 google.golang.org/grpc v1.36.0/go.mod h1:qjiiYl8FncCW8feJPdyg3v6XW24KsRHe+dy9BAGRRjU=
 google.golang.org/grpc v1.37.0/go.mod h1:NREThFqKR1f3iQ6oBuvc5LadQuXVGo9rkm5ZGrQdJfM=
 google.golang.org/grpc v1.38.0/go.mod h1:NREThFqKR1f3iQ6oBuvc5LadQuXVGo9rkm5ZGrQdJfM=
-google.golang.org/grpc v1.74.0 h1:sxRSkyLxlceWQiqDofxDot3d4u7DyoHPc7SBXMj8gGY=
-google.golang.org/grpc v1.74.0/go.mod h1:NZUaK8dAMUfzhK6uxZ+9511LtOrk73UGWOFoNvz7z+s=
+google.golang.org/grpc v1.74.2 h1:WoosgB65DlWVC9FqI82dGsZhWFNBSLjQ84bjROOpMu4=
+google.golang.org/grpc v1.74.2/go.mod h1:CtQ+BGjaAIXHs/5YS3i473GqwBBa1zGQNevxdeBEXrM=
 google.golang.org/protobuf v0.0.0-20200109180630-ec00e32a8dfd/go.mod h1:DFci5gLYBciE7Vtevhsrf46CRTquxDuWsQurQQe4oz8=
 google.golang.org/protobuf v0.0.0-20200221191635-4d8936d0db64/go.mod h1:kwYJMbMJ01Woi6D6+Kah6886xMZcty6N08ah7+eCXa0=
 google.golang.org/protobuf v0.0.0-20200228230310-ab0ca4ff8a60/go.mod h1:cfTl7dwQJ+fmap5saPgwCLgHXTUD7jkjRqWcaiX5VyM=
