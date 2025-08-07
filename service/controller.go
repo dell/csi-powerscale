@@ -1227,13 +1227,13 @@ func (s *service) ControllerPublishVolume(
 			log.Printf("    [%s]=%s", key, value)
 		}
 		// Check for AZNetwork key
-		if azNet, ok := volumeContext["AZNetwork"]; ok && azNet != "" {
+		if azNet, ok := volumeContext["AzNetwork"]; ok && azNet != "" {
 			var err error
 			log.Debugf("***[AZNETWORK] Found AZNetwork key:")
 			newExportIP, err = s.getIpsFromAZNetworkLabel(ctx, req.GetNodeId(), azNet)
 			if err != nil {
 				log.Errorf("***[AZNETWORK] Error checking AZNetwork label match: %v", err)
-				return nil, status.Error(codes.Internal, "AZNetwork label check failed")
+				return nil, status.Error(codes.Internal, fmt.Sprintf("getting AZNetwork IPs: %v", err))
 			}
 			log.Debugf("***[AZNETWORK] AZNetwork %s matched a node label IP %s", azNet, newExportIP)
 
