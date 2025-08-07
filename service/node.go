@@ -782,13 +782,13 @@ var interfaceAddrs = func() ([]net.Addr, error) {
 func (s *service) ReconcileNodeLabels(ctx context.Context) error {
 	ctx, log, _ := GetRunIDLog(ctx)
 
-	labelsToAdd := make(map[string]string)
 	addrs, err := interfaceAddrs()
 	if err != nil {
 		log.Errorf("could not get network interface addresses: '%v'", err.Error())
 		return err
 	}
 
+	labelsToAdd := make(map[string]string)
 	for _, addr := range addrs {
 		switch v := addr.(type) {
 		case *net.IPNet:
@@ -810,25 +810,25 @@ func (s *service) ReconcileNodeLabels(ctx context.Context) error {
 		}
 	}
 
-	// Not yet needed until reconcile.
-	// labels, err := s.GetNodeLabels()
-	// if err != nil {
-	// 	log.Error("failed to get node labels", err.Error())
-	// }
-	//
-	// for key, val := range labels {
-	// 	if strings.HasPrefix(key, constants.PluginName+"/aznetwork-") {
-	// 		log.Infof("label %s:%s exists on node", key, val)
-	// 		_, exists := labelsToAdd[key]
-	// 		if !exists {
-	// 			delete(labels, key)
-	// 		}
-	// 	}
-	// }
+	labels, err := s.GetNodeLabels()
+	if err != nil {
+		log.Error("failed to get node labels", err.Error())
+	}
 
-	err = s.PatchNodeLabels(labelsToAdd)
+	labelsToRemove := make([]string, 0)
+	for k := range labels {
+		if strings.HasPrefix(k, constants.PluginName+"/aznetwork-") {
+			if _, ok := labelsToAdd[k]; !ok {
+				labelsToRemove = append(labelsToRemove, k)
+			}
+		}
+	}
 
-	// TODO: log changes
-	log.Infof("reconciled node network labels")
-	return err
+	err = s.PatchNodeLabels(labelsToAdd, labelsToRemove)
+	if err != nil {
+		log.Error("failed to patch node labels", err.Error())
+	}
+
+	log.Debugf("reconciled node network labels, added: %v, removed: %v", labelsToAdd, labelsToRemove)
+	return nil
 }

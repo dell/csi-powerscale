@@ -1073,9 +1073,8 @@ func (s *service) GetNodeLabels() (map[string]string, error) {
 	return node.Labels, nil
 }
 
-func (s *service) PatchNodeLabels(labels map[string]string) (error) {
+func (s *service) PatchNodeLabels(add map[string]string, remove []string) error {
 	log := logging.GetLogger()
-	log.Debugf("Patching node labels: %v", labels) // TODO remove when code is stable
 
 	k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
 	if err != nil {
@@ -1095,13 +1094,12 @@ func (s *service) PatchNodeLabels(labels map[string]string) (error) {
 		return err
 	}
 
-	// TODO: Just an experiment, may want to have a separate parameter to delete label.
-	for k, v := range labels {
-		if strings.HasPrefix(k, "-") || v == "" {
-			delete(node.Labels, k)
-		} else {
-			node.Labels[k] = v
-		}
+	for k, v := range add {
+		node.Labels[k] = v
+	}
+
+	for _, k := range remove {
+		delete(node.Labels, k)
 	}
 
 	newNode, err := json.Marshal(node)
@@ -1125,7 +1123,6 @@ func (s *service) PatchNodeLabels(labels map[string]string) (error) {
 	log.Debugf("Node details: %s", node)
 	return err
 }
-
 
 func (s *service) ProbeController(ctx context.Context,
 	_ *commonext.ProbeControllerRequest) (
