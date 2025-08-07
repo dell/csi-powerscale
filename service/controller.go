@@ -1715,7 +1715,7 @@ func (s *service) ControllerUnpublishVolume(
 	}
 	// azNetwork := "10.0.0.0/24" // dummy value for testing
 	if azNetwork != "" {
-		ips, err := s.getIpsFromAZNetworkLabel(ctx, azNetwork)
+		ips, err := s.getIpsFromAZNetworkLabel(ctx, req.NodeId, azNetwork)
 		if err != nil || len(ips) == 0 {
 			log.Debugf("No matching IP(s) found in from AZNetwork label %s", azNetwork)
 			return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
@@ -1786,12 +1786,12 @@ func (s *service) ControllerUnpublishVolume(
 //
 //	[]string: The array of IP(s) associated with the matching AZNetwork label, or nil if not found
 //	error: Any error that occurs during the function call
-func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, azNetwork string) ([]string, error) {
+func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, nodeId, azNetwork string) ([]string, error) {
 	// Fetch log handler
 	_, log, _ := GetRunIDLog(ctx)
 
 	// Get node labels
-	nodeName, _, _, err := id.ParseNodeID(ctx, s.nodeID)
+	nodeName, _, _, err := id.ParseNodeID(ctx, nodeId)
 	if err != nil {
 		log.Error("failed to get Node Name with error", err.Error())
 		return nil, err
