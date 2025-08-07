@@ -1081,6 +1081,23 @@ func (s *service) GetNodeLabels() (map[string]string, error) {
 	return node.Labels, nil
 }
 
+func (s *service) GetNodeLabelsWithName(nodeName string) (map[string]string, error) {
+	log := logging.GetLogger()
+	k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
+	if err != nil {
+		log.Errorf("init client failed: '%s'", err.Error())
+		return nil, err
+	}
+	// access the API to fetch node object
+	node, err := k8sclientset.CoreV1().Nodes().Get(context.TODO(), nodeName, v1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	log.Debugf("Node details: %s", node)
+
+	return node.Labels, nil
+}
+
 func (s *service) PatchNodeLabels(add map[string]string, remove []string) error {
 	log := logging.GetLogger()
 
