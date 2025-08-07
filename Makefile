@@ -58,7 +58,6 @@ dev-build-image-push: dev-build
 unit-test: go-code-tester
 	GITHUB_OUTPUT=/dev/null \
 	./go-code-tester 90 "." "" "true" "" "" "./service/mock|./common/constants|./test/integration|./core|./provider"
-	( cd service; go test -race -coverprofile=c.out ./... )
 
 coverage:
 	cd service; go tool cover -html=c.out -o coverage.html
