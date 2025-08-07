@@ -120,7 +120,7 @@ type service struct {
 	statisticsCounter     int
 	isiClusters           *sync.Map
 	defaultIsiClusterName string
-	networkLabelInterval  time.Duration
+	azReconcileInterval   time.Duration
 	k8sclient             kubernetes.Interface
 }
 
@@ -551,10 +551,8 @@ func (s *service) BeforeServe(
 	go s.startAPIService(ctx)
 
 	// Watch for changes to access zone network node labels
-	if strings.EqualFold(s.mode, constants.ModeNode) {
-		if s.networkLabelInterval > 0 {
-			go s.reconcileNodeAzLabels(s.networkLabelInterval)
-		}
+	if strings.EqualFold(s.mode, constants.ModeNode) && s.azReconcileInterval > 0 {
+		go s.reconcileNodeAzLabels(s.azReconcileInterval)
 	}
 
 	return s.probeOnStart(ctx)
@@ -863,17 +861,17 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 }
 
 func (s *service) updateNetworkLabelInterval(log *logrus.Logger, v *viper.Viper) {
-	var networkLabelInterval string
-	if v.IsSet(constants.ParamNetworkLabelInterval) {
-		networkLabelInterval = v.GetString(constants.ParamNetworkLabelInterval)
+	var azReconcileInterval string
+	if v.IsSet(constants.ParamAZReconcileInterval) {
+		azReconcileInterval = v.GetString(constants.ParamAZReconcileInterval)
 	}
-	interval, err := time.ParseDuration(networkLabelInterval)
+	interval, err := time.ParseDuration(azReconcileInterval)
 	if err != nil {
-		log.Error(err, fmt.Sprintf("parsing network label interval %s", networkLabelInterval))
-		interval = constants.DefaultNetworkLabelInterval
+		log.Error(err, fmt.Sprintf("parsing access zone reconcile interval %s", azReconcileInterval))
+		interval = constants.DefaultAZReconcileInterval
 	}
 	log.WithField("network label interval", interval).Info("configuration updated")
-	s.networkLabelInterval = interval
+	s.azReconcileInterval = interval
 }
 
 // GetCSINodeID gets the id of the CSI node which regards the node name as node id

@@ -75,9 +75,9 @@ const (
 	// DefaultPodmonPollRate is the default polling frequency to check for array connectivity
 	DefaultPodmonPollRate = 60
 
-	// ParamNetworkLabelInterval interval to monitor and reconcile network interface labels on nodes
-	ParamNetworkLabelInterval = "NETWORK_LABEL_INTERVAL"
+	// ParamAZReconcileInterval interval to monitor and reconcile network interface labels on nodes
+	ParamAZReconcileInterval = "AZ_RECONCILE_INTERVAL"
 
-	// DefaultNetworkLabelInterval default interval to monitor and reconcile network interface labels on nodes
-	DefaultNetworkLabelInterval = time.Duration(1 * time.Hour)
+	// DefaultAZReconcileInterval default interval to monitor and reconcile network interface labels on nodes
+	DefaultAZReconcileInterval = time.Duration(1 * time.Hour)
 )
