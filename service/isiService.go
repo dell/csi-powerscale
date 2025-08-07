@@ -7,7 +7,7 @@ package service
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
 
-      http://www.apache.org/licenses/LICENSE-2.0
+	  http://www.apache.org/licenses/LICENSE-2.0
 
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
@@ -553,12 +553,12 @@ func (svc *isiService) OtherClientsAlreadyAdded(ctx context.Context, exportID in
 // updateClusterToNodeIDMap updates cluster to nodeID map from input clusterName, nodeID and clientToUse
 func updateClusterToNodeIDMap(ctx context.Context, clusterToNodeIDMap *sync.Map, clusterName, nodeID, clientToUse string) error {
 	log := logging.GetRunIDLogger(ctx)
-	log.Debugf("updating ClusterToNodeIDMap map for cluster '%s', for nodeID '%s' with clientToUse '%s'", clusterName, nodeID, clientToUse)
+	log.Infof("updating ClusterToNodeIDMap map for cluster '%s', for nodeID '%s' with clientToUse '%s'", clusterName, nodeID, clientToUse)
 
 	var nodeIDToClientMaps []*nodeIDToClientMap
 
 	if m, found := clusterToNodeIDMap.Load(clusterName); found {
-		log.Debugf("entry for cluster '%s' found in cluster to nodeID map", clusterName)
+		log.Infof("entry for cluster '%s' found in cluster to nodeID map", clusterName)
 		var ok bool
 		if nodeIDToClientMaps, ok = m.([]*nodeIDToClientMap); !ok {
 			return fmt.Errorf("failed to extract nodeIDToClientMap for cluster '%s'", clusterName)
@@ -671,6 +671,26 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 	log.Warnf("failed to add client '%s' to export id '%d': '%v'", otherClientToUse, exportID, err)
 
 	return fmt.Errorf("failed to add clients '%s' or '%s' to export id '%d'", clientToUse, otherClientToUse, exportID)
+}
+
+func (svc *isiService) AddExportClientByIPWithZone(ctx context.Context, clusterName string, exportID int, accessZone, nodeID string, clientIPs []string, ignoreUnresolvableHosts bool, addClientFunc func(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error) error {
+	// Fetch log handler
+	log := logging.GetRunIDLogger(ctx)
+	var err error
+
+	for _, clientIP := range clientIPs {
+		log.Debugf("AddExportClientByIPWithZone adding '%s' as client to export id '%d'", clientIP, exportID)
+		if err = addClientFunc(ctx, exportID, accessZone, clientIP, false); err == nil {
+			if err = updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, clientIP); err != nil {
+				// not returning with error as export is already updated with client
+				log.Warnf("failed to update cluster to nodeID map: '%s'", err)
+			}
+
+			return nil
+		}
+		log.Warnf("failed to add client '%s' to export id '%d': '%v'", clientIP, exportID, err)
+	}
+	return fmt.Errorf("failed to add clients '%v' to export id '%d'", clientIPs, exportID)
 }
 
 func (svc *isiService) AddExportClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error {
