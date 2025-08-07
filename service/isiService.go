@@ -648,7 +648,7 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 	if err = addClientFunc(ctx, exportID, accessZone, clientToUse, false); err == nil {
 		if err := updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, clientToUse); err != nil {
 			// not returning with error as export is already updated with client
-			log.Warnf("failed to update cluster to nodeID map: '%s'", err)
+			log.Warnf("failed to update cluster to nodeID map: '%v'", err)
 		}
 
 		return nil
@@ -746,7 +746,7 @@ func (svc *isiService) RemoveExportClientByIDWithZone(ctx context.Context, expor
 		// Return success if export doesn't exist
 		if notFoundErr, ok := err.(*api.JSONError); ok {
 			if notFoundErr.StatusCode == 404 {
-				log.Debugf("Export id '%v' does not exist", exportID)
+				log.Debugf("Export id '%d' does not exist", exportID)
 				return nil
 			}
 		}
@@ -761,10 +761,9 @@ func (svc *isiService) RemoveExportClientByIPsWithZone(ctx context.Context, expo
 	log := logging.GetRunIDLogger(ctx)
 
 	if err := svc.client.RemoveExportClientsByIDWithZone(ctx, exportID, accessZone, clientIPs, ignoreUnresolvableHosts); err != nil {
-		// Return success if export doesn't exist
 		if notFoundErr, ok := err.(*api.JSONError); ok {
 			if notFoundErr.StatusCode == 404 {
-				log.Debugf("Export id '%v' does not exist", exportID)
+				log.Debugf("Export id '%d' does not exist", exportID)
 				return nil
 			}
 		}
