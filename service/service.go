@@ -122,6 +122,7 @@ type service struct {
 	isiClusters           *sync.Map
 	defaultIsiClusterName string
 	azReconcileInterval   time.Duration
+	updateReconcileInt    chan struct{}
 	k8sclient             kubernetes.Interface
 }
 
@@ -552,8 +553,9 @@ func (s *service) BeforeServe(
 	go s.startAPIService(ctx)
 
 	// Watch for changes to access zone network node labels
+	s.updateReconcileInt = make(chan struct{}, 1)
 	if strings.EqualFold(s.mode, constants.ModeNode) && s.azReconcileInterval > 0 {
-		go s.reconcileNodeAzLabels(s.azReconcileInterval)
+		go s.reconcileNodeAzLabels(ctx)
 	}
 
 	return s.probeOnStart(ctx)
@@ -618,9 +620,13 @@ func (s *service) reconcileNodeAzLabels(interval time.Duration) error {
 		for {
 			err := s.ReconcileNodeAzLabels(context.Background())
 			if err != nil {
-				log.Errorf("Node label reconciliation failed: %v", err)
+				log.Errorf("node label reconciliation failed: %v", err)
 			}
-			time.Sleep(interval)
+		case <-s.updateReconcileInt:
+			ticker.Stop()
+			ticker = time.NewTicker(s.getReconcileInterval())
+		case <-ctx.Done():
+			return
 		}
 	}()
 	return nil
@@ -849,7 +855,7 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 	logging.UpdateLogLevel(logLevel, &updateMutex)
 	log.Infof("log level set to '%s'", logLevel)
 
-	// update network label interval
+	// set access zone network label interval
 	s.setAZReconcileInterval(log, v)
 
 	err := s.syncIsilonConfigs(ctx)
@@ -878,7 +884,7 @@ func (s *service) setAZReconcileInterval(log *logrus.Logger, v *viper.Viper) {
 		interval = constants.DefaultAZReconcileInterval
 	}
 	log.Info("access zone reconcile interval updated")
-	s.azReconcileInterval = interval
+	s.updateReconcileInterval(interval)
 }
 
 // GetCSINodeID gets the id of the CSI node which regards the node name as node id
