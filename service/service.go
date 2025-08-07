@@ -17,6 +17,7 @@ package service
 */
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -52,6 +53,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -116,6 +119,7 @@ type service struct {
 	statisticsCounter     int
 	isiClusters           *sync.Map
 	defaultIsiClusterName string
+	azReconcileInterval   time.Duration
 	k8sclient             kubernetes.Interface
 }
 
@@ -552,6 +556,11 @@ func (s *service) BeforeServe(
 	go s.loadIsilonConfigs(ctx, isilonConfigFile)
 	go s.startAPIService(ctx)
 
+	// Watch for changes to access zone network node labels
+	if strings.EqualFold(s.mode, constants.ModeNode) && s.azReconcileInterval > 0 {
+		go s.reconcileNodeAzLabels(s.azReconcileInterval)
+	}
+
 	return s.probeOnStart(ctx)
 }
 
@@ -606,6 +615,19 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 	}
 	<-done
 	return nil
+}
+
+func (s *service) reconcileNodeAzLabels(interval time.Duration) {
+	_, log := GetLogger(context.Background())
+	go func() {
+		for {
+			err := s.ReconcileNodeAzLabels(context.Background())
+			if err != nil {
+				log.Errorf("Node label reconciliation failed: %v", err)
+			}
+			time.Sleep(interval)
+		}
+	}()
 }
 
 // Returns the size of arrays
@@ -833,12 +855,29 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 	utils.UpdateLogLevel(logLevel, &updateMutex)
 	log.Infof("log level set to '%s'", logLevel)
 
+	// update network label interval
+	s.updateNetworkLabelInterval(log, v)
+
 	err := s.syncIsilonConfigs(ctx)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (s *service) updateNetworkLabelInterval(log *logrus.Logger, v *viper.Viper) {
+	var azReconcileInterval string
+	if v.IsSet(constants.ParamAZReconcileInterval) {
+		azReconcileInterval = v.GetString(constants.ParamAZReconcileInterval)
+	}
+	interval, err := time.ParseDuration(azReconcileInterval)
+	if err != nil {
+		log.Error(err, fmt.Sprintf("parsing access zone reconcile interval %s", azReconcileInterval))
+		interval = constants.DefaultAZReconcileInterval
+	}
+	log.WithField("access zone reconcile interval", interval).Info("configuration updated")
+	s.azReconcileInterval = interval
 }
 
 // GetCSINodeID gets the id of the CSI node which regards the node name as node id
@@ -1037,9 +1076,60 @@ func (s *service) GetNodeLabels() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("Node %s details\n", node)
+	log.Debugf("Node details: %s", node)
 
 	return node.Labels, nil
+}
+
+func (s *service) PatchNodeLabels(add map[string]string, remove []string) error {
+	log := logging.GetLogger()
+
+	k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
+	if err != nil {
+		log.Errorf("init client failed: '%s'", err.Error())
+		return err
+	}
+
+	node, err := k8sclientset.CoreV1().Nodes().Get(context.TODO(), s.nodeID, v1.GetOptions{})
+	if err != nil {
+		log.Errorf("failed to get current node details: '%s'", err.Error())
+		return err
+	}
+
+	currentNode, err := json.Marshal(node)
+	if err != nil {
+		log.Errorf("failed to marshal current node details: '%s'", err.Error())
+		return err
+	}
+
+	for k, v := range add {
+		node.Labels[k] = v
+	}
+
+	for _, k := range remove {
+		delete(node.Labels, k)
+	}
+
+	newNode, err := json.Marshal(node)
+	if err != nil {
+		log.Errorf("failed to marshal new node details: '%s'", err.Error())
+		return err
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(currentNode, newNode, node)
+	if err != nil {
+		log.Errorf("failed to create patch: '%s'", err.Error())
+		return err
+	}
+
+	node, err = k8sclientset.CoreV1().Nodes().Patch(context.TODO(), s.nodeID, types.StrategicMergePatchType, patchBytes, v1.PatchOptions{})
+	if err != nil {
+		log.Errorf("failed to patch node labels: '%s'", err.Error())
+		return err
+	}
+
+	log.Debugf("Node details after patching labels: %s", node)
+	return err
 }
 
 func (s *service) ProbeController(ctx context.Context,

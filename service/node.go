@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -795,4 +796,62 @@ func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
 	nodeID = nodeID + utils.NodeIDSeparator + nodeFQDN + utils.NodeIDSeparator + nodeIP
 
 	return nodeID, nil
+}
+
+var interfaceAddrs = func() ([]net.Addr, error) {
+	return net.InterfaceAddrs()
+}
+
+func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
+	ctx, log, _ := GetRunIDLog(ctx)
+
+	addrs, err := interfaceAddrs()
+	if err != nil {
+		log.Errorf("could not get network interface addresses: '%v'", err.Error())
+		return err
+	}
+
+	labelsToAdd := make(map[string]string)
+	for _, addr := range addrs {
+		switch v := addr.(type) {
+		case *net.IPNet:
+			if v.IP.To4() != nil && !v.IP.IsLoopback() {
+				ip, cnet, err := net.ParseCIDR(addr.String())
+				if err != nil {
+					log.Errorf("encountered error while parsing IP address %v", addr)
+				} else {
+					sanitizedIP := strings.ReplaceAll(cnet.String(), "/", "_")
+					key := fmt.Sprintf("%s/aznetwork-%s", constants.PluginName, sanitizedIP)
+					if _, ok := labelsToAdd[key]; ok {
+						labelsToAdd[key] = labelsToAdd[key] + "-" + ip.String()
+					} else {
+						labelsToAdd[key] = ip.String()
+					}
+					log.Debugf("discovered label %s -> %s", key, labelsToAdd[key])
+				}
+			}
+		}
+	}
+
+	labels, err := s.GetNodeLabels()
+	if err != nil {
+		log.Error("failed to get node labels", err.Error())
+	}
+
+	labelsToRemove := make([]string, 0)
+	for k := range labels {
+		if strings.HasPrefix(k, constants.PluginName+"/aznetwork-") {
+			if _, ok := labelsToAdd[k]; !ok {
+				labelsToRemove = append(labelsToRemove, k)
+			}
+		}
+	}
+
+	err = s.PatchNodeLabels(labelsToAdd, labelsToRemove)
+	if err != nil {
+		log.Error("failed to patch node labels", err.Error())
+	}
+
+	log.Debugf("reconciled node network labels, added: %v, removed: %v", labelsToAdd, labelsToRemove)
+	return nil
 }
