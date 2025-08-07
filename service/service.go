@@ -95,7 +95,6 @@ type Service interface {
 type Opts struct {
 	Port                      string
 	AccessZone                string
-	AZNetwork                 string
 	Path                      string
 	IsiVolumePathPermissions  string
 	SkipCertificateValidation bool
@@ -396,7 +395,7 @@ func (s *service) autoProbe(ctx context.Context, isiConfig *IsilonClusterConfig)
 	return s.probe(ctx, isiConfig)
 }
 
-func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClusterConfig, logLevel logrus.Level) (*isi.Client, error) { // could be useful
+func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClusterConfig, logLevel logrus.Level) (*isi.Client, error) {
 	clientCtx, log := GetLogger(clientCtx)
 
 	// First we fetch node labels using kubernetes API and check, if label
@@ -553,7 +552,9 @@ func (s *service) BeforeServe(
 
 	// Watch for changes to access zone network node labels
 	if strings.EqualFold(s.mode, constants.ModeNode) {
-		go s.reconcileNodeAzLabels(s.networkLabelInterval)
+		if s.networkLabelInterval > 0 {
+			go s.reconcileNodeAzLabels(s.networkLabelInterval)
+		}
 	}
 
 	return s.probeOnStart(ctx)
