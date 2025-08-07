@@ -1791,7 +1791,12 @@ func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, azNetwork string
 	_, log, _ := GetRunIDLog(ctx)
 
 	// Get node labels
-	labels, err := s.GetNodeLabels()
+	nodeName, _, _, err := id.ParseNodeID(ctx, s.nodeID)
+	if err != nil {
+		log.Error("failed to get Node Name with error", err.Error())
+		return nil, err
+	}
+	labels, err := s.GetNodeLabelsWithName(nodeName)
 	if err != nil {
 		log.Error("failed to get Node Labels with error", err.Error())
 		return nil, err
