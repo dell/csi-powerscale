@@ -1782,7 +1782,7 @@ func (s *service) ControllerUnpublishVolume(
 	}
 	if azNetwork != "" {
 		ips, err := s.getIpsFromAZNetworkLabel(ctx, req.NodeId, azNetwork)
-		if err != nil || len(ips) == 0 {
+		if err != nil {
 			log.Debugf("No matching IP(s) found from AZNetwork label %s", azNetwork)
 			return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
 		}
