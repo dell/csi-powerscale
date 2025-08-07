@@ -648,7 +648,7 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 	if err = addClientFunc(ctx, exportID, accessZone, clientToUse, false); err == nil {
 		if err := updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, clientToUse); err != nil {
 			// not returning with error as export is already updated with client
-			log.Warnf("failed to update cluster to nodeID map: '%s'", err)
+			log.Warnf("failed to update cluster to nodeID map: '%v'", err)
 		}
 
 		return nil
@@ -671,6 +671,26 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 	log.Warnf("failed to add client '%s' to export id '%d': '%v'", otherClientToUse, exportID, err)
 
 	return fmt.Errorf("failed to add clients '%s' or '%s' to export id '%d'", clientToUse, otherClientToUse, exportID)
+}
+
+func (svc *isiService) AddExportClientByIPWithZone(ctx context.Context, clusterName string, exportID int, accessZone, nodeID string, clientIPs []string, addClientFunc func(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error) error {
+	// Fetch log handler
+	log := logging.GetRunIDLogger(ctx)
+	var err error
+
+	for _, clientIP := range clientIPs {
+		log.Debugf("AddExportClientByIPWithZone adding '%s' as client to export id '%d'", clientIP, exportID)
+		if err = addClientFunc(ctx, exportID, accessZone, clientIP, false); err == nil {
+			if err = updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, clientIP); err != nil {
+				// not returning with error as export is already updated with client
+				log.Warnf("failed to update cluster to nodeID map: '%v'", err)
+			}
+
+			return nil
+		}
+		log.Warnf("failed to add client '%s' to export id '%d': '%v'", clientIP, exportID, err)
+	}
+	return fmt.Errorf("failed to add clients '%v' to export id '%d'", clientIPs, exportID)
 }
 
 func (svc *isiService) AddExportClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error {
@@ -723,10 +743,26 @@ func (svc *isiService) RemoveExportClientByIDWithZone(ctx context.Context, expor
 	log.Debugf("RemoveExportClientByName client '%v'", clientsToRemove)
 
 	if err := svc.client.RemoveExportClientsByIDWithZone(ctx, exportID, accessZone, clientsToRemove, ignoreUnresolvableHosts); err != nil {
-		// Return success if export doesn't exist
 		if notFoundErr, ok := err.(*api.JSONError); ok {
 			if notFoundErr.StatusCode == 404 {
-				log.Debugf("Export id '%v' does not exist", exportID)
+				log.Debugf("Export id '%d' does not exist", exportID)
+				return nil
+			}
+		}
+		return fmt.Errorf("failed to remove clients from export '%d' with access zone '%s' : '%s'", exportID, accessZone, err.Error())
+	}
+
+	return nil
+}
+
+func (svc *isiService) RemoveExportClientByIPsWithZone(ctx context.Context, exportID int, accessZone string, clientIPs []string, ignoreUnresolvableHosts bool) error {
+	// Fetch log handler
+	log := logging.GetRunIDLogger(ctx)
+
+	if err := svc.client.RemoveExportClientsByIDWithZone(ctx, exportID, accessZone, clientIPs, ignoreUnresolvableHosts); err != nil {
+		if notFoundErr, ok := err.(*api.JSONError); ok {
+			if notFoundErr.StatusCode == 404 {
+				log.Debugf("Export id '%d' does not exist", exportID)
 				return nil
 			}
 		}
