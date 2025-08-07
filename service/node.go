@@ -800,7 +800,7 @@ func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
 					sanitizedIP := strings.ReplaceAll(cnet.String(), "/", "_")
 					key := fmt.Sprintf("%s/aznetwork-%s", constants.PluginName, sanitizedIP)
 					if _, ok := labelsToAdd[key]; ok {
-						labelsToAdd[key] = labelsToAdd[key] + "_" + ip.String()
+						labelsToAdd[key] = labelsToAdd[key] + "-" + ip.String()
 					} else {
 						labelsToAdd[key] = ip.String()
 					}
