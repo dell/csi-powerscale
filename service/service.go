@@ -870,7 +870,7 @@ func (s *service) updateNetworkLabelInterval(log *logrus.Logger, v *viper.Viper)
 		log.Error(err, fmt.Sprintf("parsing access zone reconcile interval %s", azReconcileInterval))
 		interval = constants.DefaultAZReconcileInterval
 	}
-	log.WithField("network label interval", interval).Info("configuration updated")
+	log.WithField("access zone reconcile interval", interval).Info("configuration updated")
 	s.azReconcileInterval = interval
 }
 
