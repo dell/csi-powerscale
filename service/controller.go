@@ -1776,21 +1776,20 @@ func (s *service) ControllerUnpublishVolume(
 
 	azNetwork, ok := pv.Spec.CSI.VolumeAttributes["AzNetwork"]
 	if !ok {
-		log.Debugf("AZNetwork key not found in PV %s", pv.Name)
+		log.Debugf("AZNetwork attribute not found in PV %s", pv.Name)
 	} else if azNetwork == "" {
 		log.Debugf("AZNetwork value is empty in PV %s", pv.Name)
 	}
-	// azNetwork := "10.0.0.0/24" // dummy value for testing
 	if azNetwork != "" {
 		ips, err := s.getIpsFromAZNetworkLabel(ctx, req.NodeId, azNetwork)
 		if err != nil || len(ips) == 0 {
-			log.Debugf("No matching IP(s) found in from AZNetwork label %s", azNetwork)
+			log.Debugf("No matching IP(s) found from AZNetwork label %s", azNetwork)
 			return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
 		}
 		log.Debugf("AZNetwork IPs: %s", ips)
 		log.Debugf("Using IPs from AZNetwork %s to remove from export", azNetwork)
 
-		// get clients before removal
+		// DEBUG (REMOVE AFTER TESTING INTEGRATED CHANGES): get clients before removal
 		export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
 		if err != nil {
 			log.Debugf("error getting export %d with access zone %s on cluster %s, error %s", exportID, accessZone, clusterName, err.Error())
@@ -1806,7 +1805,7 @@ func (s *service) ControllerUnpublishVolume(
 			} else {
 				return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error encountered when trying to remove clients %s from export %d with access zone %s on cluster %s, error %s", ips, exportID, accessZone, clusterName, err.Error()))
 			}
-			// get clients after removal
+			// DEBUG (REMOVE AFTER TESTING INTEGRATED CHANGES): get clients after removal
 			export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
 			if err != nil {
 				log.Debugf("error getting export %d with access zone %s on cluster %s, error %s", exportID, accessZone, clusterName, err.Error())
