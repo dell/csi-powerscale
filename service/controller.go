@@ -1874,7 +1874,7 @@ func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, nodeID, azNetwor
 
 	for key, value := range labels {
 		// Found the node with the matching AZNetwork label, get its IP
-		if match := pattern.FindStringSubmatch(key); match != nil {
+		if match := pattern.FindStringSubmatch(key); len(match) == 3 {
 			log.Debugf("Key: %s, Value: %s\n", key, value)
 
 			// getting network interface IP and Subnet
