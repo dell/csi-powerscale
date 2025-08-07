@@ -550,8 +550,11 @@ func (s *service) BeforeServe(
 	// Dynamically load the config
 	go s.loadIsilonConfigs(ctx, isilonConfigFile)
 	go s.startAPIService(ctx)
+
 	// Watch for changes to access zone network node labels
-	go s.reconcileNodeLabels(s.networkLabelInterval)
+	if strings.EqualFold(s.mode, constants.ModeNode) {
+		go s.reconcileNodeAzLabels(s.networkLabelInterval)
+	}
 
 	return s.probeOnStart(ctx)
 }
@@ -609,11 +612,11 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 	return nil
 }
 
-func (s *service) reconcileNodeLabels(interval time.Duration) {
+func (s *service) reconcileNodeAzLabels(interval time.Duration) {
 	_, log := GetLogger(context.Background())
 	go func() {
 		for {
-			err := s.ReconcileNodeLabels(context.Background())
+			err := s.ReconcileNodeAzLabels(context.Background())
 			if err != nil {
 				log.Errorf("Node label reconciliation failed: %v", err)
 			}
@@ -1120,7 +1123,7 @@ func (s *service) PatchNodeLabels(add map[string]string, remove []string) error 
 		return err
 	}
 
-	log.Debugf("Node details: %s", node)
+	log.Debugf("Node details after patching labels: %s", node)
 	return err
 }
 

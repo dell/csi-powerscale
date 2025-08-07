@@ -779,7 +779,7 @@ var interfaceAddrs = func() ([]net.Addr, error) {
 	return net.InterfaceAddrs()
 }
 
-func (s *service) ReconcileNodeLabels(ctx context.Context) error {
+func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
 	ctx, log, _ := GetRunIDLog(ctx)
 
 	addrs, err := interfaceAddrs()
