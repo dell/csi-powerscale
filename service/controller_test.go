@@ -615,8 +615,8 @@ func TestGetCreateVolumeResponse(t *testing.T) {
 	}()
 
 	// Mock implementation
-	getCSIVolumeFunc = func(_ *service) func(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName string) *csi.Volume {
-		return func(_ context.Context, _ int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName string) *csi.Volume {
+	getCSIVolumeFunc = func(_ *service) func(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork string) *csi.Volume {
+		return func(_ context.Context, _ int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork string) *csi.Volume {
 			return &csi.Volume{
 				VolumeId:      volName,
 				CapacityBytes: sizeInBytes,
@@ -624,6 +624,7 @@ func TestGetCreateVolumeResponse(t *testing.T) {
 					"path":             path,
 					"accessZone":       accessZone,
 					"azServiceIP":      azServiceIP,
+					"azNetwork":        azNetwork,
 					"rootClient":       rootClientEnabled,
 					"sourceSnapshotID": sourceSnapshotID,
 					"sourceVolumeID":   sourceVolumeID,
@@ -644,6 +645,7 @@ func TestGetCreateVolumeResponse(t *testing.T) {
 	accessZone := "accessZone1"
 	sizeInBytes := int64(1024)
 	azServiceIP := "10.0.0.1"
+	azNetwork := "10.0.0.0/24"
 	rootClientEnabled := "true"
 	sourceSnapshotID := "snapshot123"
 	sourceVolumeID := "volume123"
@@ -657,6 +659,7 @@ func TestGetCreateVolumeResponse(t *testing.T) {
 			"path":             path,
 			"accessZone":       accessZone,
 			"azServiceIP":      azServiceIP,
+			"azNetwork":        azNetwork,
 			"rootClient":       rootClientEnabled,
 			"sourceSnapshotID": sourceSnapshotID,
 			"sourceVolumeID":   sourceVolumeID,
@@ -669,7 +672,7 @@ func TestGetCreateVolumeResponse(t *testing.T) {
 	}
 
 	// Call the function under test
-	response := s.getCreateVolumeResponse(ctx, exportID, volName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName)
+	response := s.getCreateVolumeResponse(ctx, exportID, volName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork)
 
 	// Assert the response is as expected
 	assert.Equal(t, expectedResponse, response)
