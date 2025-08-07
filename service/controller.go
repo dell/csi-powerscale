@@ -1224,7 +1224,8 @@ func (s *service) ControllerPublishVolume(
 		if azNet, ok := volumeContext["AZNetwork"]; ok && azNet != "" {
 			var err error
 			log.Debugf("***[AZNETWORK] Found AZNetwork key:")
-			newExportIP, err = s.getIpsFromAZNetworkLabel(ctx, azNet)
+			nodeName, _, _, err := id.ParseNodeID(ctx, req.GetNodeId())
+			newExportIP, err = s.getIpsFromAZNetworkLabel(ctx, azNet, nodeName)
 			if err != nil {
 				log.Errorf("***[AZNETWORK] Error checking AZNetwork label match: %v", err)
 				return nil, status.Error(codes.Internal, "AZNetwork label check failed")
@@ -1288,6 +1289,7 @@ func (s *service) ControllerPublishVolume(
 	}
 
 	nodeID := req.GetNodeId()
+
 	if nodeID == "" {
 		return nil, status.Error(codes.NotFound,
 			logging.GetMessageWithRunID(runID, "node ID is required"))
@@ -1460,12 +1462,12 @@ func (s *service) ControllerPublishVolume(
 //
 //	string: The IP(s) associated with the matching AZNetwork label, or an empty string if not found
 //	error: Any error that occurs during the function call
-func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, azNetwork string) ([]string, error) {
+func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, azNetwork string, nodeName string) ([]string, error) {
 	// Fetch log handler
 	_, log, _ := GetRunIDLog(ctx)
 
 	// Get node labels
-	labels, err := s.GetNodeLabels()
+	labels, err := s.GetNodeLabelsByNodeName(nodeName)
 	if err != nil {
 		log.Error("failed to get Node Labels with error", err.Error())
 		return nil, err
