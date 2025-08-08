@@ -117,9 +117,15 @@ const (
 // clusterToNodeIDMap is a map[clusterName][]*nodeIDToClientMap
 var clusterToNodeIDMap = new(sync.Map)
 
-var getGetExportWithPathAndZoneFunc = func(isiConfig *IsilonClusterConfig) func(context.Context, string, string) (isi.Export, error) {
-	return isiConfig.isiSvc.GetExportWithPathAndZone
-}
+var (
+	getGetExportWithPathAndZoneFunc = func(isiConfig *IsilonClusterConfig) func(context.Context, string, string) (isi.Export, error) {
+		return isiConfig.isiSvc.GetExportWithPathAndZone
+	}
+
+	getNodeLabelsWithNameFunc = func(s *service) func(string) (map[string]string, error) {
+		return s.GetNodeLabelsWithName
+	}
+)
 
 // type nodeIDElementsMap map[string]string
 type nodeIDToClientMap map[string]string
@@ -1598,15 +1604,7 @@ func (s *service) ControllerUnpublishVolume(
 			log.Debugf("No matching IP(s) found from AZNetwork label %s", azNetwork)
 			return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
 		}
-		log.Debugf("AZNetwork IPs: %s", ips)
-		log.Debugf("Using IPs from AZNetwork %s to remove from export", azNetwork)
-
-		// DEBUG (REMOVE AFTER TESTING INTEGRATED CHANGES): get clients before removal
-		export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
-		if err != nil {
-			log.Debugf("error getting export %d with access zone %s on cluster %s, error %s", exportID, accessZone, clusterName, err.Error())
-		}
-		log.Debugf("Export clients before removal: %v", export.Clients)
+		log.Debugf("Using IPs %s from AZNetwork %s to remove from export", ips, azNetwork)
 
 		if err := isiConfig.isiSvc.RemoveExportClientByIPsWithZone(ctx, exportID, accessZone, ips, *isiConfig.IgnoreUnresolvableHosts); err != nil {
 			if strings.Contains(err.Error(), "No such file or directory") {
@@ -1617,16 +1615,10 @@ func (s *service) ControllerUnpublishVolume(
 			} else {
 				return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error encountered when trying to remove clients %s from export %d with access zone %s on cluster %s, error %s", ips, exportID, accessZone, clusterName, err.Error()))
 			}
-			// DEBUG (REMOVE AFTER TESTING INTEGRATED CHANGES): get clients after removal
-			export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
-			if err != nil {
-				log.Debugf("error getting export %d with access zone %s on cluster %s, error %s", exportID, accessZone, clusterName, err.Error())
-			}
-			log.Debugf("Export clients after removal: %v", export.Clients)
 		}
 	} else {
 		// AZNetwork is not set, use existing behavior
-		log.Debugf("Using existing behavior to remove from export")
+		log.Debug("Removing export without AZNetwork attribute")
 
 		nodeID := req.GetNodeId()
 		if nodeID == "" {
@@ -1662,7 +1654,7 @@ func (s *service) ControllerUnpublishVolume(
 //
 // Returns:
 //
-//	[]string: The array of IP(s) associated with the matching AZNetwork label, or nil if not found
+//	[]string: The array of IP(s) associated with the matching AZNetwork label, or empty if not found
 //	error: Any error that occurs during the function call
 func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, nodeID, azNetwork string) ([]string, error) {
 	// Fetch log handler
@@ -1674,7 +1666,7 @@ func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, nodeID, azNetwor
 		log.Error("failed to get Node Name with error", err.Error())
 		return nil, err
 	}
-	labels, err := s.GetNodeLabelsWithName(nodeName)
+	labels, err := getNodeLabelsWithNameFunc(s)(nodeName)
 	if err != nil {
 		log.Error("failed to get Node Labels with error", err.Error())
 		return nil, err
