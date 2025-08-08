@@ -48,7 +48,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestMain(m *testing.M) {
+func xTestMain(m *testing.M) {
 	// Set required environment variables for Kubernetes client
 	os.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
 	os.Setenv("KUBERNETES_SERVICE_PORT", "6443")
@@ -1008,6 +1008,12 @@ func TestPatchNodeLabels(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("PatchNodeLabels() error = %v, wantErr %v", err, tt.wantErr)
 			}
+
+			node, err := s.k8sclient.CoreV1().Nodes().Get(context.TODO(), s.nodeID, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			tt.check(t, err, node)
 		})
 	}
 }
