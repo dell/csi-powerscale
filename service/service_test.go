@@ -991,3 +991,42 @@ func TestPatchNodeLabels(t *testing.T) {
 		})
 	}
 }
+
+func TestSetAZReconcileInterval(t *testing.T) {
+	tests := []struct {
+		name             string
+		intervalStr      string
+		expectedInterval time.Duration
+	}{
+		{
+			name:             "valid interval",
+			intervalStr:      "10s",
+			expectedInterval: 10 * time.Second,
+		},
+		{
+			name:             "invalid interval",
+			intervalStr:      "invalid",
+			expectedInterval: constants.DefaultAZReconcileInterval,
+		},
+		{
+			name:             "empty interval",
+			intervalStr:      "",
+			expectedInterval: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &service{}
+			v := viper.New()
+			if tt.intervalStr != "" {
+				v.Set(constants.ParamAZReconcileInterval, tt.intervalStr)
+			}
+
+			log := logrus.New()
+
+			s.setAZReconcileInterval(log, v)
+			assert.Equal(t, tt.expectedInterval, s.azReconcileInterval)
+		})
+	}
+}
