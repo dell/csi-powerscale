@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"reflect"
 	"sync"
@@ -1012,7 +1013,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 	}
 }
 
-func Test_service_nodeLabelsNeedPatching(t *testing.T) {
+func TestNodeLabelsNeedPatching(t *testing.T) {
 	type args struct {
 		labels         map[string]string
 		labelsToAdd    map[string]string
@@ -1127,6 +1128,178 @@ func Test_service_nodeLabelsNeedPatching(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := nodeLabelsNeedPatching(tt.args.labels, tt.args.labelsToAdd, tt.args.labelsToRemove); got != tt.want {
 				t.Errorf("nodeLabelsNeedPatching() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReconcileNodeAzLabels(t *testing.T) {
+
+	defaultGetInterfaceAddressesFunc := getInterfaceAddrsFunc
+	defaultGetNodeLabelsFunc := getNodeLabelsFunc
+	defaultPatchNodeLabelsFunc := getPatchNodeLabelsFunc
+
+	after := func() {
+		getInterfaceAddrsFunc = defaultGetInterfaceAddressesFunc
+		getNodeLabelsFunc = defaultGetNodeLabelsFunc
+		getPatchNodeLabelsFunc = defaultPatchNodeLabelsFunc
+	}
+
+	tests := []struct {
+		name                   string
+		addrs                  []net.Addr
+		addrErr                error
+		nodeLabels             map[string]string
+		expectedLabelsToAdd    map[string]string
+		expectedLabelsToRemove []string
+		wantErr                bool
+	}{
+		{
+			name: "add new labels",
+			addrs: []net.Addr{
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.1.1").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+			},
+			nodeLabels: map[string]string{},
+			expectedLabelsToAdd: map[string]string{
+				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24": "192.168.1.1",
+			},
+			expectedLabelsToRemove: []string{},
+			wantErr:                false,
+		},
+		{
+			name: "update existing labels",
+			addrs: []net.Addr{
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.1.1").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+			},
+			nodeLabels: map[string]string{
+				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24": "192.168.1.2",
+			},
+			expectedLabelsToAdd: map[string]string{
+				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24": "192.168.1.1",
+			},
+			expectedLabelsToRemove: []string{},
+			wantErr:                false,
+		},
+		{
+			name:  "remove labels",
+			addrs: []net.Addr{},
+			nodeLabels: map[string]string{
+				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24": "192.168.1.1",
+			},
+			expectedLabelsToAdd: map[string]string{},
+			expectedLabelsToRemove: []string{
+				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24",
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiple addresses in same network limits to 63 characters",
+			addrs: []net.Addr{
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.100.100").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.100.101").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.100.102").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.100.103").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+			},
+			nodeLabels: map[string]string{},
+			expectedLabelsToAdd: map[string]string{
+				"csi-isilon.dellemc.com/aznetwork-192.168.100.0_24": "192.168.100.100-192.168.100.101-192.168.100.102-192.168.100.103",
+			},
+			expectedLabelsToRemove: []string{},
+			wantErr:                false,
+		},
+		{
+			name: "too many addresses exceeding label limits",
+			addrs: []net.Addr{
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.100.100").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.100.101").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.100.102").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.100.103").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.100.104").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+			},
+			nodeLabels: map[string]string{},
+			expectedLabelsToAdd: map[string]string{
+				"csi-isilon.dellemc.com/aznetwork-192.168.100.0_24": "192.168.100.100-192.168.100.101-192.168.100.102-192.168.100.103",
+			},
+			expectedLabelsToRemove: []string{},
+			wantErr:                false,
+		},
+		{
+			name:       "failed to get interface addresses",
+			addrs:      nil,
+			addrErr:    errors.New("permission denied"),
+			nodeLabels: map[string]string{},
+			expectedLabelsToAdd: map[string]string{
+				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24": "192.168.1.1",
+			},
+			expectedLabelsToRemove: []string{},
+			wantErr:                true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+
+			s := &service{
+				nodeID: "test-node",
+			}
+			getInterfaceAddrsFunc = func() func() ([]net.Addr, error) {
+				return func() ([]net.Addr, error) {
+					return tt.addrs, tt.addrErr
+				}
+			}
+			getNodeLabelsFunc = func(s *service) func() (map[string]string, error) {
+				return func() (map[string]string, error) {
+					return tt.nodeLabels, nil
+				}
+			}
+			getPatchNodeLabelsFunc = func(s *service) func(map[string]string, []string) error {
+				return func(labelsToAdd map[string]string, labelsToRemove []string) error {
+					if !reflect.DeepEqual(labelsToAdd, tt.expectedLabelsToAdd) {
+						t.Errorf("labelsToAdd = %v, want %v", labelsToAdd, tt.expectedLabelsToAdd)
+					}
+					if !reflect.DeepEqual(labelsToRemove, tt.expectedLabelsToRemove) {
+						t.Errorf("labelsToRemove = %v, want %v", labelsToRemove, tt.expectedLabelsToRemove)
+					}
+					return nil
+				}
+			}
+
+			if err := s.ReconcileNodeAzLabels(context.Background()); (err != nil) != tt.wantErr {
+				t.Errorf("ReconcileNodeAzLabels() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

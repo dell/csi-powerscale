@@ -806,10 +806,10 @@ func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
 					sanitizedIP := strings.ReplaceAll(cnet.String(), "/", "_")
 					key := fmt.Sprintf("%s/aznetwork-%s", constants.PluginName, sanitizedIP)
 					if val, ok := labelsToAdd[key]; ok {
-						if len(key) + len(val) + len(ip.String()) < 63 {
+						if len(val) + len(ip.String()) < 63 {
 							labelsToAdd[key] = labelsToAdd[key] + "-" + ip.String()
 						} else {
-							log.Warnf("label %s will exceed 63 characters, skipping update of this label", key)
+							log.Warnf("label value will exceed 63 characters, skipping update of this label %s", key)
 						}
 					} else {
 						labelsToAdd[key] = ip.String()
