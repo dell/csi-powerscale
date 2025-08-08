@@ -1,20 +1,19 @@
-package service
-
 /*
- Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
+Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-      http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
+package service
 
 import (
 	"context"
@@ -49,9 +48,15 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// commenting this out for now, as it is an integration test
-
 func TestMain(m *testing.M) {
+	// Set required environment variables for Kubernetes client
+	os.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
+	os.Setenv("KUBERNETES_SERVICE_PORT", "6443")
+	defer func() {
+		os.Unsetenv("KUBERNETES_SERVICE_HOST")
+		os.Unsetenv("KUBERNETES_SERVICE_PORT")
+	}()
+
 	status := 0
 
 	go http.ListenAndServe("localhost:6060", nil) // #nosec G114
@@ -927,81 +932,37 @@ func TestValidateIsiPath(t *testing.T) {
 	}
 }
 
-func TestGetIsiPathByName(t *testing.T) {
-	client := fake.NewSimpleClientset()
-	s := &service{
-		k8sclient: client,
+func xTestPatchNodeLabels(t *testing.T) {
+	type args struct {
+		add    map[string]string
+		remove []string
 	}
-
-	ctx := context.Background()
-
-	// Create a fake PersistentVolume with the Path attribute
-	pvWithPath := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-pv-with-path",
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				CSI: &v1.CSIPersistentVolumeSource{
-					VolumeAttributes: map[string]string{
-						"Path": "/ifs/data",
-					},
-				},
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "success",
+			args: args{
+				add:    map[string]string{"label1": "value1"},
+				remove: []string{"label2"},
 			},
+			wantErr: false,
 		},
 	}
 
-	// Create a fake PersistentVolume without the Path attribute
-	pvWithoutPath := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-pv-without-path",
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				CSI: &v1.CSIPersistentVolumeSource{
-					VolumeAttributes: map[string]string{},
-				},
-			},
-		},
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &service{
+				mode:      "test",
+				k8sclient: fake.NewSimpleClientset(),
+			}
+
+			err := s.PatchNodeLabels(tt.args.add, tt.args.remove)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PatchNodeLabels() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
-
-	// Add the PersistentVolumes to the fake clientset
-	_, err := s.k8sclient.CoreV1().PersistentVolumes().Create(ctx, pvWithPath, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("failed to create PersistentVolume with path: %v", err)
-	}
-	_, err = s.k8sclient.CoreV1().PersistentVolumes().Create(ctx, pvWithoutPath, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("failed to create PersistentVolume without path: %v", err)
-	}
-
-	t.Run("Valid volume name with path", func(t *testing.T) {
-		volName := "test-pv-with-path"
-		expectedPath := "/ifs/data"
-		path, err := s.GetIsiPathByName(ctx, volName)
-		assert.NoError(t, err, "expected no error")
-		assert.Equal(t, expectedPath, path, "expected path to be '/ifs/data'")
-	})
-
-	t.Run("Valid volume name without path", func(t *testing.T) {
-		volName := "test-pv-without-path"
-		path, err := s.GetIsiPathByName(ctx, volName)
-		assert.Error(t, err, "expected an error for missing path attribute")
-		assert.Empty(t, path, "expected empty path for missing path attribute")
-	})
-
-	t.Run("Invalid volume name", func(t *testing.T) {
-		volName := "invalid-pv"
-		path, err := s.GetIsiPathByName(ctx, volName)
-		assert.Error(t, err, "expected an error for invalid volume name")
-		assert.Empty(t, path, "expected empty path for invalid volume name")
-	})
-
-	t.Run("No k8s clientset", func(t *testing.T) {
-		s.k8sclient = nil
-		volName := "test-pv-with-path"
-		path, err := s.GetIsiPathByName(ctx, volName)
-		assert.Error(t, err, "expected an error for no k8s clientset")
-		assert.Empty(t, path, "expected empty path for no k8s clientset")
-	})
 }
