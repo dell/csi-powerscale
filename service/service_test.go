@@ -1159,8 +1159,6 @@ func TestService_reconcileNodeAzLabels(t *testing.T) {
 		k8sclient:           k8sclient,
 	}
 
-	go func() {
-		err := s.reconcileNodeAzLabels(s.azReconcileInterval)
-		assert.NoError(t, err)
-	}()
+	err := s.reconcileNodeAzLabels(s.azReconcileInterval)
+	assert.NoError(t, err)
 }
