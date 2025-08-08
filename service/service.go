@@ -55,6 +55,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
@@ -1075,15 +1076,24 @@ func (s *service) GetNodeLabels() (map[string]string, error) {
 	return node.Labels, nil
 }
 
+var (
+	getKubeClientSet = func(kubeConfigPath string) (*kubernetes.Clientset, error) {
+		return k8sutils.CreateKubeClientSet(kubeConfigPath)
+	}
+	getK8sNodeByName = func(k8sclientset *kubernetes.Clientset, nodeName string) (*corev1.Node, error) {
+		return k8sclientset.CoreV1().Nodes().Get(context.TODO(), nodeName, v1.GetOptions{})
+	}
+)
+
 func (s *service) GetNodeLabelsWithName(nodeName string) (map[string]string, error) {
 	log := logging.GetLogger()
-	k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
+	k8sclientset, err := getKubeClientSet(s.opts.KubeConfigPath)
 	if err != nil {
 		log.Errorf("init client failed: '%s'", err.Error())
 		return nil, err
 	}
 	// access the API to fetch node object
-	node, err := k8sclientset.CoreV1().Nodes().Get(context.TODO(), nodeName, v1.GetOptions{})
+	node, err := getK8sNodeByName(k8sclientset, nodeName)
 	if err != nil {
 		return nil, err
 	}

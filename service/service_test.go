@@ -26,6 +26,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"reflect"
 
 	"github.com/akutz/gournal"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -45,6 +46,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -199,6 +201,87 @@ func TestGetNodeLabels(t *testing.T) {
 	}
 	_, err := s.GetNodeLabels()
 	assert.NotEqual(t, nil, err)
+}
+
+func TestGetNodeLabelsWithName(t *testing.T) {
+	originalGetKubeClientSet := getKubeClientSet
+	originalGetK8sNodeByName := getK8sNodeByName
+
+	after := func() {
+		getKubeClientSet = originalGetKubeClientSet
+		getK8sNodeByName = originalGetK8sNodeByName
+	}
+	defer after()
+
+	tests := []struct {
+		name                string
+		kubeConfigPath      string
+		nodeName            string
+		expectedLabels      map[string]string
+		expectedErr         bool
+		getKubeClientSetErr error
+		getK8sNodeByNameErr error
+	}{
+		{
+			name:                "Successful retrieval of node labels",
+			kubeConfigPath:      "path/to/kube/config",
+			nodeName:            "node-name",
+			expectedLabels:      map[string]string{"label1": "value1", "label2": "value2"},
+			expectedErr:         false,
+			getKubeClientSetErr: nil,
+			getK8sNodeByNameErr: nil,
+		},
+		{
+			name:                "Error creating Kubernetes client set",
+			kubeConfigPath:      "path/to/kube/config",
+			nodeName:            "node-name",
+			expectedLabels:      nil,
+			expectedErr:         true,
+			getKubeClientSetErr: fmt.Errorf("error creating client set"),
+			getK8sNodeByNameErr: nil,
+		},
+		{
+			name:                "Error getting node by name",
+			kubeConfigPath:      "path/to/kube/config",
+			nodeName:            "node-name",
+			expectedLabels:      nil,
+			expectedErr:         true,
+			getKubeClientSetErr: nil,
+			getK8sNodeByNameErr: fmt.Errorf("error getting node"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			getKubeClientSet = func(kubeConfigPath string) (*kubernetes.Clientset, error) {
+				return &kubernetes.Clientset{}, tt.getKubeClientSetErr
+			}
+
+			getK8sNodeByName = func(k8sclientset *kubernetes.Clientset, nodeName string) (*v1.Node, error) {
+				node := &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   nodeName,
+						Labels: tt.expectedLabels,
+					},
+				}
+				return node, tt.getK8sNodeByNameErr
+			}
+
+			s := &service{
+				opts: Opts{KubeConfigPath: tt.kubeConfigPath},
+			}
+
+			labels, err := s.GetNodeLabelsWithName(tt.nodeName)
+			if (err != nil) != tt.expectedErr {
+				t.Errorf("GetNodeLabelsWithName() error = %v, wantErr %v", err, tt.expectedErr)
+				return
+			}
+
+			if !reflect.DeepEqual(labels, tt.expectedLabels) {
+				t.Errorf("GetNodeLabelsWithName() labels = %v, want %v", labels, tt.expectedLabels)
+			}
+		})
+	}
 }
 
 func TestServiceInitializeServiceOpts(t *testing.T) {
