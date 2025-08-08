@@ -23,10 +23,10 @@ import (
 	_ "net/http/pprof" // #nosec G108
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
-	"reflect"
 
 	"github.com/akutz/gournal"
 	"github.com/container-storage-interface/spec/lib/go/csi"
