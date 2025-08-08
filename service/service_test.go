@@ -1,20 +1,19 @@
-package service
-
 /*
- Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
+Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-      http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
+package service
 
 import (
 	"context"
@@ -49,9 +48,15 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// commenting this out for now, as it is an integration test
-
 func TestMain(m *testing.M) {
+	// Set required environment variables for Kubernetes client
+	os.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
+	os.Setenv("KUBERNETES_SERVICE_PORT", "6443")
+	defer func() {
+		os.Unsetenv("KUBERNETES_SERVICE_HOST")
+		os.Unsetenv("KUBERNETES_SERVICE_PORT")
+	}()
+
 	status := 0
 
 	go http.ListenAndServe("localhost:6060", nil) // #nosec G114
@@ -950,5 +955,40 @@ func TestValidateIsiPath(t *testing.T) {
 	mu.Unlock()
 	if err == nil {
 		t.Errorf("expected error, got nil")
+	}
+}
+
+func xTestPatchNodeLabels(t *testing.T) {
+	type args struct {
+		add    map[string]string
+		remove []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "success",
+			args: args{
+				add:    map[string]string{"label1": "value1"},
+				remove: []string{"label2"},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &service{
+				mode:      "test",
+				k8sclient: fake.NewSimpleClientset(),
+			}
+
+			err := s.PatchNodeLabels(tt.args.add, tt.args.remove)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PatchNodeLabels() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
