@@ -1663,7 +1663,7 @@ func TestGetIpsFromAZNetworkLabel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			defer after()
 
-			getNodeLabelsWithNameFunc = func(s *service) func(string) (map[string]string, error) {
+			getNodeLabelsWithNameFunc = func(_ *service) func(string) (map[string]string, error) {
 				if tt.name == "error in getIpsFromAZNetworkLabel" {
 					return func(string) (map[string]string, error) {
 						return nil, fmt.Errorf("failed in getIpsFromAZNetworkLabel")
