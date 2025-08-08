@@ -1,20 +1,20 @@
+/*
+Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package service
 
-/*
- Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
-
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
 import (
 	"errors"
 	"fmt"
@@ -59,10 +59,9 @@ var (
 	getPatchNodeLabelsFunc = func(s *service) func(map[string]string, []string) error {
 		return s.PatchNodeLabels
 	}
-    getInterfaceAddrsFunc = func() func()([]net.Addr, error) {
+	getInterfaceAddrsFunc = func() func() ([]net.Addr, error) {
 		return net.InterfaceAddrs
 	}
-
 )
 
 func (s *service) NodeExpandVolume(
@@ -806,7 +805,7 @@ func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
 					sanitizedIP := strings.ReplaceAll(cnet.String(), "/", "_")
 					key := fmt.Sprintf("%s/aznetwork-%s", constants.PluginName, sanitizedIP)
 					if val, ok := labelsToAdd[key]; ok {
-						if len(val) + len(ip.String()) < 63 {
+						if len(val)+len(ip.String()) < 63 {
 							labelsToAdd[key] = labelsToAdd[key] + "-" + ip.String()
 						} else {
 							log.Warnf("label value will exceed 63 characters, skipping update of this label %s", key)

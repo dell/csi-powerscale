@@ -1134,7 +1134,6 @@ func TestNodeLabelsNeedPatching(t *testing.T) {
 }
 
 func TestReconcileNodeAzLabels(t *testing.T) {
-
 	defaultGetInterfaceAddressesFunc := getInterfaceAddrsFunc
 	defaultGetNodeLabelsFunc := getNodeLabelsFunc
 	defaultPatchNodeLabelsFunc := getPatchNodeLabelsFunc
@@ -1281,12 +1280,12 @@ func TestReconcileNodeAzLabels(t *testing.T) {
 					return tt.addrs, tt.addrErr
 				}
 			}
-			getNodeLabelsFunc = func(s *service) func() (map[string]string, error) {
+			getNodeLabelsFunc = func(_ *service) func() (map[string]string, error) {
 				return func() (map[string]string, error) {
 					return tt.nodeLabels, nil
 				}
 			}
-			getPatchNodeLabelsFunc = func(s *service) func(map[string]string, []string) error {
+			getPatchNodeLabelsFunc = func(_ *service) func(map[string]string, []string) error {
 				return func(labelsToAdd map[string]string, labelsToRemove []string) error {
 					if !reflect.DeepEqual(labelsToAdd, tt.expectedLabelsToAdd) {
 						t.Errorf("labelsToAdd = %v, want %v", labelsToAdd, tt.expectedLabelsToAdd)
