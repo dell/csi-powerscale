@@ -553,8 +553,8 @@ func (s *service) BeforeServe(
 	go s.startAPIService(ctx)
 
 	// Watch for changes to access zone network node labels
-	s.updateAZReconcileInterval = make(chan struct{}, 1)
 	if strings.EqualFold(s.mode, constants.ModeNode) && s.azReconcileInterval > 0 {
+		s.updateAZReconcileInterval = make(chan struct{}, 1)
 		go s.reconcileNodeAzLabels(ctx)
 	}
 
