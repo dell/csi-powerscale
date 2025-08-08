@@ -892,7 +892,7 @@ func TestAddExportClientByIPWithZone(t *testing.T) {
 			accessZone:  "System",
 			nodeID:      "node1",
 			clientIPs:   []string{"5.6.7.8"},
-			addClientFunc: func(_ context.Context, exportID int, accessZone string, clientIP string, ignoreUnresolvableHosts bool) error {
+			addClientFunc: func(_ context.Context, _ int, _ string, _ string, _ bool) error {
 				return nil
 			},
 			expectedErr: nil,
@@ -904,7 +904,7 @@ func TestAddExportClientByIPWithZone(t *testing.T) {
 			accessZone:  "System",
 			nodeID:      "node1",
 			clientIPs:   []string{},
-			addClientFunc: func(_ context.Context, exportID int, accessZone string, clientIP string, ignoreUnresolvableHosts bool) error {
+			addClientFunc: func(_ context.Context, _ int, _ string, _ string, _ bool) error {
 				return errors.New("error")
 			},
 			expectedErr: fmt.Errorf("failed to add clients '%v' to export id '%d'", []string{}, 456),
@@ -916,7 +916,7 @@ func TestAddExportClientByIPWithZone(t *testing.T) {
 			accessZone:  "System",
 			nodeID:      "node1",
 			clientIPs:   []string{},
-			addClientFunc: func(_ context.Context, exportID int, accessZone string, clientIP string, ignoreUnresolvableHosts bool) error {
+			addClientFunc: func(_ context.Context, _ int, _ string, _ string, _ bool) error {
 				return nil
 			},
 			expectedErr: fmt.Errorf("failed to add clients '%v' to export id '%d'", []string{}, 456),
