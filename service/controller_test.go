@@ -1594,3 +1594,93 @@ func TestControllerPublishVolume_MaxVolumesPerNode(t *testing.T) {
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	assert.Contains(t, err.Error(), "failed to export count for node id")
 }
+
+func TestGetIpsFromAZNetworkLabel(t *testing.T) {
+	originalGetNodeLabelsWithName := getNodeLabelsWithNameFunc
+
+	after := func() {
+		getNodeLabelsWithNameFunc = originalGetNodeLabelsWithName
+	}
+
+	tests := []struct {
+		name        string
+		nodeID      string
+		azNetwork   string
+		nodeLabels  map[string]string
+		expectedIPs []string
+		expectedErr error
+	}{
+		{
+			name:      "successful execution",
+			nodeID:    "nodename=#=#=localhost=#=#=127.0.0.1",
+			azNetwork: "10.0.0.1/24",
+			nodeLabels: map[string]string{
+				"csi-isilon.dellemc.com/aznetwork-10.0.0.1_24": "192.168.1.1-192.168.1.2",
+			},
+			expectedIPs: []string{"192.168.1.1", "192.168.1.2"},
+		},
+		{
+			name:        "node ID parsing error",
+			nodeID:      "invalid-node-id",
+			azNetwork:   "10.0.0.1/24",
+			expectedErr: fmt.Errorf("node ID '%s' cannot match the expected '^(.+)=#=#=(.+)=#=#=(.+)$' pattern", "invalid-node-id"),
+		},
+		{
+			name:        "node labels retrieval error",
+			nodeID:      "nodename=#=#=localhost=#=#=127.0.0.1",
+			azNetwork:   "10.0.0.1/24",
+			expectedIPs: []string{},
+			expectedErr: fmt.Errorf("failed to match AZNetwork to get IPs for export %s", "10.0.0.1/24"),
+		},
+		{
+			name:      "no matching AZNetwork label",
+			nodeID:    "nodename=#=#=localhost=#=#=127.0.0.1",
+			azNetwork: "10.0.0.1/24",
+			nodeLabels: map[string]string{
+				"csi-isilon.dellemc.com/aznetwork-10.0.0.2_24": "192.168.1.1-192.168.1.2",
+			},
+			expectedIPs: []string{},
+			expectedErr: fmt.Errorf("failed to match AZNetwork to get IPs for export %s", "10.0.0.1/24"),
+		},
+		{
+			name:        "empty node labels",
+			nodeID:      "nodename=#=#=localhost=#=#=127.0.0.1",
+			azNetwork:   "10.0.0.1/24",
+			nodeLabels:  map[string]string{},
+			expectedIPs: []string{},
+			expectedErr: fmt.Errorf("failed to match AZNetwork to get IPs for export %s", "10.0.0.1/24"),
+		},
+		{
+			name:        "error in getIpsFromAZNetworkLabel",
+			nodeID:      "nodename=#=#=localhost=#=#=127.0.0.1",
+			expectedIPs: nil,
+			expectedErr: fmt.Errorf("failed in getIpsFromAZNetworkLabel"),
+		},
+	}
+
+	s := &service{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+
+			getNodeLabelsWithNameFunc = func(_ *service) func(string) (map[string]string, error) {
+				if tt.name == "error in getIpsFromAZNetworkLabel" {
+					return func(string) (map[string]string, error) {
+						return nil, fmt.Errorf("failed in getIpsFromAZNetworkLabel")
+					}
+				}
+				return func(string) (map[string]string, error) {
+					return tt.nodeLabels, nil
+				}
+			}
+
+			ips, err := s.getIpsFromAZNetworkLabel(context.Background(), tt.nodeID, tt.azNetwork)
+			if (err != nil) != (tt.expectedErr != nil) || (err != nil && err.Error() != tt.expectedErr.Error()) {
+				t.Errorf("getIpsFromAZNetworkLabel() error = %v, expectedErr %v", err, tt.expectedErr)
+			}
+			if !reflect.DeepEqual(ips, tt.expectedIPs) {
+				t.Errorf("getIpsFromAZNetworkLabel() IPs = %v, expectedIPs %v", ips, tt.expectedIPs)
+			}
+		})
+	}
+}
