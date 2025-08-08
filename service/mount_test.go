@@ -222,9 +222,9 @@ func Test_unpublishVolume(t *testing.T) {
 		{
 			name: "volume not mounted",
 			args: args{
-				ctx:       context.Background(),
-				req:       &csi.NodeUnpublishVolumeRequest{
-					VolumeId: "test",
+				ctx: context.Background(),
+				req: &csi.NodeUnpublishVolumeRequest{
+					VolumeId:   "test",
 					TargetPath: "/test",
 				},
 				filterStr: "test",
@@ -234,9 +234,9 @@ func Test_unpublishVolume(t *testing.T) {
 		{
 			name: "unmount should fail on /",
 			args: args{
-				ctx:       context.Background(),
-				req:       &csi.NodeUnpublishVolumeRequest{
-					VolumeId: "test",
+				ctx: context.Background(),
+				req: &csi.NodeUnpublishVolumeRequest{
+					VolumeId:   "test",
 					TargetPath: "/",
 				},
 				filterStr: "",
