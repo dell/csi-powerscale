@@ -273,7 +273,7 @@ func (f *feature) getService() *service {
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
 
 	// create PV object
-	pv := &corev1.PersistentVolume{
+	pv1 := &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "volume1",
 		},
@@ -283,7 +283,17 @@ func (f *feature) getService() *service {
 			},
 		},
 	}
-	f.service.k8sclient = fake.NewSimpleClientset(pv)
+	pv2 := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "volume2",
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{},
+			},
+		},
+	}
+	f.service.k8sclient = fake.NewSimpleClientset(pv1, pv2)
 
 	return svc
 }
