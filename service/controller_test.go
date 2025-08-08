@@ -1705,7 +1705,8 @@ func TestControllerUnpublishVolume(t *testing.T) {
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				CSI: &corev1.CSIPersistentVolumeSource{
 					VolumeAttributes: map[string]string{
-						"AzNetwork": "10.0.0.0/24"},
+						"AzNetwork": "10.0.0.0/24",
+					},
 				},
 			},
 		},
