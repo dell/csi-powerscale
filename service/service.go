@@ -554,7 +554,6 @@ func (s *service) BeforeServe(
 
 	// Watch for changes to access zone network node labels
 	if strings.EqualFold(s.mode, constants.ModeNode) && s.azReconcileInterval > 0 {
-		s.updateAZReconcileInterval = make(chan struct{}, 1)
 		go s.reconcileNodeAzLabels(ctx)
 	}
 
@@ -616,6 +615,7 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 
 // updateReconcileInterval updates the access zone reconcile interval
 func (s *service) updateReconcileInterval(interval time.Duration) {
+	s.updateAZReconcileInterval = make(chan struct{}, 1)
 	syncMutex.Lock()
 	defer syncMutex.Unlock()
 	s.azReconcileInterval = interval
