@@ -1139,3 +1139,28 @@ func TestSetAZReconcileInterval(t *testing.T) {
 		})
 	}
 }
+
+func TestService_reconcileNodeAzLabels(t *testing.T) {
+	nodeName := "test-node"
+	nodeLabels := map[string]string{
+		"csi-isilon.dellemc.com/aznetwork-10.0.0.0_24": "10.0.0.1",
+	}
+
+	k8sclient := fake.NewSimpleClientset(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   nodeName,
+			Labels: nodeLabels,
+		},
+	})
+
+	s := &service{
+		azReconcileInterval: 10 * time.Second,
+		nodeID:              nodeName,
+		k8sclient:           k8sclient,
+	}
+
+	go func() {
+		err := s.reconcileNodeAzLabels(s.azReconcileInterval)
+		assert.NoError(t, err)
+	}()
+}

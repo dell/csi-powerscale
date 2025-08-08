@@ -612,7 +612,7 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 	return nil
 }
 
-func (s *service) reconcileNodeAzLabels(interval time.Duration) {
+func (s *service) reconcileNodeAzLabels(interval time.Duration) error {
 	_, log := GetLogger(context.Background())
 	go func() {
 		for {
@@ -623,6 +623,7 @@ func (s *service) reconcileNodeAzLabels(interval time.Duration) {
 			time.Sleep(interval)
 		}
 	}()
+	return nil
 }
 
 // Returns the size of arrays
