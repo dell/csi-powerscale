@@ -1045,14 +1045,14 @@ func TestSetAZReconcileInterval(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &service{}
 			v := viper.New()
-            if tt.intervalStr != "" {
-                v.Set(constants.ParamAZReconcileInterval, tt.intervalStr)
-            }
+			if tt.intervalStr != "" {
+				v.Set(constants.ParamAZReconcileInterval, tt.intervalStr)
+			}
 
-            log := logrus.New()
+			log := logrus.New()
 
-            s.setAZReconcileInterval(log, v)
-            assert.Equal(t, tt.expectedInterval, s.azReconcileInterval)
-        })
+			s.setAZReconcileInterval(log, v)
+			assert.Equal(t, tt.expectedInterval, s.azReconcileInterval)
+		})
 	}
 }

@@ -867,10 +867,10 @@ func (s *service) setAZReconcileInterval(log *logrus.Logger, v *viper.Viper) {
 	}
 
 	if strings.TrimSpace(azReconcileIntervalStr) == "" {
-        log.Info("access zone reconcile interval is empty; skipping reconcile feature")
-        s.azReconcileInterval = 0
-        return
-    }
+		log.Info("access zone reconcile interval is empty; skipping reconcile feature")
+		s.azReconcileInterval = 0
+		return
+	}
 
 	interval, err := time.ParseDuration(azReconcileIntervalStr)
 	if err != nil {
