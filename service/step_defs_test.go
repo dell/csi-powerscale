@@ -33,7 +33,7 @@ import (
 	"github.com/dell/csi-isilon/v2/service/mock/k8s"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"google.golang.org/grpc"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -274,6 +274,29 @@ func (f *feature) getService() *service {
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
+
+	// create PV object
+	pv1 := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "volume1",
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{},
+			},
+		},
+	}
+	pv2 := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "volume2",
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{},
+			},
+		},
+	}
+	f.service.k8sclient = fake.NewSimpleClientset(pv1, pv2)
 
 	return svc
 }
@@ -2031,20 +2054,20 @@ func (f *feature) iCallCreateSnapshot(volName, srcVolumeID, name string) error {
 	}
 
 	// Create the PersistentVolume
-	pv := &v1.PersistentVolume{
+	pv := &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: volName,
 		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				CSI: &v1.CSIPersistentVolumeSource{
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
 					VolumeAttributes: map[string]string{
 						"Path": "/ifs/data/csi-isilon/" + volName,
 					},
 				},
 			},
-			Capacity: v1.ResourceList{
-				v1.ResourceStorage: resource.MustParse("1Gi"),
+			Capacity: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse("1Gi"),
 			},
 		},
 	}

@@ -1255,7 +1255,7 @@ func TestReconcileNodeAzLabels(t *testing.T) {
 			wantErr:                true,
 		},
 		{
-			name:                   "handle invalid CIDR mask",
+			name: "handle invalid CIDR mask",
 			addrs: []net.Addr{
 				&net.IPNet{
 					IP:   net.ParseIP("192.168.100.100").To4(),
@@ -1312,7 +1312,7 @@ func TestReconcileNodeAzLabels(t *testing.T) {
 				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24": "192.168.1.1",
 			},
 			expectedLabelsToRemove: []string{},
-			patchNodeLabelsErr:  errors.New("injected failed"),
+			patchNodeLabelsErr:     errors.New("injected failed"),
 			wantErr:                true,
 		},
 	}
