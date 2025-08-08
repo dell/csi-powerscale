@@ -21,6 +21,7 @@ import (
 	"os"
 	"testing"
 
+	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -96,4 +97,158 @@ func TestMkdirNotExistingFile(t *testing.T) {
 	created, err := mkdir(ctx, path)
 	assert.Error(t, err)
 	assert.False(t, created)
+}
+
+func Test_isVolumeMounted(t *testing.T) {
+	type args struct {
+		ctx       context.Context
+		filterStr string
+		target    string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "root check",
+			args: args{
+				ctx:       context.Background(),
+				filterStr: "",
+				target:    "/",
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "not found",
+			args: args{
+				ctx:       context.Background(),
+				filterStr: "test",
+				target:    "/test",
+			},
+			want:    false,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := isVolumeMounted(tt.args.ctx, tt.args.filterStr, tt.args.target)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("isVolumeMounted() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("isVolumeMounted() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_contains(t *testing.T) {
+	type args struct {
+		list []string
+		item string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "empty list",
+			args: args{
+				list: []string{},
+				item: "test",
+			},
+			want: false,
+		},
+		{
+			name: "single item in list",
+			args: args{
+				list: []string{"test"},
+				item: "test",
+			},
+			want: true,
+		},
+		{
+			name: "multiple items in list",
+			args: args{
+				list: []string{"test1", "test2", "test3"},
+				item: "test2",
+			},
+			want: true,
+		},
+		{
+			name: "item not in list",
+			args: args{
+				list: []string{"test1", "test2", "test3"},
+				item: "test4",
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := contains(tt.args.list, tt.args.item); got != tt.want {
+				t.Errorf("contains() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_unpublishVolume(t *testing.T) {
+	type args struct {
+		ctx       context.Context
+		req       *csi.NodeUnpublishVolumeRequest
+		filterStr string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "empty request",
+			args: args{
+				ctx:       context.Background(),
+				req:       &csi.NodeUnpublishVolumeRequest{},
+				filterStr: "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "volume not mounted",
+			args: args{
+				ctx:       context.Background(),
+				req:       &csi.NodeUnpublishVolumeRequest{
+					VolumeId: "test",
+					TargetPath: "/test",
+				},
+				filterStr: "test",
+			},
+			wantErr: false,
+		},
+		{
+			name: "unmount should fail on /",
+			args: args{
+				ctx:       context.Background(),
+				req:       &csi.NodeUnpublishVolumeRequest{
+					VolumeId: "test",
+					TargetPath: "/",
+				},
+				filterStr: "",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := unpublishVolume(tt.args.ctx, tt.args.req, tt.args.filterStr); (err != nil) != tt.wantErr {
+				t.Errorf("unpublishVolume() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }
