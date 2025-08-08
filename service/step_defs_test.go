@@ -33,9 +33,6 @@ import (
 	"github.com/dell/csi-isilon/v2/service/mock/k8s"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"google.golang.org/grpc"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
@@ -46,6 +43,11 @@ import (
 	"github.com/dell/gofsutil"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"
+
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type feature struct {
@@ -274,6 +276,29 @@ func (f *feature) getService() *service {
 	f.service.defaultIsiClusterName = clusterName1
 	f.service.isiClusters = new(sync.Map)
 	f.service.isiClusters.Store(newConfig.ClusterName, &newConfig)
+
+	// create PV object
+	pv1 := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "volume1",
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{},
+			},
+		},
+	}
+	pv2 := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "volume2",
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{},
+			},
+		},
+	}
+	f.service.k8sclient = fake.NewSimpleClientset(pv1, pv2)
 
 	return svc
 }
