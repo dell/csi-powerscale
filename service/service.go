@@ -1101,13 +1101,7 @@ func (s *service) GetNodeLabelsWithName(nodeName string) (map[string]string, err
 func (s *service) PatchNodeLabels(add map[string]string, remove []string) error {
 	log := logging.GetLogger()
 
-	k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
-	if err != nil {
-		log.Errorf("init client failed: '%s'", err.Error())
-		return err
-	}
-
-	node, err := k8sclientset.CoreV1().Nodes().Get(context.TODO(), s.nodeID, v1.GetOptions{})
+	node, err := s.k8sclient.CoreV1().Nodes().Get(context.TODO(), s.nodeID, v1.GetOptions{})
 	if err != nil {
 		log.Errorf("failed to get current node details: '%s'", err.Error())
 		return err
@@ -1139,7 +1133,7 @@ func (s *service) PatchNodeLabels(add map[string]string, remove []string) error 
 		return err
 	}
 
-	node, err = k8sclientset.CoreV1().Nodes().Patch(context.TODO(), s.nodeID, types.StrategicMergePatchType, patchBytes, v1.PatchOptions{})
+	node, err = s.k8sclient.CoreV1().Nodes().Patch(context.TODO(), s.nodeID, types.StrategicMergePatchType, patchBytes, v1.PatchOptions{})
 	if err != nil {
 		log.Errorf("failed to patch node labels: '%s'", err.Error())
 		return err

@@ -1011,7 +1011,8 @@ func TestGetIsiPathByName(t *testing.T) {
 	})
 }
 
-func xTestPatchNodeLabels(t *testing.T) {
+func TestPatchNodeLabels(t *testing.T) {
+	type checkFn func(t *testing.T, err error, node *v1.Node)
 	type args struct {
 		add    map[string]string
 		remove []string
@@ -1019,7 +1020,9 @@ func xTestPatchNodeLabels(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
+		node    *v1.Node
 		wantErr bool
+		check   checkFn
 	}{
 		{
 			name: "success",
@@ -1027,7 +1030,22 @@ func xTestPatchNodeLabels(t *testing.T) {
 				add:    map[string]string{"label1": "value1"},
 				remove: []string{"label2"},
 			},
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+					Labels: map[string]string{
+						"label2": "value2",
+					},
+				},
+			},
 			wantErr: false,
+			check: func(t *testing.T, err error, node *v1.Node) {
+				assert.NoError(t, err)
+				assert.Contains(t, node.Labels, "label1")
+				assert.Equal(t, "value1", node.Labels["label1"])
+				_, exists := node.Labels["label2"]
+				assert.False(t, exists, "label2 should be removed")
+			},
 		},
 	}
 
@@ -1035,13 +1053,20 @@ func xTestPatchNodeLabels(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &service{
 				mode:      "test",
-				k8sclient: fake.NewSimpleClientset(),
+				nodeID:    "test-node",
+				k8sclient: fake.NewSimpleClientset(tt.node),
 			}
 
 			err := s.PatchNodeLabels(tt.args.add, tt.args.remove)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("PatchNodeLabels() error = %v, wantErr %v", err, tt.wantErr)
 			}
+
+			node, err := s.k8sclient.CoreV1().Nodes().Get(context.TODO(), s.nodeID, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			tt.check(t, err, node)
 		})
 	}
 }
