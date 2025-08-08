@@ -48,7 +48,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func xTestMain(m *testing.M) {
+func TestMain(m *testing.M) {
 	// Set required environment variables for Kubernetes client
 	os.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
 	os.Setenv("KUBERNETES_SERVICE_PORT", "6443")
