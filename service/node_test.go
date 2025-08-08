@@ -1139,6 +1139,8 @@ func TestReconcileNodeAzLabels(t *testing.T) {
 		nodeLabels             map[string]string
 		expectedLabelsToAdd    map[string]string
 		expectedLabelsToRemove []string
+		getNodeLabelsErr       error
+		patchNodeLabelsErr     error
 		wantErr                bool
 	}{
 		{
@@ -1244,14 +1246,73 @@ func TestReconcileNodeAzLabels(t *testing.T) {
 			wantErr:                false,
 		},
 		{
-			name:       "failed to get interface addresses",
-			addrs:      nil,
-			addrErr:    errors.New("permission denied"),
+			name:                   "failed to get interface addresses",
+			addrs:                  nil,
+			addrErr:                errors.New("permission denied"),
+			nodeLabels:             map[string]string{},
+			expectedLabelsToAdd:    map[string]string{},
+			expectedLabelsToRemove: []string{},
+			wantErr:                true,
+		},
+		{
+			name:                   "handle invalid CIDR mask",
+			addrs: []net.Addr{
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.100.100").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.100.101").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.100.102").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+				&net.IPNet{
+					IP:   net.ParseIP("192.169.100.103").To4(),
+					Mask: net.CIDRMask(25, 31), // <- invalid
+				},
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.100.104").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+			},
 			nodeLabels: map[string]string{},
+			expectedLabelsToAdd: map[string]string{
+				"csi-isilon.dellemc.com/aznetwork-192.168.100.0_24": "192.168.100.100-192.168.100.101-192.168.100.102-192.168.100.104",
+			},
+			expectedLabelsToRemove: []string{},
+			wantErr:                false,
+		},
+		{
+			name: "failure to get node labels",
+			addrs: []net.Addr{
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.1.1").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+			},
 			expectedLabelsToAdd: map[string]string{
 				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24": "192.168.1.1",
 			},
 			expectedLabelsToRemove: []string{},
+			getNodeLabelsErr:       errors.New("permission denied"),
+			wantErr:                false,
+		},
+		{
+			name: "failure to patch node labels",
+			addrs: []net.Addr{
+				&net.IPNet{
+					IP:   net.ParseIP("192.168.1.1").To4(),
+					Mask: net.CIDRMask(24, 32),
+				},
+			},
+			expectedLabelsToAdd: map[string]string{
+				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24": "192.168.1.1",
+			},
+			expectedLabelsToRemove: []string{},
+			patchNodeLabelsErr:  errors.New("injected failed"),
 			wantErr:                true,
 		},
 	}
@@ -1270,7 +1331,7 @@ func TestReconcileNodeAzLabels(t *testing.T) {
 			}
 			getNodeLabelsFunc = func(_ *service) func() (map[string]string, error) {
 				return func() (map[string]string, error) {
-					return tt.nodeLabels, nil
+					return tt.nodeLabels, tt.getNodeLabelsErr
 				}
 			}
 			getPatchNodeLabelsFunc = func(_ *service) func(map[string]string, []string) error {
@@ -1281,7 +1342,7 @@ func TestReconcileNodeAzLabels(t *testing.T) {
 					if !reflect.DeepEqual(labelsToRemove, tt.expectedLabelsToRemove) {
 						t.Errorf("labelsToRemove = %v, want %v", labelsToRemove, tt.expectedLabelsToRemove)
 					}
-					return nil
+					return tt.patchNodeLabelsErr
 				}
 			}
 
