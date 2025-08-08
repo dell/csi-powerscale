@@ -639,6 +639,9 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 	return fmt.Errorf("failed to add clients '%s' or '%s' to export id '%d'", clientToUse, otherClientToUse, exportID)
 }
 
+// AddExportClientByIPWithZone adds multiple client IPs to an export with a given ID and access zone if AzNetwork is configured..
+// It iterates through the list of client IPs and calls the provided addClientFunc for each IP, passing the export ID,
+// access zone, and client IP as arguments.
 func (svc *isiService) AddExportClientByIPWithZone(ctx context.Context, clusterName string, exportID int, accessZone, nodeID string, clientIPs []string, addClientFunc func(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error) error {
 	// Fetch log handler
 	log := logging.GetRunIDLogger(ctx)
