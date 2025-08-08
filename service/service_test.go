@@ -253,11 +253,11 @@ func TestGetNodeLabelsWithName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			getKubeClientSet = func(kubeConfigPath string) (*kubernetes.Clientset, error) {
+			getKubeClientSet = func(_ string) (*kubernetes.Clientset, error) {
 				return &kubernetes.Clientset{}, tt.getKubeClientSetErr
 			}
 
-			getK8sNodeByName = func(k8sclientset *kubernetes.Clientset, nodeName string) (*v1.Node, error) {
+			getK8sNodeByName = func(_ *kubernetes.Clientset, nodeName string) (*v1.Node, error) {
 				node := &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   nodeName,
