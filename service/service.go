@@ -850,7 +850,7 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 	log.Infof("log level set to '%s'", logLevel)
 
 	// update network label interval
-	s.updateNetworkLabelInterval(log, v)
+	s.setAZReconcileInterval(log, v)
 
 	err := s.syncIsilonConfigs(ctx)
 	if err != nil {
@@ -860,17 +860,24 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 	return nil
 }
 
-func (s *service) updateNetworkLabelInterval(log *logrus.Logger, v *viper.Viper) {
-	var azReconcileInterval string
+func (s *service) setAZReconcileInterval(log *logrus.Logger, v *viper.Viper) {
+	var azReconcileIntervalStr string
 	if v.IsSet(constants.ParamAZReconcileInterval) {
-		azReconcileInterval = v.GetString(constants.ParamAZReconcileInterval)
+		azReconcileIntervalStr = v.GetString(constants.ParamAZReconcileInterval)
 	}
-	interval, err := time.ParseDuration(azReconcileInterval)
+
+	if strings.TrimSpace(azReconcileIntervalStr) == "" {
+        log.Info("access zone reconcile interval is empty; skipping reconcile feature")
+        s.azReconcileInterval = 0
+        return
+    }
+
+	interval, err := time.ParseDuration(azReconcileIntervalStr)
 	if err != nil {
-		log.Error(err, fmt.Sprintf("parsing access zone reconcile interval %s", azReconcileInterval))
+		log.Error(err, fmt.Sprintf("parsing access zone reconcile interval %s", azReconcileIntervalStr))
 		interval = constants.DefaultAZReconcileInterval
 	}
-	log.WithField("access zone reconcile interval", interval).Info("configuration updated")
+	log.Info("access zone reconcile interval updated")
 	s.azReconcileInterval = interval
 }
 
