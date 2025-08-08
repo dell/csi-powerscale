@@ -1519,6 +1519,86 @@ func TestGetIpsFromAZNetworkLabel(t *testing.T) {
 	}
 }
 
+func TestControllerPublishVolume(t *testing.T) {
+	fmt.Println("TestControllerPublishVolume")
+
+	originalGetNodeLabelsWithName := getNodeLabelsWithNameFunc
+
+	after := func() {
+		getNodeLabelsWithNameFunc = originalGetNodeLabelsWithName
+	}
+
+	tests := []struct {
+		name       string
+		req        *csi.ControllerPublishVolumeRequest
+		nodeLabels map[string]string
+		wantErr    bool
+	}{
+		{
+			name: "fail to check volumeContext for AzNetwork and get the corresponding IP from node labels",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "",
+				VolumeContext: map[string]string{
+					"AzNetwork": "10.0.0.0/24",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty volume ID",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "",
+				NodeId:   identifiers.DummyHostNodeID,
+				VolumeContext: map[string]string{
+					"AzNetwork": "10.0.0.0/24",
+				},
+			},
+			nodeLabels: map[string]string{
+				"csi-isilon.dellemc.com/aznetwork-10.0.0.0_24": "10.0.0.1",
+			},
+			wantErr: true,
+		},
+	}
+
+	s := &service{
+		k8sclient:             fake.NewSimpleClientset(),
+		defaultIsiClusterName: "system",
+		isiClusters:           &sync.Map{},
+	}
+
+	mockClient := &isimocks.Client{}
+	isiConfig := &IsilonClusterConfig{
+		ClusterName: "system",
+		isiSvc: &isiService{
+			client: &isi.Client{
+				API: mockClient,
+			},
+		},
+	}
+
+	s.isiClusters.Store("system", isiConfig)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+
+			ctx := context.Background()
+
+			getNodeLabelsWithNameFunc = func(_ *service) func(string) (map[string]string, error) {
+				return func(string) (map[string]string, error) {
+					return tt.nodeLabels, nil
+				}
+			}
+
+			_, err := s.ControllerPublishVolume(ctx, tt.req)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("TestControllerPublishVolume() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestControllerUnpublishVolume(t *testing.T) {
 	fmt.Println("TestControllerUnpublishVolume")
 
