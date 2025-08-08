@@ -1375,7 +1375,6 @@ func (s *service) ControllerPublishVolume(
 				log.Debugf("AzNetwork label used to pulbish volume at %s", newExportIP)
 				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, isiConfig.isiSvc.AddExportClientByIDWithZone)
 			} else {
-
 				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
 			}
 		}
