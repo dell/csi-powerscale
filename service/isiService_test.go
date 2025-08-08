@@ -871,6 +871,84 @@ func TestAddExportReadOnlyClientByIDWithZone(t *testing.T) {
 	}
 }
 
+func TestAddExportClientByIPWithZone(t *testing.T) {
+	// Define the test cases
+	testCases := []struct {
+		name          string
+		clusterName   string
+		exportID      int
+		accessZone    string
+		nodeID        string
+		clientIPs     []string
+		addClientFunc func(ctx context.Context, exportID int, accessZone string, clientIP string, ignoreUnresolvableHosts bool) error
+		expectedErr   error
+	}{
+		{
+			name:        "Success",
+			clusterName: "test",
+			exportID:    456,
+			accessZone:  "System",
+			nodeID:      "node1",
+			clientIPs:   []string{"5.6.7.8"},
+			addClientFunc: func(_ context.Context, _ int, _ string, _ string, _ bool) error {
+				return nil
+			},
+			expectedErr: nil,
+		},
+		{
+			name:        "Error adding clients",
+			clusterName: "test",
+			exportID:    456,
+			accessZone:  "System",
+			nodeID:      "node1",
+			clientIPs:   []string{},
+			addClientFunc: func(_ context.Context, _ int, _ string, _ string, _ bool) error {
+				return errors.New("error")
+			},
+			expectedErr: fmt.Errorf("failed to add clients '%v' to export id '%d'", []string{}, 456),
+		},
+		{
+			name:        "Error no client IPs",
+			clusterName: "test",
+			exportID:    456,
+			accessZone:  "System",
+			nodeID:      "node1",
+			clientIPs:   []string{},
+			addClientFunc: func(_ context.Context, _ int, _ string, _ string, _ bool) error {
+				return nil
+			},
+			expectedErr: fmt.Errorf("failed to add clients '%v' to export id '%d'", []string{}, 456),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			svc := &isiService{
+				client: &isi.Client{
+					API: &MockClient{},
+				},
+			}
+
+			err := svc.AddExportClientByIPWithZone(ctx, tc.clusterName, tc.exportID, tc.accessZone, tc.nodeID, tc.clientIPs, tc.addClientFunc)
+
+			if err != nil {
+				if tc.expectedErr == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.expectedErr, err)
+				}
+			} else {
+				if tc.expectedErr != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.expectedErr)
+				}
+			}
+		})
+	}
+}
+
 func TestRemoveExportClientByIDWithZone(t *testing.T) {
 	mockClient := &MockClient{}
 
