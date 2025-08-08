@@ -25,16 +25,16 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/dell/csi-isilon/v2/common/utils"
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	isi "github.com/dell/goisilon"
 	v1 "github.com/dell/goisilon/api/v1"
 	v2 "github.com/dell/goisilon/api/v2"
+	isimocks "github.com/dell/goisilon/mocks"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -1441,6 +1441,86 @@ func TestGetIpsFromAZNetworkLabel(t *testing.T) {
 			}
 			if !reflect.DeepEqual(ips, tt.expectedIPs) {
 				t.Errorf("getIpsFromAZNetworkLabel() IPs = %v, expectedIPs %v", ips, tt.expectedIPs)
+			}
+		})
+	}
+}
+
+func TestControllerPublishVolume(t *testing.T) {
+	fmt.Println("TestControllerPublishVolume")
+
+	originalGetNodeLabelsWithName := getNodeLabelsWithNameFunc
+
+	after := func() {
+		getNodeLabelsWithNameFunc = originalGetNodeLabelsWithName
+	}
+
+	tests := []struct {
+		name       string
+		req        *csi.ControllerPublishVolumeRequest
+		nodeLabels map[string]string
+		wantErr    bool
+	}{
+		{
+			name: "fail to check volumeContext for AzNetwork and get the corresponding IP from node labels",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "",
+				VolumeContext: map[string]string{
+					"AzNetwork": "10.0.0.0/24",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty volume ID",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "",
+				NodeId:   utils.DummyHostNodeID,
+				VolumeContext: map[string]string{
+					"AzNetwork": "10.0.0.0/24",
+				},
+			},
+			nodeLabels: map[string]string{
+				"csi-isilon.dellemc.com/aznetwork-10.0.0.0_24": "10.0.0.1",
+			},
+			wantErr: true,
+		},
+	}
+
+	s := &service{
+		k8sclient:             fake.NewSimpleClientset(),
+		defaultIsiClusterName: "system",
+		isiClusters:           &sync.Map{},
+	}
+
+	mockClient := &isimocks.Client{}
+	isiConfig := &IsilonClusterConfig{
+		ClusterName: "system",
+		isiSvc: &isiService{
+			client: &isi.Client{
+				API: mockClient,
+			},
+		},
+	}
+
+	s.isiClusters.Store("system", isiConfig)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+
+			ctx := context.Background()
+
+			getNodeLabelsWithNameFunc = func(_ *service) func(string) (map[string]string, error) {
+				return func(string) (map[string]string, error) {
+					return tt.nodeLabels, nil
+				}
+			}
+
+			_, err := s.ControllerPublishVolume(ctx, tt.req)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("TestControllerPublishVolume() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
