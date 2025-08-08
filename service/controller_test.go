@@ -1771,7 +1771,7 @@ func TestControllerUnpublishVolume(t *testing.T) {
 				VolumeId: "azpv=_=_=19=_=_=csi0zone",
 				NodeId:   identifiers.DummyHostNodeID,
 			},
-			nodeLabels : map[string]string{
+			nodeLabels: map[string]string{
 				"csi-isilon.dellemc.com/aznetwork-10.247.0.0_24": "10.0.0.1",
 			},
 			wantErr: true,
