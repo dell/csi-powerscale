@@ -252,3 +252,98 @@ func Test_unpublishVolume(t *testing.T) {
 		})
 	}
 }
+
+
+func Test_publishVolume(t *testing.T) {
+	type args struct {
+		ctx       context.Context
+		req       *csi.NodePublishVolumeRequest
+		filterStr string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "empty request",
+			args: args{
+				ctx:       context.Background(),
+				req:       &csi.NodePublishVolumeRequest{},
+				filterStr: "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty access mode",
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodePublishVolumeRequest{
+					VolumeId:   "ut-vol",
+					VolumeCapability: &csi.VolumeCapability{},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid access mode",
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodePublishVolumeRequest{
+					VolumeId:   "ut-vol",
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid target path",
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodePublishVolumeRequest{
+					VolumeId:   "ut-vol",
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid target path",
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodePublishVolumeRequest{
+					VolumeId:   "ut-vol",
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := publishVolume(tt.args.ctx, tt.args.req, tt.args.filterStr); (err != nil) != tt.wantErr {
+				t.Errorf("publishVolume() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
