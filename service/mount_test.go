@@ -253,7 +253,6 @@ func Test_unpublishVolume(t *testing.T) {
 	}
 }
 
-
 func Test_publishVolume(t *testing.T) {
 	type args struct {
 		ctx       context.Context
@@ -262,6 +261,7 @@ func Test_publishVolume(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
+		before  func() error
 		args    args
 		wantErr bool
 	}{
@@ -279,7 +279,7 @@ func Test_publishVolume(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 				req: &csi.NodePublishVolumeRequest{
-					VolumeId:   "ut-vol",
+					VolumeId:         "ut-vol",
 					VolumeCapability: &csi.VolumeCapability{},
 				},
 			},
@@ -290,7 +290,7 @@ func Test_publishVolume(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 				req: &csi.NodePublishVolumeRequest{
-					VolumeId:   "ut-vol",
+					VolumeId: "ut-vol",
 					VolumeCapability: &csi.VolumeCapability{
 						AccessMode: &csi.VolumeCapability_AccessMode{
 							Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
@@ -305,7 +305,7 @@ func Test_publishVolume(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 				req: &csi.NodePublishVolumeRequest{
-					VolumeId:   "ut-vol",
+					VolumeId: "ut-vol",
 					VolumeCapability: &csi.VolumeCapability{
 						AccessMode: &csi.VolumeCapability_AccessMode{
 							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
@@ -323,7 +323,7 @@ func Test_publishVolume(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 				req: &csi.NodePublishVolumeRequest{
-					VolumeId:   "ut-vol",
+					VolumeId: "ut-vol",
 					VolumeCapability: &csi.VolumeCapability{
 						AccessMode: &csi.VolumeCapability_AccessMode{
 							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
@@ -336,11 +336,38 @@ func Test_publishVolume(t *testing.T) {
 			},
 			wantErr: true,
 		},
-
+		{
+			name: "failure to create target path",
+			before: func() error {
+				return os.WriteFile("/test/bad", []byte("dummy-content"), 0o600)
+			},
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodePublishVolumeRequest{
+					VolumeId: "ut-vol",
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+					},
+					TargetPath: "/test/bad",
+				},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.before != nil {
+				if err := tt.before(); err != nil {
+					t.Errorf("publishVolume() error in before() function %v", err)
+				}
+			}
+
 			if err := publishVolume(tt.args.ctx, tt.args.req, tt.args.filterStr); (err != nil) != tt.wantErr {
 				t.Errorf("publishVolume() error = %v, wantErr %v", err, tt.wantErr)
 			}
