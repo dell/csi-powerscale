@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
@@ -358,6 +359,27 @@ func Test_publishVolume(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "call to get mounts",
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodePublishVolumeRequest{
+					VolumeId: "ut-vol",
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+					},
+					TargetPath: filepath.Join( t.TempDir(), "/mount-test"),
+				},
+			},
+			wantErr: true,
+		},
+
+
 	}
 
 	for _, tt := range tests {
