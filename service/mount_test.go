@@ -105,17 +105,54 @@ func TestMkdirNotExistingFile(t *testing.T) {
 }
 
 func Test_isVolumeMounted(t *testing.T) {
+	defaultGetGetMountsFunc := getGetMountsFunc
+
+	after := func() {
+		getGetMountsFunc = defaultGetGetMountsFunc
+	}
+
 	type args struct {
 		ctx       context.Context
 		filterStr string
 		target    string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    bool
-		wantErr bool
+		name             string
+		getGetMountsFunc func() func(ctx context.Context) ([]gofsutil.Info, error)
+		args             args
+		want             bool
+		wantErr          bool
 	}{
+		{
+			name: "failure in getting mounts",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
+					return nil, fmt.Errorf("injected error for unit test")
+				}
+			},
+			args: args{
+				ctx:       context.Background(),
+				filterStr: "",
+				target:    "/",
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "no mounts exist",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
+					return nil, nil
+				}
+			},
+			args: args{
+				ctx:       context.Background(),
+				filterStr: "",
+				target:    "/",
+			},
+			want:    false,
+			wantErr: false,
+		},
 		{
 			name: "root check",
 			args: args{
@@ -139,6 +176,12 @@ func Test_isVolumeMounted(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+
+			if tt.getGetMountsFunc != nil {
+				getGetMountsFunc = tt.getGetMountsFunc
+			}
+
 			got, err := isVolumeMounted(tt.args.ctx, tt.args.filterStr, tt.args.target)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("isVolumeMounted() error = %v, wantErr %v", err, tt.wantErr)

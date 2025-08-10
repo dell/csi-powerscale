@@ -244,7 +244,7 @@ func isVolumeMounted(ctx context.Context, filterStr string, target string) (bool
 	// Fetch log handler
 	ctx, log := GetLogger(ctx)
 
-	mnts, err := gofsutil.GetMounts(ctx)
+	mnts, err := getGetMountsFunc()(ctx)
 	if err != nil {
 		return false, status.Errorf(codes.Internal,
 			"could not reliably determine existing mount status: '%s'",
