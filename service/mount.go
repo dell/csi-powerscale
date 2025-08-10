@@ -54,6 +54,10 @@ var (
 		return gofsutil.Unmount
 	}
 
+	getOsRemoveAllFunc = func() func(name string) error {
+		return os.RemoveAll
+	}
+
 	publishVolumeFunc = func(
 		ctx context.Context,
 		req *csi.NodePublishVolumeRequest,
@@ -196,7 +200,7 @@ func unpublishVolume(
 	log.Debugf("unmounting '%s' succeeded", target)
 
 	// Remove the target path after unmounting
-	if err := os.RemoveAll(target); err != nil {
+	if err := getOsRemoveAllFunc()(target); err != nil {
 		return status.Errorf(codes.Internal,
 			"error removing target path '%s': '%s'", target, err.Error())
 	}

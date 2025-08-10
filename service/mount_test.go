@@ -238,15 +238,31 @@ func Test_contains(t *testing.T) {
 }
 
 func Test_unpublishVolume(t *testing.T) {
+	defaultGetGetMountsFunc := getGetMountsFunc
+	defaultGetMountFunc := getMountFunc
+	defaultGetUnmountFunc := getUnmountFunc
+	defaultGetOsRemoveAllFunc := getOsRemoveAllFunc
+
+	after := func() {
+		getGetMountsFunc = defaultGetGetMountsFunc
+		getMountFunc = defaultGetMountFunc
+		getUnmountFunc = defaultGetUnmountFunc
+		getOsRemoveAllFunc = defaultGetOsRemoveAllFunc
+	}
+
 	type args struct {
 		ctx       context.Context
 		req       *csi.NodeUnpublishVolumeRequest
 		filterStr string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name               string
+		getGetMountsFunc   func() func(ctx context.Context) ([]gofsutil.Info, error)
+		getMountFunc       func() func(ctx context.Context, source, target, fsType string, opts ...string) error
+		getUnmountFunc     func() func(ctx context.Context, target string) error
+		getOsRemoveAllFunc func() func(path string) error
+		args               args
+		wantErr            bool
 	}{
 		{
 			name: "empty request",
@@ -269,9 +285,137 @@ func Test_unpublishVolume(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "error determining volume is mounted",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
+					return nil, fmt.Errorf("injected error for unit test")
+				}
+			},
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodeUnpublishVolumeRequest{
+					VolumeId:   "test",
+					TargetPath: "/test",
+				},
+				filterStr: "test",
+			},
+			wantErr: true,
+		},
+		{
+			name: "failure to unmount",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
+					mounts := []gofsutil.Info{
+						{
+							Path:   "/data1",
+							Opts:   []string{"rw", "remount"},
+							Device: "testdata1",
+						},
+					}
+					return mounts, nil
+				}
+			},
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodeUnpublishVolumeRequest{
+					VolumeId:   "testdata1",
+					TargetPath: "/data1",
+				},
+				filterStr: "data1",
+			},
+			wantErr: true,
+		},
+		{
+			name: "successful unmount",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
+					mounts := []gofsutil.Info{
+						{
+							Path:   "/data1",
+							Opts:   []string{"rw", "remount"},
+							Device: "testdata1",
+						},
+					}
+					return mounts, nil
+				}
+			},
+			getUnmountFunc: func() func(ctx context.Context, target string) error {
+				return func(_ context.Context, _ string) error {
+					return nil
+				}
+			},
+			getOsRemoveAllFunc: func() func(path string) error {
+				return func(_ string) error {
+					return nil
+				}
+			},
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodeUnpublishVolumeRequest{
+					VolumeId:   "testdata1",
+					TargetPath: "/data1",
+				},
+				filterStr: "data1",
+			},
+			wantErr: false,
+		},
+		{
+			name: "cleanup fails after unmount",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
+					mounts := []gofsutil.Info{
+						{
+							Path:   "/data1",
+							Opts:   []string{"rw", "remount"},
+							Device: "testdata1",
+						},
+					}
+					return mounts, nil
+				}
+			},
+			getUnmountFunc: func() func(ctx context.Context, target string) error {
+				return func(_ context.Context, _ string) error {
+					return nil
+				}
+			},
+			getOsRemoveAllFunc: func() func(path string) error {
+				return func(_ string) error {
+					return fmt.Errorf("injected error for unit test")
+				}
+			},
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodeUnpublishVolumeRequest{
+					VolumeId:   "testdata1",
+					TargetPath: "/data1",
+				},
+				filterStr: "data1",
+			},
+			wantErr: true,
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+
+			if tt.getGetMountsFunc != nil {
+				getGetMountsFunc = tt.getGetMountsFunc
+			}
+
+			if tt.getMountFunc != nil {
+				getMountFunc = tt.getMountFunc
+			}
+
+			if tt.getUnmountFunc != nil {
+				getUnmountFunc = tt.getUnmountFunc
+			}
+
+			if tt.getOsRemoveAllFunc != nil {
+				getOsRemoveAllFunc = tt.getOsRemoveAllFunc
+			}
+
 			if err := unpublishVolume(tt.args.ctx, tt.args.req, tt.args.filterStr); (err != nil) != tt.wantErr {
 				t.Errorf("unpublishVolume() error = %v, wantErr %v", err, tt.wantErr)
 			}
