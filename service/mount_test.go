@@ -374,7 +374,7 @@ func Test_publishVolume(t *testing.T) {
 		{
 			name: "failure to get mounts",
 			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
-				return func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
 					return nil, fmt.Errorf("injected error for unit test")
 				}
 			},
@@ -401,7 +401,7 @@ func Test_publishVolume(t *testing.T) {
 		{
 			name: "do not mount when already mounted with same options",
 			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
-				return func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
 					mounts := []gofsutil.Info{
 						{
 							Path: "/tmp",
@@ -412,7 +412,7 @@ func Test_publishVolume(t *testing.T) {
 				}
 			},
 			getMountFunc: func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
-				return func(ctx context.Context, source, target, fsType string, opts ...string) error {
+				return func(_ context.Context, _, _, _ string, _ ...string) error {
 					return fmt.Errorf("mount function should not be called T1=T2, P1=P2 ret OK")
 				}
 			},
@@ -436,7 +436,7 @@ func Test_publishVolume(t *testing.T) {
 		{
 			name: "return error when already mounted with different options",
 			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
-				return func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
 					mounts := []gofsutil.Info{
 						{
 							Path: "/tmp",
@@ -447,7 +447,7 @@ func Test_publishVolume(t *testing.T) {
 				}
 			},
 			getMountFunc: func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
-				return func(ctx context.Context, source, target, fsType string, opts ...string) error {
+				return func(_ context.Context, _, _, _ string, _ ...string) error {
 					return fmt.Errorf("mount function should not be called T1=T2, P1!=P2 ret FailedPrecondition")
 				}
 			},
@@ -471,7 +471,6 @@ func Test_publishVolume(t *testing.T) {
 				assert.Equal(t, codes.AlreadyExists, status.Code(err))
 			},
 		},
-
 	}
 
 	for _, tt := range tests {

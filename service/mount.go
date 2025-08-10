@@ -43,10 +43,10 @@ func publishVolume(
 
 var (
 	getGetMountsFunc = func() func(ctx context.Context) ([]gofsutil.Info, error) {
-			return gofsutil.GetMounts
+		return gofsutil.GetMounts
 	}
 
-	getMountFunc = func() func(ctx context.Context,	source, target, fsType string,	opts ...string,) (error) {
+	getMountFunc = func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
 		return gofsutil.Mount
 	}
 
