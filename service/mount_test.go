@@ -316,6 +316,11 @@ func Test_unpublishVolume(t *testing.T) {
 					return mounts, nil
 				}
 			},
+			getUnmountFunc: func() func(ctx context.Context, target string) error {
+				return func(_ context.Context, _ string) error {
+					return fmt.Errorf("injected error for unit test")
+				}
+			},
 			args: args{
 				ctx: context.Background(),
 				req: &csi.NodeUnpublishVolumeRequest{
