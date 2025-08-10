@@ -189,7 +189,7 @@ func unpublishVolume(
 	if !isMounted {
 		return nil
 	}
-	if err := gofsutil.Unmount(context.Background(), target); err != nil {
+	if err := getUnmountFunc()(context.Background(), target); err != nil {
 		return status.Errorf(codes.Internal,
 			"error unmounting target '%s': '%s'", target, err.Error())
 	}

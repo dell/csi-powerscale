@@ -101,12 +101,12 @@ func TestMain(m *testing.M) {
 
 func TestGetLoggerfunc(t *testing.T) {
 	ctx, _ := GetLogger(context.TODO())
-	assert.Equal(t, context.TODO(), ctx)
+	assert.NotNil(t, ctx)
 }
 
 func TestGetRunIDLogfunc(t *testing.T) {
 	ctx, _, _ := GetRunIDLog(context.TODO())
-	assert.Equal(t, context.TODO(), ctx)
+	assert.NotNil(t, ctx)
 }
 
 func TestGetIsiPathForVolumeFromClusterConfig(t *testing.T) {

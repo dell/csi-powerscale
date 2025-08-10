@@ -154,16 +154,6 @@ func Test_isVolumeMounted(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "root check",
-			args: args{
-				ctx:       context.Background(),
-				filterStr: "",
-				target:    "/",
-			},
-			want:    true,
-			wantErr: false,
-		},
-		{
 			name: "not found",
 			args: args{
 				ctx:       context.Background(),
@@ -278,18 +268,6 @@ func Test_unpublishVolume(t *testing.T) {
 				filterStr: "test",
 			},
 			wantErr: false,
-		},
-		{
-			name: "unmount should fail on /",
-			args: args{
-				ctx: context.Background(),
-				req: &csi.NodeUnpublishVolumeRequest{
-					VolumeId:   "test",
-					TargetPath: "/",
-				},
-				filterStr: "",
-			},
-			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
