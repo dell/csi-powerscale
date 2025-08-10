@@ -263,20 +263,22 @@ func Test_publishVolume(t *testing.T) {
 	defaultGetMountFunc := getMountFunc
 	defaultGetUnmountFunc := getUnmountFunc
 
+	mountCallsInTest := 0
+
 	after := func() {
 		getGetMountsFunc = defaultGetGetMountsFunc
 		getMountFunc = defaultGetMountFunc
 		getUnmountFunc = defaultGetUnmountFunc
+		mountCallsInTest = 0
 	}
 
 	type args struct {
 		ctx       context.Context
 		req       *csi.NodePublishVolumeRequest
-		filterStr string
+		nfsExportURL string
 	}
 	tests := []struct {
 		name             string
-		before           func() error
 		getGetMountsFunc func() func(ctx context.Context) ([]gofsutil.Info, error)
 		getMountFunc     func() func(ctx context.Context, source, target, fsType string, opts ...string) error
 		getUnmountFunc   func() func(ctx context.Context, target string) error
@@ -289,7 +291,7 @@ func Test_publishVolume(t *testing.T) {
 			args: args{
 				ctx:       context.Background(),
 				req:       &csi.NodePublishVolumeRequest{},
-				filterStr: "",
+				nfsExportURL: "",
 			},
 			wantErr: true,
 			errorChecker: func(t *testing.T, err error) {
@@ -471,6 +473,226 @@ func Test_publishVolume(t *testing.T) {
 				assert.Equal(t, codes.AlreadyExists, status.Code(err))
 			},
 		},
+		{
+			name: "return error when mount point in use by same device,singlenodewriter",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
+					mounts := []gofsutil.Info{
+						{
+							Path: "/tmp/notsameastargetpath",
+							Opts: []string{"rw", "remount"},
+							Device: "server:/export/path",
+						},
+					}
+					return mounts, nil
+				}
+			},
+			getMountFunc: func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
+				return func(_ context.Context, _, _, _ string, _ ...string) error {
+					return fmt.Errorf("mount function should not be called T1!=T2, P1==P2 || P1!=P2 FailedPrecondition")
+				}
+			},
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodePublishVolumeRequest{
+					VolumeId: "ut-vol",
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+					},
+					TargetPath: "/tmp",
+				},
+				nfsExportURL: "server:/export/path",
+			},
+			wantErr: true,
+			errorChecker: func(t *testing.T, err error) {
+				assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+			},
+		},
+		{
+			name: "return error when mount point in use by same device,singlenodereaderonly",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
+					mounts := []gofsutil.Info{
+						{
+							Path: "/tmp/notsameastargetpath",
+							Opts: []string{"rw", "remount"},
+							Device: "server:/export/path",
+						},
+					}
+					return mounts, nil
+				}
+			},
+			getMountFunc: func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
+				return func(_ context.Context, _, _, _ string, _ ...string) error {
+					return fmt.Errorf("mount function should not be called T1!=T2, P1==P2 || P1!=P2 FailedPrecondition")
+				}
+			},
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodePublishVolumeRequest{
+					VolumeId: "ut-vol",
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
+						},
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+					},
+					TargetPath: "/tmp",
+				},
+				nfsExportURL: "server:/export/path",
+			},
+			wantErr: true,
+			errorChecker: func(t *testing.T, err error) {
+				assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+			},
+		},
+		{
+			name: "return error when mount point in use by same device,singlenodesinglewriter",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
+					mounts := []gofsutil.Info{
+						{
+							Path: "/tmp/notsameastargetpath",
+							Opts: []string{"rw", "remount"},
+							Device: "server:/export/path",
+						},
+					}
+					return mounts, nil
+				}
+			},
+			getMountFunc: func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
+				return func(_ context.Context, _, _, _ string, _ ...string) error {
+					return fmt.Errorf("mount function should not be called T1!=T2, P1==P2 || P1!=P2 FailedPrecondition")
+				}
+			},
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodePublishVolumeRequest{
+					VolumeId: "ut-vol",
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
+						},
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+					},
+					TargetPath: "/tmp",
+				},
+				nfsExportURL: "server:/export/path",
+			},
+			wantErr: true,
+			errorChecker: func(t *testing.T, err error) {
+				assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+			},
+		},
+		{
+			name: "mount returns access denied by server while mounting",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
+					return []gofsutil.Info{}, nil
+				}
+			},
+			getMountFunc: func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
+				return func(_ context.Context, _, _, _ string, _ ...string) error {
+					return fmt.Errorf("injected error: access denied by server while mounting")
+				}
+			},
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodePublishVolumeRequest{
+					VolumeId: "ut-vol",
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+					},
+					TargetPath: "/tmp",
+				},
+				nfsExportURL: "server:/export/path",
+			},
+			wantErr: true,
+			errorChecker: func(t *testing.T, err error) {
+				assert.Contains(t, err.Error(), "injected error: access denied by server while mounting")
+			},
+		},
+		{
+			name: "mount returns no such file or directory",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
+					return []gofsutil.Info{}, nil
+				}
+			},
+			getMountFunc: func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
+				return func(_ context.Context, _, _, _ string, _ ...string) error {
+					return fmt.Errorf("injected error: no such file or directory")
+				}
+			},
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodePublishVolumeRequest{
+					VolumeId: "ut-vol",
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+					},
+					TargetPath: "/tmp",
+				},
+				nfsExportURL: "server:/export/path",
+			},
+			wantErr: true,
+			errorChecker: func(t *testing.T, err error) {
+				assert.Contains(t, err.Error(), "injected error: no such file or directory")
+			},
+		},
+		{
+			name: "mount successful after retry",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
+					return []gofsutil.Info{}, nil
+				}
+			},
+			getMountFunc: func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
+				return func(_ context.Context, _, _, _ string, _ ...string) error {
+					if mountCallsInTest < 4 {
+						mountCallsInTest++
+						return fmt.Errorf("injected error %d: no such file or directory", mountCallsInTest)
+					}
+					return nil
+				}
+			},
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodePublishVolumeRequest{
+					VolumeId: "ut-vol",
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+					},
+					TargetPath: "/tmp",
+				},
+				nfsExportURL: "server:/export/path",
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -489,13 +711,7 @@ func Test_publishVolume(t *testing.T) {
 				getUnmountFunc = tt.getUnmountFunc
 			}
 
-			if tt.before != nil {
-				if err := tt.before(); err != nil {
-					t.Errorf("publishVolume() error in before() function %v", err)
-				}
-			}
-
-			err := publishVolume(tt.args.ctx, tt.args.req, tt.args.filterStr)
+			err := publishVolume(tt.args.ctx, tt.args.req, tt.args.nfsExportURL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("publishVolume() error = %v, wantErr %v", err, tt.wantErr)
 			}
