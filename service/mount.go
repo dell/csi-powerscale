@@ -149,7 +149,7 @@ var (
 			// Both substring validation is for NFSv3 and NFSv4 errors resp.
 			for (strings.Contains(strings.ToLower(errmsg), "access denied by server while mounting") || (strings.Contains(strings.ToLower(errmsg), "no such file or directory"))) && count < 5 {
 				time.Sleep(2 * time.Second)
-				log.Infof("Mount re-trial attempt-%d", count)
+				log.Infof("Mount retry attempt-%d", count)
 				err = getMountFunc()(context.Background(), nfsExportURL, target, "nfs", mntOptions...)
 				if err != nil {
 					errmsg = err.Error()

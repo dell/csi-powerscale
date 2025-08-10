@@ -273,8 +273,8 @@ func Test_publishVolume(t *testing.T) {
 	}
 
 	type args struct {
-		ctx       context.Context
-		req       *csi.NodePublishVolumeRequest
+		ctx          context.Context
+		req          *csi.NodePublishVolumeRequest
 		nfsExportURL string
 	}
 	tests := []struct {
@@ -289,8 +289,8 @@ func Test_publishVolume(t *testing.T) {
 		{
 			name: "empty request",
 			args: args{
-				ctx:       context.Background(),
-				req:       &csi.NodePublishVolumeRequest{},
+				ctx:          context.Background(),
+				req:          &csi.NodePublishVolumeRequest{},
 				nfsExportURL: "",
 			},
 			wantErr: true,
@@ -479,8 +479,8 @@ func Test_publishVolume(t *testing.T) {
 				return func(_ context.Context) ([]gofsutil.Info, error) {
 					mounts := []gofsutil.Info{
 						{
-							Path: "/tmp/notsameastargetpath",
-							Opts: []string{"rw", "remount"},
+							Path:   "/tmp/notsameastargetpath",
+							Opts:   []string{"rw", "remount"},
 							Device: "server:/export/path",
 						},
 					}
@@ -519,8 +519,8 @@ func Test_publishVolume(t *testing.T) {
 				return func(_ context.Context) ([]gofsutil.Info, error) {
 					mounts := []gofsutil.Info{
 						{
-							Path: "/tmp/notsameastargetpath",
-							Opts: []string{"rw", "remount"},
+							Path:   "/tmp/notsameastargetpath",
+							Opts:   []string{"rw", "remount"},
 							Device: "server:/export/path",
 						},
 					}
@@ -559,8 +559,8 @@ func Test_publishVolume(t *testing.T) {
 				return func(_ context.Context) ([]gofsutil.Info, error) {
 					mounts := []gofsutil.Info{
 						{
-							Path: "/tmp/notsameastargetpath",
-							Opts: []string{"rw", "remount"},
+							Path:   "/tmp/notsameastargetpath",
+							Opts:   []string{"rw", "remount"},
 							Device: "server:/export/path",
 						},
 					}
@@ -688,6 +688,41 @@ func Test_publishVolume(t *testing.T) {
 						},
 					},
 					TargetPath: "/tmp",
+				},
+				nfsExportURL: "server:/export/path",
+			},
+			wantErr: false,
+		},
+		{
+			name: "support ro mount and validate mount options",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(_ context.Context) ([]gofsutil.Info, error) {
+					return []gofsutil.Info{}, nil
+				}
+			},
+			getMountFunc: func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
+				return func(_ context.Context, nfsExportURL, target, fsType string, mntOptions ...string) error {
+					assert.Contains(t, nfsExportURL, "server:/export/path")
+					assert.Contains(t, target, "/tmp")
+					assert.Contains(t, fsType, "nfs")
+					assert.Contains(t, mntOptions, "ro")
+					return nil
+				}
+			},
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodePublishVolumeRequest{
+					VolumeId: "ut-vol",
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+					},
+					TargetPath: "/tmp",
+					Readonly:   true,
 				},
 				nfsExportURL: "server:/export/path",
 			},
