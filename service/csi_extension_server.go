@@ -31,7 +31,7 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 		Messages: make([]string, 0),
 	}
 
-	if (len(req.GetVolumeIds()) == 0 || len(req.GetVolumeIds()) == 0) && req.GetNodeId() == "" {
+	if len(req.GetVolumeIds()) == 0 && req.GetNodeId() == "" {
 		// This is a nop call just testing the interface is present
 		rep.Messages = append(rep.Messages, "ValidateVolumeHostConnectivity is implemented")
 		return rep, nil

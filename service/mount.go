@@ -42,6 +42,18 @@ func publishVolume(
 }
 
 var (
+	getGetMountsFunc = func() func(ctx context.Context) ([]gofsutil.Info, error) {
+			return gofsutil.GetMounts
+	}
+
+	getMountFunc = func() func(ctx context.Context,	source, target, fsType string,	opts ...string,) (error) {
+		return gofsutil.Mount
+	}
+
+	getUnmountFunc = func() func(ctx context.Context, target string) error {
+		return gofsutil.Unmount
+	}
+
 	publishVolumeFunc = func(
 		ctx context.Context,
 		req *csi.NodePublishVolumeRequest,
@@ -96,7 +108,7 @@ var (
 			"AccessMode": accMode.GetMode(),
 		}
 		logrus.WithFields(f).Info("Node publish volume params ")
-		mnts, err := gofsutil.GetMounts(ctx)
+		mnts, err := getGetMountsFunc()(ctx)
 		if err != nil {
 			return status.Errorf(codes.Internal,
 				"could not reliably determine existing mount status: '%s'",
@@ -131,14 +143,14 @@ var (
 		}
 
 		log.Infof("The mountOptions being used for mount are: %s", mntOptions)
-		if err := gofsutil.Mount(context.Background(), nfsExportURL, target, "nfs", mntOptions...); err != nil {
+		if err := getMountFunc()(context.Background(), nfsExportURL, target, "nfs", mntOptions...); err != nil {
 			count := 0
 			errmsg := err.Error()
 			// Both substring validation is for NFSv3 and NFSv4 errors resp.
 			for (strings.Contains(strings.ToLower(errmsg), "access denied by server while mounting") || (strings.Contains(strings.ToLower(errmsg), "no such file or directory"))) && count < 5 {
 				time.Sleep(2 * time.Second)
 				log.Infof("Mount re-trial attempt-%d", count)
-				err = gofsutil.Mount(context.Background(), nfsExportURL, target, "nfs", mntOptions...)
+				err = getMountFunc()(context.Background(), nfsExportURL, target, "nfs", mntOptions...)
 				if err != nil {
 					errmsg = err.Error()
 				} else {

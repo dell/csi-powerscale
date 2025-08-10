@@ -18,12 +18,16 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/dell/gofsutil"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Split TestMkdir into separate tests to test each case
@@ -255,16 +259,30 @@ func Test_unpublishVolume(t *testing.T) {
 }
 
 func Test_publishVolume(t *testing.T) {
+	defaultGetGetMountsFunc := getGetMountsFunc
+	defaultGetMountFunc := getMountFunc
+	defaultGetUnmountFunc := getUnmountFunc
+
+	after := func() {
+		getGetMountsFunc = defaultGetGetMountsFunc
+		getMountFunc = defaultGetMountFunc
+		getUnmountFunc = defaultGetUnmountFunc
+	}
+
 	type args struct {
 		ctx       context.Context
 		req       *csi.NodePublishVolumeRequest
 		filterStr string
 	}
 	tests := []struct {
-		name    string
-		before  func() error
-		args    args
-		wantErr bool
+		name             string
+		before           func() error
+		getGetMountsFunc func() func(ctx context.Context) ([]gofsutil.Info, error)
+		getMountFunc     func() func(ctx context.Context, source, target, fsType string, opts ...string) error
+		getUnmountFunc   func() func(ctx context.Context, target string) error
+		args             args
+		wantErr          bool
+		errorChecker     func(t *testing.T, err error)
 	}{
 		{
 			name: "empty request",
@@ -274,6 +292,9 @@ func Test_publishVolume(t *testing.T) {
 				filterStr: "",
 			},
 			wantErr: true,
+			errorChecker: func(t *testing.T, err error) {
+				assert.Equal(t, codes.InvalidArgument, status.Code(err))
+			},
 		},
 		{
 			name: "empty access mode",
@@ -285,6 +306,9 @@ func Test_publishVolume(t *testing.T) {
 				},
 			},
 			wantErr: true,
+			errorChecker: func(t *testing.T, err error) {
+				assert.Equal(t, codes.InvalidArgument, status.Code(err))
+			},
 		},
 		{
 			name: "invalid access mode",
@@ -300,6 +324,9 @@ func Test_publishVolume(t *testing.T) {
 				},
 			},
 			wantErr: true,
+			errorChecker: func(t *testing.T, err error) {
+				assert.Equal(t, codes.InvalidArgument, status.Code(err))
+			},
 		},
 		{
 			name: "invalid target path",
@@ -318,30 +345,12 @@ func Test_publishVolume(t *testing.T) {
 				},
 			},
 			wantErr: true,
-		},
-		{
-			name: "invalid target path",
-			args: args{
-				ctx: context.Background(),
-				req: &csi.NodePublishVolumeRequest{
-					VolumeId: "ut-vol",
-					VolumeCapability: &csi.VolumeCapability{
-						AccessMode: &csi.VolumeCapability_AccessMode{
-							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-						},
-						AccessType: &csi.VolumeCapability_Mount{
-							Mount: &csi.VolumeCapability_MountVolume{},
-						},
-					},
-				},
+			errorChecker: func(t *testing.T, err error) {
+				assert.Equal(t, codes.InvalidArgument, status.Code(err))
 			},
-			wantErr: true,
 		},
 		{
 			name: "failure to create target path",
-			before: func() error {
-				return os.WriteFile("/test/bad", []byte("dummy-content"), 0o600)
-			},
 			args: args{
 				ctx: context.Background(),
 				req: &csi.NodePublishVolumeRequest{
@@ -354,13 +363,21 @@ func Test_publishVolume(t *testing.T) {
 							Mount: &csi.VolumeCapability_MountVolume{},
 						},
 					},
-					TargetPath: "/test/bad",
+					TargetPath: "/dev/null",
 				},
 			},
 			wantErr: true,
+			errorChecker: func(t *testing.T, err error) {
+				assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+			},
 		},
 		{
-			name: "call to get mounts",
+			name: "failure to get mounts",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(ctx context.Context) ([]gofsutil.Info, error) {
+					return nil, fmt.Errorf("injected error for unit test")
+				}
+			},
 			args: args{
 				ctx: context.Background(),
 				req: &csi.NodePublishVolumeRequest{
@@ -373,25 +390,119 @@ func Test_publishVolume(t *testing.T) {
 							Mount: &csi.VolumeCapability_MountVolume{},
 						},
 					},
-					TargetPath: filepath.Join( t.TempDir(), "/mount-test"),
+					TargetPath: filepath.Join(t.TempDir(), "/mount-test"),
 				},
 			},
 			wantErr: true,
+			errorChecker: func(t *testing.T, err error) {
+				assert.Equal(t, codes.Internal, status.Code(err))
+			},
 		},
-
+		{
+			name: "do not mount when already mounted with same options",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(ctx context.Context) ([]gofsutil.Info, error) {
+					mounts := []gofsutil.Info{
+						{
+							Path: "/tmp",
+							Opts: []string{"rw", "remount"},
+						},
+					}
+					return mounts, nil
+				}
+			},
+			getMountFunc: func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
+				return func(ctx context.Context, source, target, fsType string, opts ...string) error {
+					return fmt.Errorf("mount function should not be called T1=T2, P1=P2 ret OK")
+				}
+			},
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodePublishVolumeRequest{
+					VolumeId: "ut-vol",
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+					},
+					TargetPath: "/tmp",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "return error when already mounted with different options",
+			getGetMountsFunc: func() func(ctx context.Context) ([]gofsutil.Info, error) {
+				return func(ctx context.Context) ([]gofsutil.Info, error) {
+					mounts := []gofsutil.Info{
+						{
+							Path: "/tmp",
+							Opts: []string{"ro", "remount"},
+						},
+					}
+					return mounts, nil
+				}
+			},
+			getMountFunc: func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
+				return func(ctx context.Context, source, target, fsType string, opts ...string) error {
+					return fmt.Errorf("mount function should not be called T1=T2, P1!=P2 ret FailedPrecondition")
+				}
+			},
+			args: args{
+				ctx: context.Background(),
+				req: &csi.NodePublishVolumeRequest{
+					VolumeId: "ut-vol",
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+					},
+					TargetPath: "/tmp",
+				},
+			},
+			wantErr: true,
+			errorChecker: func(t *testing.T, err error) {
+				assert.Equal(t, codes.AlreadyExists, status.Code(err))
+			},
+		},
 
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+
+			if tt.getGetMountsFunc != nil {
+				getGetMountsFunc = tt.getGetMountsFunc
+			}
+
+			if tt.getMountFunc != nil {
+				getMountFunc = tt.getMountFunc
+			}
+
+			if tt.getUnmountFunc != nil {
+				getUnmountFunc = tt.getUnmountFunc
+			}
+
 			if tt.before != nil {
 				if err := tt.before(); err != nil {
 					t.Errorf("publishVolume() error in before() function %v", err)
 				}
 			}
 
-			if err := publishVolume(tt.args.ctx, tt.args.req, tt.args.filterStr); (err != nil) != tt.wantErr {
+			err := publishVolume(tt.args.ctx, tt.args.req, tt.args.filterStr)
+			if (err != nil) != tt.wantErr {
 				t.Errorf("publishVolume() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantErr && err != nil && tt.errorChecker != nil {
+				tt.errorChecker(t, err)
 			}
 		})
 	}

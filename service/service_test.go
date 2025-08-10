@@ -100,12 +100,12 @@ func TestMain(m *testing.M) {
 }
 
 func TestGetLoggerfunc(t *testing.T) {
-	ctx, _ := GetLogger(nil)
+	ctx, _ := GetLogger(context.TODO())
 	assert.Equal(t, nil, ctx)
 }
 
 func TestGetRunIDLogfunc(t *testing.T) {
-	ctx, _, _ := GetRunIDLog(nil)
+	ctx, _, _ := GetRunIDLog(context.TODO())
 	assert.Equal(t, nil, ctx)
 }
 
@@ -765,16 +765,6 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 type mockService struct {
 	service
 	mock.Mock
-}
-
-func (m *mockService) syncIsilonConfigs(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *mockService) probe(ctx context.Context, isiConfig *IsilonClusterConfig) error {
-	args := m.Called(ctx, isiConfig)
-	return args.Error(0)
 }
 
 func TestUpdateDriverConfigParams(t *testing.T) {
