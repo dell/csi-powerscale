@@ -1164,24 +1164,7 @@ func TestReconcileNodeAzLabels(t *testing.T) {
 			},
 			nodeLabels: map[string]string{},
 			expectedLabelsToAdd: map[string]string{
-				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24": "192.168.1.1",
-			},
-			expectedLabelsToRemove: []string{},
-			wantErr:                false,
-		},
-		{
-			name: "update existing labels",
-			addrs: []net.Addr{
-				&net.IPNet{
-					IP:   net.ParseIP("192.168.1.1").To4(),
-					Mask: net.CIDRMask(24, 32),
-				},
-			},
-			nodeLabels: map[string]string{
-				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24": "192.168.1.2",
-			},
-			expectedLabelsToAdd: map[string]string{
-				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24": "192.168.1.1",
+				"csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.1": "true",
 			},
 			expectedLabelsToRemove: []string{},
 			wantErr:                false,
@@ -1190,43 +1173,16 @@ func TestReconcileNodeAzLabels(t *testing.T) {
 			name:  "remove labels",
 			addrs: []net.Addr{},
 			nodeLabels: map[string]string{
-				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24": "192.168.1.1",
+				"csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.1": "true",
 			},
 			expectedLabelsToAdd: map[string]string{},
 			expectedLabelsToRemove: []string{
-				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24",
+				"csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.1",
 			},
 			wantErr: false,
 		},
 		{
-			name: "multiple addresses in same network limits to 63 characters",
-			addrs: []net.Addr{
-				&net.IPNet{
-					IP:   net.ParseIP("192.168.100.100").To4(),
-					Mask: net.CIDRMask(24, 32),
-				},
-				&net.IPNet{
-					IP:   net.ParseIP("192.168.100.101").To4(),
-					Mask: net.CIDRMask(24, 32),
-				},
-				&net.IPNet{
-					IP:   net.ParseIP("192.168.100.102").To4(),
-					Mask: net.CIDRMask(24, 32),
-				},
-				&net.IPNet{
-					IP:   net.ParseIP("192.168.100.103").To4(),
-					Mask: net.CIDRMask(24, 32),
-				},
-			},
-			nodeLabels: map[string]string{},
-			expectedLabelsToAdd: map[string]string{
-				"csi-isilon.dellemc.com/aznetwork-192.168.100.0_24": "192.168.100.100-192.168.100.101-192.168.100.102-192.168.100.103",
-			},
-			expectedLabelsToRemove: []string{},
-			wantErr:                false,
-		},
-		{
-			name: "too many addresses exceeding label limits",
+			name: "multiple addresses in same network",
 			addrs: []net.Addr{
 				&net.IPNet{
 					IP:   net.ParseIP("192.168.100.100").To4(),
@@ -1251,7 +1207,11 @@ func TestReconcileNodeAzLabels(t *testing.T) {
 			},
 			nodeLabels: map[string]string{},
 			expectedLabelsToAdd: map[string]string{
-				"csi-isilon.dellemc.com/aznetwork-192.168.100.0_24": "192.168.100.100-192.168.100.101-192.168.100.102-192.168.100.103",
+				"csi-isilon.dellemc.com/az-192.168.100.0-24-192.168.100.100": "true",
+				"csi-isilon.dellemc.com/az-192.168.100.0-24-192.168.100.101": "true",
+				"csi-isilon.dellemc.com/az-192.168.100.0-24-192.168.100.102": "true",
+				"csi-isilon.dellemc.com/az-192.168.100.0-24-192.168.100.103": "true",
+				"csi-isilon.dellemc.com/az-192.168.100.0-24-192.168.100.104": "true",
 			},
 			expectedLabelsToRemove: []string{},
 			wantErr:                false,
@@ -1291,7 +1251,10 @@ func TestReconcileNodeAzLabels(t *testing.T) {
 			},
 			nodeLabels: map[string]string{},
 			expectedLabelsToAdd: map[string]string{
-				"csi-isilon.dellemc.com/aznetwork-192.168.100.0_24": "192.168.100.100-192.168.100.101-192.168.100.102-192.168.100.104",
+				"csi-isilon.dellemc.com/az-192.168.100.0-24-192.168.100.100": "true",
+				"csi-isilon.dellemc.com/az-192.168.100.0-24-192.168.100.101": "true",
+				"csi-isilon.dellemc.com/az-192.168.100.0-24-192.168.100.102": "true",
+				"csi-isilon.dellemc.com/az-192.168.100.0-24-192.168.100.104": "true",
 			},
 			expectedLabelsToRemove: []string{},
 			wantErr:                false,
@@ -1305,7 +1268,7 @@ func TestReconcileNodeAzLabels(t *testing.T) {
 				},
 			},
 			expectedLabelsToAdd: map[string]string{
-				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24": "192.168.1.1",
+				"csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.1": "true",
 			},
 			expectedLabelsToRemove: []string{},
 			getNodeLabelsErr:       errors.New("permission denied"),
@@ -1320,7 +1283,7 @@ func TestReconcileNodeAzLabels(t *testing.T) {
 				},
 			},
 			expectedLabelsToAdd: map[string]string{
-				"csi-isilon.dellemc.com/aznetwork-192.168.1.0_24": "192.168.1.1",
+				"csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.1": "true",
 			},
 			expectedLabelsToRemove: []string{},
 			patchNodeLabelsErr:     errors.New("injected failed"),

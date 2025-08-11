@@ -825,17 +825,9 @@ func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
 				if err != nil {
 					log.Errorf("encountered error while parsing IP address %v", addr)
 				} else {
-					sanitizedIP := strings.ReplaceAll(cnet.String(), "/", "_")
-					key := fmt.Sprintf("%s/aznetwork-%s", constants.PluginName, sanitizedIP)
-					if val, ok := labelsToAdd[key]; ok {
-						if len(val)+len(ip.String()) < 63 {
-							labelsToAdd[key] = labelsToAdd[key] + "-" + ip.String()
-						} else {
-							log.Warnf("label value will exceed 63 characters, skipping update of this label %s", key)
-						}
-					} else {
-						labelsToAdd[key] = ip.String()
-					}
+					sanitizedNet := strings.ReplaceAll(cnet.String(), "/", "-")
+					key := fmt.Sprintf("%s/az-%s-%s", constants.PluginName, sanitizedNet, ip.String())
+					labelsToAdd[key] = "true"
 					log.Debugf("discovered label %s -> %s", key, labelsToAdd[key])
 				}
 			}
@@ -849,7 +841,7 @@ func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
 
 	labelsToRemove := make([]string, 0)
 	for k := range labels {
-		if strings.HasPrefix(k, constants.PluginName+"/aznetwork-") {
+		if strings.HasPrefix(k, constants.PluginName+"/az-") {
 			if _, ok := labelsToAdd[k]; !ok {
 				labelsToRemove = append(labelsToRemove, k)
 			}

@@ -1186,7 +1186,7 @@ func TestSetAZReconcileInterval(t *testing.T) {
 func TestService_reconcileNodeAzLabels(t *testing.T) {
 	nodeName := "test-node"
 	nodeLabels := map[string]string{
-		"csi-isilon.dellemc.com/aznetwork-10.0.0.0_24": "10.0.0.1",
+		"csi-isilon.dellemc.com/az-10.0.0.0-24-10.0.0.1": "true",
 	}
 
 	k8sclient := fake.NewSimpleClientset(&v1.Node{
