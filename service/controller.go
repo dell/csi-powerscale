@@ -1860,12 +1860,12 @@ func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, nodeID, azNetwor
 			log.Debugf("Key: %s, Value: %s\n", key, value)
 
 			// getting network interface IP, subnet, and export IP
-			azNetworkIp, azNetworkSubnet, exportIp := match[1], match[2], match[3]
-			log.Debugf("AZNetwork IP %s, AZNetwork subnet %s, export IP %s from node label", azNetworkIp, azNetworkSubnet, exportIp)
+			azNetworkIP, azNetworkSubnet, exportIP := match[1], match[2], match[3]
+			log.Debugf("AZNetwork IP %s, AZNetwork subnet %s, export IP %s from node label", azNetworkIP, azNetworkSubnet, exportIP)
 
 			// if matching, return the IP(s)
-			if azNetwork == fmt.Sprintf("%s/%s", azNetworkIp, azNetworkSubnet) {
-				ips = append(ips, exportIp)
+			if azNetwork == fmt.Sprintf("%s/%s", azNetworkIP, azNetworkSubnet) {
+				ips = append(ips, exportIP)
 			}
 		}
 	}
