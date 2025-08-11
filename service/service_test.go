@@ -1131,6 +1131,9 @@ func TestSetAZReconcileInterval(t *testing.T) {
 }
 
 func TestService_reconcileNodeAzLabels(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	nodeName := "test-node"
 	nodeLabels := map[string]string{
 		"csi-isilon.dellemc.com/az-10.0.0.0-24-10.0.0.1": "true",
@@ -1143,12 +1146,63 @@ func TestService_reconcileNodeAzLabels(t *testing.T) {
 		},
 	})
 
-	s := &service{
-		azReconcileInterval: 10 * time.Second,
-		nodeID:              nodeName,
-		k8sclient:           k8sclient,
-	}
+	t.Run("trigger reconciliation of labels", func(t *testing.T) {
+		called := make(chan struct{}, 1)
 
-	err := s.reconcileNodeAzLabels(s.azReconcileInterval)
-	assert.NoError(t, err)
+		s := &service{
+			azReconcileInterval:         50 * time.Millisecond,
+			updateAZReconcileIntervalCh: make(chan time.Duration),
+			reconcileNodeAzLabelsFunc: func(ctx context.Context) error {
+				called <- struct{}{}
+				return nil
+			},
+			nodeID:    nodeName,
+			k8sclient: k8sclient,
+		}
+
+		err := s.reconcileNodeAzLabels(ctx)
+		assert.NoError(t, err)
+
+		select {
+		case <-called:
+			// Success
+		case <-time.After(200 * time.Millisecond):
+			t.Fatal("Reconcile function was not called")
+		}
+	})
+
+	t.Run("reconcile interval updated", func(t *testing.T) {
+		callCount := 0
+		called := make(chan struct{}, 2)
+
+		s := &service{
+			azReconcileInterval:         50 * time.Millisecond,
+			updateAZReconcileIntervalCh: make(chan time.Duration),
+			reconcileNodeAzLabelsFunc: func(ctx context.Context) error {
+				callCount++
+				called <- struct{}{}
+				return nil
+			},
+			nodeID:    nodeName,
+			k8sclient: k8sclient,
+		}
+
+		err := s.reconcileNodeAzLabels(ctx)
+		assert.NoError(t, err)
+
+		// Wait for first call
+		<-called
+
+		// Update interval
+		s.updateAZReconcileIntervalCh <- 30 * time.Millisecond
+
+		// Wait for second call
+		select {
+		case <-called:
+			assert.GreaterOrEqual(t, callCount, 2)
+		case <-time.After(200 * time.Millisecond):
+			t.Fatal("Reconcile function was not called after interval update")
+		}
+
+	})
 }

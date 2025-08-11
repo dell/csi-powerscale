@@ -626,6 +626,10 @@ func (s *service) reconcileNodeAzLabels(ctx context.Context) error {
 	_, log := GetLogger(ctx)
 	s.updateAZReconcileIntervalCh = make(chan time.Duration)
 
+	if s.reconcileNodeAzLabelsFunc == nil {
+		s.reconcileNodeAzLabelsFunc = s.ReconcileNodeAzLabels
+	}
+
 	go func() {
 		ticker := time.NewTicker(s.getReconcileInterval())
 		defer ticker.Stop()
@@ -633,8 +637,7 @@ func (s *service) reconcileNodeAzLabels(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				fmt.Println("called")
-				err := s.ReconcileNodeAzLabels(ctx)
+				err := s.reconcileNodeAzLabelsFunc(ctx)
 				if err != nil {
 					log.Errorf("node label reconciliation failed: %v", err)
 				}
