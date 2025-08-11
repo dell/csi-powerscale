@@ -1855,7 +1855,7 @@ func TestControllerUnpublishVolume(t *testing.T) {
 				NodeId:   identifiers.DummyHostNodeID,
 			},
 			nodeLabels: map[string]string{
-				"csi-isilon.dellemc.com/az-10.0.0.0-24-10.0.0.1": "true",
+				"csi-isilon.dellemc.com/az-10.0.0.0-32-10.0.0.1": "true",
 			},
 			wantErr: true,
 		},
