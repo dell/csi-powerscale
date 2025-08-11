@@ -1847,28 +1847,33 @@ func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, nodeID, azNetwor
 	}
 
 	// Find the node label with matching AZNetwork
+	// Example: csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.1
 	pluginName := regexp.QuoteMeta(constants.PluginName)
-	pattern := regexp.MustCompile(fmt.Sprintf("^%s\\/aznetwork-([0-9\\.]+)_([0-9]+)$", pluginName))
+	pattern := regexp.MustCompile(fmt.Sprintf("^%s\\/az-([0-9\\.]+)-([0-9]+)-([0-9\\.]+)$", pluginName))
+
+	// Array of IPs that match the given AZNetwork
+	ips := []string{}
 
 	for key, value := range labels {
 		// Found the node with the matching AZNetwork label, get its IP
-		if match := pattern.FindStringSubmatch(key); len(match) == 3 {
+		if match := pattern.FindStringSubmatch(key); len(match) == 4 {
 			log.Debugf("Key: %s, Value: %s\n", key, value)
 
-			// getting network interface IP and Subnet
-			ipFromLabel := match[1]
-			subnetFromLabel := match[2]
-			log.Debugf("AZNetwork IP from node label: %s, AZNetwork subnet from node label: %s", ipFromLabel, subnetFromLabel)
+			// getting network interface IP, subnet, and export IP
+			azNetworkIp, azNetworkSubnet, exportIp := match[1], match[2], match[3]
+			log.Debugf("AZNetwork IP %s, AZNetwork subnet %s, export IP %s from node label", azNetworkIp, azNetworkSubnet, exportIp)
 
 			// if matching, return the IP(s)
-			if azNetwork == fmt.Sprintf("%s/%s", ipFromLabel, subnetFromLabel) {
-				// convert IPs separated by "-" in a string to a slice of IPs
-				ips := strings.Split(value, "-")
-				return ips, nil
+			if azNetwork == fmt.Sprintf("%s/%s", azNetworkIp, azNetworkSubnet) {
+				ips = append(ips, exportIp)
 			}
 		}
 	}
-	return []string{}, fmt.Errorf("failed to match AZNetwork to get IPs for export %s", azNetwork)
+
+	if len(ips) > 0 {
+		return ips, nil
+	}
+	return ips, fmt.Errorf("failed to match AZNetwork to get IPs for export %s", azNetwork)
 }
 
 func (s *service) GetCapacity(
