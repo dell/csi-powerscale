@@ -658,7 +658,7 @@ func (s *service) CreateVolume(
 					}
 					// return the createVolume response with actual array volume name
 					exportPath := path
-					if export != nil && export.Paths != nil {
+					if export.Paths != nil {
 						if len(*export.Paths) > 0 {
 							exportPath = (*export.Paths)[0]
 							pathToken := strings.Split(exportPath, "/")
@@ -689,7 +689,7 @@ func (s *service) CreateVolume(
 					}
 					// return the createVolume response with actual array volume name
 					exportPath := path
-					if export != nil && export.Paths != nil {
+					if export.Paths != nil {
 						if len(*export.Paths) > 0 {
 							exportPath = (*export.Paths)[0]
 							pathToken := strings.Split(exportPath, "/")
@@ -2353,21 +2353,16 @@ func validateVolumeCaps(
 			supported = false
 			reason = errUnknownAccessMode
 		case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
-			break
 		case csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER:
-			break
 		case csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER:
-			break
 		case csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY:
 			supported = false
 			reason = errNoSingleNodeReader
 		case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
-			break
 		case csi.VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER:
 			supported = false
 			reason = errNoMultiNodeSingleWriter
 		case csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER:
-			break
 		default:
 			// This is to guard against new access modes not understood
 			supported = false

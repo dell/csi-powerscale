@@ -41,117 +41,135 @@ func publishVolume(
 	return publishVolumeFunc(ctx, req, nfsExportURL)
 }
 
-var publishVolumeFunc = func(
-	ctx context.Context,
-	req *csi.NodePublishVolumeRequest,
-	nfsExportURL string,
-) error {
-	// Fetch log handler
-	ctx, log := GetLogger(ctx)
-
-	volCap := req.GetVolumeCapability()
-	if volCap == nil {
-		return status.Error(codes.InvalidArgument,
-			"Volume Capability is required")
+var (
+	getGetMountsFunc = func() func(ctx context.Context) ([]gofsutil.Info, error) {
+		return gofsutil.GetMounts
 	}
 
-	accMode := volCap.GetAccessMode()
-	if accMode == nil {
-		return status.Error(codes.InvalidArgument,
-			"Volume Access Mode is required")
-	}
-	mntVol := volCap.GetMount()
-	if mntVol == nil {
-		return status.Error(codes.InvalidArgument, "Invalid access type")
+	getMountFunc = func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
+		return gofsutil.Mount
 	}
 
-	var mntOptions []string
-	mntOptions = mntVol.GetMountFlags()
-	log.Infof("The mountOptions received are: %s", mntOptions)
-
-	target := req.GetTargetPath()
-	if target == "" {
-		return status.Error(codes.InvalidArgument,
-			"Target Path is required")
+	getUnmountFunc = func() func(ctx context.Context, target string) error {
+		return gofsutil.Unmount
 	}
 
-	// make sure target is created
-	_, err := mkdir(ctx, target)
-	if err != nil {
-		return status.Error(codes.FailedPrecondition, fmt.Sprintf("Could not create '%s': '%s'", target, err.Error()))
-	}
-	roFlag := req.GetReadonly()
-	rwOption := "rw"
-	if roFlag {
-		rwOption = "ro"
+	getOsRemoveAllFunc = func() func(name string) error {
+		return os.RemoveAll
 	}
 
-	mntOptions = append(mntOptions, rwOption)
+	publishVolumeFunc = func(
+		ctx context.Context,
+		req *csi.NodePublishVolumeRequest,
+		nfsExportURL string,
+	) error {
+		// Fetch log handler
+		ctx, log := GetLogger(ctx)
 
-	f := logrus.Fields{
-		"ID":         req.VolumeId,
-		"TargetPath": target,
-		"ExportPath": nfsExportURL,
-		"AccessMode": accMode.GetMode(),
-	}
-	logrus.WithFields(f).Info("Node publish volume params ")
-	mnts, err := gofsutil.GetMounts(ctx)
-	if err != nil {
-		return status.Errorf(codes.Internal,
-			"could not reliably determine existing mount status: '%s'",
-			err.Error())
-	}
-
-	if len(mnts) != 0 {
-		for _, m := range mnts {
-			// check for idempotency
-			// same volume
-			if m.Device == nfsExportURL {
-				if m.Path == target {
-					// as per specs, T1=T2, P1=P2 - return OK
-					if contains(m.Opts, rwOption) {
-						logrus.WithFields(f).Debug(
-							"mount already in place with same options")
-						return nil
-					}
-					// T1=T2, P1!=P2 - return AlreadyExists
-					logrus.WithFields(f).Error("Mount point already in use by device with different options")
-					return status.Error(codes.AlreadyExists, "Mount point already in use by device with different options")
-				}
-				// T1!=T2, P1==P2 || P1 != P2 - return FailedPrecondition for single node
-				if accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER ||
-					accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY ||
-					accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER {
-					logrus.WithFields(f).Error("Mount point already in use for same device")
-					return status.Error(codes.FailedPrecondition, "Mount point already in use for same device")
-				}
-			}
+		volCap := req.GetVolumeCapability()
+		if volCap == nil {
+			return status.Error(codes.InvalidArgument,
+				"Volume Capability is required")
 		}
-	}
 
-	log.Infof("The mountOptions being used for mount are: %s", mntOptions)
-	if err := gofsutil.Mount(context.Background(), nfsExportURL, target, "nfs", mntOptions...); err != nil {
-		count := 0
-		errmsg := err.Error()
-		// Both substring validation is for NFSv3 and NFSv4 errors resp.
-		for (strings.Contains(strings.ToLower(errmsg), "access denied by server while mounting") || (strings.Contains(strings.ToLower(errmsg), "no such file or directory"))) && count < 5 {
-			time.Sleep(2 * time.Second)
-			log.Infof("Mount re-trial attempt-%d", count)
-			err = gofsutil.Mount(context.Background(), nfsExportURL, target, "nfs", mntOptions...)
-			if err != nil {
-				errmsg = err.Error()
-			} else {
-				break
-			}
-			count++
+		accMode := volCap.GetAccessMode()
+		if accMode == nil {
+			return status.Error(codes.InvalidArgument,
+				"Volume Access Mode is required")
 		}
+		mntVol := volCap.GetMount()
+		if mntVol == nil {
+			return status.Error(codes.InvalidArgument, "Invalid access type")
+		}
+
+		var mntOptions []string
+		mntOptions = mntVol.GetMountFlags()
+		log.Infof("The mountOptions received are: %s", mntOptions)
+
+		target := req.GetTargetPath()
+		if target == "" {
+			return status.Error(codes.InvalidArgument,
+				"Target Path is required")
+		}
+
+		// make sure target is created
+		_, err := mkdir(ctx, target)
 		if err != nil {
-			log.Errorf("%v", err)
-			return err
+			return status.Error(codes.FailedPrecondition, fmt.Sprintf("Could not create '%s': '%s'", target, err.Error()))
 		}
+		roFlag := req.GetReadonly()
+		rwOption := "rw"
+		if roFlag {
+			rwOption = "ro"
+		}
+
+		mntOptions = append(mntOptions, rwOption)
+
+		f := logrus.Fields{
+			"ID":         req.VolumeId,
+			"TargetPath": target,
+			"ExportPath": nfsExportURL,
+			"AccessMode": accMode.GetMode(),
+		}
+		logrus.WithFields(f).Info("Node publish volume params ")
+		mnts, err := getGetMountsFunc()(ctx)
+		if err != nil {
+			return status.Errorf(codes.Internal,
+				"could not reliably determine existing mount status: '%s'",
+				err.Error())
+		}
+
+		if len(mnts) != 0 {
+			for _, m := range mnts {
+				// check for idempotency
+				// same volume
+				if m.Device == nfsExportURL {
+					if m.Path == target {
+						// as per specs, T1=T2, P1=P2 - return OK
+						if contains(m.Opts, rwOption) {
+							logrus.WithFields(f).Debug(
+								"mount already in place with same options")
+							return nil
+						}
+						// T1=T2, P1!=P2 - return AlreadyExists
+						logrus.WithFields(f).Error("Mount point already in use by device with different options")
+						return status.Error(codes.AlreadyExists, "Mount point already in use by device with different options")
+					}
+					// T1!=T2, P1==P2 || P1 != P2 - return FailedPrecondition for single node
+					if accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER ||
+						accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY ||
+						accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER {
+						logrus.WithFields(f).Error("Mount point already in use for same device")
+						return status.Error(codes.FailedPrecondition, "Mount point already in use for same device")
+					}
+				}
+			}
+		}
+
+		log.Infof("The mountOptions being used for mount are: %s", mntOptions)
+		if err := getMountFunc()(context.Background(), nfsExportURL, target, "nfs", mntOptions...); err != nil {
+			count := 0
+			errmsg := err.Error()
+			// Both substring validation is for NFSv3 and NFSv4 errors resp.
+			for (strings.Contains(strings.ToLower(errmsg), "access denied by server while mounting") || (strings.Contains(strings.ToLower(errmsg), "no such file or directory"))) && count < 5 {
+				time.Sleep(2 * time.Second)
+				log.Infof("Mount retry attempt-%d", count)
+				err = getMountFunc()(context.Background(), nfsExportURL, target, "nfs", mntOptions...)
+				if err != nil {
+					errmsg = err.Error()
+				} else {
+					break
+				}
+				count++
+			}
+			if err != nil {
+				log.Errorf("%v", err)
+				return err
+			}
+		}
+		return nil
 	}
-	return nil
-}
+)
 
 // unpublishVolume removes the mount to the target path
 func unpublishVolume(
@@ -175,14 +193,14 @@ func unpublishVolume(
 	if !isMounted {
 		return nil
 	}
-	if err := gofsutil.Unmount(context.Background(), target); err != nil {
+	if err := getUnmountFunc()(context.Background(), target); err != nil {
 		return status.Errorf(codes.Internal,
 			"error unmounting target '%s': '%s'", target, err.Error())
 	}
 	log.Debugf("unmounting '%s' succeeded", target)
 
 	// Remove the target path after unmounting
-	if err := os.RemoveAll(target); err != nil {
+	if err := getOsRemoveAllFunc()(target); err != nil {
 		return status.Errorf(codes.Internal,
 			"error removing target path '%s': '%s'", target, err.Error())
 	}
@@ -230,7 +248,7 @@ func isVolumeMounted(ctx context.Context, filterStr string, target string) (bool
 	// Fetch log handler
 	ctx, log := GetLogger(ctx)
 
-	mnts, err := gofsutil.GetMounts(ctx)
+	mnts, err := getGetMountsFunc()(ctx)
 	if err != nil {
 		return false, status.Errorf(codes.Internal,
 			"could not reliably determine existing mount status: '%s'",
