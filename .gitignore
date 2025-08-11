@@ -21,13 +21,5 @@ semver.mk
 goisilon
 gocsi
 .idea
-<<<<<<< HEAD
-=======
 csm-common.mk
 go-code-tester
->>>>>>> ef9712b (CreateVolume adds the AZNetwork from the storage class to the volume context (#429))
-<<<<<<< HEAD
-=======
-csm-common.mk
-go-code-tester
->>>>>>> ef9712b (CreateVolume adds the AZNetwork from the storage class to the volume context (#429))
