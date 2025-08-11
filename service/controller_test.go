@@ -1525,3 +1525,70 @@ func TestControllerPublishVolume(t *testing.T) {
 		})
 	}
 }
+
+func TestControllerCreateVolume(t *testing.T) {
+	fmt.Println("TestControllerCreateVolume")
+
+	tests := []struct {
+		name    string
+		req     *csi.CreateVolumeRequest
+		wantErr bool
+	}{
+		{
+			name: "fail - remote system doesn't exist",
+			req: &csi.CreateVolumeRequest{
+				Name: "test-volume",
+				Parameters: map[string]string{
+					"AzServiceIP":              "",
+					"AzNetwork":                "10.0.0.0/24",
+					"IsiVolumePathPermissions": "0777",
+					"RootClientEnabled":        "notabool",
+					"isReplicationEnabled":     "true",
+					"UT/isReplicationEnabled":  "true",
+					"UT/volumeGroupPrefix":     "UT",
+					"UT/rpo":                   "Five_Minutes",
+					"UT/remoteSystem":          "remote-system",
+				},
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 1024,
+				},
+			},
+			wantErr: true,
+		},
+	}
+
+	s := &service{
+		k8sclient:             fake.NewSimpleClientset(),
+		defaultIsiClusterName: "system",
+		isiClusters:           &sync.Map{},
+		opts: Opts{
+			CustomTopologyEnabled: true,
+			replicationPrefix:     "UT",
+		},
+	}
+
+	mockClient := &isimocks.Client{}
+	isiConfig := &IsilonClusterConfig{
+		Endpoint:    "http://testendpoint:8080",
+		ClusterName: "system",
+		isiSvc: &isiService{
+			client: &isi.Client{
+				API: mockClient,
+			},
+		},
+	}
+
+	s.isiClusters.Store("system", isiConfig)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			_, err := s.CreateVolume(ctx, tt.req)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("TestControllerCreateVolume() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
