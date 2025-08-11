@@ -10,13 +10,13 @@ require (
 	github.com/akutz/gournal v0.5.0
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/cucumber/godog v0.15.0
-	github.com/dell/csi-metadata-retriever v1.11.1-0.20250728054709-02998bccd1ba
-	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250717054012-23ceaf9c9606
-	github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250717054012-23ceaf9c9606
-	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250717054012-23ceaf9c9606
+	github.com/dell/csi-metadata-retriever v1.11.1-0.20250808070259-5b6b33b97fc8
+	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250804115738-13401bbd0ec4
+	github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250804115738-13401bbd0ec4
+	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250804115738-13401bbd0ec4
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.1
 	github.com/dell/gocsi v1.14.1-0.20250718150756-9e598eb9e012
-	github.com/dell/gofsutil v1.19.1-0.20250715050132-d6bd228cbcb0
+	github.com/dell/gofsutil v1.19.1-0.20250808101846-511ec63df403
 	github.com/dell/goisilon v1.19.1-0.20250708120138-0d938924b4df
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/golang/mock v1.6.0
