@@ -842,7 +842,7 @@ func (svc *isiService) isROVolumeFromSnapshot(exportPath, accessZone string) boo
 			isROVolFromSnapshot = true
 		}
 	} else {
-		if strings.Index(exportPath, "/.snapshot") != -1 {
+		if strings.Contains(exportPath, "/.snapshot") {
 			isROVolFromSnapshot = true
 		}
 	}
