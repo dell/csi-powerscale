@@ -1616,31 +1616,33 @@ func TestGetIpsFromAZNetworkLabel(t *testing.T) {
 		{
 			name:      "successful execution",
 			nodeID:    "nodename=#=#=localhost=#=#=127.0.0.1",
-			azNetwork: "10.0.0.1/24",
+			azNetwork: "192.168.1.0/24",
 			nodeLabels: map[string]string{
-				"csi-isilon.dellemc.com/aznetwork-10.0.0.1_24": "192.168.1.1-192.168.1.2",
+				"csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.1": "true",
+				"csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.2": "true",
 			},
 			expectedIPs: []string{"192.168.1.1", "192.168.1.2"},
 		},
 		{
 			name:        "node ID parsing error",
 			nodeID:      "invalid-node-id",
-			azNetwork:   "10.0.0.1/24",
+			azNetwork:   "192.168.1.0/24",
 			expectedErr: fmt.Errorf("node ID '%s' cannot match the expected '^(.+)=#=#=(.+)=#=#=(.+)$' pattern", "invalid-node-id"),
 		},
 		{
 			name:        "node labels retrieval error",
 			nodeID:      "nodename=#=#=localhost=#=#=127.0.0.1",
-			azNetwork:   "10.0.0.1/24",
+			azNetwork:   "192.168.1.0/24",
 			expectedIPs: []string{},
-			expectedErr: fmt.Errorf("failed to match AZNetwork to get IPs for export %s", "10.0.0.1/24"),
+			expectedErr: fmt.Errorf("failed to match AZNetwork to get IPs for export %s", "192.168.1.0/24"),
 		},
 		{
 			name:      "no matching AZNetwork label",
 			nodeID:    "nodename=#=#=localhost=#=#=127.0.0.1",
 			azNetwork: "10.0.0.1/24",
 			nodeLabels: map[string]string{
-				"csi-isilon.dellemc.com/aznetwork-10.0.0.2_24": "192.168.1.1-192.168.1.2",
+				"csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.1": "true",
+				"csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.2": "true",
 			},
 			expectedIPs: []string{},
 			expectedErr: fmt.Errorf("failed to match AZNetwork to get IPs for export %s", "10.0.0.1/24"),
@@ -1648,10 +1650,10 @@ func TestGetIpsFromAZNetworkLabel(t *testing.T) {
 		{
 			name:        "empty node labels",
 			nodeID:      "nodename=#=#=localhost=#=#=127.0.0.1",
-			azNetwork:   "10.0.0.1/24",
+			azNetwork:   "192.168.1.0/24",
 			nodeLabels:  map[string]string{},
 			expectedIPs: []string{},
-			expectedErr: fmt.Errorf("failed to match AZNetwork to get IPs for export %s", "10.0.0.1/24"),
+			expectedErr: fmt.Errorf("failed to match AZNetwork to get IPs for export %s", "192.168.1.0/24"),
 		},
 		{
 			name:        "error in getIpsFromAZNetworkLabel",
@@ -1723,7 +1725,7 @@ func TestControllerPublishVolume(t *testing.T) {
 				},
 			},
 			nodeLabels: map[string]string{
-				"csi-isilon.dellemc.com/aznetwork-10.0.0.0_24": "10.0.0.1",
+				"csi-isilon.dellemc.com/az-10.0.0.0-24-10.0.0.1": "true",
 			},
 			wantErr: true,
 		},
@@ -1853,7 +1855,7 @@ func TestControllerUnpublishVolume(t *testing.T) {
 				NodeId:   identifiers.DummyHostNodeID,
 			},
 			nodeLabels: map[string]string{
-				"csi-isilon.dellemc.com/aznetwork-10.247.0.0_24": "10.0.0.1",
+				"csi-isilon.dellemc.com/az-10.0.0.0-32-10.0.0.1": "true",
 			},
 			wantErr: true,
 		},
