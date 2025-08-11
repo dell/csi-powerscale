@@ -21,6 +21,7 @@ import (
 	"io/fs"
 	"net"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sync"
 	"testing"
@@ -30,6 +31,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
+
+const testTargetPath = "/tmp/csi-powerscale-test"
+
+func Test_node_readFileFunc(t *testing.T) {
+	tmpfile := filepath.Join(t.TempDir(), "config.yaml")
+	os.WriteFile(tmpfile, []byte("dummy-content"), 0o600)
+	result, err := readFileFunc(tmpfile)
+	assert.NoError(t, err)
+	assert.Equal(t, []byte("dummy-content"), result)
+}
 
 func TestNodeGetVolumeStats(t *testing.T) {
 	// Original function references

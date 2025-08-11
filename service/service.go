@@ -736,9 +736,7 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 
 		// Let Endpoint be generic.
 		// Take out https prefix from it, if present, and let it's consumers to use it the way they want
-		if strings.HasPrefix(config.Endpoint, "https://") {
-			config.Endpoint = strings.TrimPrefix(config.Endpoint, "https://")
-		}
+		config.Endpoint = strings.TrimPrefix(config.Endpoint, "https://")
 
 		if config.EndpointPort == "" {
 			log.Warnf("using default as EndpointPort not provided for cluster %s in secret at index [%d]", config.ClusterName, i)
