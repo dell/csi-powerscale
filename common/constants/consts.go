@@ -80,4 +80,7 @@ const (
 
 	// DefaultAZReconcileInterval default interval to monitor and reconcile network interface labels on nodes
 	DefaultAZReconcileInterval = time.Duration(1 * time.Hour)
+
+	// DefaultCsiVolumePrefix is the default prefix for CSI volumes
+	DefaultCsiVolumePrefix = "csi"
 )

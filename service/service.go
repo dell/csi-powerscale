@@ -1098,7 +1098,7 @@ var (
 )
 
 func (s *service) GetNodeLabelsWithName(nodeName string) (map[string]string, error) {
-	log := logging.GetLogger()
+	log := utils.GetLogger()
 	k8sclientset, err := getKubeClientSet(s.opts.KubeConfigPath)
 	if err != nil {
 		log.Errorf("init client failed: '%s'", err.Error())
@@ -1115,7 +1115,7 @@ func (s *service) GetNodeLabelsWithName(nodeName string) (map[string]string, err
 }
 
 func (s *service) PatchNodeLabels(add map[string]string, remove []string) error {
-	log := logging.GetLogger()
+	log := utils.GetLogger()
 
 	node, err := s.k8sclient.CoreV1().Nodes().Get(context.TODO(), s.nodeID, v1.GetOptions{})
 	if err != nil {
