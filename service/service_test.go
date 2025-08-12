@@ -1148,7 +1148,7 @@ func (m *mockReconciler) ReconcileNodeAzLabels(ctx context.Context) error {
 	return m.reconcileNodeAzLabelsFunc(ctx)
 }
 
-func (m *mockReconciler) setAZReconcileInterval(log *logrus.Logger, v *viper.Viper) {}
+func (m *mockReconciler) setAZReconcileInterval(_ *logrus.Logger, _ *viper.Viper) {}
 
 func TestGetReconcileInterval(t *testing.T) {
 	expectedInterval := 5 * time.Second
@@ -1198,7 +1198,7 @@ func TestService_reconcileNodeAzLabels(t *testing.T) {
 	mock := &mockReconciler{
 		azReconcileInterval:         10 * time.Millisecond,
 		updateAZReconcileIntervalCh: make(chan time.Duration, 1),
-		reconcileNodeAzLabelsFunc: func(ctx context.Context) error {
+		reconcileNodeAzLabelsFunc: func(_ context.Context) error {
 			reconcileCalled++
 			reconcileDone <- struct{}{}
 			return nil
