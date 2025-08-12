@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1193,13 +1194,13 @@ func TestService_reconcileNodeAzLabels(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var reconcileCalled int
+	var reconcileCalled atomic.Int32
 	reconcileDone := make(chan struct{})
 	mock := &mockReconciler{
 		azReconcileInterval:         10 * time.Millisecond,
 		updateAZReconcileIntervalCh: make(chan time.Duration, 1),
 		reconcileNodeAzLabelsFunc: func(_ context.Context) error {
-			reconcileCalled++
+			reconcileCalled.Add(1)
 			reconcileDone <- struct{}{}
 			return nil
 		},
@@ -1223,8 +1224,7 @@ func TestService_reconcileNodeAzLabels(t *testing.T) {
 		t.Fatal("timed out waiting for reconcile after interval update")
 	}
 
-	if reconcileCalled < 2 {
-		t.Errorf("expected at least 2 reconcile calls, got %d", reconcileCalled)
+	if reconcileCalled.Load() < 2 {
+		t.Errorf("expected at least 2 reconcile calls, got %d", reconcileCalled.Load())
 	}
-
 }
