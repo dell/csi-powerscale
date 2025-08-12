@@ -123,9 +123,14 @@ type service struct {
 	defaultIsiClusterName       string
 	azReconcileInterval         time.Duration
 	updateAZReconcileIntervalCh chan time.Duration
+	azReconcile                 azReconcile
 	k8sclient                   kubernetes.Interface
-	reconcileNodeAzLabelsFunc   func(ctx context.Context) error
 }
+type azReconcile interface {
+	reconcileNodeAzLabels(ctx context.Context, s *service) error
+}
+
+type reconciler struct{}
 
 // IsilonClusters To unmarshal secret.yaml file
 type IsilonClusters struct {
@@ -555,7 +560,7 @@ func (s *service) BeforeServe(
 
 	// Watch for changes to access zone network node labels
 	if strings.EqualFold(s.mode, constants.ModeNode) && s.azReconcileInterval > 0 {
-		go s.reconcileNodeAzLabels(ctx)
+		go s.azReconcile.reconcileNodeAzLabels(ctx, s)
 	}
 
 	return s.probeOnStart(ctx)
@@ -622,13 +627,9 @@ func (s *service) getReconcileInterval() time.Duration {
 }
 
 // reconcileNodeAzLabels reconciles the node access zone labels
-func (s *service) reconcileNodeAzLabels(ctx context.Context) error {
+func (r *reconciler) reconcileNodeAzLabels(ctx context.Context, s *service) error {
 	_, log := GetLogger(ctx)
 	s.updateAZReconcileIntervalCh = make(chan time.Duration)
-
-	if s.reconcileNodeAzLabelsFunc == nil {
-		s.reconcileNodeAzLabelsFunc = s.ReconcileNodeAzLabels
-	}
 
 	go func() {
 		ticker := time.NewTicker(s.getReconcileInterval())
@@ -637,7 +638,7 @@ func (s *service) reconcileNodeAzLabels(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				err := s.reconcileNodeAzLabelsFunc(ctx)
+				err := s.ReconcileNodeAzLabels(ctx)
 				if err != nil {
 					log.Errorf("node label reconciliation failed: %v", err)
 				}
