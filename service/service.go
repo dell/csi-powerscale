@@ -904,8 +904,8 @@ func (s *service) setAZReconcileInterval(log *logrus.Logger, v *viper.Viper) {
 		azReconcileIntervalStr = v.GetString(constants.ParamAZReconcileInterval)
 	}
 
-	if strings.TrimSpace(azReconcileIntervalStr) == "" {
-		log.Info("access zone reconcile interval is empty; skipping reconcile feature")
+	if strings.TrimSpace(azReconcileIntervalStr) == "" || azReconcileIntervalStr == "0" {
+		log.Info("disabling access zone reconcile feature")
 		s.azReconcileInterval = 0
 		return
 	}
