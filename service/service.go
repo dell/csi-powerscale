@@ -123,14 +123,24 @@ type service struct {
 	defaultIsiClusterName       string
 	azReconcileInterval         time.Duration
 	updateAZReconcileIntervalCh chan time.Duration
-	azReconcile                 azReconcile
+	reconcile                   azReconcile
 	k8sclient                   kubernetes.Interface
 }
-type azReconcile interface {
-	reconcileNodeAzLabels(ctx context.Context, s *service) error
+
+type azNetworkLabels interface {
+	setAZReconcileInterval(log *logrus.Logger, v *viper.Viper)
+	getReconcileInterval() time.Duration
+	getUpdateIntervalChannel() <-chan time.Duration
+	ReconcileNodeAzLabels(ctx context.Context) error
 }
 
-type reconciler struct{}
+type azReconcile interface {
+	reconcileNodeAzLabels(ctx context.Context) error
+}
+
+type reconciler struct {
+	service azNetworkLabels
+}
 
 // IsilonClusters To unmarshal secret.yaml file
 type IsilonClusters struct {
@@ -560,7 +570,11 @@ func (s *service) BeforeServe(
 
 	// Watch for changes to access zone network node labels
 	if strings.EqualFold(s.mode, constants.ModeNode) && s.azReconcileInterval > 0 {
-		go s.azReconcile.reconcileNodeAzLabels(ctx, s)
+		s.reconcile = &reconciler{
+			service: s,
+		}
+		s.updateAZReconcileIntervalCh = make(chan time.Duration)
+		go s.reconcile.reconcileNodeAzLabels(ctx)
 	}
 
 	return s.probeOnStart(ctx)
@@ -626,25 +640,29 @@ func (s *service) getReconcileInterval() time.Duration {
 	return s.azReconcileInterval
 }
 
+// getUpdateIntervalChannel returns the updated access zone reconcile interval
+func (s *service) getUpdateIntervalChannel() <-chan time.Duration {
+	return s.updateAZReconcileIntervalCh
+}
+
 // reconcileNodeAzLabels reconciles the node access zone labels
-func (r *reconciler) reconcileNodeAzLabels(ctx context.Context, s *service) error {
+func (r *reconciler) reconcileNodeAzLabels(ctx context.Context) error {
 	_, log := GetLogger(ctx)
-	s.updateAZReconcileIntervalCh = make(chan time.Duration)
 
 	go func() {
-		ticker := time.NewTicker(s.getReconcileInterval())
+		ticker := time.NewTicker(r.service.getReconcileInterval())
 		defer ticker.Stop()
 
 		for {
 			select {
 			case <-ticker.C:
-				err := s.ReconcileNodeAzLabels(ctx)
+				err := r.service.ReconcileNodeAzLabels(ctx)
 				if err != nil {
 					log.Errorf("node label reconciliation failed: %v", err)
 				}
-			case newInterval := <-s.updateAZReconcileIntervalCh:
+			case newInterval := <-r.service.getUpdateIntervalChannel():
 				ticker.Stop()
-				ticker = time.NewTicker(s.getReconcileInterval())
+				ticker = time.NewTicker(r.service.getReconcileInterval())
 				log.Infof("access zone reconcile interval changed to %s", newInterval)
 			}
 		}
