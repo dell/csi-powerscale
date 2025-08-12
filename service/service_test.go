@@ -1130,79 +1130,101 @@ func TestSetAZReconcileInterval(t *testing.T) {
 	}
 }
 
+type mockReconciler struct {
+	azReconcileInterval         time.Duration
+	updateAZReconcileIntervalCh chan time.Duration
+	reconcileNodeAzLabelsFunc   func(ctx context.Context) error
+}
+
+func (m *mockReconciler) getReconcileInterval() time.Duration {
+	return m.azReconcileInterval
+}
+
+func (m *mockReconciler) getUpdateIntervalChannel() <-chan time.Duration {
+	return m.updateAZReconcileIntervalCh
+}
+
+func (m *mockReconciler) ReconcileNodeAzLabels(ctx context.Context) error {
+	return m.reconcileNodeAzLabelsFunc(ctx)
+}
+
+func (m *mockReconciler) setAZReconcileInterval(log *logrus.Logger, v *viper.Viper) {}
+
+func TestGetReconcileInterval(t *testing.T) {
+	expectedInterval := 5 * time.Second
+
+	s := &service{
+		azReconcileInterval: expectedInterval,
+	}
+
+	var wg sync.WaitGroup
+	for range 1 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			actual := s.getReconcileInterval()
+			if actual != expectedInterval {
+				t.Errorf("expected %v, got %v", expectedInterval, actual)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func TestGetUpdateIntervalChannel(t *testing.T) {
+	ch := make(chan time.Duration, 1)
+	s := &service{
+		updateAZReconcileIntervalCh: ch,
+	}
+
+	expected := 10 * time.Second
+	ch <- expected
+	select {
+	case actual := <-s.getUpdateIntervalChannel():
+		if actual != expected {
+			t.Errorf("expected %v, got %v", expected, actual)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timed out waiting for value from update interval channel")
+	}
+}
+
 func TestService_reconcileNodeAzLabels(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	nodeName := "test-node"
-	nodeLabels := map[string]string{
-		"csi-isilon.dellemc.com/az-10.0.0.0-24-10.0.0.1": "true",
+	var reconcileCalled int
+	reconcileDone := make(chan struct{})
+	mock := &mockReconciler{
+		azReconcileInterval:         10 * time.Millisecond,
+		updateAZReconcileIntervalCh: make(chan time.Duration, 1),
+		reconcileNodeAzLabelsFunc: func(ctx context.Context) error {
+			reconcileCalled++
+			reconcileDone <- struct{}{}
+			return nil
+		},
+	}
+	r := &reconciler{
+		service: mock,
+	}
+	err := r.reconcileNodeAzLabels(ctx)
+	assert.NoError(t, err)
+
+	select {
+	case <-reconcileDone:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timed out waiting for reconcile to be called")
 	}
 
-	k8sclient := fake.NewSimpleClientset(&v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   nodeName,
-			Labels: nodeLabels,
-		},
-	})
+	mock.updateAZReconcileIntervalCh <- 20 * time.Millisecond
+	select {
+	case <-reconcileDone:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for reconcile after interval update")
+	}
 
-	t.Run("trigger reconciliation of labels", func(t *testing.T) {
-		called := make(chan struct{}, 1)
+	if reconcileCalled < 2 {
+		t.Errorf("expected at least 2 reconcile calls, got %d", reconcileCalled)
+	}
 
-		s := &service{
-			azReconcileInterval:         50 * time.Millisecond,
-			updateAZReconcileIntervalCh: make(chan time.Duration),
-			reconcileNodeAzLabelsFunc: func(ctx context.Context) error {
-				called <- struct{}{}
-				return nil
-			},
-			nodeID:    nodeName,
-			k8sclient: k8sclient,
-		}
-
-		err := s.reconcileNodeAzLabels(ctx)
-		assert.NoError(t, err)
-
-		select {
-		case <-called:
-			// Success
-		case <-time.After(200 * time.Millisecond):
-			t.Fatal("Reconcile function was not called")
-		}
-	})
-
-	t.Run("reconcile interval updated", func(t *testing.T) {
-		callCount := 0
-		called := make(chan struct{}, 2)
-
-		s := &service{
-			azReconcileInterval:         50 * time.Millisecond,
-			updateAZReconcileIntervalCh: make(chan time.Duration),
-			reconcileNodeAzLabelsFunc: func(ctx context.Context) error {
-				callCount++
-				called <- struct{}{}
-				return nil
-			},
-			nodeID:    nodeName,
-			k8sclient: k8sclient,
-		}
-
-		err := s.reconcileNodeAzLabels(ctx)
-		assert.NoError(t, err)
-
-		// Wait for first call
-		<-called
-
-		// Update interval
-		s.updateAZReconcileIntervalCh <- 30 * time.Millisecond
-
-		// Wait for second call
-		select {
-		case <-called:
-			assert.GreaterOrEqual(t, callCount, 2)
-		case <-time.After(200 * time.Millisecond):
-			t.Fatal("Reconcile function was not called after interval update")
-		}
-
-	})
 }

@@ -61,27 +61,21 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// To maintain runid for Non debug mode. Note: CSI will not generate runid if CSI_DEBUG=false
 var (
+	// To maintain runid for Non debug mode. Note: CSI will not generate runid if CSI_DEBUG=false
 	runid            int64
 	isilonConfigFile string
-)
-
-// DriverConfigParamsFile is the name of the input driver config params file
-var (
+	// DriverConfigParamsFile is the name of the input driver config params file
 	DriverConfigParamsFile string
 	updateMutex            sync.Mutex
+	Manifest               = map[string]string{
+		"url":    "http://github.com/dell/csi-isilon",
+		"semver": core.SemVer,
+		"commit": core.CommitSha32,
+		"formed": core.CommitTime.Format(time.RFC1123),
+	}
+	noProbeOnStart bool
 )
-
-// Manifest is the SP's manifest.
-var Manifest = map[string]string{
-	"url":    "http://github.com/dell/csi-isilon",
-	"semver": core.SemVer,
-	"commit": core.CommitSha32,
-	"formed": core.CommitTime.Format(time.RFC1123),
-}
-
-var noProbeOnStart bool
 
 // Service is the CSI service provider.
 type Service interface {
@@ -90,6 +84,17 @@ type Service interface {
 	csi.NodeServer
 	BeforeServe(context.Context, *gocsi.StoragePlugin, net.Listener) error
 	RegisterAdditionalServers(server *grpc.Server)
+}
+
+type azNetworkLabels interface {
+	setAZReconcileInterval(log *logrus.Logger, v *viper.Viper)
+	getReconcileInterval() time.Duration
+	getUpdateIntervalChannel() <-chan time.Duration
+	ReconcileNodeAzLabels(ctx context.Context) error
+}
+
+type azReconcile interface {
+	reconcileNodeAzLabels(ctx context.Context) error
 }
 
 // Opts defines service configuration options.
@@ -125,17 +130,6 @@ type service struct {
 	updateAZReconcileIntervalCh chan time.Duration
 	reconcile                   azReconcile
 	k8sclient                   kubernetes.Interface
-}
-
-type azNetworkLabels interface {
-	setAZReconcileInterval(log *logrus.Logger, v *viper.Viper)
-	getReconcileInterval() time.Duration
-	getUpdateIntervalChannel() <-chan time.Duration
-	ReconcileNodeAzLabels(ctx context.Context) error
-}
-
-type azReconcile interface {
-	reconcileNodeAzLabels(ctx context.Context) error
 }
 
 type reconciler struct {
