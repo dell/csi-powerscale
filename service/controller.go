@@ -326,6 +326,7 @@ func (s *service) CreateVolume(
 
 	// When custom topology is enabled it takes precedence over the current default behavior
 	// Set azServiceIP to updated endpoint when custom topology is enabled
+
 	if s.opts.CustomTopologyEnabled {
 		azServiceIP = isiConfig.Endpoint
 	} else if _, ok := params[AzServiceIPParam]; ok {
@@ -337,6 +338,12 @@ func (s *service) CreateVolume(
 	} else {
 		// use the endpoint if not set in the storage class
 		azServiceIP = isiConfig.Endpoint
+	}
+	fmt.Println("--================------------------------", azServiceIP, isiConfig)
+	if strings.Contains(azServiceIP, "localhost") {
+		fmt.Println("--==============Authorization is enabled==------------------------", azServiceIP, isiConfig)
+		log.Debugf("Authorization is enabled, reading MountEndpoint: '%s'", isiConfig.MountEndpoint)
+		azServiceIP = isiConfig.MountEndpoint
 	}
 
 	if val, ok := params[RootClientEnabledParam]; ok {
@@ -450,8 +457,12 @@ func (s *service) CreateVolume(
 			log.Error("Failed to get Isilon config with error ", err.Error())
 			return nil, status.Errorf(codes.InvalidArgument, "can't find cluster with name %s in driver config", remoteSystemName)
 		}
-		remoteSystemEndpoint := remoteIsiConfig.Endpoint
 
+		remoteSystemEndpoint := remoteIsiConfig.Endpoint
+		if strings.Contains(remoteSystemEndpoint, "localhost") {
+			log.Debugf("Authorization is enabled, reading MountEndpoint: '%s'", remoteIsiConfig.MountEndpoint)
+			remoteSystemEndpoint = remoteIsiConfig.MountEndpoint
+		}
 		namespace := ""
 		if ignoreNS, ok := params[s.WithRP(KeyReplicationIgnoreNamespaces)]; ok && ignoreNS == "false" {
 			pvcNS, ok := params[KeyCSIPVCNamespace]
