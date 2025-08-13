@@ -1341,7 +1341,7 @@ func (s *service) ControllerPublishVolume(
 		}
 
 		if len(newExportIP) > 0 {
-			log.Debugf("AzNetwork label used to pulbish volume at %s", newExportIP)
+			log.Debugf("AzNetwork label used to publish volume at %s", newExportIP)
 			err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, addClientFunc)
 		} else {
 			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
@@ -1349,7 +1349,7 @@ func (s *service) ControllerPublishVolume(
 
 		if err == nil && rootClientEnabled {
 			if len(newExportIP) > 0 {
-				log.Debugf("AzNetwork label used to pulbish volume at %s", newExportIP)
+				log.Debugf("AzNetwork label used to publish volume at %s", newExportIP)
 				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, isiConfig.isiSvc.AddExportClientByIDWithZone)
 			} else {
 				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
@@ -1360,14 +1360,14 @@ func (s *service) ControllerPublishVolume(
 		if rootClientEnabled && isROVolumeFromSnapshot {
 			log.Debugf("ROVolumeFromSnapshot & rootClientEnabled is set to true, add to root clients")
 			if len(newExportIP) > 0 {
-				log.Debugf("AzNetwork label used to pulbish volume at %s", newExportIP)
+				log.Debugf("AzNetwork label used to publish volume at %s", newExportIP)
 				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, isiConfig.isiSvc.AddExportRootClientByIDWithZone)
 			} else {
 				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportRootClientByIDWithZone)
 			}
 		} else {
 			if len(newExportIP) > 0 {
-				log.Debugf("AzNetwork label used to pulbish volume at %s", newExportIP)
+				log.Debugf("AzNetwork label used to publish volume at %s", newExportIP)
 				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, isiConfig.isiSvc.AddExportReadOnlyClientByIDWithZone)
 			} else {
 				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportReadOnlyClientByIDWithZone)
@@ -1393,14 +1393,14 @@ func (s *service) ControllerPublishVolume(
 			}
 		}
 		if len(newExportIP) > 0 {
-			log.Debugf("AzNetwork label used to pulbish volume at %s", newExportIP)
+			log.Debugf("AzNetwork label used to publish volume at %s", newExportIP)
 			err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, addClientFunc)
 		} else {
 			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
 		}
 		if err == nil && rootClientEnabled {
 			if len(newExportIP) > 0 {
-				log.Debugf("AzNetwork label used to pulbish volume at %s", newExportIP)
+				log.Debugf("AzNetwork label used to publish volume at %s", newExportIP)
 				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, isiConfig.isiSvc.AddExportClientByIDWithZone)
 			} else {
 				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
