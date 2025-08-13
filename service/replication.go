@@ -187,6 +187,10 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	if !ok {
 		remoteAzServiceIP = remoteIsiConfig.Endpoint
 	}
+
+	if strings.Contains(remoteAzServiceIP, "localhost") {
+		remoteAzServiceIP = remoteIsiConfig.MountEndpoint
+	}
 	remoteRootClientEnabled, ok := req.Parameters[s.WithRP(KeyReplicationRemoteRootClientEnabled)]
 	if !ok {
 		remoteRootClientEnabled = RootClientEnabledParamDefault
@@ -270,19 +274,32 @@ func (s *service) CreateStorageProtectionGroup(ctx context.Context,
 	isiPath := isilonfs.GetIsiPathFromExportPath(exportPath)
 
 	vgName := isilonfs.GetVolumeNameFromExportPath(isiPath)
+	var ManagementAddress string
+	var RemoteManagementAddress string
 
+	if isiConfig.Endpoint == "localhost" {
+		ManagementAddress = isiConfig.MountEndpoint
+	} else {
+		ManagementAddress = isiConfig.Endpoint
+	}
+
+	if remoteIsiConfig.Endpoint == "localhost" {
+		RemoteManagementAddress = remoteIsiConfig.MountEndpoint
+	} else {
+		RemoteManagementAddress = remoteIsiConfig.Endpoint
+	}
 	localParams := map[string]string{
 		s.opts.replicationContextPrefix + "systemName":              clusterName,
 		s.opts.replicationContextPrefix + "remoteSystemName":        remoteClusterName,
-		s.opts.replicationContextPrefix + "managementAddress":       isiConfig.Endpoint,
-		s.opts.replicationContextPrefix + "remoteManagementAddress": remoteIsiConfig.Endpoint,
+		s.opts.replicationContextPrefix + "managementAddress":       ManagementAddress,
+		s.opts.replicationContextPrefix + "remoteManagementAddress": RemoteManagementAddress,
 		s.opts.replicationContextPrefix + "VolumeGroupName":         vgName,
 	}
 	remoteParams := map[string]string{
 		s.opts.replicationContextPrefix + "systemName":              remoteClusterName,
 		s.opts.replicationContextPrefix + "remoteSystemName":        clusterName,
-		s.opts.replicationContextPrefix + "managementAddress":       remoteIsiConfig.Endpoint,
-		s.opts.replicationContextPrefix + "remoteManagementAddress": isiConfig.Endpoint,
+		s.opts.replicationContextPrefix + "managementAddress":       RemoteManagementAddress,
+		s.opts.replicationContextPrefix + "remoteManagementAddress": ManagementAddress,
 		s.opts.replicationContextPrefix + "VolumeGroupName":         vgName,
 	}
 
@@ -743,10 +760,17 @@ func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteI
 		return status.Errorf(codes.Internal, "reprotect: delete policy on remote site failed %s", err.Error())
 	}
 
+	var remoteManagementAddress string
+	if remoteIsiConfig.Endpoint == "localhost" {
+		remoteManagementAddress = remoteIsiConfig.MountEndpoint
+	} else {
+		remoteManagementAddress = remoteIsiConfig.Endpoint
+	}
+
 	// Create a new local policy based on previous remote policy's parameters
 	log.Info("Creating new local SyncIQ policy")
 	err = localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
-		remotePolicy.TargetPath, remotePolicy.SourcePath, remoteIsiConfig.Endpoint, remoteIsiConfig.ReplicationCertificateID, true)
+		remotePolicy.TargetPath, remotePolicy.SourcePath, remoteManagementAddress, remoteIsiConfig.ReplicationCertificateID, true)
 	if err != nil {
 		return status.Errorf(codes.Internal, "reprotect: create protection policy on the local site failed %s", err.Error())
 	}

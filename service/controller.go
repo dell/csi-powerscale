@@ -326,6 +326,7 @@ func (s *service) CreateVolume(
 
 	// When custom topology is enabled it takes precedence over the current default behavior
 	// Set azServiceIP to updated endpoint when custom topology is enabled
+
 	if s.opts.CustomTopologyEnabled {
 		azServiceIP = isiConfig.Endpoint
 	} else if _, ok := params[AzServiceIPParam]; ok {
@@ -337,6 +338,9 @@ func (s *service) CreateVolume(
 	} else {
 		// use the endpoint if not set in the storage class
 		azServiceIP = isiConfig.Endpoint
+	}
+	if strings.Contains(azServiceIP, "localhost") {
+		azServiceIP = isiConfig.MountEndpoint
 	}
 
 	if val, ok := params[RootClientEnabledParam]; ok {
@@ -450,7 +454,17 @@ func (s *service) CreateVolume(
 			log.Error("Failed to get Isilon config with error ", err.Error())
 			return nil, status.Errorf(codes.InvalidArgument, "can't find cluster with name %s in driver config", remoteSystemName)
 		}
-		remoteSystemEndpoint := remoteIsiConfig.Endpoint
+		log.Info("=====================my CHnages =======================")
+		var remoteSystemEndpoint string
+		log.Infof("Is replication+ Auth Enabled: %s, no auth: %s", remoteIsiConfig.MountEndpoint, remoteIsiConfig.Endpoint)
+		if remoteIsiConfig.Endpoint == "localhost" {
+			log.Info("=================INSIDE IF LOCAL HOST======================:", remoteIsiConfig.MountEndpoint)
+			remoteSystemEndpoint = remoteIsiConfig.MountEndpoint
+		} else {
+			log.Info("=================INSIDE ELSE======================:", remoteIsiConfig.Endpoint)
+			remoteSystemEndpoint = remoteIsiConfig.Endpoint
+		}
+		log.Info("=================Final remoteSystemEndpoint======================:", remoteSystemEndpoint)
 
 		namespace := ""
 		if ignoreNS, ok := params[s.WithRP(KeyReplicationIgnoreNamespaces)]; ok && ignoreNS == "false" {
