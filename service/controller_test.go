@@ -1591,7 +1591,7 @@ func TestControllerPublishVolume(t *testing.T) {
 				}
 			}
 
-			getVolumeWithIsiPathFunc = func(isiConfig *IsilonClusterConfig) func(_ context.Context, _, _, _ string) (isi.Volume, error) {
+			getVolumeWithIsiPathFunc = func(_ *IsilonClusterConfig) func(_ context.Context, _, _, _ string) (isi.Volume, error) {
 				if tt.name == "empty volume name" {
 					return func(_ context.Context, _, _, _ string) (isi.Volume, error) {
 						return tt.volume, errors.New("empty volume name")
