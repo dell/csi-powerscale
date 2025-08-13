@@ -126,7 +126,7 @@ var (
 		return s.GetNodeLabelsWithName
 	}
 
-	getVolumeWithIsiPathFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, volID, volName string) (isi.Volume, error) {
+	getVolumeWithIsiPathFunc = func(isiConfig *IsilonClusterConfig) func(context.Context, string, string, string) (isi.Volume, error) {
 		return isiConfig.isiSvc.GetVolume
 	}
 
