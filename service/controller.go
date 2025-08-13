@@ -1601,7 +1601,7 @@ func (s *service) ControllerUnpublishVolume(
 		ips, err := s.getIpsFromAZNetworkLabel(ctx, req.NodeId, azNetwork)
 		if err != nil {
 			log.Debugf("No matching IP(s) found from AZNetwork label %s", azNetwork)
-			return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
+			return nil, status.Error(codes.FailedPrecondition, utils.GetMessageWithRunID(runID, "error %s", err.Error()))
 		}
 		log.Debugf("Using IPs %s from AZNetwork %s to remove from export", ips, azNetwork)
 
@@ -1612,7 +1612,7 @@ func (s *service) ControllerUnpublishVolume(
 					return nil, delErr
 				}
 			} else {
-				return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error encountered when trying to remove clients %s from export %d with access zone %s on cluster %s, error %s", ips, exportID, accessZone, clusterName, err.Error()))
+				return nil, status.Error(codes.Internal, utils.GetMessageWithRunID(runID, "error encountered when trying to remove clients %s from export %d with access zone %s on cluster %s, error %s", ips, exportID, accessZone, clusterName, err.Error()))
 			}
 		}
 	} else {
@@ -1660,7 +1660,7 @@ func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, nodeID, azNetwor
 	_, log, _ := GetRunIDLog(ctx)
 
 	// Get node labels
-	nodeName, _, _, err := id.ParseNodeID(ctx, nodeID)
+	nodeName, _, _, err := utils.ParseNodeID(ctx, nodeID)
 	if err != nil {
 		log.Error("failed to get Node Name with error", err.Error())
 		return nil, err

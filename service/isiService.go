@@ -644,7 +644,7 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 // access zone, and client IP as arguments.
 func (svc *isiService) AddExportClientByIPWithZone(ctx context.Context, clusterName string, exportID int, accessZone, nodeID string, clientIPs []string, addClientFunc func(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error) error {
 	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := utils.GetRunIDLogger(ctx)
 	var err error
 
 	for _, clientIP := range clientIPs {
@@ -726,7 +726,7 @@ func (svc *isiService) RemoveExportClientByIDWithZone(ctx context.Context, expor
 
 func (svc *isiService) RemoveExportClientByIPsWithZone(ctx context.Context, exportID int, accessZone string, clientIPs []string, ignoreUnresolvableHosts bool) error {
 	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := utils.GetRunIDLogger(ctx)
 
 	if err := svc.client.RemoveExportClientsByIDWithZone(ctx, exportID, accessZone, clientIPs, ignoreUnresolvableHosts); err != nil {
 		if notFoundErr, ok := err.(*api.JSONError); ok {
