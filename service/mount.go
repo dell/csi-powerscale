@@ -54,10 +54,6 @@ var (
 		return gofsutil.Unmount
 	}
 
-	getOsRemoveAllFunc = func() func(name string) error {
-		return os.RemoveAll
-	}
-
 	publishVolumeFunc = func(
 		ctx context.Context,
 		req *csi.NodePublishVolumeRequest,
