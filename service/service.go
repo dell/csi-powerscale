@@ -118,17 +118,17 @@ type Opts struct {
 }
 
 type service struct {
-	opts                  Opts
-	mode                  string
-	nodeID                string
-	nodeIP                string
-	statisticsCounter     int
-	isiClusters           *sync.Map
-	defaultIsiClusterName string
+	opts                        Opts
+	mode                        string
+	nodeID                      string
+	nodeIP                      string
+	statisticsCounter           int
+	isiClusters                 *sync.Map
+	defaultIsiClusterName       string
 	azReconcileInterval         time.Duration
 	updateAZReconcileIntervalCh chan time.Duration
 	reconcile                   azReconcile
-	k8sclient             kubernetes.Interface
+	k8sclient                   kubernetes.Interface
 }
 
 type reconciler struct {

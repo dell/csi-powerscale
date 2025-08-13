@@ -1627,6 +1627,25 @@ func TestControllerUnpublishVolume(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "error encountered when trying to remove clients with azNetwork",
+			req: &csi.ControllerUnpublishVolumeRequest{
+				VolumeId: "azpv=_=_=19=_=_=csi0zone",
+				NodeId:   utils.DummyHostNodeID,
+			},
+			nodeLabels: map[string]string{
+				"csi-isilon.dellemc.com/az-10.0.0.0-24-10.0.0.1": "true",
+			},
+			wantErr: true,
+		},
+		{
+			name: "error encountered when trying to remove clients without azNetwork",
+			req: &csi.ControllerUnpublishVolumeRequest{
+				VolumeId: "systempv=_=_=19=_=_=csi0zone",
+				NodeId:   utils.DummyHostNodeID,
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1660,6 +1679,15 @@ func TestControllerUnpublishVolume(t *testing.T) {
 			if tt.name == "failed to autoProbe" {
 				isiConfig.isiSvc = nil
 				s.opts.AutoProbe = false
+			}
+
+			if tt.name == "error encountered when trying to remove clients with azNetwork" || tt.name == "error encountered when trying to remove clients without azNetwork" {
+				ignore := true
+				isiConfig.IgnoreUnresolvableHosts = &ignore
+
+				// Mock the necessary calls
+				isiConfig.isiSvc.client.API.(*isimocks.Client).ExpectedCalls = nil
+				isiConfig.isiSvc.client.API.(*isimocks.Client).On("Get", anyArgs[0:6]...).Return(fmt.Errorf("failed to get exports")).Once()
 			}
 
 			s.isiClusters.Store("system", isiConfig)
