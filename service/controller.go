@@ -1310,7 +1310,6 @@ func (s *service) ControllerPublishVolume(
 	}
 
 	vcs := []*csi.VolumeCapability{getVolumeCapabilityFromReq(req)}
-	log.Debugf("Volume capabilities: %s", vcs[0].AccessType)
 	if !checkValidAccessTypes(vcs) {
 		return nil, status.Error(codes.InvalidArgument,
 			utils.GetMessageWithRunID(runID, errUnknownAccessType))
