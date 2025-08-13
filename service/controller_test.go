@@ -1454,16 +1454,22 @@ func TestControllerPublishVolume(t *testing.T) {
 	fmt.Println("TestControllerPublishVolume")
 
 	originalGetNodeLabelsWithName := getNodeLabelsWithNameFunc
+	originalGetVolumeWithIsiPathFunc := getVolumeWithIsiPathFunc
+	originalGetVolumeCapabilityFromReq := getVolumeCapabilityFromReq
 
 	after := func() {
 		getNodeLabelsWithNameFunc = originalGetNodeLabelsWithName
+		getVolumeWithIsiPathFunc = originalGetVolumeWithIsiPathFunc
+		getVolumeCapabilityFromReq = originalGetVolumeCapabilityFromReq
 	}
 
 	tests := []struct {
-		name       string
-		req        *csi.ControllerPublishVolumeRequest
-		nodeLabels map[string]string
-		wantErr    bool
+		name             string
+		req              *csi.ControllerPublishVolumeRequest
+		nodeLabels       map[string]string
+		volume           *v1.IsiVolume
+		volumeCapability *csi.VolumeCapability
+		wantErr          bool
 	}{
 		{
 			name: "fail to check volumeContext for AzNetwork and get the corresponding IP from node labels",
@@ -1486,6 +1492,70 @@ func TestControllerPublishVolume(t *testing.T) {
 			},
 			nodeLabels: map[string]string{
 				"csi-isilon.dellemc.com/az-10.0.0.0-24-10.0.0.1": "true",
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty node ID",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "k8s-e89c9d089e=_=_=19=_=_=csi0zone",
+				NodeId:   "",
+				VolumeContext: map[string]string{
+					"AzNetwork": "",
+				},
+			},
+			volume: &v1.IsiVolume{
+				Name: "test-volume",
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty volume name",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "k8s-e89c9d089e=_=_=19=_=_=csi0zone",
+				NodeId:   utils.DummyHostNodeID,
+				VolumeContext: map[string]string{
+					"AzNetwork": "",
+				},
+			},
+			volume: &v1.IsiVolume{
+				Name: "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "nil volume capability",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "k8s-e89c9d089e=_=_=19=_=_=csi0zone",
+				NodeId:   utils.DummyHostNodeID,
+				VolumeContext: map[string]string{
+					"AzNetwork": "",
+				},
+			},
+			volume: &v1.IsiVolume{
+				Name: "test-volume",
+			},
+			volumeCapability: nil,
+			wantErr:          true,
+		},
+		{
+			// VolumeCapability_Mount is expected instead of VolumeCapability_Block
+			name: "invalid volume capability",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "k8s-e89c9d089e=_=_=19=_=_=csi0zone",
+				NodeId:   utils.DummyHostNodeID,
+				VolumeContext: map[string]string{
+					"AzNetwork": "",
+				},
+			},
+			volume: &v1.IsiVolume{
+				Name: "test-volume",
+			},
+			volumeCapability: &csi.VolumeCapability{
+				AccessType: &csi.VolumeCapability_Block{
+					Block: &csi.VolumeCapability_BlockVolume{},
+				},
+				AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER},
 			},
 			wantErr: true,
 		},
@@ -1519,6 +1589,21 @@ func TestControllerPublishVolume(t *testing.T) {
 				return func(string) (map[string]string, error) {
 					return tt.nodeLabels, nil
 				}
+			}
+
+			getVolumeWithIsiPathFunc = func(isiConfig *IsilonClusterConfig) func(_ context.Context, _, _, _ string) (isi.Volume, error) {
+				if tt.name == "empty volume name" {
+					return func(_ context.Context, _, _, _ string) (isi.Volume, error) {
+						return tt.volume, errors.New("empty volume name")
+					}
+				}
+				return func(_ context.Context, _, _, _ string) (isi.Volume, error) {
+					return tt.volume, nil
+				}
+			}
+
+			getVolumeCapabilityFromReq = func(_ *csi.ControllerPublishVolumeRequest) *csi.VolumeCapability {
+				return tt.volumeCapability
 			}
 
 			_, err := s.ControllerPublishVolume(ctx, tt.req)

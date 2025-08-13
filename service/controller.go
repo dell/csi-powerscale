@@ -116,6 +116,7 @@ const (
 // clusterToNodeIDMap is a map[clusterName][]*nodeIDToClientMap
 var clusterToNodeIDMap = new(sync.Map)
 
+// function wrappers for unit testing
 var (
 	getGetExportWithPathAndZoneFunc = func(isiConfig *IsilonClusterConfig) func(context.Context, string, string) (isi.Export, error) {
 		return isiConfig.isiSvc.GetExportWithPathAndZone
@@ -123,6 +124,14 @@ var (
 
 	getNodeLabelsWithNameFunc = func(s *service) func(string) (map[string]string, error) {
 		return s.GetNodeLabelsWithName
+	}
+
+	getVolumeWithIsiPathFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, isiPath, volID, volName string) (isi.Volume, error) {
+		return isiConfig.isiSvc.GetVolume
+	}
+
+	getVolumeCapabilityFromReq = func(req *csi.ControllerPublishVolumeRequest) *csi.VolumeCapability {
+		return req.GetVolumeCapability()
 	}
 )
 
@@ -1268,7 +1277,7 @@ func (s *service) ControllerPublishVolume(
 		}
 	} else {
 		isiPath = utils.GetIsiPathFromExportPath(exportPath)
-		vol, err := isiConfig.isiSvc.GetVolume(ctx, isiPath, "", volName)
+		vol, err := getVolumeWithIsiPathFunc(isiConfig)(ctx, isiPath, "", volName)
 		if err != nil || vol.Name == "" {
 			return nil, status.Error(codes.Internal,
 				utils.GetMessageWithRunID(runID, "failure checking volume status before controller publish: %s",
@@ -1283,7 +1292,7 @@ func (s *service) ControllerPublishVolume(
 			utils.GetMessageWithRunID(runID, "node ID is required"))
 	}
 
-	vc := req.GetVolumeCapability()
+	vc := getVolumeCapabilityFromReq(req)
 	if vc == nil {
 		return nil, status.Error(codes.InvalidArgument,
 			utils.GetMessageWithRunID(runID, "volume capability is required"))
@@ -1300,7 +1309,8 @@ func (s *service) ControllerPublishVolume(
 			utils.GetMessageWithRunID(runID, errUnknownAccessMode))
 	}
 
-	vcs := []*csi.VolumeCapability{req.GetVolumeCapability()}
+	vcs := []*csi.VolumeCapability{getVolumeCapabilityFromReq(req)}
+	log.Debugf("Volume capabilities: %s", vcs[0].AccessType)
 	if !checkValidAccessTypes(vcs) {
 		return nil, status.Error(codes.InvalidArgument,
 			utils.GetMessageWithRunID(runID, errUnknownAccessType))
