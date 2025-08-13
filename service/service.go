@@ -87,7 +87,7 @@ type Service interface {
 }
 
 type azNetworkLabels interface {
-	setAZReconcileInterval(log *logrus.Logger, v *viper.Viper)
+	setAzReconcileInterval(log *logrus.Logger, v *viper.Viper)
 	getReconcileInterval() time.Duration
 	getUpdateIntervalChannel() <-chan time.Duration
 	ReconcileNodeAzLabels(ctx context.Context) error
@@ -888,7 +888,7 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 	log.Infof("log level set to '%s'", logLevel)
 
 	// set access zone network label interval
-	s.setAZReconcileInterval(log, v)
+	s.setAzReconcileInterval(log, v)
 
 	err := s.syncIsilonConfigs(ctx)
 	if err != nil {
@@ -898,7 +898,7 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 	return nil
 }
 
-func (s *service) setAZReconcileInterval(log *logrus.Logger, v *viper.Viper) {
+func (s *service) setAzReconcileInterval(log *logrus.Logger, v *viper.Viper) {
 	var azReconcileIntervalStr string
 	if v.IsSet(constants.ParamAZReconcileInterval) {
 		azReconcileIntervalStr = v.GetString(constants.ParamAZReconcileInterval)

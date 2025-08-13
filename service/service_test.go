@@ -1092,7 +1092,7 @@ func TestPatchNodeLabels(t *testing.T) {
 	}
 }
 
-func TestSetAZReconcileInterval(t *testing.T) {
+func TestSetAzReconcileInterval(t *testing.T) {
 	tests := []struct {
 		name             string
 		intervalStr      string
@@ -1125,7 +1125,7 @@ func TestSetAZReconcileInterval(t *testing.T) {
 
 			log := logrus.New()
 
-			s.setAZReconcileInterval(log, v)
+			s.setAzReconcileInterval(log, v)
 			assert.Equal(t, tt.expectedInterval, s.azReconcileInterval)
 		})
 	}
@@ -1149,7 +1149,7 @@ func (m *mockReconciler) ReconcileNodeAzLabels(ctx context.Context) error {
 	return m.reconcileNodeAzLabelsFunc(ctx)
 }
 
-func (m *mockReconciler) setAZReconcileInterval(_ *logrus.Logger, _ *viper.Viper) {}
+func (m *mockReconciler) setAzReconcileInterval(_ *logrus.Logger, _ *viper.Viper) {}
 
 func TestGetReconcileInterval(t *testing.T) {
 	expectedInterval := 5 * time.Second
