@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1144,7 +1145,7 @@ func TestPatchNodeLabels(t *testing.T) {
 	}
 }
 
-func TestSetAZReconcileInterval(t *testing.T) {
+func TestSetAzReconcileInterval(t *testing.T) {
 	tests := []struct {
 		name             string
 		intervalStr      string
@@ -1177,31 +1178,106 @@ func TestSetAZReconcileInterval(t *testing.T) {
 
 			log := logrus.New()
 
-			s.setAZReconcileInterval(log, v)
+			s.setAzReconcileInterval(log, v)
 			assert.Equal(t, tt.expectedInterval, s.azReconcileInterval)
 		})
 	}
 }
 
-func TestService_reconcileNodeAzLabels(t *testing.T) {
-	nodeName := "test-node"
-	nodeLabels := map[string]string{
-		"csi-isilon.dellemc.com/az-10.0.0.0-24-10.0.0.1": "true",
-	}
+type mockReconciler struct {
+	azReconcileInterval         time.Duration
+	updateAZReconcileIntervalCh chan time.Duration
+	reconcileNodeAzLabelsFunc   func(ctx context.Context) error
+}
 
-	k8sclient := fake.NewSimpleClientset(&v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   nodeName,
-			Labels: nodeLabels,
-		},
-	})
+func (m *mockReconciler) getReconcileInterval() time.Duration {
+	return m.azReconcileInterval
+}
+
+func (m *mockReconciler) getUpdateIntervalChannel() <-chan time.Duration {
+	return m.updateAZReconcileIntervalCh
+}
+
+func (m *mockReconciler) ReconcileNodeAzLabels(ctx context.Context) error {
+	return m.reconcileNodeAzLabelsFunc(ctx)
+}
+
+func (m *mockReconciler) setAzReconcileInterval(_ *logrus.Logger, _ *viper.Viper) {}
+
+func TestGetReconcileInterval(t *testing.T) {
+	expectedInterval := 5 * time.Second
 
 	s := &service{
-		azReconcileInterval: 10 * time.Second,
-		nodeID:              nodeName,
-		k8sclient:           k8sclient,
+		azReconcileInterval: expectedInterval,
 	}
 
-	err := s.reconcileNodeAzLabels(s.azReconcileInterval)
+	var wg sync.WaitGroup
+	for range 1 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			actual := s.getReconcileInterval()
+			if actual != expectedInterval {
+				t.Errorf("expected %v, got %v", expectedInterval, actual)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func TestGetUpdateIntervalChannel(t *testing.T) {
+	ch := make(chan time.Duration, 1)
+	s := &service{
+		updateAZReconcileIntervalCh: ch,
+	}
+
+	expected := 10 * time.Second
+	ch <- expected
+	select {
+	case actual := <-s.getUpdateIntervalChannel():
+		if actual != expected {
+			t.Errorf("expected %v, got %v", expected, actual)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timed out waiting for value from update interval channel")
+	}
+}
+
+func TestService_reconcileNodeAzLabels(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var reconcileCalled atomic.Int32
+	reconcileDone := make(chan struct{})
+	mock := &mockReconciler{
+		azReconcileInterval:         10 * time.Millisecond,
+		updateAZReconcileIntervalCh: make(chan time.Duration, 1),
+		reconcileNodeAzLabelsFunc: func(_ context.Context) error {
+			reconcileCalled.Add(1)
+			reconcileDone <- struct{}{}
+			return nil
+		},
+	}
+	r := &reconciler{
+		service: mock,
+	}
+	err := r.reconcileNodeAzLabels(ctx)
 	assert.NoError(t, err)
+
+	select {
+	case <-reconcileDone:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timed out waiting for reconcile to be called")
+	}
+
+	mock.updateAZReconcileIntervalCh <- 20 * time.Millisecond
+	select {
+	case <-reconcileDone:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for reconcile after interval update")
+	}
+
+	if reconcileCalled.Load() < 2 {
+		t.Errorf("expected at least 2 reconcile calls, got %d", reconcileCalled.Load())
+	}
 }
