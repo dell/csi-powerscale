@@ -61,27 +61,21 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// To maintain runid for Non debug mode. Note: CSI will not generate runid if CSI_DEBUG=false
 var (
+	// To maintain runid for Non debug mode. Note: CSI will not generate runid if CSI_DEBUG=false
 	runid            int64
 	isilonConfigFile string
-)
-
-// DriverConfigParamsFile is the name of the input driver config params file
-var (
+	// DriverConfigParamsFile is the name of the input driver config params file
 	DriverConfigParamsFile string
 	updateMutex            sync.Mutex
+	Manifest               = map[string]string{
+		"url":    "http://github.com/dell/csi-isilon",
+		"semver": core.SemVer,
+		"commit": core.CommitSha32,
+		"formed": core.CommitTime.Format(time.RFC1123),
+	}
+	noProbeOnStart bool
 )
-
-// Manifest is the SP's manifest.
-var Manifest = map[string]string{
-	"url":    "http://github.com/dell/csi-isilon",
-	"semver": core.SemVer,
-	"commit": core.CommitSha32,
-	"formed": core.CommitTime.Format(time.RFC1123),
-}
-
-var noProbeOnStart bool
 
 // Service is the CSI service provider.
 type Service interface {
@@ -90,6 +84,17 @@ type Service interface {
 	csi.NodeServer
 	BeforeServe(context.Context, *gocsi.StoragePlugin, net.Listener) error
 	RegisterAdditionalServers(server *grpc.Server)
+}
+
+type azNetworkLabels interface {
+	setAzReconcileInterval(log *logrus.Logger, v *viper.Viper)
+	getReconcileInterval() time.Duration
+	getUpdateIntervalChannel() <-chan time.Duration
+	ReconcileNodeAzLabels(ctx context.Context) error
+}
+
+type azReconcile interface {
+	reconcileNodeAzLabels(ctx context.Context) error
 }
 
 // Opts defines service configuration options.
@@ -114,15 +119,21 @@ type Opts struct {
 }
 
 type service struct {
-	opts                  Opts
-	mode                  string
-	nodeID                string
-	nodeIP                string
-	statisticsCounter     int
-	isiClusters           *sync.Map
-	defaultIsiClusterName string
-	azReconcileInterval   time.Duration
-	k8sclient             kubernetes.Interface
+	opts                        Opts
+	mode                        string
+	nodeID                      string
+	nodeIP                      string
+	statisticsCounter           int
+	isiClusters                 *sync.Map
+	defaultIsiClusterName       string
+	azReconcileInterval         time.Duration
+	updateAZReconcileIntervalCh chan time.Duration
+	reconcile                   azReconcile
+	k8sclient                   kubernetes.Interface
+}
+
+type reconciler struct {
+	service azNetworkLabels
 }
 
 // IsilonClusters To unmarshal secret.yaml file
@@ -553,7 +564,11 @@ func (s *service) BeforeServe(
 
 	// Watch for changes to access zone network node labels
 	if strings.EqualFold(s.mode, constants.ModeNode) && s.azReconcileInterval > 0 {
-		go s.reconcileNodeAzLabels(s.azReconcileInterval)
+		s.reconcile = &reconciler{
+			service: s,
+		}
+		s.updateAZReconcileIntervalCh = make(chan time.Duration)
+		go s.reconcile.reconcileNodeAzLabels(ctx)
 	}
 
 	return s.probeOnStart(ctx)
@@ -612,15 +627,38 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 	return nil
 }
 
-func (s *service) reconcileNodeAzLabels(interval time.Duration) error {
-	_, log := GetLogger(context.Background())
+// getReconcileInterval returns the access zone reconcile interval
+func (s *service) getReconcileInterval() time.Duration {
+	syncMutex.Lock()
+	defer syncMutex.Unlock()
+	return s.azReconcileInterval
+}
+
+// getUpdateIntervalChannel returns the updated access zone reconcile interval
+func (s *service) getUpdateIntervalChannel() <-chan time.Duration {
+	return s.updateAZReconcileIntervalCh
+}
+
+// reconcileNodeAzLabels reconciles the node access zone labels
+func (r *reconciler) reconcileNodeAzLabels(ctx context.Context) error {
+	_, log := GetLogger(ctx)
+
 	go func() {
+		ticker := time.NewTicker(r.service.getReconcileInterval())
+		defer ticker.Stop()
+
 		for {
-			err := s.ReconcileNodeAzLabels(context.Background())
-			if err != nil {
-				log.Errorf("Node label reconciliation failed: %v", err)
+			select {
+			case <-ticker.C:
+				err := r.service.ReconcileNodeAzLabels(ctx)
+				if err != nil {
+					log.Errorf("node label reconciliation failed: %v", err)
+				}
+			case newInterval := <-r.service.getUpdateIntervalChannel():
+				ticker.Stop()
+				ticker = time.NewTicker(r.service.getReconcileInterval())
+				log.Infof("access zone reconcile interval changed to %s", newInterval)
 			}
-			time.Sleep(interval)
 		}
 	}()
 	return nil
@@ -849,8 +887,8 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 	logging.UpdateLogLevel(logLevel, &updateMutex)
 	log.Infof("log level set to '%s'", logLevel)
 
-	// update network label interval
-	s.setAZReconcileInterval(log, v)
+	// set access zone network label interval
+	s.setAzReconcileInterval(log, v)
 
 	err := s.syncIsilonConfigs(ctx)
 	if err != nil {
@@ -860,14 +898,14 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 	return nil
 }
 
-func (s *service) setAZReconcileInterval(log *logrus.Logger, v *viper.Viper) {
+func (s *service) setAzReconcileInterval(log *logrus.Logger, v *viper.Viper) {
 	var azReconcileIntervalStr string
 	if v.IsSet(constants.ParamAZReconcileInterval) {
 		azReconcileIntervalStr = v.GetString(constants.ParamAZReconcileInterval)
 	}
 
-	if strings.TrimSpace(azReconcileIntervalStr) == "" {
-		log.Info("access zone reconcile interval is empty; skipping reconcile feature")
+	if strings.TrimSpace(azReconcileIntervalStr) == "" || azReconcileIntervalStr == "0" {
+		log.Info("disabling access zone reconcile feature")
 		s.azReconcileInterval = 0
 		return
 	}
@@ -877,8 +915,11 @@ func (s *service) setAZReconcileInterval(log *logrus.Logger, v *viper.Viper) {
 		log.Error(err, fmt.Sprintf("parsing access zone reconcile interval %s", azReconcileIntervalStr))
 		interval = constants.DefaultAZReconcileInterval
 	}
-	log.Info("access zone reconcile interval updated")
+	log.Infof("access zone reconcile interval set to %s", interval)
 	s.azReconcileInterval = interval
+	if s.updateAZReconcileIntervalCh != nil {
+		s.updateAZReconcileIntervalCh <- interval
+	}
 }
 
 // GetCSINodeID gets the id of the CSI node which regards the node name as node id
