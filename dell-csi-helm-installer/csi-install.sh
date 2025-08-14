@@ -13,7 +13,7 @@
 
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-HELM_BRANCH="csi-isilon-2.14.0"
+HELM_BRANCH="csi-isilon-2.14.1"
 DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
 DRIVER="csi-isilon"
 VERIFYSCRIPT="${SCRIPTDIR}/verify.sh"
@@ -21,7 +21,7 @@ PROG="${0}"
 NODE_VERIFY=1
 VERIFY=1
 MODE="install"
-DEFAULT_DRIVER_VERSION="v2.14.0"
+DEFAULT_DRIVER_VERSION="v2.14.1"
 WATCHLIST=""
 
 # export the name of the debug log, so child processes will see it
@@ -384,7 +384,7 @@ if [ ! -d "$DRIVERDIR/helm-charts" ]; then
     git clone --quiet -c advice.detachedHead=false -b $HELM_BRANCH https://github.com/dell/helm-charts
   fi
   mv helm-charts $DRIVERDIR
-else 
+else
   if [  -d "$SCRIPTDIR/helm-charts" ]; then
     rm -rf $SCRIPTDIR/helm-charts
   fi
