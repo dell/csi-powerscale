@@ -20,7 +20,7 @@ help:
 
 # Clean the build
 clean:
-	rm -f core/core_generated.go
+	rm -f core/core_generated.go go-code-tester
 	rm -f semver.mk
 	go clean
 
@@ -55,8 +55,9 @@ dev-build-image-push: dev-build
 	make -f docker.mk docker-build-image-push
 
 # Windows or Linux; requires no hardware
-unit-test:
-	( cd service; go clean -cache; go test -v -coverprofile=c.out ./... )
+unit-test: go-code-tester
+	GITHUB_OUTPUT=/dev/null \
+	./go-code-tester 90 "." "" "true" "" "" "./service/mock|./common/constants|./test/integration|./core|./provider"
 
 coverage:
 	cd service; go tool cover -html=c.out -o coverage.html
@@ -80,6 +81,10 @@ actions: ## Run all GitHub Action checks that run on a pull request creation
 		echo "Running workflow: $${WF}"; \
 		act pull_request --no-cache-server --platform ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest --job "$${WF}"; \
 	done
+
+go-code-tester:
+	curl -o go-code-tester -L https://raw.githubusercontent.com/dell/common-github-actions/main/go-code-tester/entrypoint.sh \
+	&& chmod +x go-code-tester
 
 action-help: ## Echo instructions to run one specific workflow locally
 	@echo "GitHub Workflows can be run locally with the following command:"

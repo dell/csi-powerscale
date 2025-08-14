@@ -118,7 +118,7 @@ func TestMainFunction(t *testing.T) {
 
 			oldDoExec := doExec
 			doExec = func(_ string, _ ...string) ([]byte, error) {
-				return []byte("v2.14.0-77-g38b3a19-dirty"), nil
+				return []byte("v2.14.1-77-g38b3a19-dirty"), nil
 			}
 
 			main()

@@ -25,14 +25,19 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/dell/csi-isilon/v2/common/utils"
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	isi "github.com/dell/goisilon"
 	v1 "github.com/dell/goisilon/api/v1"
 	v2 "github.com/dell/goisilon/api/v2"
+	isimocks "github.com/dell/goisilon/mocks"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestRemoveString(t *testing.T) {
@@ -615,8 +620,8 @@ func TestGetCreateVolumeResponse(t *testing.T) {
 	}()
 
 	// Mock implementation
-	getCSIVolumeFunc = func(_ *service) func(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName string) *csi.Volume {
-		return func(_ context.Context, _ int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName string) *csi.Volume {
+	getCSIVolumeFunc = func(_ *service) func(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork string) *csi.Volume {
+		return func(_ context.Context, _ int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork string) *csi.Volume {
 			return &csi.Volume{
 				VolumeId:      volName,
 				CapacityBytes: sizeInBytes,
@@ -624,6 +629,7 @@ func TestGetCreateVolumeResponse(t *testing.T) {
 					"path":             path,
 					"accessZone":       accessZone,
 					"azServiceIP":      azServiceIP,
+					"azNetwork":        azNetwork,
 					"rootClient":       rootClientEnabled,
 					"sourceSnapshotID": sourceSnapshotID,
 					"sourceVolumeID":   sourceVolumeID,
@@ -644,6 +650,7 @@ func TestGetCreateVolumeResponse(t *testing.T) {
 	accessZone := "accessZone1"
 	sizeInBytes := int64(1024)
 	azServiceIP := "10.0.0.1"
+	azNetwork := "10.0.0.0/24"
 	rootClientEnabled := "true"
 	sourceSnapshotID := "snapshot123"
 	sourceVolumeID := "volume123"
@@ -657,6 +664,7 @@ func TestGetCreateVolumeResponse(t *testing.T) {
 			"path":             path,
 			"accessZone":       accessZone,
 			"azServiceIP":      azServiceIP,
+			"azNetwork":        azNetwork,
 			"rootClient":       rootClientEnabled,
 			"sourceSnapshotID": sourceSnapshotID,
 			"sourceVolumeID":   sourceVolumeID,
@@ -669,7 +677,7 @@ func TestGetCreateVolumeResponse(t *testing.T) {
 	}
 
 	// Call the function under test
-	response := s.getCreateVolumeResponse(ctx, exportID, volName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName)
+	response := s.getCreateVolumeResponse(ctx, exportID, volName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork)
 
 	// Assert the response is as expected
 	assert.Equal(t, expectedResponse, response)
@@ -1348,4 +1356,499 @@ func TestGetCapacity(t *testing.T) {
 	_, err := s.GetCapacity(ctx, req)
 
 	assert.NotEqual(t, nil, err)
+}
+
+func TestGetIpsFromAZNetworkLabel(t *testing.T) {
+	originalGetNodeLabelsWithName := getNodeLabelsWithNameFunc
+
+	after := func() {
+		getNodeLabelsWithNameFunc = originalGetNodeLabelsWithName
+	}
+
+	tests := []struct {
+		name        string
+		nodeID      string
+		azNetwork   string
+		nodeLabels  map[string]string
+		expectedIPs []string
+		expectedErr error
+	}{
+		{
+			name:      "successful execution",
+			nodeID:    "nodename=#=#=localhost=#=#=127.0.0.1",
+			azNetwork: "192.168.1.0/24",
+			nodeLabels: map[string]string{
+				"csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.1": "true",
+				"csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.2": "true",
+			},
+			expectedIPs: []string{"192.168.1.1", "192.168.1.2"},
+		},
+		{
+			name:        "node ID parsing error",
+			nodeID:      "invalid-node-id",
+			azNetwork:   "192.168.1.0/24",
+			expectedErr: fmt.Errorf("node ID '%s' cannot match the expected '^(.+)=#=#=(.+)=#=#=(.+)$' pattern", "invalid-node-id"),
+		},
+		{
+			name:        "node labels retrieval error",
+			nodeID:      "nodename=#=#=localhost=#=#=127.0.0.1",
+			azNetwork:   "192.168.1.0/24",
+			expectedIPs: []string{},
+			expectedErr: fmt.Errorf("failed to match AZNetwork to get IPs for export %s", "192.168.1.0/24"),
+		},
+		{
+			name:      "no matching AZNetwork label",
+			nodeID:    "nodename=#=#=localhost=#=#=127.0.0.1",
+			azNetwork: "10.0.0.1/24",
+			nodeLabels: map[string]string{
+				"csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.1": "true",
+				"csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.2": "true",
+			},
+			expectedIPs: []string{},
+			expectedErr: fmt.Errorf("failed to match AZNetwork to get IPs for export %s", "10.0.0.1/24"),
+		},
+		{
+			name:        "empty node labels",
+			nodeID:      "nodename=#=#=localhost=#=#=127.0.0.1",
+			azNetwork:   "192.168.1.0/24",
+			nodeLabels:  map[string]string{},
+			expectedIPs: []string{},
+			expectedErr: fmt.Errorf("failed to match AZNetwork to get IPs for export %s", "192.168.1.0/24"),
+		},
+		{
+			name:        "error in getIpsFromAZNetworkLabel",
+			nodeID:      "nodename=#=#=localhost=#=#=127.0.0.1",
+			expectedIPs: nil,
+			expectedErr: fmt.Errorf("failed in getIpsFromAZNetworkLabel"),
+		},
+	}
+
+	s := &service{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+
+			getNodeLabelsWithNameFunc = func(_ *service) func(string) (map[string]string, error) {
+				if tt.name == "error in getIpsFromAZNetworkLabel" {
+					return func(string) (map[string]string, error) {
+						return nil, fmt.Errorf("failed in getIpsFromAZNetworkLabel")
+					}
+				}
+				return func(string) (map[string]string, error) {
+					return tt.nodeLabels, nil
+				}
+			}
+
+			ips, err := s.getIpsFromAZNetworkLabel(context.Background(), tt.nodeID, tt.azNetwork)
+			if (err != nil) != (tt.expectedErr != nil) || (err != nil && err.Error() != tt.expectedErr.Error()) {
+				t.Errorf("getIpsFromAZNetworkLabel() error = %v, expectedErr %v", err, tt.expectedErr)
+			}
+			if !reflect.DeepEqual(ips, tt.expectedIPs) {
+				t.Errorf("getIpsFromAZNetworkLabel() IPs = %v, expectedIPs %v", ips, tt.expectedIPs)
+			}
+		})
+	}
+}
+
+func TestControllerPublishVolume(t *testing.T) {
+	fmt.Println("TestControllerPublishVolume")
+
+	originalGetNodeLabelsWithName := getNodeLabelsWithNameFunc
+	originalGetVolumeWithIsiPathFunc := getVolumeWithIsiPathFunc
+	originalGetVolumeCapabilityFromReq := getVolumeCapabilityFromReq
+
+	after := func() {
+		getNodeLabelsWithNameFunc = originalGetNodeLabelsWithName
+		getVolumeWithIsiPathFunc = originalGetVolumeWithIsiPathFunc
+		getVolumeCapabilityFromReq = originalGetVolumeCapabilityFromReq
+	}
+
+	tests := []struct {
+		name             string
+		req              *csi.ControllerPublishVolumeRequest
+		nodeLabels       map[string]string
+		volume           *v1.IsiVolume
+		volumeCapability *csi.VolumeCapability
+		wantErr          bool
+	}{
+		{
+			name: "fail to check volumeContext for AzNetwork and get the corresponding IP from node labels",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "",
+				VolumeContext: map[string]string{
+					"AzNetwork": "10.0.0.0/24",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty volume ID",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "",
+				NodeId:   utils.DummyHostNodeID,
+				VolumeContext: map[string]string{
+					"AzNetwork": "10.0.0.0/24",
+				},
+			},
+			nodeLabels: map[string]string{
+				"csi-isilon.dellemc.com/az-10.0.0.0-24-10.0.0.1": "true",
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty node ID",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "k8s-e89c9d089e=_=_=19=_=_=csi0zone",
+				NodeId:   "",
+				VolumeContext: map[string]string{
+					"AzNetwork": "",
+				},
+			},
+			volume: &v1.IsiVolume{
+				Name: "test-volume",
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty volume name",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "k8s-e89c9d089e=_=_=19=_=_=csi0zone",
+				NodeId:   utils.DummyHostNodeID,
+				VolumeContext: map[string]string{
+					"AzNetwork": "",
+				},
+			},
+			volume: &v1.IsiVolume{
+				Name: "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "nil volume capability",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "k8s-e89c9d089e=_=_=19=_=_=csi0zone",
+				NodeId:   utils.DummyHostNodeID,
+				VolumeContext: map[string]string{
+					"AzNetwork": "",
+				},
+			},
+			volume: &v1.IsiVolume{
+				Name: "test-volume",
+			},
+			volumeCapability: nil,
+			wantErr:          true,
+		},
+		{
+			// VolumeCapability_Mount is expected instead of VolumeCapability_Block
+			name: "invalid volume capability",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "k8s-e89c9d089e=_=_=19=_=_=csi0zone",
+				NodeId:   utils.DummyHostNodeID,
+				VolumeContext: map[string]string{
+					"AzNetwork": "",
+				},
+			},
+			volume: &v1.IsiVolume{
+				Name: "test-volume",
+			},
+			volumeCapability: &csi.VolumeCapability{
+				AccessType: &csi.VolumeCapability_Block{
+					Block: &csi.VolumeCapability_BlockVolume{},
+				},
+				AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER},
+			},
+			wantErr: true,
+		},
+	}
+
+	s := &service{
+		k8sclient:             fake.NewSimpleClientset(),
+		defaultIsiClusterName: "system",
+		isiClusters:           &sync.Map{},
+	}
+
+	mockClient := &isimocks.Client{}
+	isiConfig := &IsilonClusterConfig{
+		ClusterName: "system",
+		isiSvc: &isiService{
+			client: &isi.Client{
+				API: mockClient,
+			},
+		},
+	}
+
+	s.isiClusters.Store("system", isiConfig)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+
+			ctx := context.Background()
+
+			getNodeLabelsWithNameFunc = func(_ *service) func(string) (map[string]string, error) {
+				return func(string) (map[string]string, error) {
+					return tt.nodeLabels, nil
+				}
+			}
+
+			getVolumeWithIsiPathFunc = func(_ *IsilonClusterConfig) func(_ context.Context, _, _, _ string) (isi.Volume, error) {
+				if tt.name == "empty volume name" {
+					return func(_ context.Context, _, _, _ string) (isi.Volume, error) {
+						return tt.volume, errors.New("empty volume name")
+					}
+				}
+				return func(_ context.Context, _, _, _ string) (isi.Volume, error) {
+					return tt.volume, nil
+				}
+			}
+
+			getVolumeCapabilityFromReq = func(_ *csi.ControllerPublishVolumeRequest) *csi.VolumeCapability {
+				return tt.volumeCapability
+			}
+
+			_, err := s.ControllerPublishVolume(ctx, tt.req)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("TestControllerPublishVolume() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestControllerUnpublishVolume(t *testing.T) {
+	fmt.Println("TestControllerUnpublishVolume")
+
+	originalGetNodeLabelsWithName := getNodeLabelsWithNameFunc
+
+	after := func() {
+		getNodeLabelsWithNameFunc = originalGetNodeLabelsWithName
+	}
+
+	azPv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "azpv",
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					VolumeAttributes: map[string]string{
+						"AzNetwork": "10.0.0.0/24",
+					},
+				},
+			},
+		},
+	}
+
+	systemPv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "systempv",
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					VolumeAttributes: map[string]string{},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name       string
+		req        *csi.ControllerUnpublishVolumeRequest
+		nodeLabels map[string]string
+		wantErr    bool
+	}{
+		{
+			name: "empty volume ID",
+			req: &csi.ControllerUnpublishVolumeRequest{
+				VolumeId: "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid volume ID",
+			req: &csi.ControllerUnpublishVolumeRequest{
+				VolumeId: "invalid-volume-id",
+			},
+			wantErr: true,
+		},
+		{
+			name: "failed to get PV",
+			req: &csi.ControllerUnpublishVolumeRequest{
+				VolumeId: "fake-pv=_=_=19=_=_=csi0zone",
+			},
+			wantErr: true,
+		},
+		{
+			name: "failed to get Isilon config",
+			req: &csi.ControllerUnpublishVolumeRequest{
+				VolumeId: "azpv=_=_=19=_=_=csi0zone=_=_=fake-cluster",
+			},
+			wantErr: true,
+		},
+		{
+			name: "failed to autoProbe",
+			req: &csi.ControllerUnpublishVolumeRequest{
+				VolumeId: "azpv=_=_=19=_=_=csi0zone",
+			},
+			wantErr: true,
+		},
+		{
+			name: "fail to match node label IPs with AzNetwork attribute",
+			req: &csi.ControllerUnpublishVolumeRequest{
+				VolumeId: "azpv=_=_=19=_=_=csi0zone",
+				NodeId:   utils.DummyHostNodeID,
+			},
+			nodeLabels: map[string]string{
+				"csi-isilon.dellemc.com/az-10.0.0.0-32-10.0.0.1": "true",
+			},
+			wantErr: true,
+		},
+		{
+			name: "fail to getNodeId when removing export without AZNetwork attribute",
+			req: &csi.ControllerUnpublishVolumeRequest{
+				VolumeId: "systempv=_=_=19=_=_=csi0zone",
+				NodeId:   "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "error encountered when trying to remove clients with azNetwork",
+			req: &csi.ControllerUnpublishVolumeRequest{
+				VolumeId: "azpv=_=_=19=_=_=csi0zone",
+				NodeId:   utils.DummyHostNodeID,
+			},
+			nodeLabels: map[string]string{
+				"csi-isilon.dellemc.com/az-10.0.0.0-24-10.0.0.1": "true",
+			},
+			wantErr: true,
+		},
+		{
+			name: "error encountered when trying to remove clients without azNetwork",
+			req: &csi.ControllerUnpublishVolumeRequest{
+				VolumeId: "systempv=_=_=19=_=_=csi0zone",
+				NodeId:   utils.DummyHostNodeID,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+
+			ctx := context.Background()
+
+			getNodeLabelsWithNameFunc = func(_ *service) func(string) (map[string]string, error) {
+				return func(string) (map[string]string, error) {
+					return tt.nodeLabels, nil
+				}
+			}
+
+			s := &service{
+				k8sclient:             fake.NewSimpleClientset(azPv, systemPv),
+				defaultIsiClusterName: "system",
+				isiClusters:           &sync.Map{},
+			}
+
+			mockClient := &isimocks.Client{}
+			isiConfig := &IsilonClusterConfig{
+				ClusterName: "system",
+				isiSvc: &isiService{
+					client: &isi.Client{
+						API: mockClient,
+					},
+				},
+			}
+
+			if tt.name == "failed to autoProbe" {
+				isiConfig.isiSvc = nil
+				s.opts.AutoProbe = false
+			}
+
+			if tt.name == "error encountered when trying to remove clients with azNetwork" || tt.name == "error encountered when trying to remove clients without azNetwork" {
+				ignore := true
+				isiConfig.IgnoreUnresolvableHosts = &ignore
+
+				// Mock the necessary calls
+				isiConfig.isiSvc.client.API.(*isimocks.Client).ExpectedCalls = nil
+				isiConfig.isiSvc.client.API.(*isimocks.Client).On("Get", anyArgs[0:6]...).Return(fmt.Errorf("failed to get exports")).Once()
+			}
+
+			s.isiClusters.Store("system", isiConfig)
+
+			_, err := s.ControllerUnpublishVolume(ctx, tt.req)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("TestControllerUnpublishVolume() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestControllerCreateVolume(t *testing.T) {
+	fmt.Println("TestControllerCreateVolume")
+
+	tests := []struct {
+		name    string
+		req     *csi.CreateVolumeRequest
+		wantErr bool
+	}{
+		{
+			name: "fail - remote system doesn't exist",
+			req: &csi.CreateVolumeRequest{
+				Name: "test-volume",
+				Parameters: map[string]string{
+					"AzServiceIP":              "",
+					"AzNetwork":                "10.0.0.0/24",
+					"IsiVolumePathPermissions": "0777",
+					"RootClientEnabled":        "notabool",
+					"isReplicationEnabled":     "true",
+					"UT/isReplicationEnabled":  "true",
+					"UT/volumeGroupPrefix":     "UT",
+					"UT/rpo":                   "Five_Minutes",
+					"UT/remoteSystem":          "remote-system",
+				},
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 1024,
+				},
+			},
+			wantErr: true,
+		},
+	}
+
+	s := &service{
+		k8sclient:             fake.NewSimpleClientset(),
+		defaultIsiClusterName: "system",
+		isiClusters:           &sync.Map{},
+		opts: Opts{
+			CustomTopologyEnabled: true,
+			replicationPrefix:     "UT",
+		},
+	}
+
+	mockClient := &isimocks.Client{}
+	isiConfig := &IsilonClusterConfig{
+		Endpoint:    "http://testendpoint:8080",
+		ClusterName: "system",
+		isiSvc: &isiService{
+			client: &isi.Client{
+				API: mockClient,
+			},
+		},
+	}
+
+	s.isiClusters.Store("system", isiConfig)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			_, err := s.CreateVolume(ctx, tt.req)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("TestControllerCreateVolume() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }

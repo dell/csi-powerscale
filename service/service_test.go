@@ -1,20 +1,19 @@
-package service
-
 /*
- Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
+Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-      http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
+package service
 
 import (
 	"context"
@@ -24,7 +23,9 @@ import (
 	_ "net/http/pprof" // #nosec G108
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -46,12 +47,19 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// commenting this out for now, as it is an integration test
-
 func TestMain(m *testing.M) {
+	// Set required environment variables for Kubernetes client
+	os.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
+	os.Setenv("KUBERNETES_SERVICE_PORT", "6443")
+	defer func() {
+		os.Unsetenv("KUBERNETES_SERVICE_HOST")
+		os.Unsetenv("KUBERNETES_SERVICE_PORT")
+	}()
+
 	status := 0
 
 	go http.ListenAndServe("localhost:6060", nil) // #nosec G114
@@ -84,13 +92,13 @@ func TestMain(m *testing.M) {
 }
 
 func TestGetLoggerfunc(t *testing.T) {
-	ctx, _ := GetLogger(nil)
-	assert.Equal(t, nil, ctx)
+	ctx, _ := GetLogger(context.TODO())
+	assert.NotNil(t, ctx)
 }
 
 func TestGetRunIDLogfunc(t *testing.T) {
-	ctx, _, _ := GetRunIDLog(nil)
-	assert.Equal(t, nil, ctx)
+	ctx, _, _ := GetRunIDLog(context.TODO())
+	assert.NotNil(t, ctx)
 }
 
 func TestGetIsiPathForVolumeFromClusterConfig(t *testing.T) {
@@ -185,6 +193,87 @@ func TestGetNodeLabels(t *testing.T) {
 	}
 	_, err := s.GetNodeLabels()
 	assert.NotEqual(t, nil, err)
+}
+
+func TestGetNodeLabelsWithName(t *testing.T) {
+	originalGetKubeClientSet := getKubeClientSet
+	originalGetK8sNodeByName := getK8sNodeByName
+
+	after := func() {
+		getKubeClientSet = originalGetKubeClientSet
+		getK8sNodeByName = originalGetK8sNodeByName
+	}
+	defer after()
+
+	tests := []struct {
+		name                string
+		kubeConfigPath      string
+		nodeName            string
+		expectedLabels      map[string]string
+		expectedErr         bool
+		getKubeClientSetErr error
+		getK8sNodeByNameErr error
+	}{
+		{
+			name:                "Successful retrieval of node labels",
+			kubeConfigPath:      "path/to/kube/config",
+			nodeName:            "node-name",
+			expectedLabels:      map[string]string{"label1": "value1", "label2": "value2"},
+			expectedErr:         false,
+			getKubeClientSetErr: nil,
+			getK8sNodeByNameErr: nil,
+		},
+		{
+			name:                "Error creating Kubernetes client set",
+			kubeConfigPath:      "path/to/kube/config",
+			nodeName:            "node-name",
+			expectedLabels:      nil,
+			expectedErr:         true,
+			getKubeClientSetErr: fmt.Errorf("error creating client set"),
+			getK8sNodeByNameErr: nil,
+		},
+		{
+			name:                "Error getting node by name",
+			kubeConfigPath:      "path/to/kube/config",
+			nodeName:            "node-name",
+			expectedLabels:      nil,
+			expectedErr:         true,
+			getKubeClientSetErr: nil,
+			getK8sNodeByNameErr: fmt.Errorf("error getting node"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			getKubeClientSet = func(_ string) (*kubernetes.Clientset, error) {
+				return &kubernetes.Clientset{}, tt.getKubeClientSetErr
+			}
+
+			getK8sNodeByName = func(_ *kubernetes.Clientset, nodeName string) (*v1.Node, error) {
+				node := &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   nodeName,
+						Labels: tt.expectedLabels,
+					},
+				}
+				return node, tt.getK8sNodeByNameErr
+			}
+
+			s := &service{
+				opts: Opts{KubeConfigPath: tt.kubeConfigPath},
+			}
+
+			labels, err := s.GetNodeLabelsWithName(tt.nodeName)
+			if (err != nil) != tt.expectedErr {
+				t.Errorf("GetNodeLabelsWithName() error = %v, wantErr %v", err, tt.expectedErr)
+				return
+			}
+
+			if !reflect.DeepEqual(labels, tt.expectedLabels) {
+				t.Errorf("GetNodeLabelsWithName() labels = %v, want %v", labels, tt.expectedLabels)
+			}
+		})
+	}
 }
 
 func TestServiceInitializeServiceOpts(t *testing.T) {
@@ -677,16 +766,6 @@ type mockService struct {
 	mock.Mock
 }
 
-func (m *mockService) syncIsilonConfigs(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *mockService) probe(ctx context.Context, isiConfig *IsilonClusterConfig) error {
-	args := m.Called(ctx, isiConfig)
-	return args.Error(0)
-}
-
 func TestUpdateDriverConfigParams(t *testing.T) {
 	// Create a mock service
 	mockSvc := new(mockService)
@@ -1004,4 +1083,201 @@ func TestGetIsiPathByName(t *testing.T) {
 		assert.Error(t, err, "expected an error for no k8s clientset")
 		assert.Empty(t, path, "expected empty path for no k8s clientset")
 	})
+}
+
+func TestPatchNodeLabels(t *testing.T) {
+	type checkFn func(t *testing.T, err error, node *v1.Node)
+	type args struct {
+		add    map[string]string
+		remove []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		node    *v1.Node
+		wantErr bool
+		check   checkFn
+	}{
+		{
+			name: "success",
+			args: args{
+				add:    map[string]string{"label1": "value1"},
+				remove: []string{"label2"},
+			},
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+					Labels: map[string]string{
+						"label2": "value2",
+					},
+				},
+			},
+			wantErr: false,
+			check: func(t *testing.T, err error, node *v1.Node) {
+				assert.NoError(t, err)
+				assert.Contains(t, node.Labels, "label1")
+				assert.Equal(t, "value1", node.Labels["label1"])
+				_, exists := node.Labels["label2"]
+				assert.False(t, exists, "label2 should be removed")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &service{
+				mode:      "test",
+				nodeID:    "test-node",
+				k8sclient: fake.NewSimpleClientset(tt.node),
+			}
+
+			err := s.PatchNodeLabels(tt.args.add, tt.args.remove)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PatchNodeLabels() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			node, err := s.k8sclient.CoreV1().Nodes().Get(context.TODO(), s.nodeID, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			tt.check(t, err, node)
+		})
+	}
+}
+
+func TestSetAzReconcileInterval(t *testing.T) {
+	tests := []struct {
+		name             string
+		intervalStr      string
+		expectedInterval time.Duration
+	}{
+		{
+			name:             "valid interval",
+			intervalStr:      "10s",
+			expectedInterval: 10 * time.Second,
+		},
+		{
+			name:             "invalid interval",
+			intervalStr:      "invalid",
+			expectedInterval: constants.DefaultAZReconcileInterval,
+		},
+		{
+			name:             "empty interval",
+			intervalStr:      "",
+			expectedInterval: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &service{}
+			v := viper.New()
+			if tt.intervalStr != "" {
+				v.Set(constants.ParamAZReconcileInterval, tt.intervalStr)
+			}
+
+			log := logrus.New()
+
+			s.setAzReconcileInterval(log, v)
+			assert.Equal(t, tt.expectedInterval, s.azReconcileInterval)
+		})
+	}
+}
+
+type mockReconciler struct {
+	azReconcileInterval         time.Duration
+	updateAZReconcileIntervalCh chan time.Duration
+	reconcileNodeAzLabelsFunc   func(ctx context.Context) error
+}
+
+func (m *mockReconciler) getReconcileInterval() time.Duration {
+	return m.azReconcileInterval
+}
+
+func (m *mockReconciler) getUpdateIntervalChannel() <-chan time.Duration {
+	return m.updateAZReconcileIntervalCh
+}
+
+func (m *mockReconciler) ReconcileNodeAzLabels(ctx context.Context) error {
+	return m.reconcileNodeAzLabelsFunc(ctx)
+}
+
+func (m *mockReconciler) setAzReconcileInterval(_ *logrus.Logger, _ *viper.Viper) {}
+
+func TestGetReconcileInterval(t *testing.T) {
+	expectedInterval := 5 * time.Second
+
+	s := &service{
+		azReconcileInterval: expectedInterval,
+	}
+
+	var wg sync.WaitGroup
+	for range 1 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			actual := s.getReconcileInterval()
+			if actual != expectedInterval {
+				t.Errorf("expected %v, got %v", expectedInterval, actual)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func TestGetUpdateIntervalChannel(t *testing.T) {
+	ch := make(chan time.Duration, 1)
+	s := &service{
+		updateAZReconcileIntervalCh: ch,
+	}
+
+	expected := 10 * time.Second
+	ch <- expected
+	select {
+	case actual := <-s.getUpdateIntervalChannel():
+		if actual != expected {
+			t.Errorf("expected %v, got %v", expected, actual)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timed out waiting for value from update interval channel")
+	}
+}
+
+func TestService_reconcileNodeAzLabels(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var reconcileCalled atomic.Int32
+	reconcileDone := make(chan struct{})
+	mock := &mockReconciler{
+		azReconcileInterval:         10 * time.Millisecond,
+		updateAZReconcileIntervalCh: make(chan time.Duration, 1),
+		reconcileNodeAzLabelsFunc: func(_ context.Context) error {
+			reconcileCalled.Add(1)
+			reconcileDone <- struct{}{}
+			return nil
+		},
+	}
+	r := &reconciler{
+		service: mock,
+	}
+	err := r.reconcileNodeAzLabels(ctx)
+	assert.NoError(t, err)
+
+	select {
+	case <-reconcileDone:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timed out waiting for reconcile to be called")
+	}
+
+	mock.updateAZReconcileIntervalCh <- 20 * time.Millisecond
+	select {
+	case <-reconcileDone:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for reconcile after interval update")
+	}
+
+	if reconcileCalled.Load() < 2 {
+		t.Errorf("expected at least 2 reconcile calls, got %d", reconcileCalled.Load())
+	}
 }

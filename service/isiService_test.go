@@ -126,13 +126,21 @@ func (m *MockClient) Get(ctx context.Context, path string, id string, params api
 	return r0
 }
 
-func (m *MockClient) Post(
-	_ context.Context,
-	_, _ string,
-	_ api.OrderedValues, _ map[string]string,
-	_, _ interface{},
-) error {
-	return nil
+func (m *MockClient) Post(ctx context.Context, path string, id string, params api.OrderedValues, headers map[string]string, body interface{}, resp interface{}) error {
+	ret := m.Called(ctx, path, id, params, headers, body, resp)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Post")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, api.OrderedValues, map[string]string, interface{}, interface{}) error); ok {
+		r0 = rf(ctx, path, id, params, headers, body, resp)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 func (m *MockClient) Put(ctx context.Context, path string, id string, params api.OrderedValues, headers map[string]string, body interface{}, resp interface{}) error {
@@ -871,6 +879,84 @@ func TestAddExportReadOnlyClientByIDWithZone(t *testing.T) {
 	}
 }
 
+func TestAddExportClientByIPWithZone(t *testing.T) {
+	// Define the test cases
+	testCases := []struct {
+		name          string
+		clusterName   string
+		exportID      int
+		accessZone    string
+		nodeID        string
+		clientIPs     []string
+		addClientFunc func(ctx context.Context, exportID int, accessZone string, clientIP string, ignoreUnresolvableHosts bool) error
+		expectedErr   error
+	}{
+		{
+			name:        "Success",
+			clusterName: "test",
+			exportID:    456,
+			accessZone:  "System",
+			nodeID:      "node1",
+			clientIPs:   []string{"5.6.7.8"},
+			addClientFunc: func(_ context.Context, _ int, _ string, _ string, _ bool) error {
+				return nil
+			},
+			expectedErr: nil,
+		},
+		{
+			name:        "Error adding clients",
+			clusterName: "test",
+			exportID:    456,
+			accessZone:  "System",
+			nodeID:      "node1",
+			clientIPs:   []string{},
+			addClientFunc: func(_ context.Context, _ int, _ string, _ string, _ bool) error {
+				return errors.New("error")
+			},
+			expectedErr: fmt.Errorf("failed to add clients '%v' to export id '%d'", []string{}, 456),
+		},
+		{
+			name:        "Error no client IPs",
+			clusterName: "test",
+			exportID:    456,
+			accessZone:  "System",
+			nodeID:      "node1",
+			clientIPs:   []string{},
+			addClientFunc: func(_ context.Context, _ int, _ string, _ string, _ bool) error {
+				return nil
+			},
+			expectedErr: fmt.Errorf("failed to add clients '%v' to export id '%d'", []string{}, 456),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			svc := &isiService{
+				client: &isi.Client{
+					API: &MockClient{},
+				},
+			}
+
+			err := svc.AddExportClientByIPWithZone(ctx, tc.clusterName, tc.exportID, tc.accessZone, tc.nodeID, tc.clientIPs, tc.addClientFunc)
+
+			if err != nil {
+				if tc.expectedErr == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.expectedErr, err)
+				}
+			} else {
+				if tc.expectedErr != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.expectedErr)
+				}
+			}
+		})
+	}
+}
+
 func TestRemoveExportClientByIDWithZone(t *testing.T) {
 	mockClient := &MockClient{}
 
@@ -924,6 +1010,68 @@ func TestRemoveExportClientByIDWithZone(t *testing.T) {
 			} else {
 				if tc.expectedErr != nil {
 					t.Errorf("Expected error '%v', but got nil", tc.expectedErr)
+				}
+			}
+		})
+	}
+}
+
+func TestCreateSnapshot(t *testing.T) {
+	tests := []struct {
+		name             string
+		path             string
+		snapshotName     string
+		setup            func(svc *isiService)
+		expectedSnapshot isi.Snapshot
+		wantErr          error
+	}{
+		{
+			name:         "success case",
+			path:         "/ifs/data/csi-isilon/volume2",
+			snapshotName: "ut-snapshot",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Post", anyArgs...).Return(nil)
+			},
+		},
+		{
+			name:         "failure case",
+			path:         "/ifs/data/csi-isilon/volume2",
+			snapshotName: "ut-snapshot",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Post", anyArgs...).Return(errors.New("mock error"))
+			},
+			wantErr: errors.New("mock error"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &isiService{
+				endpoint: "http://localhost:8080",
+				client: &isi.Client{
+					API: &MockClient{},
+				},
+			}
+
+			if tc.setup != nil {
+				tc.setup(svc)
+			}
+
+			ctx := context.Background()
+			snapshot, err := svc.CreateSnapshot(ctx, tc.path, tc.snapshotName)
+			if err != nil {
+				if tc.wantErr == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.wantErr.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.wantErr, err)
+				}
+			} else {
+				if tc.wantErr != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.wantErr)
+				} else {
+					if !reflect.DeepEqual(snapshot, tc.expectedSnapshot) {
+						t.Errorf("Expected snapshot '%v', but got '%v'", tc.expectedSnapshot, snapshot)
+					}
 				}
 			}
 		})
@@ -1065,6 +1213,62 @@ func TestIsHostAlreadyAdded(t *testing.T) {
 
 			if result != tc.expectedBool {
 				t.Errorf("Expected '%v', but got '%v'", tc.expectedBool, result)
+			}
+		})
+	}
+}
+
+func TestGetExports(t *testing.T) {
+	type fields struct {
+		endpoint string
+		client   *isi.Client
+	}
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name    string
+		setup   func(svc *isiService)
+		want    isi.ExportList
+		wantErr bool
+	}{
+		{
+			name: "Success case",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "Error case",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error"))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &isiService{
+				endpoint: "http://localhost:8080",
+				client: &isi.Client{
+					API: &MockClient{},
+				},
+			}
+
+			if tc.setup != nil {
+				tc.setup(svc)
+			}
+
+			ctx := context.Background()
+			got, err := svc.GetExports(ctx)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("isiService.GetExports() error = %v, wantErr %v", err, tc.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("isiService.GetExports() = %v, want %v", got, tc.want)
 			}
 		})
 	}

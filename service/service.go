@@ -1,22 +1,23 @@
+/*
+Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package service
 
-/*
- Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
-
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -51,31 +52,28 @@ import (
 	"github.com/spf13/viper"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
 )
 
-// To maintain runid for Non debug mode. Note: CSI will not generate runid if CSI_DEBUG=false
 var (
+	// To maintain runid for Non debug mode. Note: CSI will not generate runid if CSI_DEBUG=false
 	runid            int64
 	isilonConfigFile string
-)
-
-// DriverConfigParamsFile is the name of the input driver config params file
-var (
+	// DriverConfigParamsFile is the name of the input driver config params file
 	DriverConfigParamsFile string
 	updateMutex            sync.Mutex
+	Manifest               = map[string]string{
+		"url":    "http://github.com/dell/csi-isilon",
+		"semver": core.SemVer,
+		"commit": core.CommitSha32,
+		"formed": core.CommitTime.Format(time.RFC1123),
+	}
+	noProbeOnStart bool
 )
-
-// Manifest is the SP's manifest.
-var Manifest = map[string]string{
-	"url":    "http://github.com/dell/csi-isilon",
-	"semver": core.SemVer,
-	"commit": core.CommitSha32,
-	"formed": core.CommitTime.Format(time.RFC1123),
-}
-
-var noProbeOnStart bool
 
 // Service is the CSI service provider.
 type Service interface {
@@ -84,6 +82,17 @@ type Service interface {
 	csi.NodeServer
 	BeforeServe(context.Context, *gocsi.StoragePlugin, net.Listener) error
 	RegisterAdditionalServers(server *grpc.Server)
+}
+
+type azNetworkLabels interface {
+	setAzReconcileInterval(log *logrus.Logger, v *viper.Viper)
+	getReconcileInterval() time.Duration
+	getUpdateIntervalChannel() <-chan time.Duration
+	ReconcileNodeAzLabels(ctx context.Context) error
+}
+
+type azReconcile interface {
+	reconcileNodeAzLabels(ctx context.Context) error
 }
 
 // Opts defines service configuration options.
@@ -109,14 +118,21 @@ type Opts struct {
 }
 
 type service struct {
-	opts                  Opts
-	mode                  string
-	nodeID                string
-	nodeIP                string
-	statisticsCounter     int
-	isiClusters           *sync.Map
-	defaultIsiClusterName string
-	k8sclient             kubernetes.Interface
+	opts                        Opts
+	mode                        string
+	nodeID                      string
+	nodeIP                      string
+	statisticsCounter           int
+	isiClusters                 *sync.Map
+	defaultIsiClusterName       string
+	azReconcileInterval         time.Duration
+	updateAZReconcileIntervalCh chan time.Duration
+	reconcile                   azReconcile
+	k8sclient                   kubernetes.Interface
+}
+
+type reconciler struct {
+	service azNetworkLabels
 }
 
 // IsilonClusters To unmarshal secret.yaml file
@@ -552,6 +568,15 @@ func (s *service) BeforeServe(
 	go s.loadIsilonConfigs(ctx, isilonConfigFile)
 	go s.startAPIService(ctx)
 
+	// Watch for changes to access zone network node labels
+	if strings.EqualFold(s.mode, constants.ModeNode) && s.azReconcileInterval > 0 {
+		s.reconcile = &reconciler{
+			service: s,
+		}
+		s.updateAZReconcileIntervalCh = make(chan time.Duration)
+		go s.reconcile.reconcileNodeAzLabels(ctx)
+	}
+
 	return s.probeOnStart(ctx)
 }
 
@@ -605,6 +630,43 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 		return err
 	}
 	<-done
+	return nil
+}
+
+// getReconcileInterval returns the access zone reconcile interval
+func (s *service) getReconcileInterval() time.Duration {
+	syncMutex.Lock()
+	defer syncMutex.Unlock()
+	return s.azReconcileInterval
+}
+
+// getUpdateIntervalChannel returns the updated access zone reconcile interval
+func (s *service) getUpdateIntervalChannel() <-chan time.Duration {
+	return s.updateAZReconcileIntervalCh
+}
+
+// reconcileNodeAzLabels reconciles the node access zone labels
+func (r *reconciler) reconcileNodeAzLabels(ctx context.Context) error {
+	_, log := GetLogger(ctx)
+
+	go func() {
+		ticker := time.NewTicker(r.service.getReconcileInterval())
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				err := r.service.ReconcileNodeAzLabels(ctx)
+				if err != nil {
+					log.Errorf("node label reconciliation failed: %v", err)
+				}
+			case newInterval := <-r.service.getUpdateIntervalChannel():
+				ticker.Stop()
+				ticker = time.NewTicker(r.service.getReconcileInterval())
+				log.Infof("access zone reconcile interval changed to %s", newInterval)
+			}
+		}
+	}()
 	return nil
 }
 
@@ -712,9 +774,7 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 
 		// Let Endpoint be generic.
 		// Take out https prefix from it, if present, and let it's consumers to use it the way they want
-		if strings.HasPrefix(config.Endpoint, "https://") {
-			config.Endpoint = strings.TrimPrefix(config.Endpoint, "https://")
-		}
+		config.Endpoint = strings.TrimPrefix(config.Endpoint, "https://")
 
 		if config.EndpointPort == "" {
 			log.Warnf("using default as EndpointPort not provided for cluster %s in secret at index [%d]", config.ClusterName, i)
@@ -833,12 +893,39 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 	utils.UpdateLogLevel(logLevel, &updateMutex)
 	log.Infof("log level set to '%s'", logLevel)
 
+	// set access zone network label interval
+	s.setAzReconcileInterval(log, v)
+
 	err := s.syncIsilonConfigs(ctx)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (s *service) setAzReconcileInterval(log *logrus.Logger, v *viper.Viper) {
+	var azReconcileIntervalStr string
+	if v.IsSet(constants.ParamAZReconcileInterval) {
+		azReconcileIntervalStr = v.GetString(constants.ParamAZReconcileInterval)
+	}
+
+	if strings.TrimSpace(azReconcileIntervalStr) == "" || azReconcileIntervalStr == "0" {
+		log.Info("disabling access zone reconcile feature")
+		s.azReconcileInterval = 0
+		return
+	}
+
+	interval, err := time.ParseDuration(azReconcileIntervalStr)
+	if err != nil {
+		log.Error(err, fmt.Sprintf("parsing access zone reconcile interval %s", azReconcileIntervalStr))
+		interval = constants.DefaultAZReconcileInterval
+	}
+	log.Infof("access zone reconcile interval set to %s", interval)
+	s.azReconcileInterval = interval
+	if s.updateAZReconcileIntervalCh != nil {
+		s.updateAZReconcileIntervalCh <- interval
+	}
 }
 
 // GetCSINodeID gets the id of the CSI node which regards the node name as node id
@@ -1037,9 +1124,80 @@ func (s *service) GetNodeLabels() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("Node %s details\n", node)
+	log.Debugf("Node details: %s", node)
 
 	return node.Labels, nil
+}
+
+var (
+	getKubeClientSet = func(kubeConfigPath string) (*kubernetes.Clientset, error) {
+		return k8sutils.CreateKubeClientSet(kubeConfigPath)
+	}
+	getK8sNodeByName = func(k8sclientset *kubernetes.Clientset, nodeName string) (*corev1.Node, error) {
+		return k8sclientset.CoreV1().Nodes().Get(context.TODO(), nodeName, v1.GetOptions{})
+	}
+)
+
+func (s *service) GetNodeLabelsWithName(nodeName string) (map[string]string, error) {
+	log := utils.GetLogger()
+	k8sclientset, err := getKubeClientSet(s.opts.KubeConfigPath)
+	if err != nil {
+		log.Errorf("init client failed: '%s'", err.Error())
+		return nil, err
+	}
+	// access the API to fetch node object
+	node, err := getK8sNodeByName(k8sclientset, nodeName)
+	if err != nil {
+		return nil, err
+	}
+	log.Debugf("Node details: %s", node)
+
+	return node.Labels, nil
+}
+
+func (s *service) PatchNodeLabels(add map[string]string, remove []string) error {
+	log := utils.GetLogger()
+
+	node, err := s.k8sclient.CoreV1().Nodes().Get(context.TODO(), s.nodeID, v1.GetOptions{})
+	if err != nil {
+		log.Errorf("failed to get current node details: '%s'", err.Error())
+		return err
+	}
+
+	currentNode, err := json.Marshal(node)
+	if err != nil {
+		log.Errorf("failed to marshal current node details: '%s'", err.Error())
+		return err
+	}
+
+	for k, v := range add {
+		node.Labels[k] = v
+	}
+
+	for _, k := range remove {
+		delete(node.Labels, k)
+	}
+
+	newNode, err := json.Marshal(node)
+	if err != nil {
+		log.Errorf("failed to marshal new node details: '%s'", err.Error())
+		return err
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(currentNode, newNode, node)
+	if err != nil {
+		log.Errorf("failed to create patch: '%s'", err.Error())
+		return err
+	}
+
+	node, err = s.k8sclient.CoreV1().Nodes().Patch(context.TODO(), s.nodeID, types.StrategicMergePatchType, patchBytes, v1.PatchOptions{})
+	if err != nil {
+		log.Errorf("failed to patch node labels: '%s'", err.Error())
+		return err
+	}
+
+	log.Debugf("Node details after patching labels: %s", node)
+	return err
 }
 
 func (s *service) ProbeController(ctx context.Context,
