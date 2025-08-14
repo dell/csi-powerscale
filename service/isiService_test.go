@@ -26,6 +26,8 @@ import (
 	isi "github.com/dell/goisilon"
 	"github.com/dell/goisilon/api"
 	apiv1 "github.com/dell/goisilon/api/v1"
+	apiv2 "github.com/dell/goisilon/api/v2"
+	apiv5 "github.com/dell/goisilon/api/v5"
 	isimocks "github.com/dell/goisilon/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -84,13 +86,21 @@ func (m *MockClient) Group() string {
 	return ""
 }
 
-func (m *MockClient) Delete(
-	_ context.Context,
-	_, _ string,
-	_ api.OrderedValues, _ map[string]string,
-	_ interface{},
-) error {
-	return nil
+func (m *MockClient) Delete(ctx context.Context, path string, id string, params api.OrderedValues, headers map[string]string, resp interface{}) error {
+	ret := m.Called(ctx, path, id, params, headers, resp)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Delete")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, api.OrderedValues, map[string]string, interface{}) error); ok {
+		r0 = rf(ctx, path, id, params, headers, resp)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 func (m *MockClient) Do(
@@ -185,7 +195,7 @@ func TestCopySnapshot(t *testing.T) {
 		err                         error
 	}{
 		{
-			name:                        "Error case",
+			name:                        "error case",
 			isiPath:                     "/ifs/data",
 			snapshotSourceVolumeIsiPath: "/ifs/data/snapshots",
 			srcSnapshotID:               456,
@@ -243,7 +253,7 @@ func TestCopyVolume(t *testing.T) {
 		err           error
 	}{
 		{
-			name:          "Error case",
+			name:          "error case",
 			isiPath:       "/ifs/data",
 			srcVolumeName: "src_volume",
 			dstVolumeName: "dst_volume",
@@ -299,7 +309,7 @@ func TestCreateVolume(t *testing.T) {
 		err                      error
 	}{
 		{
-			name:                     "Error case",
+			name:                     "error case",
 			isiPath:                  "/ifs/data",
 			volName:                  "test_volume",
 			isiVolumePathPermissions: "755",
@@ -351,7 +361,7 @@ func TestCreateVolumeWithMetaData(t *testing.T) {
 		err                      error
 	}{
 		{
-			name:                     "Error case",
+			name:                     "error case",
 			isiPath:                  "/ifs/data",
 			volName:                  "test_volume",
 			isiVolumePathPermissions: "755",
@@ -385,19 +395,9 @@ func TestCreateVolumeWithMetaData(t *testing.T) {
 }
 
 func TestGetVolumeQuota(t *testing.T) {
-	mockClient := &MockClient{}
-
-	// Create a new instance of the isiService struct
-	svc := &isiService{
-		endpoint: "http://localhost:8080",
-		client: &isi.Client{
-			API: mockClient,
-		},
-	}
-
-	// Define the test cases
 	testCases := []struct {
 		name         string
+		setup        func(svc *isiService)
 		volName      string
 		exportID     int
 		accessZone   string
@@ -405,20 +405,89 @@ func TestGetVolumeQuota(t *testing.T) {
 		expectedErr  error
 	}{
 		{
-			name:         "Error case",
+			name: "failed to get export",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			},
 			volName:      "test_volume",
 			exportID:     456,
 			accessZone:   "System",
 			expectedQuot: nil,
 			expectedErr:  errors.New("failed to get export 'test_volume':'456' with access zone 'System', error: 'mock error'"),
 		},
+		{
+			name: "nil export",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Once()
+			},
+			volName:      "test_volume",
+			exportID:     456,
+			accessZone:   "System",
+			expectedQuot: nil,
+			expectedErr:  errors.New("failed to get quota for volume 'test_volume'"),
+		},
+		{
+			name: "no quota id for export",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(*apiv2.ExportList)
+					*resp = apiv2.ExportList{
+						&apiv2.Export{},
+					}
+				})
+			},
+			volName:      "test_volume",
+			exportID:     456,
+			accessZone:   "System",
+			expectedQuot: nil,
+			expectedErr:  errors.New("failed to get quota: No quota set on the volume 'test_volume'"),
+		},
+		{
+			name: "success case",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(*apiv2.ExportList)
+					*resp = apiv2.ExportList{
+						&apiv2.Export{
+							ID:          456,
+							Description: "CSI_QUOTA_ID:123",
+						},
+					}
+				}).Once().On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(*apiv1.IsiQuotaListResp)
+					*resp = apiv1.IsiQuotaListResp{
+						Quotas: []apiv1.IsiQuota{
+							{
+								ID: "123",
+							},
+						},
+					}
+				})
+			},
+			volName:    "test_volume",
+			exportID:   456,
+			accessZone: "System",
+			expectedQuot: &apiv1.IsiQuota{
+				ID: "123",
+			},
+			expectedErr: nil,
+		},
 	}
 
-	// Run the test cases
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			svc := &isiService{
+				endpoint: "http://localhost:8080",
+				client: &isi.Client{
+					API: &MockClient{},
+				},
+			}
+
+			if tc.setup != nil {
+				tc.setup(svc)
+			}
+
 			quota, err := svc.GetVolumeQuota(ctx, tc.volName, tc.exportID, tc.accessZone)
 			if err != nil {
 				if tc.expectedErr == nil {
@@ -443,6 +512,7 @@ func TestGetVolumeQuota(t *testing.T) {
 func TestCreateQuota(t *testing.T) {
 	testCases := []struct {
 		name            string
+		setup           func(svc *isiService)
 		isiPath         string
 		volName         string
 		softLimit       string
@@ -454,34 +524,147 @@ func TestCreateQuota(t *testing.T) {
 		expectedError   error
 	}{
 		{
-			name:            "Invalid advisory limit",
+			name: "quota not enabled skip creating quotas",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).RunFn = func(args mock.Arguments) {
+					panic("should not be called")
+				}
+			},
+			quotaEnabled: false,
+		},
+		{
+			name: "invalid smart quota value skip create",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(*apiv5.QuotaLicense)
+					*resp = apiv5.QuotaLicense{
+						STATUS: "invalid",
+					}
+				}).Once()
+			},
+			sizeInBytes:  100,
+			quotaEnabled: true,
+		},
+		{
+			name: "failed to create quota",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(*apiv5.QuotaLicense)
+					*resp = apiv5.QuotaLicense{
+						STATUS: "Licensed",
+					}
+				}).Once()
+
+				svc.client.API.(*MockClient).On("Post", anyArgs...).Return(errors.New("mock error"))
+			},
+			sizeInBytes:   100,
+			quotaEnabled:  true,
+			expectedError: errors.New("SmartQuotas is activated, but creating quota failed with error: 'mock error'"),
+		},
+		{
+			name: "invalid soft grace period use default",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(*apiv5.QuotaLicense)
+					*resp = apiv5.QuotaLicense{
+						STATUS: "Licensed",
+					}
+				}).Once()
+
+				svc.client.API.(*MockClient).On("Post", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(6).(*apiv1.IsiQuota)
+					*resp = apiv1.IsiQuota{
+						ID: "mock-id",
+					}
+				}).Once()
+			},
 			isiPath:         "/ifs/data/csi-isilon",
 			volName:         "volume3",
 			softLimit:       "70",
 			advisoryLimit:   "invalid",
-			softGracePrd:    "30",
+			softGracePrd:    "invalid",
 			sizeInBytes:     100,
 			quotaEnabled:    true,
-			expectedQuotaID: "",
-			expectedError:   fmt.Errorf("invalid advisory limit"),
+			expectedQuotaID: "mock-id",
+		},
+		{
+			name: "invalid soft limit use default",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Once()
+			},
+			isiPath:       "/ifs/data/csi-isilon",
+			volName:       "volume3",
+			softLimit:     "invalid",
+			advisoryLimit: "invalid",
+			softGracePrd:  "invalid",
+			sizeInBytes:   100,
+			quotaEnabled:  true,
+		},
+		{
+			name: "invalid advisory limit use default", // TODO need to validate
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Once()
+			},
+			isiPath:       "/ifs/data/csi-isilon",
+			volName:       "volume3",
+			softLimit:     "100",
+			advisoryLimit: "invalid",
+			softGracePrd:  "30",
+			sizeInBytes:   100,
+			quotaEnabled:  true,
+		},
+		{
+			name: "size zero skip creating quotas",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).RunFn = func(args mock.Arguments) {
+					panic("should not be called")
+				}
+			},
+			sizeInBytes:  0,
+			quotaEnabled: true,
+		},
+		{
+			name: "size negative skip creating quotas",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).RunFn = func(args mock.Arguments) {
+					panic("should not be called")
+				}
+			},
+			sizeInBytes:  -1,
+			quotaEnabled: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-
-			mockClient := &MockClient{}
-
 			svc := &isiService{
 				endpoint: "http://localhost:8080",
 				client: &isi.Client{
-					API: mockClient,
+					API: &MockClient{},
 				},
 			}
-			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("invalid advisory limit")).Once()
-			_, err := svc.CreateQuota(ctx, tc.isiPath, tc.volName, tc.softLimit, tc.advisoryLimit, tc.softGracePrd, tc.sizeInBytes, tc.quotaEnabled)
-			assert.NoError(t, err)
+
+			if tc.setup != nil {
+				tc.setup(svc)
+			}
+
+			quotaID, err := svc.CreateQuota(ctx, tc.isiPath, tc.volName, tc.softLimit, tc.advisoryLimit, tc.softGracePrd, tc.sizeInBytes, tc.quotaEnabled)
+			if err != nil {
+				if tc.expectedError == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedError.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.expectedError, err)
+				}
+			} else {
+				if tc.expectedError != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.expectedError)
+				} else {
+					if quotaID != tc.expectedQuotaID {
+						t.Errorf("Expected quota ID '%s', but got '%s'", tc.expectedQuotaID, quotaID)
+					}
+				}
+			}
 		})
 	}
 }
@@ -505,7 +688,7 @@ func TestGetExportsWithParams(t *testing.T) {
 		err      error
 	}{
 		{
-			name: "Error case",
+			name: "error case",
 			params: api.OrderedValues{
 				{[]byte("zone"), []byte("")},
 			},
@@ -560,7 +743,7 @@ func TestGetVolumeSize(t *testing.T) {
 		expectedErr  error
 	}{
 		{
-			name:         "Error case",
+			name:         "error case",
 			isiPath:      "/ifs/data",
 			volName:      "test_volume",
 			expectedSize: 0,
@@ -597,7 +780,7 @@ func TestIsIOInProgress(t *testing.T) {
 		expectedErr     error
 	}{
 		{
-			name:            "Error case",
+			name:            "error case",
 			expectedClients: nil,
 			expectedErr:     errors.New("mock error"),
 		},
@@ -693,7 +876,7 @@ func TestAddExportClientNetworkIdentifierByIDWithZone(t *testing.T) {
 		expectedErr             error
 	}{
 		{
-			name:                    "Error case",
+			name:                    "error case",
 			clusterName:             "cluster2",
 			exportID:                456,
 			accessZone:              "System",
@@ -750,7 +933,7 @@ func TestAddExportClientByIDWithZone(t *testing.T) {
 		expectedErr             error
 	}{
 		{
-			name:                    "Error case",
+			name:                    "error case",
 			exportID:                456,
 			accessZone:              "System",
 			clientIP:                "5.6.7.8",
@@ -800,7 +983,7 @@ func TestAddExportRootClientByIDWithZone(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			name:        "Error case",
+			name:        "error case",
 			exportID:    456,
 			accessZone:  "System",
 			clientIP:    "5.6.7.8",
@@ -850,7 +1033,7 @@ func TestAddExportReadOnlyClientByIDWithZone(t *testing.T) {
 		expectedErr             error
 	}{
 		{
-			name:                    "Error case",
+			name:                    "error case",
 			exportID:                456,
 			accessZone:              "System",
 			clientIP:                "5.6.7.8",
@@ -987,7 +1170,7 @@ func TestRemoveExportClientByIDWithZone(t *testing.T) {
 			expectedErr:             errors.New("node ID '5.6.7.8' cannot match the expected '^(.+)=#=#=(.+)=#=#=(.+)$' pattern"),
 		},
 		{
-			name:                    "Error case",
+			name:                    "error case",
 			exportID:                456,
 			accessZone:              "System",
 			clientIP:                "abc=#=#=def=#=#=xyz",
@@ -1299,13 +1482,6 @@ func TestGetExportsCountAttachedToNode(t *testing.T) {
 }
 
 func TestGetExports(t *testing.T) {
-	type fields struct {
-		endpoint string
-		client   *isi.Client
-	}
-	type args struct {
-		ctx context.Context
-	}
 	tests := []struct {
 		name    string
 		setup   func(svc *isiService)
@@ -1320,7 +1496,7 @@ func TestGetExports(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Error case",
+			name: "error case",
 			setup: func(svc *isiService) {
 				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error"))
 			},
@@ -1349,6 +1525,277 @@ func TestGetExports(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("isiService.GetExports() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestExportVolumeWithZone(t *testing.T) {
+	type args struct {
+		isiPath     string
+		volName     string
+		accessZone  string
+		description string
+	}
+	tests := []struct {
+		name    string
+		setup   func(svc *isiService)
+		args    args
+		want    int
+		wantErr bool
+	}{
+		{
+			name: "Test ExportVolumeWithZone Success",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Post", anyArgs...).Return(nil)
+			},
+			args: args{
+				isiPath:     "/ifs/data",
+				volName:     "test_volume",
+				accessZone:  "System",
+				description: "Test volume",
+			},
+			want:    0,
+			wantErr: false,
+		},
+		{
+			name: "Test ExportVolumeWithZone Failure",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Post", anyArgs...).Return(errors.New("mock error"))
+			},
+			args: args{
+				isiPath:     "/ifs/data",
+				volName:     "test_volume",
+				accessZone:  "System",
+				description: "Test volume",
+			},
+			want:    -1,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &isiService{
+				endpoint: "http://localhost:8080",
+				client: &isi.Client{
+					API: &MockClient{},
+				},
+			}
+
+			if tt.setup != nil {
+				tt.setup(svc)
+			}
+
+			ctx := context.Background()
+			got, err := svc.ExportVolumeWithZone(ctx, tt.args.isiPath, tt.args.volName, tt.args.accessZone, tt.args.description)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("isiService.ExportVolumeWithZone() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("isiService.ExportVolumeWithZone() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDeleteQuotaByExportIDWithZone(t *testing.T) {
+	type args struct {
+		volName    string
+		exportID   int
+		accessZone string
+	}
+	tests := []struct {
+		name    string
+		setup   func(svc *isiService)
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "failure to get export",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error"))
+			},
+			args: args{
+				volName:    "test-volume",
+				exportID:   123,
+				accessZone: "System",
+			},
+			wantErr: true,
+		},
+		{
+			name: "no quota set on the volume, skip deleting quota",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(*apiv2.ExportList)
+					*resp = apiv2.ExportList{
+						&apiv2.Export{
+							ID: 123,
+						},
+					}
+				})
+			},
+			args: args{
+				volName:    "test-volume",
+				exportID:   123,
+				accessZone: "System",
+			},
+			wantErr: false,
+		},
+		{
+			name: "successful quota delete",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(*apiv2.ExportList)
+					*resp = apiv2.ExportList{
+						&apiv2.Export{
+							ID:          123,
+							Description: fmt.Sprintf("CSI_QUOTA_ID:%d", 123),
+						},
+					}
+					svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(nil)
+				})
+			},
+			args: args{
+				volName:    "test-volume",
+				exportID:   123,
+				accessZone: "System",
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &isiService{
+				endpoint: "http://localhost:8080",
+				client: &isi.Client{
+					API: &MockClient{},
+				},
+			}
+
+			if tt.setup != nil {
+				tt.setup(svc)
+			}
+
+			ctx := context.Background()
+			if err := svc.DeleteQuotaByExportIDWithZone(ctx, tt.args.volName, tt.args.exportID, tt.args.accessZone); (err != nil) != tt.wantErr {
+				t.Errorf("isiService.DeleteQuotaByExportIDWithZone() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestUpdateQuotaSize(t *testing.T) {
+	type args struct {
+		ctx                  context.Context
+		quotaID              string
+		updatedSize          int64
+		updatedSoftLimit     int64
+		updatedAdvisoryLimit int64
+		softGrace            int64
+	}
+	tests := []struct {
+		name    string
+		setup   func(svc *isiService)
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "success case",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Put", anyArgs...).Return(nil)
+			},
+			args: args{
+				quotaID:              "test-quota-id",
+				updatedSize:          100,
+				updatedSoftLimit:     50,
+				updatedAdvisoryLimit: 75,
+				softGrace:            10,
+			},
+			wantErr: false,
+		},
+		{
+			name: "failure case",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Put", anyArgs...).Return(errors.New("mock error"))
+			},
+			args: args{
+				quotaID:              "test-quota-id",
+				updatedSize:          100,
+				updatedSoftLimit:     50,
+				updatedAdvisoryLimit: 75,
+				softGrace:            10,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &isiService{
+				endpoint: "http://localhost:8080",
+				client: &isi.Client{
+					API: &MockClient{},
+				},
+			}
+
+			if tt.setup != nil {
+				tt.setup(svc)
+			}
+
+			ctx := context.Background()
+			if err := svc.UpdateQuotaSize(ctx, tt.args.quotaID, tt.args.updatedSize, tt.args.updatedSoftLimit, tt.args.updatedAdvisoryLimit, tt.args.softGrace); (err != nil) != tt.wantErr {
+				t.Errorf("isiService.UpdateQuotaSize() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestUnexportByIDWithZone(t *testing.T) {
+	tests := []struct {
+		name       string
+		setup      func(svc *isiService)
+		exportID   int
+		accessZone string
+		wantErr    bool
+	}{
+		{
+			name: "success case",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(nil)
+			},
+			exportID:   123,
+			accessZone: "System",
+			wantErr:    false,
+		},
+		{
+			name: "failure case",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(errors.New("mock error"))
+			},
+			exportID:   123,
+			accessZone: "System",
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &isiService{
+				endpoint: "http://localhost:8080",
+				client: &isi.Client{
+					API: &MockClient{},
+				},
+			}
+
+			if tt.setup != nil {
+				tt.setup(svc)
+			}
+
+			ctx := context.Background()
+			if err := svc.UnexportByIDWithZone(ctx, tt.exportID, tt.accessZone); (err != nil) != tt.wantErr {
+				t.Errorf("isiService.UnexportByIDWithZone() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
