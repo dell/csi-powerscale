@@ -151,7 +151,6 @@ func TestQueryArrayStatus_Invoke_Panic(t *testing.T) {
 	}
 }
 
-// TODO: This test also seems to be failing.
 func TestQueryArrayStatus_Mock_IoReadAll(t *testing.T) {
 	originalGetIoReadAll := GetIoReadAll
 	originalGetTimeNow := getTimeNow
@@ -246,7 +245,7 @@ func TestQueryArrayStatus_Mock_IoReadAll(t *testing.T) {
 			}
 
 			s := &service{}
-			got, err := s.queryArrayStatus(context.Background(), "http://example.com/api")
+			got, err := s.queryArrayStatus(context.Background(), server.URL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("queryArrayStatus() error = %v, wantErr %v", err, tt.wantErr)
 			}
