@@ -230,11 +230,8 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit
 			log.Warnf("Soft Grace Period must be configured along with Soft threshold, Setting it to default for Volume '%s'", volName)
 			softlimitInt, softGracePrdInt = 0, 0
 		}
-		var isQuotaActivated bool
-		var checkLicErr error
 
-		isQuotaActivated, checkLicErr = svc.client.IsQuotaLicenseActivated(ctx)
-
+		isQuotaActivated, checkLicErr := svc.client.IsQuotaLicenseActivated(ctx)
 		if checkLicErr != nil {
 			log.Errorf("failed to check SmartQuotas license info: '%v'", checkLicErr)
 		}
