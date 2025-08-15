@@ -1093,7 +1093,6 @@ func handleGetReportsByPolicy(w http.ResponseWriter, _ *http.Request) {
 func handleGetExistentSnapshotVolume(_ http.ResponseWriter, _ *http.Request) {
 	// response body is true
 	// w.Write([]byte("true"))
-	return
 }
 
 // handleCreateVolumeFromSnapshot implements PUT /namespace/ifs/data/csi-isilon/childZone/.csi-existent_snapshot_name_4-tracking-dir
