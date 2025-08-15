@@ -18,9 +18,9 @@ package service
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	_ "net/http/pprof" // #nosec G108
 	"testing"
 	"time"
@@ -153,71 +153,102 @@ func TestQueryArrayStatus_Invoke_Panic(t *testing.T) {
 
 // TODO: This test also seems to be failing.
 func TestQueryArrayStatus_Mock_IoReadAll(t *testing.T) {
+	originalGetIoReadAll := GetIoReadAll
+	originalGetTimeNow := getTimeNow
+	originalSetPollingFrequency := getPollingFrequency
+	after := func() {
+		GetIoReadAll = originalGetIoReadAll
+		getTimeNow = originalGetTimeNow
+		getPollingFrequency = originalSetPollingFrequency
+	}
+
 	tests := []struct {
 		name            string
-		ctx             context.Context
-		url             string
+		body            string
+		readErr         error
+		unmarshalErr    bool
 		lastAttempt     int64
-		ReadAllErr      error
+		lastSuccess     int64
+		currentTime     int64
+		tolerance       int64
 		wantArrayStatus bool
 		wantErr         bool
 	}{
 		{
-			name:            "Unmarshal json - connectivity is broken",
-			ctx:             context.Background(),
-			url:             "http://example.com/api",
-			lastAttempt:     1660000000,
-			ReadAllErr:      nil,
+			name: "Connectivity is ok",
+			body: `{
+				"lastSuccess": 1560000000,
+				"lastAttempt": 1560000002
+			}`,
+			readErr:         nil,
+			unmarshalErr:    false,
+			currentTime:     1560000003,
+			tolerance:       10,
+			wantArrayStatus: true,
+			wantErr:         false,
+		},
+		{
+			name: "Connectivity is broken due to stale attempt",
+			body: `{
+				"lastSuccess": 1560000000,
+				"lastAttempt": 1560000002
+			}`,
+			readErr:         nil,
+			unmarshalErr:    false,
+			currentTime:     1560000030,
+			tolerance:       10,
 			wantArrayStatus: false,
 			wantErr:         false,
 		},
 		{
-			name:            "Unmarshal json - failed to read API response",
-			ctx:             context.Background(),
-			url:             "http://example.com/api",
-			lastAttempt:     1660000000,
-			ReadAllErr:      errors.New("failed to read API response"),
+			name:            "Unmarshal error",
+			body:            `invalid-json`,
+			readErr:         nil,
+			unmarshalErr:    true,
+			currentTime:     1560000003,
+			tolerance:       10,
 			wantArrayStatus: false,
 			wantErr:         true,
 		},
 		{
-			name:            "Unmarshal json - connectivity is ok",
-			ctx:             context.Background(),
-			url:             "http://example.com/api",
-			lastAttempt:     time.Now().Unix(),
-			ReadAllErr:      nil,
+			name:            "Read error",
+			body:            ``,
+			readErr:         errors.New("read error"),
+			unmarshalErr:    false,
+			currentTime:     1560000003,
+			tolerance:       10,
 			wantArrayStatus: false,
-			wantErr:         false,
-		},
-		{
-			name:            "Unmarshal json - connectivity is broken",
-			ctx:             context.Background(),
-			url:             "http://example.com/api",
-			lastAttempt:     1560000002,
-			ReadAllErr:      nil,
-			wantArrayStatus: false,
-			wantErr:         false,
+			wantErr:         true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			originalGetIoReadAll := GetIoReadAll
+
+			GetIoReadAll = originalGetIoReadAll
+			getTimeNow = originalGetTimeNow
+			getPollingFrequency = originalSetPollingFrequency
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Write([]byte(tt.body))
+			}))
+			defer server.Close()
+
+			defer after()
 			GetIoReadAll = func(_ io.Reader) ([]byte, error) {
-				return []byte(`{
-					"lastSuccess": 1560000000,
-					"lastAttempt": ` + fmt.Sprint(tt.lastAttempt) + `
-				}`), tt.ReadAllErr
+				return []byte(tt.body), tt.readErr
 			}
-			defer func() {
-				GetIoReadAll = originalGetIoReadAll
-			}()
+			getTimeNow = func() time.Time {
+				return time.Unix(tt.currentTime, 0)
+			}
+			getPollingFrequency = func(_ context.Context) int64 {
+				return tt.tolerance
+			}
 
 			s := &service{}
-			got, err := s.queryArrayStatus(tt.ctx, tt.url)
+			got, err := s.queryArrayStatus(context.Background(), "http://example.com/api")
 			if (err != nil) != tt.wantErr {
 				t.Errorf("queryArrayStatus() error = %v, wantErr %v", err, tt.wantErr)
-				return
 			}
 			if got != tt.wantArrayStatus {
 				t.Errorf("queryArrayStatus() = %v, want %v", got, tt.wantArrayStatus)

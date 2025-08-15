@@ -1666,6 +1666,7 @@ func TestGetIpsFromAZNetworkLabel(t *testing.T) {
 	s := &service{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			getNodeLabelsWithNameFunc = originalGetNodeLabelsWithName
 			defer after()
 
 			getNodeLabelsWithNameFunc = func(_ *service) func(string) (map[string]string, error) {
