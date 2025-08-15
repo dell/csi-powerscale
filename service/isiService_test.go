@@ -1800,3 +1800,231 @@ func TestUnexportByIDWithZone(t *testing.T) {
 		})
 	}
 }
+
+func TestDeleteVolume(t *testing.T) {
+	tests := []struct {
+		name    string
+		setup   func(svc *isiService)
+		isiPath string
+		volName string
+		wantErr bool
+	}{
+		{
+			name: "success case",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(nil)
+			},
+			isiPath: "/ifs/data",
+			volName: "test_volume",
+			wantErr: false,
+		},
+		{
+			name: "failure case",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(errors.New("mock error"))
+			},
+			isiPath: "/ifs/data",
+			volName: "test_volume",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &isiService{
+				endpoint: "http://localhost:8080",
+				client: &isi.Client{
+					API: &MockClient{},
+				},
+			}
+
+			if tt.setup != nil {
+				tt.setup(svc)
+			}
+
+			ctx := context.Background()
+			if err := svc.DeleteVolume(ctx, tt.isiPath, tt.volName); (err != nil) != tt.wantErr {
+				t.Errorf("isiService.DeleteVolume() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestClearQuotaByID(t *testing.T) {
+	tests := []struct {
+		name    string
+		setup   func(svc *isiService)
+		quotaID string
+		wantErr bool
+	}{
+		{
+			name: "success case",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(nil)
+			},
+			quotaID: "123",
+			wantErr: false,
+		},
+		{
+			name: "failure case",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(errors.New("mock error"))
+			},
+			quotaID: "123",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &isiService{
+				endpoint: "http://localhost:8080",
+				client: &isi.Client{
+					API: &MockClient{},
+				},
+			}
+
+			if tt.setup != nil {
+				tt.setup(svc)
+			}
+
+			ctx := context.Background()
+			if err := svc.ClearQuotaByID(ctx, tt.quotaID); (err != nil) != tt.wantErr {
+				t.Errorf("isiService.ClearQuotaByID() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestTestConnection(t *testing.T) {
+	tests := []struct {
+		name    string
+		setup   func(svc *isiService)
+		wantErr bool
+	}{
+		{
+			name: "success case",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "failure case",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error"))
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &isiService{
+				endpoint: "http://localhost:8080",
+				client: &isi.Client{
+					API: &MockClient{},
+				},
+			}
+
+			if tt.setup != nil {
+				tt.setup(svc)
+			}
+
+			ctx := context.Background()
+			if err := svc.TestConnection(ctx); (err != nil) != tt.wantErr {
+				t.Errorf("isiService.TestConnection() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestGetVolumeWithIsiPath(t *testing.T) {
+	tests := []struct {
+		name    string
+		setup   func(svc *isiService)
+		isiPath string
+		volID   string
+		volName string
+		want    *apiv1.IsiVolume
+		wantErr bool
+	}{
+		{
+			name: "success case",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(**apiv1.GetIsiVolumeAttributesResp)
+					*resp = &apiv1.GetIsiVolumeAttributesResp{
+						AttributeMap: []struct {
+							Name  string      `json:"name"`
+							Value interface{} `json:"value"`
+						}{
+							{
+								Name:  "test1Name",
+								Value: "test1Value",
+							},
+							{
+								Name:  "test2Name",
+								Value: "test2Value",
+							},
+						},
+					}
+				})
+			},
+			isiPath: "/ifs/data",
+			volID:   "123",
+			volName: "test_volume",
+			want: &apiv1.IsiVolume{
+				Name: "123",
+				AttributeMap: []struct {
+					Name  string      `json:"name"`
+					Value interface{} `json:"value"`
+				}{
+					{
+						Name:  "test1Name",
+						Value: "test1Value",
+					},
+					{
+						Name:  "test2Name",
+						Value: "test2Value",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "failure case",
+			setup: func(svc *isiService) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error"))
+			},
+			isiPath: "/ifs/data",
+			volID:   "123",
+			volName: "test_volume",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &isiService{
+				endpoint: "http://localhost:8080",
+				client: &isi.Client{
+					API: &MockClient{},
+				},
+			}
+
+			if tt.setup != nil {
+				tt.setup(svc)
+			}
+
+			ctx := context.Background()
+			got, err := svc.GetVolumeWithIsiPath(ctx, tt.isiPath, tt.volID, tt.volName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("isiService.GetVolumeWithIsiPath() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if (err == nil) && !reflect.DeepEqual(got.Name, tt.want.Name) {
+				t.Errorf("isiService.GetVolumeWithIsiPath() = '%v', want '%v'", got, tt.want)
+			}
+		})
+	}
+}
