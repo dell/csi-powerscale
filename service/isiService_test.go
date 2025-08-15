@@ -526,7 +526,7 @@ func TestCreateQuota(t *testing.T) {
 		{
 			name: "quota not enabled skip creating quotas",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).RunFn = func(args mock.Arguments) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).RunFn = func(_ mock.Arguments) {
 					panic("should not be called")
 				}
 			},
@@ -616,7 +616,7 @@ func TestCreateQuota(t *testing.T) {
 		{
 			name: "size zero skip creating quotas",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).RunFn = func(args mock.Arguments) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).RunFn = func(_ mock.Arguments) {
 					panic("should not be called")
 				}
 			},
@@ -626,7 +626,7 @@ func TestCreateQuota(t *testing.T) {
 		{
 			name: "size negative skip creating quotas",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).RunFn = func(args mock.Arguments) {
+				svc.client.API.(*MockClient).On("Get", anyArgs...).RunFn = func(_ mock.Arguments) {
 					panic("should not be called")
 				}
 			},
