@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -1666,7 +1667,6 @@ func TestGetIpsFromAZNetworkLabel(t *testing.T) {
 	s := &service{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			getNodeLabelsWithNameFunc = originalGetNodeLabelsWithName
 			defer after()
 
 			getNodeLabelsWithNameFunc = func(_ *service) func(string) (map[string]string, error) {
@@ -1684,6 +1684,9 @@ func TestGetIpsFromAZNetworkLabel(t *testing.T) {
 			if (err != nil) != (tt.expectedErr != nil) || (err != nil && err.Error() != tt.expectedErr.Error()) {
 				t.Errorf("getIpsFromAZNetworkLabel() error = %v, expectedErr %v", err, tt.expectedErr)
 			}
+
+			sort.Strings(ips)
+			sort.Strings(tt.expectedIPs)
 			if !reflect.DeepEqual(ips, tt.expectedIPs) {
 				t.Errorf("getIpsFromAZNetworkLabel() IPs = %v, expectedIPs %v", ips, tt.expectedIPs)
 			}
