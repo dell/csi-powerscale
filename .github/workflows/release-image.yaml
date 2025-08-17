@@ -52,7 +52,7 @@ jobs:
   csm-release:
     needs: [process-inputs]
     uses: dell/common-github-actions/.github/workflows/release-image.yaml@main
-    name: Release CSI-Powerscale Image
+    name: Release Image
     with:
       version: ${{ needs.process-inputs.outputs.processedVersion }}
       images: 'csi-isilon'
