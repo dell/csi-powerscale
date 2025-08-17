@@ -1,4 +1,4 @@
-name: Release CSI-Powerscale
+name: Create Tag and Release
 # Invocable as a reusable workflow
 # Can be manually triggered
 on:  # yamllint disable-line rule:truthy
@@ -21,6 +21,7 @@ on:  # yamllint disable-line rule:truthy
         type: string
   repository_dispatch:
     types: [auto-release-workflow]
+
 jobs:
   process-inputs:
     name: Process Inputs
@@ -38,22 +39,31 @@ jobs:
             exit 0
           fi
           if [[ "${{ github.event.inputs.version }}" != "" && "${{ github.event.inputs.option }}" == "n-1/n-2 patch (Provide input in the below box)" ]]; then
-            # if both version and option are provided, then version takes precedence i.e. patch release for n-1/n-2
             echo "versionEnv=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
             exit 0
           fi
           if [[ "${{ github.event.inputs.option }}" != "n-1/n-2 patch (Provide input in the below box)" ]]; then
-            # if only option is provided, then option takes precedence i.e. minor, major or patch release
             echo "versionEnv=${{ github.event.inputs.option }}" >> $GITHUB_OUTPUT
             exit 0
           fi
-          # if neither option nor version is provided, then minor release is taken by default (Auto-release)
           echo "versionEnv=minor" >> $GITHUB_OUTPUT
+
   csm-release:
-    needs: [process-inputs]
-    uses: dell/common-github-actions/.github/workflows/csm-release-driver-module.yaml@main
-    name: Release CSM Drivers and Modules
+    needs: process-inputs
+    uses: dell/common-github-actions/.github/workflows/create-tag-release.yaml@main
+    name: Create Tag and Release
     with:
       version: ${{ needs.process-inputs.outputs.processedVersion }}
       images: 'csi-isilon'
     secrets: inherit
+
+  next-steps:
+    name: 📌 Next Steps for Release Process
+    runs-on: ubuntu-latest
+    needs: csm-release
+    steps:
+      - name: Share next steps with user
+        run: |
+          echo "✅ Tag and release completed."
+          echo "➡️ Please manually trigger the Jenkins image build job: CSM-Images-Build-Nightly."
+          echo "🚀 Once the Jenkins image build job is successful, trigger the Release Image workflow from GitHub Actions."
