@@ -66,5 +66,5 @@ jobs:
         run: |
           echo "✅ Tag and release completed."
           echo "➡️ Please manually trigger the Jenkins image build job: CSM-Images-Build-Nightly."
-          echo "🚀 Once the Jenkins image build job is successful, trigger the Release Image workflow from GitHub Actions."
-          
+          echo "🚀 Once the Jenkins image build job is successful, trigger the Release Image workflow from GitHub Actions.
+       
