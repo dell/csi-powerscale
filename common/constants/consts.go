@@ -1,6 +1,10 @@
 package constants
 
-import "github.com/sirupsen/logrus"
+import (
+	"time"
+
+	"github.com/sirupsen/logrus"
+)
 
 /*
  Copyright (c) 2019-2022 Dell Inc, or its subsidiaries.
@@ -70,4 +74,10 @@ const (
 
 	// DefaultPodmonPollRate is the default polling frequency to check for array connectivity
 	DefaultPodmonPollRate = 60
+
+	// ParamAZReconcileInterval interval to monitor and reconcile network interface labels on nodes
+	ParamAZReconcileInterval = "AZ_RECONCILE_INTERVAL"
+
+	// DefaultAZReconcileInterval default interval to monitor and reconcile network interface labels on nodes
+	DefaultAZReconcileInterval = time.Duration(1 * time.Hour)
 )

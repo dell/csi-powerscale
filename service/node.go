@@ -1,24 +1,25 @@
+/*
+Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package service
 
-/*
- Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
-
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
 import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -52,6 +53,15 @@ var (
 	}
 	getUtilsGetFQDNByIP = id.GetFQDNByIP
 	getK8sutilsGetStats = k8sutils.GetStats
+	getNodeLabelsFunc   = func(s *service) func() (map[string]string, error) {
+		return s.GetNodeLabels
+	}
+	getPatchNodeLabelsFunc = func(s *service) func(map[string]string, []string) error {
+		return s.PatchNodeLabels
+	}
+	getInterfaceAddrsFunc = func() func() ([]net.Addr, error) {
+		return net.InterfaceAddrs
+	}
 )
 
 func (s *service) NodeExpandVolume(
@@ -772,4 +782,72 @@ func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
 	nodeID = nodeID + id.NodeIDSeparator + nodeFQDN + id.NodeIDSeparator + nodeIP
 
 	return nodeID, nil
+}
+
+func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
+	ctx, log, _ := GetRunIDLog(ctx)
+
+	addrs, err := getInterfaceAddrsFunc()()
+	if err != nil {
+		log.Errorf("could not get network interface addresses: '%v'", err.Error())
+		return err
+	}
+
+	labelsToAdd := make(map[string]string)
+	for _, addr := range addrs {
+		switch v := addr.(type) {
+		case *net.IPNet:
+			if v.IP.To4() != nil && !v.IP.IsLoopback() {
+				ip, cnet, err := net.ParseCIDR(addr.String())
+				if err != nil {
+					log.Errorf("encountered error while parsing IP address %v", addr)
+				} else {
+					sanitizedNet := strings.ReplaceAll(cnet.String(), "/", "-")
+					key := fmt.Sprintf("%s/az-%s-%s", constants.PluginName, sanitizedNet, ip.String())
+					labelsToAdd[key] = "true"
+					log.Debugf("discovered label %s -> %s", key, labelsToAdd[key])
+				}
+			}
+		}
+	}
+
+	labels, err := getNodeLabelsFunc(s)()
+	if err != nil {
+		log.Error("failed to get node labels", err.Error())
+	}
+
+	labelsToRemove := make([]string, 0)
+	for k := range labels {
+		if strings.HasPrefix(k, constants.PluginName+"/az-") {
+			if _, ok := labelsToAdd[k]; !ok {
+				labelsToRemove = append(labelsToRemove, k)
+			}
+		}
+	}
+
+	if nodeLabelsNeedPatching(labels, labelsToAdd, labelsToRemove) {
+		err = getPatchNodeLabelsFunc(s)(labelsToAdd, labelsToRemove)
+		if err != nil {
+			log.Error("failed to patch node labels", err.Error())
+			return err
+		}
+		log.Debugf("reconciled node network labels, added: %v, removed: %v", labelsToAdd, labelsToRemove)
+	}
+
+	return nil
+}
+
+func nodeLabelsNeedPatching(labels, labelsToAdd map[string]string, labelsToRemove []string) bool {
+	for k, v := range labelsToAdd {
+		if labels[k] != v {
+			return true
+		}
+	}
+
+	for _, k := range labelsToRemove {
+		if _, ok := labels[k]; ok {
+			return true
+		}
+	}
+	return false
 }

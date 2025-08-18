@@ -241,7 +241,7 @@ func TestSetPollingFrequency(t *testing.T) {
 func TestApiRouter(t *testing.T) {
 	// Start the service in a separate goroutine
 	s := &service{}
-	go s.apiRouter(nil)
+	go s.apiRouter(context.TODO())
 
 	tests := []struct {
 		name               string
