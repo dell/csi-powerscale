@@ -124,3 +124,46 @@ func TestGetNFSClientIP(t *testing.T) {
 		})
 	}
 }
+
+func TestIpInCIDR(t *testing.T) {
+	tests := []struct {
+		name     string
+		ipStr    string
+		cidrStr  string
+		expected bool
+	}{
+		{
+			name:     "simple IP in CIDR",
+			ipStr:    "192.168.1.1",
+			cidrStr:  "192.168.1.0/24",
+			expected: true,
+		},
+		{
+			name:     "IP not in CIDR",
+			ipStr:    "192.168.2.1",
+			cidrStr:  "192.168.1.0/24",
+			expected: false,
+		},
+		{
+			name:     "invalid IP",
+			ipStr:    "256.1.1.1",
+			cidrStr:  "192.168.1.0/24",
+			expected: false,
+		},
+		{
+			name:     "invalid CIDR",
+			ipStr:    "192.168.1.1",
+			cidrStr:  "192.168.1.0/33",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := IPInCIDR(tt.ipStr, tt.cidrStr)
+			if actual != tt.expected {
+				t.Errorf("IPInCIDR(%q, %q) = %v, want %v", tt.ipStr, tt.cidrStr, actual, tt.expected)
+			}
+		})
+	}
+}
