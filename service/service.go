@@ -928,7 +928,7 @@ func (s *service) setAzReconcileInterval(log *logrus.Logger, v *viper.Viper) {
 
 	interval, err := time.ParseDuration(azReconcileIntervalStr)
 	if err != nil {
-		log.Error(err, fmt.Sprintf("parsing access zone reconcile interval %s", azReconcileIntervalStr))
+		log.Error(err, fmt.Sprintf("parsing access zone reconcile interval %s, defaulting to %s", azReconcileIntervalStr, constants.DefaultAZReconcileInterval))
 		interval = constants.DefaultAZReconcileInterval
 	}
 	log.Infof("access zone reconcile interval set to %s", interval)
