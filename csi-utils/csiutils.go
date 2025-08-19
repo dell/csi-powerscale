@@ -74,3 +74,12 @@ func GetNFSClientIP(allowedNetworks []string) (string, error) {
 
 	return nodeIP, nil
 }
+
+func IPInCIDR(ipStr, cidrStr string) bool {
+	ip := net.ParseIP(ipStr)
+	_, cidrNet, err := net.ParseCIDR(cidrStr)
+	if err != nil || ip == nil {
+		return false
+	}
+	return cidrNet.Contains(ip)
+}

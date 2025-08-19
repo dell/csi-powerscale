@@ -1385,6 +1385,16 @@ func TestGetIpsFromAZNetworkLabel(t *testing.T) {
 			expectedIPs: []string{"192.168.1.1", "192.168.1.2"},
 		},
 		{
+			name:      "successful execution with IPInCIDR check",
+			nodeID:    "nodename=#=#=localhost=#=#=127.0.0.1",
+			azNetwork: "192.168.0.0/16",
+			nodeLabels: map[string]string{
+				"csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.5.100": "true",
+				"csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.6.101": "true",
+			},
+			expectedIPs: []string{"192.168.5.100", "192.168.6.101"},
+		},
+		{
 			name:        "node ID parsing error",
 			nodeID:      "invalid-node-id",
 			azNetwork:   "192.168.1.0/24",
@@ -1704,7 +1714,7 @@ func TestControllerUnpublishVolume(t *testing.T) {
 				NodeId:   utils.DummyHostNodeID,
 			},
 			nodeLabels: map[string]string{
-				"csi-isilon.dellemc.com/az-10.0.0.0-32-10.0.0.1": "true",
+				"csi-isilon.dellemc.com/az-10.0.0.0-32-100.0.0.1": "true",
 			},
 			wantErr: true,
 		},
