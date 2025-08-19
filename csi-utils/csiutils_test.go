@@ -160,9 +160,9 @@ func TestIpInCIDR(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := IpInCIDR(tt.ipStr, tt.cidrStr)
+			actual := IPInCIDR(tt.ipStr, tt.cidrStr)
 			if actual != tt.expected {
-				t.Errorf("IpInCIDR(%q, %q) = %v, want %v", tt.ipStr, tt.cidrStr, actual, tt.expected)
+				t.Errorf("IPInCIDR(%q, %q) = %v, want %v", tt.ipStr, tt.cidrStr, actual, tt.expected)
 			}
 		})
 	}

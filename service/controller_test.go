@@ -1384,7 +1384,7 @@ func TestGetIpsFromAZNetworkLabel(t *testing.T) {
 			expectedIPs: []string{"192.168.1.1", "192.168.1.2"},
 		},
 		{
-			name:      "successful execution with IpInCIDR check",
+			name:      "successful execution with IPInCIDR check",
 			nodeID:    "nodename=#=#=localhost=#=#=127.0.0.1",
 			azNetwork: "192.168.0.0/16",
 			nodeLabels: map[string]string{
