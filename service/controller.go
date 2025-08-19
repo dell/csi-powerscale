@@ -34,6 +34,7 @@ import (
 	id "github.com/dell/csi-isilon/v2/common/utils/identifiers"
 	"github.com/dell/csi-isilon/v2/common/utils/logging"
 	isilonfs "github.com/dell/csi-isilon/v2/common/utils/powerscale-fs"
+	csiutils "github.com/dell/csi-isilon/v2/csi-utils"
 	isi "github.com/dell/goisilon"
 	isiApi "github.com/dell/goisilon/api"
 	v1 "github.com/dell/goisilon/api/v1"
@@ -1845,7 +1846,7 @@ func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, nodeID, azNetwor
 		return nil, err
 	}
 
-	// Find the node label with matching AZNetwork
+	// Find the node label with IP that belongs to AZNetwork
 	// Example: csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.1
 	pluginName := regexp.QuoteMeta(constants.PluginName)
 	pattern := regexp.MustCompile(fmt.Sprintf("^%s\\/az-([0-9\\.]+)-([0-9]+)-([0-9\\.]+)$", pluginName))
@@ -1854,16 +1855,14 @@ func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, nodeID, azNetwor
 	ips := []string{}
 
 	for key, value := range labels {
-		// Found the node with the matching AZNetwork label, get its IP
+		// Found the node with IP that belongs to the AZNetwork
 		if match := pattern.FindStringSubmatch(key); len(match) == 4 {
 			log.Debugf("Key: %s, Value: %s\n", key, value)
 
-			// getting network interface IP, subnet, and export IP
-			azNetworkIP, azNetworkSubnet, exportIP := match[1], match[2], match[3]
-			log.Debugf("AZNetwork IP %s, AZNetwork subnet %s, export IP %s from node label", azNetworkIP, azNetworkSubnet, exportIP)
+			exportIP := match[3]
+			log.Debugf("Export IP %s from node label", exportIP)
 
-			// if matching, return the IP(s)
-			if azNetwork == fmt.Sprintf("%s/%s", azNetworkIP, azNetworkSubnet) {
+			if csiutils.IPInCIDR(exportIP, azNetwork) {
 				ips = append(ips, exportIP)
 			}
 		}
