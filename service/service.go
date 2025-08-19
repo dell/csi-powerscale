@@ -651,6 +651,11 @@ func (r *reconciler) reconcileNodeAzLabels(ctx context.Context) error {
 
 	azReconcileInterval := r.service.getReconcileInterval()
 
+	if azReconcileInterval == 0 {
+		log.Info("Reconcile is invalid value of 0. Must be greater than 0 to enable label reconciler.")
+		return nil
+	}
+
 	// On first iteration, reconcile labels then start the ticker
 	if azReconcileInterval > 0 {
 		err := r.service.ReconcileNodeAzLabels(ctx)

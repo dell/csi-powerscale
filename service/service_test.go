@@ -1244,40 +1244,100 @@ func TestGetUpdateIntervalChannel(t *testing.T) {
 }
 
 func TestService_reconcileNodeAzLabels(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	t.Run("successful reconcile and interval update", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	var reconcileCalled atomic.Int32
-	reconcileDone := make(chan struct{}, 2)
-	mock := &mockReconciler{
-		azReconcileInterval:         10 * time.Millisecond,
-		updateAZReconcileIntervalCh: make(chan time.Duration, 1),
-		reconcileNodeAzLabelsFunc: func(_ context.Context) error {
-			reconcileCalled.Add(1)
-			reconcileDone <- struct{}{}
-			return nil
-		},
-	}
-	r := &reconciler{
-		service: mock,
-	}
-	err := r.reconcileNodeAzLabels(ctx)
-	assert.NoError(t, err)
+		var reconcileCalled atomic.Int32
+		reconcileDone := make(chan struct{}, 2)
+		mock := &mockReconciler{
+			azReconcileInterval:         10 * time.Millisecond,
+			updateAZReconcileIntervalCh: make(chan time.Duration, 1),
+			reconcileNodeAzLabelsFunc: func(_ context.Context) error {
+				reconcileCalled.Add(1)
+				reconcileDone <- struct{}{}
+				return nil
+			},
+		}
+		r := &reconciler{
+			service: mock,
+		}
+		err := r.reconcileNodeAzLabels(ctx)
+		assert.NoError(t, err)
 
-	select {
-	case <-reconcileDone:
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("timed out waiting for reconcile to be called")
-	}
+		select {
+		case <-reconcileDone:
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("timed out waiting for reconcile to be called")
+		}
 
-	mock.updateAZReconcileIntervalCh <- 20 * time.Millisecond
-	select {
-	case <-reconcileDone:
-	case <-time.After(200 * time.Millisecond):
-		t.Fatal("timed out waiting for reconcile after interval update")
-	}
+		mock.updateAZReconcileIntervalCh <- 20 * time.Millisecond
+		select {
+		case <-reconcileDone:
+		case <-time.After(200 * time.Millisecond):
+			t.Fatal("timed out waiting for reconcile after interval update")
+		}
 
-	if reconcileCalled.Load() < 2 {
-		t.Errorf("expected at least 2 reconcile calls, got %d", reconcileCalled.Load())
-	}
+		if reconcileCalled.Load() < 2 {
+			t.Errorf("expected at least 2 reconcile calls, got %d", reconcileCalled.Load())
+		}
+	})
+
+	t.Run("failed first reconcile", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		var reconcileCalled atomic.Int32
+		reconcileDone := make(chan struct{}, 1)
+
+		mock := &mockReconciler{
+			azReconcileInterval:         10 * time.Millisecond,
+			updateAZReconcileIntervalCh: make(chan time.Duration, 1),
+			reconcileNodeAzLabelsFunc: func(_ context.Context) error {
+				reconcileCalled.Add(1)
+				reconcileDone <- struct{}{}
+				return errors.New("mock reconcile error")
+			},
+		}
+
+		r := &reconciler{service: mock}
+		err := r.reconcileNodeAzLabels(ctx)
+		assert.NoError(t, err, "reconcileNodeAzLabels should not return error even if reconcile fails")
+
+		select {
+		case <-reconcileDone:
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("timed out waiting for reconcile to be called")
+		}
+
+		if reconcileCalled.Load() != 1 {
+			t.Errorf("expected 1 reconcile call, got %d", reconcileCalled.Load())
+		}
+	})
+
+	t.Run("get invalid interval", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		var reconcileCalled atomic.Int32
+		reconcileDone := make(chan struct{}, 1)
+
+		mock := &mockReconciler{
+			azReconcileInterval:         0,
+			updateAZReconcileIntervalCh: make(chan time.Duration, 1),
+			reconcileNodeAzLabelsFunc: func(_ context.Context) error {
+				reconcileCalled.Add(1)
+				reconcileDone <- struct{}{}
+				return errors.New("mock reconcile error")
+			},
+		}
+
+		r := &reconciler{service: mock}
+		err := r.reconcileNodeAzLabels(ctx)
+		assert.NoError(t, err, "expected no error when reconcile interval is zero")
+
+		if reconcileCalled.Load() != 0 {
+			t.Errorf("expected reconcile not to be called, but got %d calls", reconcileCalled.Load())
+		}
+	})
 }
