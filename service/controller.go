@@ -1681,6 +1681,7 @@ func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, nodeID, azNetwor
 		return nil, err
 	}
 
+	// Find the node label with IP that belongs to AZNetwork
 	// Example: csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.1
 	pluginName := regexp.QuoteMeta(constants.PluginName)
 	pattern := regexp.MustCompile(fmt.Sprintf("^%s\\/az-([0-9\\.]+)-([0-9]+)-([0-9\\.]+)$", pluginName))
@@ -1689,14 +1690,13 @@ func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, nodeID, azNetwor
 	ips := []string{}
 
 	for key, value := range labels {
-		// Find the IP that belongs to the AzNetwork parameter set in storageclass
+		// Found the node with IP that belongs to the AZNetwork
 		if match := pattern.FindStringSubmatch(key); len(match) == 4 {
 			log.Debugf("Key: %s, Value: %s\n", key, value)
 
 			exportIP := match[3]
 			log.Debugf("Export IP %s from node label", exportIP)
 
-			// if matching, return the IP(s)
 			if csiutils.IPInCIDR(exportIP, azNetwork) {
 				ips = append(ips, exportIP)
 			}
