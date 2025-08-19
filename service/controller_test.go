@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"sync"
 	"testing"
 
@@ -1443,6 +1444,9 @@ func TestGetIpsFromAZNetworkLabel(t *testing.T) {
 			if (err != nil) != (tt.expectedErr != nil) || (err != nil && err.Error() != tt.expectedErr.Error()) {
 				t.Errorf("getIpsFromAZNetworkLabel() error = %v, expectedErr %v", err, tt.expectedErr)
 			}
+
+			sort.Strings(ips)
+			sort.Strings(tt.expectedIPs)
 			if !reflect.DeepEqual(ips, tt.expectedIPs) {
 				t.Errorf("getIpsFromAZNetworkLabel() IPs = %v, expectedIPs %v", ips, tt.expectedIPs)
 			}
