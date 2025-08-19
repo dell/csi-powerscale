@@ -173,6 +173,7 @@ func setUpSvcForFailbackDiscardLocal(failStep int) (*IsilonClusterConfig, *Isilo
 	}
 
 	svc.client.API.(*MockClient).On("Post", anyArgs...).Return(nil)
+	svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(nil)
 	return localIsiConfig, remoteIsiConfig
 }
 
