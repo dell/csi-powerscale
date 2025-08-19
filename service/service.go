@@ -569,7 +569,7 @@ func (s *service) BeforeServe(
 	go s.startAPIService(ctx)
 
 	// Watch for changes to access zone network node labels
-	if strings.EqualFold(s.mode, constants.ModeNode) && s.azReconcileInterval > 0 {
+	if strings.EqualFold(s.mode, constants.ModeNode) {
 		s.reconcile = &reconciler{
 			service: s,
 		}
@@ -648,6 +648,16 @@ func (s *service) getUpdateIntervalChannel() <-chan time.Duration {
 // reconcileNodeAzLabels reconciles the node access zone labels
 func (r *reconciler) reconcileNodeAzLabels(ctx context.Context) error {
 	_, log := GetLogger(ctx)
+
+	azReconcileInterval := r.service.getReconcileInterval()
+
+	// On first iteration, reconcile labels then start the ticker
+	if azReconcileInterval > 0 {
+		err := r.service.ReconcileNodeAzLabels(ctx)
+		if err != nil {
+			log.Errorf("node label reconciliation failed: %v", err)
+		}
+	}
 
 	go func() {
 		ticker := time.NewTicker(r.service.getReconcileInterval())
