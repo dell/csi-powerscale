@@ -1248,7 +1248,7 @@ func TestService_reconcileNodeAzLabels(t *testing.T) {
 	defer cancel()
 
 	var reconcileCalled atomic.Int32
-	reconcileDone := make(chan struct{})
+	reconcileDone := make(chan struct{}, 2)
 	mock := &mockReconciler{
 		azReconcileInterval:         10 * time.Millisecond,
 		updateAZReconcileIntervalCh: make(chan time.Duration, 1),
