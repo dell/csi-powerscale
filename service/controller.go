@@ -32,6 +32,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-isilon/v2/common/constants"
 	"github.com/dell/csi-isilon/v2/common/utils"
+	csiutils "github.com/dell/csi-isilon/v2/csi-utils"
 	isi "github.com/dell/goisilon"
 	isiApi "github.com/dell/goisilon/api"
 	v1 "github.com/dell/goisilon/api/v1"
@@ -1693,12 +1694,11 @@ func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, nodeID, azNetwor
 		if match := pattern.FindStringSubmatch(key); len(match) == 4 {
 			log.Debugf("Key: %s, Value: %s\n", key, value)
 
-			// getting network interface IP, subnet, and export IP
-			azNetworkIP, azNetworkSubnet, exportIP := match[1], match[2], match[3]
-			log.Debugf("AZNetwork IP %s, AZNetwork subnet %s, export IP %s from node label", azNetworkIP, azNetworkSubnet, exportIP)
+			exportIP := match[3]
+			log.Debugf("Export IP %s from node label", exportIP)
 
 			// if matching, return the IP(s)
-			if azNetwork == fmt.Sprintf("%s/%s", azNetworkIP, azNetworkSubnet) {
+			if csiutils.IpInCIDR(exportIP, azNetwork) {
 				ips = append(ips, exportIP)
 			}
 		}
