@@ -563,7 +563,7 @@ func (s *service) BeforeServe(
 	go s.startAPIService(ctx)
 
 	// Watch for changes to access zone network node labels
-	if strings.EqualFold(s.mode, constants.ModeNode) && s.azReconcileInterval > 0 {
+	if strings.EqualFold(s.mode, constants.ModeNode) {
 		s.reconcile = &reconciler{
 			service: s,
 		}
@@ -642,6 +642,21 @@ func (s *service) getUpdateIntervalChannel() <-chan time.Duration {
 // reconcileNodeAzLabels reconciles the node access zone labels
 func (r *reconciler) reconcileNodeAzLabels(ctx context.Context) error {
 	_, log := GetLogger(ctx)
+
+	azReconcileInterval := r.service.getReconcileInterval()
+
+	if azReconcileInterval == 0 {
+		log.Info("Reconcile is invalid value of 0. Must be greater than 0 to enable label reconciler.")
+		return nil
+	}
+
+	// On first iteration, reconcile labels then start the ticker
+	if azReconcileInterval > 0 {
+		err := r.service.ReconcileNodeAzLabels(ctx)
+		if err != nil {
+			log.Errorf("node label reconciliation failed: %v", err)
+		}
+	}
 
 	go func() {
 		ticker := time.NewTicker(r.service.getReconcileInterval())
@@ -912,7 +927,7 @@ func (s *service) setAzReconcileInterval(log *logrus.Logger, v *viper.Viper) {
 
 	interval, err := time.ParseDuration(azReconcileIntervalStr)
 	if err != nil {
-		log.Error(err, fmt.Sprintf("parsing access zone reconcile interval %s", azReconcileIntervalStr))
+		log.Error(err, fmt.Sprintf("parsing access zone reconcile interval %s, defaulting to %s", azReconcileIntervalStr, constants.DefaultAZReconcileInterval))
 		interval = constants.DefaultAZReconcileInterval
 	}
 	log.Infof("access zone reconcile interval set to %s", interval)
