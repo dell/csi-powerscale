@@ -52,6 +52,11 @@ func checkLeaderElectionError(err error) {
 }
 
 func main() {
+
+        // We always want to enable Request and Response logging(no reason for users to control this)
+	_ = os.Setenv(gocsi.EnvVarReqLogging, "true")
+	_ = os.Setenv(gocsi.EnvVarRepLogging, "true")
+
 	mainR(gocsi.Run, func(kubeconfig string) (kubernetes.Interface, error) {
 		return k8sutils.CreateKubeClientSet(kubeconfig)
 	}, func(clientset kubernetes.Interface, lockName, namespace string, renewDeadline, leaseDuration, retryPeriod time.Duration, run func(ctx context.Context)) {
