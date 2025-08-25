@@ -52,8 +52,7 @@ func checkLeaderElectionError(err error) {
 }
 
 func main() {
-
-        // We always want to enable Request and Response logging(no reason for users to control this)
+	// We always want to enable Request and Response logging(no reason for users to control this)
 	_ = os.Setenv(gocsi.EnvVarReqLogging, "true")
 	_ = os.Setenv(gocsi.EnvVarRepLogging, "true")
 
