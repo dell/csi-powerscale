@@ -36,6 +36,13 @@ import (
 
 var exitFunc = os.Exit
 
+// sets environment variables
+func setEnvsFunc() {
+	// We always want to enable Request and Response logging(no reason for users to control this)
+	_ = os.Setenv(gocsi.EnvVarReqLogging, "true")
+	_ = os.Setenv(gocsi.EnvVarRepLogging, "true")
+}
+
 func validateArgs(driverConfigParamsfile *string) {
 	log.Info("Validating driver config params file argument")
 	if *driverConfigParamsfile == "" {
@@ -52,10 +59,6 @@ func checkLeaderElectionError(err error) {
 }
 
 func main() {
-	// We always want to enable Request and Response logging(no reason for users to control this)
-	_ = os.Setenv(gocsi.EnvVarReqLogging, "true")
-	_ = os.Setenv(gocsi.EnvVarRepLogging, "true")
-
 	mainR(gocsi.Run, func(kubeconfig string) (kubernetes.Interface, error) {
 		return k8sutils.CreateKubeClientSet(kubeconfig)
 	}, func(clientset kubernetes.Interface, lockName, namespace string, renewDeadline, leaseDuration, retryPeriod time.Duration, run func(ctx context.Context)) {
@@ -64,6 +67,7 @@ func main() {
 }
 
 func mainR(runFunc func(ctx context.Context, name, desc string, usage string, sp gocsi.StoragePluginProvider), createKubeClientSet func(kubeconfig string) (kubernetes.Interface, error), leaderElection func(clientset kubernetes.Interface, lockName, namespace string, renewDeadline, leaseDuration, retryPeriod time.Duration, run func(ctx context.Context))) {
+	setEnvsFunc()
 	enableLeaderElection := flag.Bool("leader-election", false, "Enables leader election.")
 	log.Info("Enabling leader election")
 	leaderElectionNamespace := flag.String("leader-election-namespace", "", "The namespace where leader election lease will be created. Defaults to the pod namespace if not set.")
