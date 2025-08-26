@@ -10,13 +10,13 @@ require (
 	github.com/akutz/gournal v0.5.0
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/cucumber/godog v0.15.0
-	github.com/dell/csi-metadata-retriever v1.11.1-0.20250814111114-ea5f2d69b521
-	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250811191959-eb2cab02fb75
-	github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250811191959-eb2cab02fb75
-	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250811191959-eb2cab02fb75
+	github.com/dell/csi-metadata-retriever v1.11.1-0.20250818122924-619ef61f48a2
+	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250819061805-75a74ddc3cba
+	github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250819061805-75a74ddc3cba
+	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250819061805-75a74ddc3cba
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.1
-	github.com/dell/gocsi v1.14.1-0.20250814142855-75596c20cbec
-	github.com/dell/gofsutil v1.19.1-0.20250812102612-38ce511bc840
+	github.com/dell/gocsi v1.14.1-0.20250819131305-b1e701f09007
+	github.com/dell/gofsutil v1.19.1-0.20250819055627-f3c46eb76ffe
 	github.com/dell/goisilon v1.19.1-0.20250708120138-0d938924b4df
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/golang/mock v1.6.0
@@ -25,9 +25,9 @@ require (
 	github.com/kubernetes-csi/csi-lib-utils v0.11.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.20.0
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	golang.org/x/net v0.43.0
-	google.golang.org/grpc v1.74.2
+	google.golang.org/grpc v1.75.0
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.33.0
@@ -87,8 +87,8 @@ require (
 	go.etcd.io/etcd/api/v3 v3.6.1 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.6.1 // indirect
 	go.etcd.io/etcd/client/v3 v3.6.1 // indirect
-	go.opentelemetry.io/otel v1.36.0 // indirect
-	go.opentelemetry.io/otel/trace v1.36.0 // indirect
+	go.opentelemetry.io/otel v1.37.0 // indirect
+	go.opentelemetry.io/otel/trace v1.37.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
@@ -96,8 +96,8 @@ require (
 	golang.org/x/term v0.34.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250528174236-200df99c418a // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250528174236-200df99c418a // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/component-base v0.32.1 // indirect
