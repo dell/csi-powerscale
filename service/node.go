@@ -172,6 +172,8 @@ func (s *service) NodePublishVolume(
 	}
 
 	if strings.Contains(azServiceIP, "localhost") {
+		log.Debugf("Authorization is enabled, reading MountEndpoint: '%s'", isiConfig.MountEndpoint)
+
 		azServiceIP = isiConfig.MountEndpoint
 	}
 

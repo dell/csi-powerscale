@@ -234,7 +234,7 @@ func (f *feature) getService() *service {
 
 	newConfig := IsilonClusterConfig{}
 	newConfig.ClusterName = clusterName1
-	newConfig.Endpoint = "127.0.0.1"
+	newConfig.Endpoint = "localhost"
 	newConfig.EndpointPort = "8080"
 	newConfig.EndpointURL = "http://127.0.0.1"
 	newConfig.User = "blah"
@@ -2526,7 +2526,7 @@ func (f *feature) getServiceWithParams(user, mode string) *service {
 
 	newConfig := IsilonClusterConfig{}
 	newConfig.ClusterName = clusterName1
-	newConfig.Endpoint = "127.0.0.1"
+	newConfig.Endpoint = "localhost"
 	newConfig.EndpointPort = "8080"
 	newConfig.EndpointURL = "http://127.0.0.1"
 	newConfig.User = user
@@ -2567,7 +2567,7 @@ func (f *feature) getServiceWithsessionauth() *service {
 
 	newConfig := IsilonClusterConfig{}
 	newConfig.ClusterName = clusterName1
-	newConfig.Endpoint = "127.0.0.1"
+	newConfig.Endpoint = "localhost"
 	newConfig.EndpointPort = "8080"
 	newConfig.EndpointURL = "http://127.0.0.1"
 	newConfig.User = "blah"
