@@ -27,6 +27,7 @@ import (
 
 	"github.com/dell/csi-isilon/v2/common/constants"
 	"github.com/dell/gocsi"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -256,4 +257,28 @@ var exitCode int
 func exitFunc1(code int) {
 	// Mock exit function for testing
 	exitCode = code
+}
+
+func Test_setEnvs(t *testing.T) {
+	tests := []struct {
+		name string
+		want map[string]string
+	}{
+		{
+			name: "execute setEnvs()",
+			want: map[string]string{
+				gocsi.EnvVarReqLogging: "true",
+				gocsi.EnvVarRepLogging: "true",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setEnvsFunc()
+
+			for envVar, expected := range tt.want {
+				assert.Equal(t, expected, os.Getenv(envVar))
+			}
+		})
+	}
 }

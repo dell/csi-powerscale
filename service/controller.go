@@ -1,25 +1,25 @@
-package service
-
 /*
- Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
+Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-      http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
+package service
 
 import (
 	"errors"
 	"fmt"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,6 +34,7 @@ import (
 	id "github.com/dell/csi-isilon/v2/common/utils/identifiers"
 	"github.com/dell/csi-isilon/v2/common/utils/logging"
 	isilonfs "github.com/dell/csi-isilon/v2/common/utils/powerscale-fs"
+	csiutils "github.com/dell/csi-isilon/v2/csi-utils"
 	isi "github.com/dell/goisilon"
 	isiApi "github.com/dell/goisilon/api"
 	v1 "github.com/dell/goisilon/api/v1"
@@ -41,6 +42,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // RPOEnum represents valid rpo values
@@ -59,6 +61,7 @@ const (
 	IsiPathParam                  = "IsiPath"
 	IsiVolumePathPermissionsParam = "IsiVolumePathPermissions"
 	AzServiceIPParam              = "AzServiceIP"
+	AzNetwork                     = "AzNetwork"
 	RootClientEnabledParam        = "RootClientEnabled"
 	RootClientEnabledParamDefault = "false"
 	DeleteSnapshotMarker          = "DELETE_SNAPSHOT"
@@ -116,9 +119,15 @@ const (
 // clusterToNodeIDMap is a map[clusterName][]*nodeIDToClientMap
 var clusterToNodeIDMap = new(sync.Map)
 
-var getGetExportWithPathAndZoneFunc = func(isiConfig *IsilonClusterConfig) func(context.Context, string, string) (isi.Export, error) {
-	return isiConfig.isiSvc.GetExportWithPathAndZone
-}
+var (
+	getGetExportWithPathAndZoneFunc = func(isiConfig *IsilonClusterConfig) func(context.Context, string, string) (isi.Export, error) {
+		return isiConfig.isiSvc.GetExportWithPathAndZone
+	}
+
+	getNodeLabelsWithNameFunc = func(s *service) func(string) (map[string]string, error) {
+		return s.GetNodeLabelsWithName
+	}
+)
 
 // type nodeIDElementsMap map[string]string
 type nodeIDToClientMap map[string]string
@@ -226,6 +235,7 @@ func (s *service) CreateVolume(
 		volumePathPermissions             string
 		path                              string
 		azServiceIP                       string
+		azNetwork                         string
 		rootClientEnabled                 string
 		quotaID                           string
 		exportID                          int
@@ -248,6 +258,10 @@ func (s *service) CreateVolume(
 	)
 
 	params := req.GetParameters()
+
+	if _, ok := params[AzNetwork]; ok {
+		azNetwork = params[AzNetwork]
+	}
 
 	if _, ok := params[ClusterNameParam]; ok {
 		if params[ClusterNameParam] == "" {
@@ -588,7 +602,7 @@ func (s *service) CreateVolume(
 					}
 				}
 
-				return s.getCreateVolumeResponse(ctx, exportID, req.GetName(), path, export.Zone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
+				return s.getCreateVolumeResponse(ctx, exportID, req.GetName(), path, export.Zone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork), nil
 			}
 			// in case the export exists but no related volume (directory)
 			if err = isiConfig.isiSvc.UnexportByIDWithZone(ctx, exportID, accessZone); err != nil {
@@ -655,7 +669,7 @@ func (s *service) CreateVolume(
 					}
 					// return the createVolume response with actual array volume name
 					exportPath := path
-					if export != nil && export.Paths != nil {
+					if export.Paths != nil {
 						if len(*export.Paths) > 0 {
 							exportPath = (*export.Paths)[0]
 							pathToken := strings.Split(exportPath, "/")
@@ -664,7 +678,7 @@ func (s *service) CreateVolume(
 						}
 					}
 					// return the response
-					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
+					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork), nil
 				}
 				time.Sleep(RetrySleepTime)
 				log.Printf("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
@@ -686,7 +700,7 @@ func (s *service) CreateVolume(
 					}
 					// return the createVolume response with actual array volume name
 					exportPath := path
-					if export != nil && export.Paths != nil {
+					if export.Paths != nil {
 						if len(*export.Paths) > 0 {
 							exportPath = (*export.Paths)[0]
 							pathToken := strings.Split(exportPath, "/")
@@ -695,7 +709,7 @@ func (s *service) CreateVolume(
 						}
 					}
 
-					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName), nil
+					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork), nil
 				}
 				time.Sleep(RetrySleepTime)
 				log.Printf("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
@@ -845,17 +859,17 @@ func (s *service) createVolumeFromSource(
 }
 
 // Define a variable for the getCSIVolume function
-var getCSIVolumeFunc = func(svc *service) func(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName string) *csi.Volume {
+var getCSIVolumeFunc = func(svc *service) func(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork string) *csi.Volume {
 	return svc.getCSIVolume
 }
 
-func (s *service) getCreateVolumeResponse(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName string) *csi.CreateVolumeResponse {
+func (s *service) getCreateVolumeResponse(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork string) *csi.CreateVolumeResponse {
 	return &csi.CreateVolumeResponse{
-		Volume: getCSIVolumeFunc(s)(ctx, exportID, volName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName),
+		Volume: getCSIVolumeFunc(s)(ctx, exportID, volName, path, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork),
 	}
 }
 
-func (s *service) getCSIVolume(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName string) *csi.Volume {
+func (s *service) getCSIVolume(ctx context.Context, exportID int, volName, path, accessZone string, sizeInBytes int64, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork string) *csi.Volume {
 	// Make the additional volume attributes
 	attributes := map[string]string{
 		"ID":                strconv.Itoa(exportID),
@@ -863,6 +877,7 @@ func (s *service) getCSIVolume(ctx context.Context, exportID int, volName, path,
 		"Path":              path,
 		"AccessZone":        accessZone,
 		"AzServiceIP":       azServiceIP,
+		"AzNetwork":         azNetwork,
 		"RootClientEnabled": rootClientEnabled,
 		"ClusterName":       clusterName,
 	}
@@ -1213,6 +1228,7 @@ func (s *service) ControllerPublishVolume(
 		accessZone             string
 		exportPath             string
 		isiPath                string
+		newExportIP            []string
 		isROVolumeFromSnapshot bool
 	)
 
@@ -1226,6 +1242,18 @@ func (s *service) ControllerPublishVolume(
 		log.Printf("VolumeContext:")
 		for key, value := range volumeContext {
 			log.Printf("    [%s]=%s", key, value)
+		}
+		// Check volumeContext for AzNetwork and get the corresponding IP from node labels
+		if azNet, ok := volumeContext["AzNetwork"]; ok && azNet != "" {
+			var err error
+			newExportIP, err = s.getIpsFromAZNetworkLabel(ctx, req.GetNodeId(), azNet)
+			if err != nil {
+				return nil, status.Error(codes.Internal, fmt.Sprintf("getting AZNetwork IPs: %v", err))
+			}
+			log.Debugf("AzNetwork %s matched a node label IP %s", azNet, newExportIP)
+
+		} else {
+			log.Debugf("AzNetwork not found in volumeContext, proceeding without it")
 		}
 	}
 
@@ -1279,6 +1307,7 @@ func (s *service) ControllerPublishVolume(
 	}
 
 	nodeID := req.GetNodeId()
+
 	if nodeID == "" {
 		return nil, status.Error(codes.NotFound,
 			logging.GetMessageWithRunID(runID, "node ID is required"))
@@ -1344,20 +1373,45 @@ func (s *service) ControllerPublishVolume(
 		}
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, id.DummyHostNodeID) {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, id.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			if len(newExportIP) > 0 {
+				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, id.DummyHostNodeID, newExportIP, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			} else {
+				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, id.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			}
 		}
 
-		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
+		if len(newExportIP) > 0 {
+			log.Debugf("AzNetwork label used to pulbish volume at %s", newExportIP)
+			err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, addClientFunc)
+		} else {
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
+		}
+
 		if err == nil && rootClientEnabled {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			if len(newExportIP) > 0 {
+				log.Debugf("AzNetwork label used to pulbish volume at %s", newExportIP)
+				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			} else {
+				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			}
 		}
 	case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
 		// since read-only has higher privileges than root-clients, add to root-clients in exports on powerscale if root client enabled is set to true
 		if rootClientEnabled && isROVolumeFromSnapshot {
-			log.Info("ROVolumeFromSnapshot & rootClientEnabled is set to true, add to root clients")
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportRootClientByIDWithZone)
+			log.Debugf("ROVolumeFromSnapshot & rootClientEnabled is set to true, add to root clients")
+			if len(newExportIP) > 0 {
+				log.Debugf("AzNetwork label used to pulbish volume at %s", newExportIP)
+				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, isiConfig.isiSvc.AddExportRootClientByIDWithZone)
+			} else {
+				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportRootClientByIDWithZone)
+			}
 		} else {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportReadOnlyClientByIDWithZone)
+			if len(newExportIP) > 0 {
+				log.Debugf("AzNetwork label used to pulbish volume at %s", newExportIP)
+				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, isiConfig.isiSvc.AddExportReadOnlyClientByIDWithZone)
+			} else {
+				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportReadOnlyClientByIDWithZone)
+			}
 		}
 	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
@@ -1372,11 +1426,25 @@ func (s *service) ControllerPublishVolume(
 		}
 
 		if !isiConfig.isiSvc.IsHostAlreadyAdded(ctx, exportID, accessZone, id.DummyHostNodeID) {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, id.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			if len(newExportIP) > 0 {
+				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, id.DummyHostNodeID, newExportIP, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			} else {
+				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, id.DummyHostNodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			}
 		}
-		err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
+		if len(newExportIP) > 0 {
+			log.Debugf("AzNetwork label used to pulbish volume at %s", newExportIP)
+			err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, addClientFunc)
+		} else {
+			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, addClientFunc)
+		}
 		if err == nil && rootClientEnabled {
-			err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			if len(newExportIP) > 0 {
+				log.Debugf("AzNetwork label used to pulbish volume at %s", newExportIP)
+				err = isiConfig.isiSvc.AddExportClientByIPWithZone(ctx, clusterName, exportID, accessZone, nodeID, newExportIP, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			} else {
+				err = isiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, clusterName, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts, isiConfig.isiSvc.AddExportClientByIDWithZone)
+			}
 		}
 	default:
 		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "unsupported access mode: %s", am.String()))
@@ -1681,10 +1749,19 @@ func (s *service) ControllerUnpublishVolume(
 		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "ControllerUnpublishVolumeRequest.VolumeId is empty"))
 	}
 
-	_, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, req.VolumeId)
+	volumeName, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, req.VolumeId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "failed to parse volume ID %s, error : %s", req.VolumeId, err.Error()))
 	}
+
+	// Get the PV with the given volumeName
+	log.Debugf("Getting PV with name: %s", volumeName)
+	pv, err := s.k8sclient.CoreV1().PersistentVolumes().Get(ctx, volumeName, metav1.GetOptions{})
+	if err != nil {
+		log.Errorf("Failed to get PV %s: %v", volumeName, err)
+		return nil, err
+	}
+	log.Debugf("Got PV: %s", pv.Name)
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
@@ -1700,26 +1777,112 @@ func (s *service) ControllerUnpublishVolume(
 		return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
 	}
 
-	nodeID := req.GetNodeId()
-	if nodeID == "" {
-		return nil, status.Error(codes.InvalidArgument,
-			logging.GetMessageWithRunID(runID, "node ID is required"))
+	azNetwork, ok := pv.Spec.CSI.VolumeAttributes["AzNetwork"]
+	if !ok {
+		log.Debugf("AZNetwork attribute not found in PV %s", pv.Name)
+	} else if azNetwork == "" {
+		log.Debugf("AZNetwork value is empty in PV %s", pv.Name)
 	}
+	if azNetwork != "" {
+		ips, err := s.getIpsFromAZNetworkLabel(ctx, req.NodeId, azNetwork)
+		if err != nil {
+			log.Debugf("No matching IP(s) found from AZNetwork label %s", azNetwork)
+			return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
+		}
+		log.Debugf("Using IPs %s from AZNetwork %s to remove from export", ips, azNetwork)
 
-	log.Debugf("ignoreUnresolvableHosts value is '%t', for clusterName '%s'", *isiConfig.IgnoreUnresolvableHosts, clusterName)
-
-	if err := isiConfig.isiSvc.RemoveExportClientByIDWithZone(ctx, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts); err != nil {
-		if strings.Contains(err.Error(), "No such file or directory") {
-			_, delErr := s.DeleteVolume(ctx, &csi.DeleteVolumeRequest{VolumeId: req.VolumeId})
-			if delErr != nil {
-				return nil, delErr
+		if err := isiConfig.isiSvc.RemoveExportClientByIPsWithZone(ctx, exportID, accessZone, ips, *isiConfig.IgnoreUnresolvableHosts); err != nil {
+			if strings.Contains(err.Error(), "No such file or directory") {
+				_, delErr := s.DeleteVolume(ctx, &csi.DeleteVolumeRequest{VolumeId: req.VolumeId})
+				if delErr != nil {
+					return nil, delErr
+				}
+			} else {
+				return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error encountered when trying to remove clients %s from export %d with access zone %s on cluster %s, error %s", ips, exportID, accessZone, clusterName, err.Error()))
 			}
-		} else {
-			return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error encountered when trying to remove client %s from export %d with access zone %s on cluster %s, error %s", nodeID, exportID, accessZone, clusterName, err.Error()))
+		}
+	} else {
+		// AZNetwork is not set, use existing behavior
+		log.Debug("Removing export without AZNetwork attribute")
+
+		nodeID := req.GetNodeId()
+		if nodeID == "" {
+			return nil, status.Error(codes.InvalidArgument,
+				logging.GetMessageWithRunID(runID, "node ID is required"))
+		}
+
+		log.Debugf("ignoreUnresolvableHosts value is '%t', for clusterName '%s'", *isiConfig.IgnoreUnresolvableHosts, clusterName)
+
+		if err := isiConfig.isiSvc.RemoveExportClientByIDWithZone(ctx, exportID, accessZone, nodeID, *isiConfig.IgnoreUnresolvableHosts); err != nil {
+			if strings.Contains(err.Error(), "No such file or directory") {
+				_, delErr := s.DeleteVolume(ctx, &csi.DeleteVolumeRequest{VolumeId: req.VolumeId})
+				if delErr != nil {
+					return nil, delErr
+				}
+			} else {
+				return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error encountered when trying to remove client %s from export %d with access zone %s on cluster %s, error %s", nodeID, exportID, accessZone, clusterName, err.Error()))
+			}
 		}
 	}
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
+}
+
+// getIpsFromAZNetworkLabel retrieves the IP(s) from the AZNetwork label
+// on a node. It searches for a node label that matches the given AZNetwork
+// and returns the corresponding IP(s) if found.
+//
+// Parameters:
+//
+//	ctx (context.Context): The context for the function call
+//	azNetwork (string): The AZNetwork to search for in the node labels. E.g. 10.0.0.0/24
+//
+// Returns:
+//
+//	[]string: The array of IP(s) associated with the matching AZNetwork label, or empty if not found
+//	error: Any error that occurs during the function call
+func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, nodeID, azNetwork string) ([]string, error) {
+	// Fetch log handler
+	_, log, _ := GetRunIDLog(ctx)
+
+	// Get node labels
+	nodeName, _, _, err := id.ParseNodeID(ctx, nodeID)
+	if err != nil {
+		log.Error("failed to get Node Name with error", err.Error())
+		return nil, err
+	}
+	labels, err := getNodeLabelsWithNameFunc(s)(nodeName)
+	if err != nil {
+		log.Error("failed to get Node Labels with error", err.Error())
+		return nil, err
+	}
+
+	// Find the node label with IP that belongs to AZNetwork
+	// Example: csi-isilon.dellemc.com/az-192.168.1.0-24-192.168.1.1
+	pluginName := regexp.QuoteMeta(constants.PluginName)
+	pattern := regexp.MustCompile(fmt.Sprintf("^%s\\/az-([0-9\\.]+)-([0-9]+)-([0-9\\.]+)$", pluginName))
+
+	// Array of IPs that match the given AZNetwork
+	ips := []string{}
+
+	for key, value := range labels {
+		// Found the node with IP that belongs to the AZNetwork
+		if match := pattern.FindStringSubmatch(key); len(match) == 4 {
+			log.Debugf("Key: %s, Value: %s\n", key, value)
+
+			exportIP := match[3]
+			log.Debugf("Export IP %s from node label", exportIP)
+
+			if csiutils.IPInCIDR(exportIP, azNetwork) {
+				ips = append(ips, exportIP)
+			}
+		}
+	}
+
+	if len(ips) > 0 {
+		return ips, nil
+	}
+	return ips, fmt.Errorf("failed to match AZNetwork to get IPs for export %s", azNetwork)
 }
 
 func (s *service) GetCapacity(
@@ -2204,21 +2367,16 @@ func validateVolumeCaps(
 			supported = false
 			reason = errUnknownAccessMode
 		case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
-			break
 		case csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER:
-			break
 		case csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER:
-			break
 		case csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY:
 			supported = false
 			reason = errNoSingleNodeReader
 		case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
-			break
 		case csi.VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER:
 			supported = false
 			reason = errNoMultiNodeSingleWriter
 		case csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER:
-			break
 		default:
 			// This is to guard against new access modes not understood
 			supported = false

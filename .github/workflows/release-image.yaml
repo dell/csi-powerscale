@@ -1,0 +1,59 @@
+name: Release CSI-Powerscale Image
+# Invocable as a reusable workflow
+# Can be manually triggered
+on:  # yamllint disable-line rule:truthy
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      option:
+        description: 'Select version to release'
+        required: true
+        type: choice
+        default: 'minor'
+        options:
+          - major
+          - minor
+          - patch
+          - n-1/n-2 patch (Provide input in the below box)
+      version:
+        description: "Patch version to release. example: 2.1.x (Use this only if n-1/n-2 patch is selected)"
+        required: false
+        type: string
+  repository_dispatch:
+    types: [auto-release-workflow]
+jobs:
+  process-inputs:
+    name: Process Inputs
+    runs-on: ubuntu-latest
+    outputs:
+      processedVersion: ${{ steps.set-version.outputs.versionEnv }}
+    steps:
+      - name: Process input
+        id: set-version
+        shell: bash
+        run: |
+          echo "Triggered by: ${{ github.event_name }}"
+          if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+            echo "versionEnv=minor" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if [[ "${{ github.event.inputs.version }}" != "" && "${{ github.event.inputs.option }}" == "n-1/n-2 patch (Provide input in the below box)" ]]; then
+            # if both version and option are provided, then version takes precedence i.e. patch release for n-1/n-2
+            echo "versionEnv=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if [[ "${{ github.event.inputs.option }}" != "n-1/n-2 patch (Provide input in the below box)" ]]; then
+            # if only option is provided, then option takes precedence i.e. minor, major or patch release
+            echo "versionEnv=${{ github.event.inputs.option }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          # if neither option nor version is provided, then minor release is taken by default (Auto-release)
+          echo "versionEnv=minor" >> $GITHUB_OUTPUT
+  csm-release:
+    needs: [process-inputs]
+    uses: dell/common-github-actions/.github/workflows/release-image.yaml@main
+    name: Release Image
+    with:
+      version: ${{ needs.process-inputs.outputs.processedVersion }}
+      images: 'csi-isilon'
+    secrets: inherit
