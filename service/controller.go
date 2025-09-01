@@ -353,9 +353,7 @@ func (s *service) CreateVolume(
 		// use the endpoint if not set in the storage class
 		azServiceIP = isiConfig.Endpoint
 	}
-	fmt.Println("--================------------------------", azServiceIP, isiConfig)
 	if strings.Contains(azServiceIP, "localhost") {
-		fmt.Println("--==============Authorization is enabled==------------------------", azServiceIP, isiConfig)
 		log.Debugf("Authorization is enabled, reading MountEndpoint: '%s'", isiConfig.MountEndpoint)
 		azServiceIP = isiConfig.MountEndpoint
 	}
