@@ -15,6 +15,11 @@ ARG GOPROXY
 ARG GOIMAGE
 ARG BASEIMAGE
 
+
+
+
+
+
 # Stage to build the driver
 FROM $GOIMAGE as builder
 ARG GOPROXY
