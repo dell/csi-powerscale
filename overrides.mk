@@ -23,7 +23,6 @@ ifeq ($(origin BUILD_TIMESTAMP), undefined)
 BUILD_TIMESTAMP := $(shell date +%Y%m%d%H%M%S)
 endif
 DEFAULT_IMAGETAG=$(BUILD_TIMESTAMP)
-DEFAULT_GOPROXY=""
 
 # set the GOVERSION if needed
 ifeq ($(GOVERSION),)
@@ -43,11 +42,6 @@ endif
 # set the IMAGETAG if needed
 ifeq ($(IMAGETAG),)
 export IMAGETAG="$(DEFAULT_IMAGETAG)"
-endif
-
-# set the GOPROXY if needed
-ifeq ($(GOPROXY),)
-export GOPROXY="$(DEFAULT_GOPROXY)"
 endif
 
 # figure out if podman or docker should be used (use podman if found)
@@ -70,6 +64,4 @@ overrides-help:
 	@echo "             Current setting is: $(IMAGENAME)"
 	@echo "IMAGETAG   - The image tag to be built, default is an empty string which will determine the tag by examining annotated tags in the repo."
 	@echo "             Current setting is: $(IMAGETAG)"
-	@echo "GOPROXY    - The goproxy to be used for resolving dependencies, default is: $(DEFAULT_GOPROXY)"
-	@echo "             Current setting is: $(GOPROXY)"
 	@echo

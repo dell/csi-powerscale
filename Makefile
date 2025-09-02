@@ -34,7 +34,7 @@ format:
 
 # Build the driver locally
 build: dependencies
-	GOOS=linux CGO_ENABLED=0 go build
+	CGO_ENABLED=0 GOOS=linux GO111MODULE=on go build
 
 # Generates the docker container (but does not push)
 podman-build:
