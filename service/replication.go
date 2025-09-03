@@ -209,7 +209,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 
 	remoteAzNetwork, ok := req.Parameters[s.WithRP(KeyReplicationRemoteAccessZoneNetwork)]
 	if ok {
-		// update the volume context with AzNetwork now pointing to the remoteAzNetwork from the incoming request as the volume creation will be treated as local on the remote side.
+		// update the volume context with AzNetwork now pointing to the remoteAzNetwork from the incoming request as AzNetwork is required in ControllerPublishVolume
 		volumeContext[AzNetwork] = remoteAzNetwork
 	}
 
