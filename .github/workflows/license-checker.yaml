@@ -7,5 +7,5 @@ on:
 jobs:
   license-check:
     name: Run License Header Checker
-    uses: harishp8889/test-common-github-actions/.github/workflows/license-checker.yaml@main
+    uses: dell/common-github-actions/.github/workflows/license-checker.yaml@main
     secrets: inherit
