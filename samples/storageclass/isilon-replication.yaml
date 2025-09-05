@@ -65,7 +65,6 @@ parameters:
   # Optional: true
   # Default value: endpoint of the remote cluster ClusterName
   # replication.storage.dell.com/remoteAzServiceIP: 192.168.2.1
-  
   # The CIDR notation of the subnet on which the volumes should be
   # accessible. The volumes will only be exported to addresses in
   # this subnet. If not specified, then the volume will be exported to
