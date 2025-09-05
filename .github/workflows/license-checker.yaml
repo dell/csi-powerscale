@@ -4,35 +4,8 @@ on:
   schedule:
     - cron: '0 0 * * 1'  # Runs every Monday at 00:00 UTC
   workflow_dispatch:
-
 jobs:
   license-check:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@v6
-        with:
-          gpg_private_key: ${{ secrets.CSM_GPG_PRIVATE_KEY }}
-          git_user_signingkey: true
-          git_commit_gpgsign: true
-          git_tag_gpgsign: true
-          git_config_global: true
-
-      - name: Run License Header Checker
-        uses: dell/common-github-actions/license-checker@main
-        with:
-          autofix: true
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v7
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: autofix/license-header
-          commit-message: "License header autofix"
-          title: "Automated PR for file changes"
-          body: "This PR was created automatically by a GitHub Action."
-          sign-commits: true
-          delete-branch: false
+    name: Run License Header Checker
+    uses: dell/common-github-actions/.github/workflows/license-checker.yaml@main
+    secrets: inherit
