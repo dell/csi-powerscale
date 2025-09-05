@@ -2701,6 +2701,9 @@ func getCreateRemoteVolumeRequestWithParams(s *service, volhand string, keyreplr
 	req.VolumeHandle = volhand
 	parameters := make(map[string]string)
 	parameters[s.WithRP(keyreplremsys)] = "cluster1"
+	parameters[s.WithRP(KeyReplicationRemoteAccessZone)] = "remoteAccessZone"
+	parameters[s.WithRP(KeyReplicationRemoteAzServiceIP)] = "remoteAzServiceIP"
+	parameters[s.WithRP(KeyReplicationRemoteAccessZoneNetwork)] = "remoteAzNetwork"
 	req.Parameters = parameters
 	return req
 }
@@ -3577,6 +3580,7 @@ func getCreatevolumeReplicationEnabledWithParams(s *service, vgPrefix, rpo, remo
 	parameters[s.WithRP(KeyReplicationRemoteAccessZone)] = "remoteAccessZone"
 	parameters[s.WithRP(KeyReplicationRemoteAzServiceIP)] = "remoteAzServiceIP"
 	parameters[s.WithRP(KeyReplicationRemoteRootClientEnabled)] = "remoteRootClientEnabled"
+
 	if rpo != "" {
 		parameters[s.WithRP(KeyReplicationRPO)] = rpo
 	}
