@@ -65,6 +65,15 @@ parameters:
   # Optional: true
   # Default value: endpoint of the remote cluster ClusterName
   # replication.storage.dell.com/remoteAzServiceIP: 192.168.2.1
+  # The CIDR notation of the subnet on which the volumes should be
+  # accessible. The volumes will only be exported to addresses in
+  # this subnet. If not specified, then the volume will be exported to
+  # the default (primary) address of the node.
+  # Optional: true
+  # Default value: None
+  # Examples: 192.168.200.0/24
+  #
+  # replication.storage.dell.com/remoteAzNetwork: 192.168.200.0/24
 
   # replication.storage.dell.com/remoteRootClientEnabled: When a PVC is being created, this parameter determines, when a node mounts the PVC,
   # whether to add the remote k8s node to the "Root clients" field or "Clients" field of the NFS export.
@@ -100,6 +109,15 @@ parameters:
   # Optional: true
   # Default value: endpoint of the cluster ClusterName
   # AzServiceIP : 192.168.2.1
+
+  # The CIDR notation of the subnet on which the volumes should be
+  # accessible. The volumes will only be exported to addresses in
+  # this subnet. If not specified, then the volume will be exported to
+  # the default (primary) address of the node.
+  # Optional: true
+  # Examples: 192.168.100.0/24
+  #
+  # AzNetwork: 192.168.100.0/24
 
   # When a PVC is being created, this parameter determines, when a node mounts the PVC,
   # whether to add the k8s node to the "Root clients" field or "Clients" field of the NFS export

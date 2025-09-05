@@ -97,6 +97,8 @@ const (
 	KeyReplicationRemoteSystem = "remoteSystem"
 	// KeyReplicationRemoteAccessZone represents key for replication remote access zone
 	KeyReplicationRemoteAccessZone = "remoteAccessZone"
+	// KeyReplicationRemoteAccessZoneNetwork represents key for replication remote access zone network
+	KeyReplicationRemoteAccessZoneNetwork = "remoteAzNetwork"
 	// KeyReplicationRemoteAzServiceIP represents key for replication remote AzServiceIP
 	KeyReplicationRemoteAzServiceIP = "remoteAzServiceIP"
 	// KeyReplicationRemoteRootClientEnabled represents key for replication remote root client enabled

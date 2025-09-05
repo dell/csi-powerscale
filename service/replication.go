@@ -196,6 +196,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	if !ok {
 		remoteRootClientEnabled = RootClientEnabledParamDefault
 	}
+
 	volumeContext := map[string]string{
 		"Path":              exportPath,
 		"AccessZone":        remoteAccessZone,
@@ -204,6 +205,12 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 		"ClusterName":       remoteClusterName,
 		"AzServiceIP":       remoteAzServiceIP,
 		"RootClientEnabled": remoteRootClientEnabled,
+	}
+
+	remoteAzNetwork, ok := req.Parameters[s.WithRP(KeyReplicationRemoteAccessZoneNetwork)]
+	if ok {
+		// update the volume context with AzNetwork now pointing to the remoteAzNetwork from the incoming request as AzNetwork is required in ControllerPublishVolume
+		volumeContext[AzNetwork] = remoteAzNetwork
 	}
 
 	log.Println(volumeContext)

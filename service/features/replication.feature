@@ -3,12 +3,16 @@ Feature: Isilon CSI interface
   I want to test service methods
   So that they are known to work
 
-  @createRemoteVolume
-  @v1.0.0
   Scenario: Create remote volume good scenario
     Given a Isilon service
     When I call Probe
     And I call CreateRemoteVolume
+    Then a valid CreateRemoteVolumeResponse is returned
+
+  Scenario: Create remote volume with params good scenario
+    Given a Isilon service
+    When I call Probe
+    And I call WithParamsCreateRemoteVolume "volume1=_=_=19=_=_=System" "remoteSystem"
     Then a valid CreateRemoteVolumeResponse is returned
 
   Scenario Outline: Create remote volume bad scenario
