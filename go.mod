@@ -8,14 +8,14 @@ require (
 	github.com/akutz/gournal v0.5.0
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/cucumber/godog v0.15.0
-	github.com/dell/csi-metadata-retriever v1.11.1-0.20250825144336-5c293c436c99
-	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250825155821-05e7f81ae500
-	github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250825155821-05e7f81ae500
-	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250825155821-05e7f81ae500
+	github.com/dell/csi-metadata-retriever v1.11.1-0.20250905071610-d02a4c8ac65a
+	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250905054742-ad01c425487b
+	github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250905054742-ad01c425487b
+	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250905054742-ad01c425487b
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.1
-	github.com/dell/gocsi v1.14.1-0.20250828071850-fe2891b95da5
-	github.com/dell/gofsutil v1.19.1-0.20250828071543-d6f6a5a812e3
-	github.com/dell/goisilon v1.19.1-0.20250828071604-4688201e7277
+	github.com/dell/gocsi v1.14.1-0.20250905061753-91bcfb5340eb
+	github.com/dell/gofsutil v1.19.1-0.20250905055737-9760342d7345
+	github.com/dell/goisilon v1.19.1-0.20250904220606-ded4eec2654d
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
