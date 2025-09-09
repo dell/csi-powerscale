@@ -1744,6 +1744,7 @@ func (s *service) ControllerUnpublishVolume(
 	ctx, log, runID := GetRunIDLog(ctx)
 	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
+	azNetwork := ""
 
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "ControllerUnpublishVolumeRequest.VolumeId is empty"))
@@ -1756,12 +1757,13 @@ func (s *service) ControllerUnpublishVolume(
 
 	// Get the PV with the given volumeName
 	log.Debugf("Getting PV with name: %s", volumeName)
-	pv, err := s.k8sclient.CoreV1().PersistentVolumes().Get(ctx, volumeName, metav1.GetOptions{})
-	if err != nil {
-		log.Errorf("Failed to get PV %s: %v", volumeName, err)
-		return nil, err
+	pv, volErr := s.k8sclient.CoreV1().PersistentVolumes().Get(ctx, volumeName, metav1.GetOptions{})
+	if volErr != nil {
+		log.Warnf("Failed to get PV %s: %v", volumeName, volErr)
+		// Not returning error code here as there is an authorization upgrade scenario where PV might not be found when it was created with tenant prefix
+	} else {
+		log.Debugf("Got PV: %s", pv.Name)
 	}
-	log.Debugf("Got PV: %s", pv.Name)
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
@@ -1777,11 +1779,14 @@ func (s *service) ControllerUnpublishVolume(
 		return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
 	}
 
-	azNetwork, ok := pv.Spec.CSI.VolumeAttributes["AzNetwork"]
-	if !ok {
-		log.Debugf("AZNetwork attribute not found in PV %s", pv.Name)
-	} else if azNetwork == "" {
-		log.Debugf("AZNetwork value is empty in PV %s", pv.Name)
+	if volErr == nil {
+		var ok bool
+		azNetwork, ok = pv.Spec.CSI.VolumeAttributes["AzNetwork"]
+		if !ok {
+			log.Debugf("AZNetwork attribute not found in PV %s", pv.Name)
+		} else if azNetwork == "" {
+			log.Debugf("AZNetwork value is empty in PV %s", pv.Name)
+		}
 	}
 	if azNetwork != "" {
 		ips, err := s.getIpsFromAZNetworkLabel(ctx, req.NodeId, azNetwork)
