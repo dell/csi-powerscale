@@ -1,3 +1,6 @@
+# yamllint disable-file
+# This file is not valid YAML because it is a Helm template
+
 # Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,8 +14,6 @@
 # limitations under the License.
 #
 
-# yamllint disable-file
-# This file is not valid YAML because it is a Helm template
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
