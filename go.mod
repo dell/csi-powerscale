@@ -8,14 +8,14 @@ require (
 	github.com/akutz/gournal v0.5.0
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/cucumber/godog v0.15.0
-	github.com/dell/csi-metadata-retriever v1.11.1-0.20250905071610-d02a4c8ac65a
-	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250905054742-ad01c425487b
-	github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250905054742-ad01c425487b
-	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250905054742-ad01c425487b
+	github.com/dell/csi-metadata-retriever v1.12.0
+	github.com/dell/dell-csi-extensions/common v1.9.0
+	github.com/dell/dell-csi-extensions/podmon v1.9.0
+	github.com/dell/dell-csi-extensions/replication v1.12.0
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.1
-	github.com/dell/gocsi v1.14.1-0.20250905061753-91bcfb5340eb
-	github.com/dell/gofsutil v1.19.1-0.20250905055737-9760342d7345
-	github.com/dell/goisilon v1.19.1-0.20250904220606-ded4eec2654d
+	github.com/dell/gocsi v1.15.0
+	github.com/dell/gofsutil v1.20.0
+	github.com/dell/goisilon v1.20.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
@@ -78,7 +78,7 @@ require (
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
-	github.com/spf13/pflag v1.0.6 // indirect
+	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
@@ -92,7 +92,7 @@ require (
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/term v0.34.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
