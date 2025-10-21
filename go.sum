@@ -109,8 +109,8 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dell/csi-metadata-retriever v1.12.0 h1:54z7Sm2XCgTfiEI8lcGwg5P24brEnfylqGvMzQiWKWo=
 github.com/dell/csi-metadata-retriever v1.12.0/go.mod h1:TsLkzdvdsp/EBT2ffeTw3Sq/v2bSWzIIvfUfhhYQBZg=
-github.com/dell/dell-csi-extensions/common v1.9.0 h1:H1NXBYlJZ+XTCe4tSXo94Lvg8HD2wgt6ywql3kVrG34=
-github.com/dell/dell-csi-extensions/common v1.9.0/go.mod h1:DA9lX2BX3fdshR40IaXfokDrIKo9a32QShcTlAqhf+c=
+github.com/dell/dell-csi-extensions/common v1.9.1-0.20250916113526-fe78a563d94f h1:N6AX1BY6IrzcOctOQ7HHJuywpCNXvt5bgN1pC5Ps9Bs=
+github.com/dell/dell-csi-extensions/common v1.9.1-0.20250916113526-fe78a563d94f/go.mod h1:DA9lX2BX3fdshR40IaXfokDrIKo9a32QShcTlAqhf+c=
 github.com/dell/dell-csi-extensions/podmon v1.9.0 h1:AYE3n6o6jB3Sh0uce65JPmir3FPxvqSW/21/bGqRhvY=
 github.com/dell/dell-csi-extensions/podmon v1.9.0/go.mod h1:jz846RAruY/m25uBbZVYcr8vp7wmKakbjOuUBwpY0Ls=
 github.com/dell/dell-csi-extensions/replication v1.12.0 h1:jOdaZsoGHWX9SsqgH+2v9cIJSAVLF1SnKKHtdiF5Ywc=

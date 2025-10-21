@@ -9,7 +9,7 @@ require (
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/cucumber/godog v0.15.0
 	github.com/dell/csi-metadata-retriever v1.12.0
-	github.com/dell/dell-csi-extensions/common v1.9.0
+	github.com/dell/dell-csi-extensions/common v1.9.1-0.20250916113526-fe78a563d94f
 	github.com/dell/dell-csi-extensions/podmon v1.9.0
 	github.com/dell/dell-csi-extensions/replication v1.12.0
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.1
