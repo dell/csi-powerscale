@@ -29,9 +29,9 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	isi "github.com/dell/goisilon"
+	v1 "github.com/dell/goisilon/api/v1"
+	v2 "github.com/dell/goisilon/api/v2"
 	isimocks "github.com/dell/goisilon/mocks"
-	v1 "github.com/dell/gopowerscale/api/v1"
-	v2 "github.com/dell/gopowerscale/api/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/net/context"
