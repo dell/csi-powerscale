@@ -31,7 +31,7 @@ import (
 
 	"github.com/akutz/gournal"
 	"github.com/dell/csi-isilon/v2/common/k8sutils"
-	isilonfs "github.com/dell/csi-powerscale/v2/common/utils/powerscale-fs"
+	isilonfs "github.com/dell/csi-isilon/v2/common/utils/powerscale-fs"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/wrapperspb"
