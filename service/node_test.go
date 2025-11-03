@@ -29,11 +29,16 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	isi "github.com/dell/goisilon"
-	apiv1 "github.com/dell/goisilon/api/v1"
 	isimocks "github.com/dell/goisilon/mocks"
+	v1 "github.com/dell/gopowerscale/api/v1"
+	v2 "github.com/dell/gopowerscale/api/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/net/context"
+	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 const testTargetPath = "/tmp/csi-powerscale-test"
@@ -46,12 +51,53 @@ func Test_node_readFileFunc(t *testing.T) {
 	assert.Equal(t, []byte("dummy-content"), result)
 }
 
+func setK8sClient(s *service) {
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "volume-id",
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			StorageClassName: "test-sc",
+		},
+	}
+	sc := &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-sc",
+		},
+		Parameters: map[string]string{
+			IsiPathParam: "/new/isi/path",
+		},
+	}
+	s.k8sclient = fake.NewClientset(pv, sc)
+}
+
+func setNewIsiClientWithArgsFunc(mockClient *isimocks.Client) {
+	newIsiClientWithArgsFunc = func(
+		_ context.Context,
+		_ string,
+		_ bool,
+		_ uint,
+		_ string,
+		_ string,
+		_ string,
+		_ string,
+		_ string,
+		_ bool,
+		_ uint8,
+	) (*isi.Client, error) {
+		return &isi.Client{
+			API: mockClient,
+		}, nil
+	}
+}
+
 func TestNodeGetVolumeStats(t *testing.T) {
 	// Original function references
 	originalGetIsVolumeExistentFunc := getIsVolumeExistentFunc
 	originalGetIsVolumeMounted := getIsVolumeMounted
 	originalGetOsReadDir := getOsReadDir
 	originalGetK8sutilsGetStats := getK8sutilsGetStats
+	originalNewIsiClientWithArgsFunc := newIsiClientWithArgsFunc
 
 	// Reset function to reset mocks after tests
 	resetMocks := func() {
@@ -59,10 +105,12 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		getIsVolumeMounted = originalGetIsVolumeMounted
 		getOsReadDir = originalGetOsReadDir
 		getK8sutilsGetStats = originalGetK8sutilsGetStats
+		newIsiClientWithArgsFunc = originalNewIsiClientWithArgsFunc
 	}
 
-	// Mock IsiCluster and service setup
 	mockClient := &isimocks.Client{}
+
+	// Setup mock IsiCluster and service
 	IsiClusters := new(sync.Map)
 	testBool := false
 	testIsilonClusterConfig := IsilonClusterConfig{
@@ -94,10 +142,35 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		isiClusters:           IsiClusters,
 	}
 	mockClient.On("VolumesPath").Return("/path/to/volumes")
-	mockClient.On("Get", anyArgs[0:6]...).Return(nil).Run(func(args mock.Arguments) {
-		resp := args.Get(5).(**apiv1.GetIsiVolumeAttributesResp)
-		*resp = &apiv1.GetIsiVolumeAttributesResp{}
+	mockClient.On(
+		"Get",
+		mock.AnythingOfType("*context.valueCtx"),
+		"platform/2/protocols/nfs/exports",
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("api.OrderedValues"),
+		mock.AnythingOfType("map[string]string"),
+		mock.MatchedBy(func(arg interface{}) bool {
+			_, ok := arg.(*v2.ExportList)
+			return ok
+		}),
+	).Return(errors.New("mocked export lookup failure"))
+
+	mockClient.On(
+		"Get",
+		mock.AnythingOfType("*context.valueCtx"),
+		"namespace/path/to/volumes",
+		"volume-id",
+		mock.AnythingOfType("api.OrderedValues"),
+		mock.AnythingOfType("map[string]string"),
+		mock.MatchedBy(func(arg interface{}) bool {
+			_, ok := arg.(**v1.GetIsiVolumeAttributesResp)
+			return ok
+		}),
+	).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(**v1.GetIsiVolumeAttributesResp)
+		*resp = &v1.GetIsiVolumeAttributesResp{}
 	})
+
 	tests := []struct {
 		name         string
 		ctx          context.Context
@@ -114,6 +187,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				VolumePath: "/path/to/volume",
 			},
 			setup: func() {
+				setK8sClient(s)
 				getIsVolumeExistentFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, isiPath, volID, name string) bool {
 					return func(_ context.Context, _, _, _ string) bool {
 						return true
@@ -131,6 +205,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				getK8sutilsGetStats = func(_ context.Context, _ string) (int64, int64, int64, int64, int64, int64, error) {
 					return 0, 0, 0, 0, 0, 0, errors.New("failed to get volume stats metrics")
 				}
+				setNewIsiClientWithArgsFunc(mockClient)
 			},
 			wantResponse: &csi.NodeGetVolumeStatsResponse{
 				Usage: []*csi.VolumeUsage{
@@ -202,6 +277,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				VolumePath: "/path/to/volume",
 			},
 			setup: func() {
+				setK8sClient(s)
 				getIsVolumeExistentFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, isiPath, volID, name string) bool {
 					return func(_ context.Context, _, _, _ string) bool {
 						return true
@@ -219,6 +295,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				getK8sutilsGetStats = func(_ context.Context, _ string) (int64, int64, int64, int64, int64, int64, error) {
 					return 1000, 2000, 1000, 4, 2, 2, nil
 				}
+				setNewIsiClientWithArgsFunc(mockClient)
 			},
 			wantResponse: &csi.NodeGetVolumeStatsResponse{
 				Usage: []*csi.VolumeUsage{
@@ -242,6 +319,194 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "Success in NodeGetVolumeStats- isiPathFromParams is used",
+			ctx:  context.Background(),
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   "volume-id",
+				VolumePath: "/path/to/volume",
+			},
+			setup: func() {
+				pv := &corev1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "volume-id",
+					},
+					Spec: corev1.PersistentVolumeSpec{
+						StorageClassName: "test-sc",
+					},
+				}
+				sc := &storagev1.StorageClass{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-sc",
+					},
+					Parameters: map[string]string{
+						IsiPathParam: "/new/isi/path",
+					},
+				}
+				s.k8sclient = fake.NewClientset(pv, sc)
+
+				getIsVolumeExistentFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, isiPath, volID, name string) bool {
+					return func(_ context.Context, _, _, _ string) bool {
+						return true
+					}
+				}
+
+				getIsVolumeMounted = func(_ context.Context, _ string, _ string) (bool, error) {
+					return true, nil
+				}
+
+				getOsReadDir = func(_ string) ([]os.DirEntry, error) {
+					return []os.DirEntry{}, nil
+				}
+
+				getK8sutilsGetStats = func(_ context.Context, _ string) (int64, int64, int64, int64, int64, int64, error) {
+					return 1000, 2000, 1000, 4, 2, 2, nil
+				}
+				setNewIsiClientWithArgsFunc(mockClient)
+			},
+			wantResponse: &csi.NodeGetVolumeStatsResponse{
+				Usage: []*csi.VolumeUsage{
+					{
+						Unit:      csi.VolumeUsage_BYTES,
+						Available: 1000,
+						Total:     2000,
+						Used:      1000,
+					},
+					{
+						Unit:      csi.VolumeUsage_INODES,
+						Available: 2,
+						Total:     4,
+						Used:      2,
+					},
+				},
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: false,
+					Message:  "",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Success in NodeGetVolumeStats- isiPath from pv is used",
+			ctx:  context.Background(),
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   "volume-id",
+				VolumePath: "/path/to/volume",
+			},
+			setup: func() {
+				pv := &corev1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "volume-id",
+					},
+					Spec: corev1.PersistentVolumeSpec{
+						StorageClassName: "test-sc",
+						PersistentVolumeSource: corev1.PersistentVolumeSource{
+							CSI: &corev1.CSIPersistentVolumeSource{
+								VolumeAttributes: map[string]string{
+									"Path": "/new/isi/path",
+								},
+							},
+						},
+					},
+				}
+				sc := &storagev1.StorageClass{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-sc",
+					},
+					Parameters: map[string]string{
+						IsiPathParam: "/new/isi/path",
+					},
+				}
+				s.k8sclient = fake.NewClientset(pv, sc)
+
+				getIsVolumeExistentFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, isiPath, volID, name string) bool {
+					return func(_ context.Context, _, _, _ string) bool {
+						return true
+					}
+				}
+
+				getIsVolumeMounted = func(_ context.Context, _ string, _ string) (bool, error) {
+					return true, nil
+				}
+
+				getOsReadDir = func(_ string) ([]os.DirEntry, error) {
+					return []os.DirEntry{}, nil
+				}
+
+				getK8sutilsGetStats = func(_ context.Context, _ string) (int64, int64, int64, int64, int64, int64, error) {
+					return 1000, 2000, 1000, 4, 2, 2, nil
+				}
+
+				setNewIsiClientWithArgsFunc(mockClient)
+			},
+			wantResponse: &csi.NodeGetVolumeStatsResponse{
+				Usage: []*csi.VolumeUsage{
+					{
+						Unit:      csi.VolumeUsage_BYTES,
+						Available: 1000,
+						Total:     2000,
+						Used:      1000,
+					},
+					{
+						Unit:      csi.VolumeUsage_INODES,
+						Available: 2,
+						Total:     4,
+						Used:      2,
+					},
+				},
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: false,
+					Message:  "",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Failure in NodeGetVolumeStats- isiPathFromParams is used but cannot get isi Service",
+			ctx:  context.Background(),
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   "volume-id",
+				VolumePath: "/path/to/volume",
+			},
+			setup: func() {
+				pv := &corev1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "volume-id",
+					},
+					Spec: corev1.PersistentVolumeSpec{
+						StorageClassName: "test-sc",
+					},
+				}
+				sc := &storagev1.StorageClass{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-sc",
+					},
+					Parameters: map[string]string{
+						IsiPathParam: "/new/isi/path",
+					},
+				}
+
+				s.k8sclient = fake.NewClientset(pv, sc)
+
+				newIsiClientWithArgsFunc = func(
+					_ context.Context,
+					_ string,
+					_ bool,
+					_ uint,
+					_ string,
+					_ string,
+					_ string,
+					_ string,
+					_ string,
+					_ bool,
+					_ uint8,
+				) (*isi.Client, error) {
+					return nil, errors.New("cannot get isi Service")
+				}
+			},
+			wantResponse: nil,
+			wantErr:      true,
+		},
 	}
 
 	// Run the test cases
@@ -257,6 +522,9 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			// Call the function under test
 			got, err := s.NodeGetVolumeStats(tt.ctx, tt.req)
 
+			// reset the k8sclient
+			s.k8sclient = nil
+
 			// Check if the error status matches
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NodeGetVolumeStats() error = %v, wantErr %v", err, tt.wantErr)
@@ -270,7 +538,10 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		})
 	}
 
-	t.Run("Volume does not exists", func(t *testing.T) {
+	t.Run("Volume does not exist", func(t *testing.T) {
+		defer resetMocks()
+		setK8sClient(s)
+		setNewIsiClientWithArgsFunc(mockClient)
 		mockClient.ExpectedCalls = nil
 		mockClient.On("VolumesPath").Return("/path/to/volumes")
 		mockClient.On("Get", anyArgs[0:6]...).Return(fmt.Errorf("not found"))

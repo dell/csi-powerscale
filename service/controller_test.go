@@ -1564,6 +1564,7 @@ func TestControllerPublishVolume_MaxVolumesPerNode(t *testing.T) {
 
 	// Mock the necessary calls
 	isiConfig.isiSvc.client.API.(*isimocks.Client).ExpectedCalls = nil
+	isiConfig.isiSvc.client.API.(*isimocks.Client).On("Get", anyArgs[0:6]...).Return(errors.New("mocked export lookup failure")).Once()
 	isiConfig.isiSvc.client.API.(*isimocks.Client).On("Get", anyArgs[0:6]...).Return(nil).Run(func(args mock.Arguments) {
 		resp := args.Get(5).(**apiv1.GetIsiVolumeAttributesResp)
 		*resp = &apiv1.GetIsiVolumeAttributesResp{}
@@ -1588,6 +1589,7 @@ func TestControllerPublishVolume_MaxVolumesPerNode(t *testing.T) {
 
 	// Error Scenario
 	isiConfig.isiSvc.client.API.(*isimocks.Client).ExpectedCalls = nil
+	isiConfig.isiSvc.client.API.(*isimocks.Client).On("Get", anyArgs[0:6]...).Return(errors.New("mocked export lookup failure")).Once()
 	isiConfig.isiSvc.client.API.(*isimocks.Client).On("Get", anyArgs[0:6]...).Return(nil).Run(func(args mock.Arguments) {
 		resp := args.Get(5).(**apiv1.GetIsiVolumeAttributesResp)
 		*resp = &apiv1.GetIsiVolumeAttributesResp{}

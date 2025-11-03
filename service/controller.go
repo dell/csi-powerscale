@@ -1287,8 +1287,14 @@ func (s *service) ControllerPublishVolume(
 	}
 
 	if exportPath = volumeContext[ExportPathParam]; exportPath == "" {
-		exportPath = isilonfs.GetPathForVolume(isiConfig.IsiPath, volName)
+		// if not in request, calculate it from the export
+		exportPath, err = getExportPathFromExportID(ctx, isiConfig, exportID, accessZone)
+		if err != nil {
+			log.Infof("Could not get export path by export ID: %v", err)
+			exportPath = isilonfs.GetPathForVolume(isiConfig.IsiPath, volName)
+		}
 	}
+	log.Infof("Export path: %s", exportPath)
 	isROVolumeFromSnapshot = isiConfig.isiSvc.isROVolumeFromSnapshot(volumeContext["Path"], accessZone)
 
 	if isROVolumeFromSnapshot {
@@ -1472,7 +1478,7 @@ func (s *service) ValidateVolumeCapabilities(
 
 	// parse the input volume id and fetch it's components
 	volID := req.GetVolumeId()
-	volName, _, _, clusterName, err := id.ParseNormalizedVolumeID(ctx, volID)
+	volName, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, volID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
@@ -1493,7 +1499,12 @@ func (s *service) ValidateVolumeCapabilities(
 
 	volumeContext := req.GetVolumeContext()
 	if exportPath = volumeContext[ExportPathParam]; exportPath == "" {
-		exportPath = isilonfs.GetPathForVolume(isiConfig.IsiPath, volName)
+		// if not in request, calculate it from the export
+		exportPath, err = getExportPathFromExportID(ctx, isiConfig, exportID, accessZone)
+		if err != nil {
+			log.Infof("Could not get export path by export ID: %v", err)
+			exportPath = isilonfs.GetPathForVolume(isiConfig.IsiPath, volName)
+		}
 	}
 	isiPath = isilonfs.GetIsiPathFromExportPath(exportPath)
 
