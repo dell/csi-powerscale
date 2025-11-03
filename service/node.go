@@ -460,27 +460,62 @@ func (s *service) NodeGetVolumeStats(
 		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "no Volume Path found in request"))
 	}
 
-	volName, _, _, clusterName, _ := id.ParseNormalizedVolumeID(ctx, volID)
+	volName, exportID, accessZone, clusterName, _ := id.ParseNormalizedVolumeID(ctx, volID)
 	if volName == "" {
 		volName = volID
 	}
 
 	// Check if given volume exists
+	// Create copy of isiconfig so we don't modify the original
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
 		return nil, err
 	}
 
-	isiPath := isiConfig.IsiPath
-
-	isiPathFromParams, err := s.validateIsiPath(ctx, volName)
-	if err != nil {
-		log.Error("Failed get isiPath", err.Error())
+	isiConfigCopy := &IsilonClusterConfig{
+		ClusterName:               isiConfig.ClusterName,
+		Endpoint:                  isiConfig.Endpoint,
+		EndpointPort:              isiConfig.EndpointPort,
+		MountEndpoint:             isiConfig.MountEndpoint,
+		EndpointURL:               isiConfig.EndpointURL,
+		accessZone:                isiConfig.accessZone,
+		User:                      isiConfig.User,
+		Password:                  isiConfig.Password,
+		SkipCertificateValidation: isiConfig.SkipCertificateValidation,
+		IsiPath:                   isiConfig.IsiPath,
+		IsiVolumePathPermissions:  isiConfig.IsiVolumePathPermissions,
+		IsDefault:                 isiConfig.IsDefault,
+		ReplicationCertificateID:  isiConfig.ReplicationCertificateID,
+		IgnoreUnresolvableHosts:   isiConfig.IgnoreUnresolvableHosts,
+		isiSvc:                    isiConfig.isiSvc,
 	}
 
-	if isiPathFromParams != isiPath && isiPathFromParams != "" {
-		log.Debug("overriding isiPath with value from StorageClass", isiPathFromParams)
+	// save the isiPath var, if we cannot find another isiPath tied to the vol, we will use this one
+	isiPath := isiConfigCopy.IsiPath
+
+	// first we check pv, sc for isiPath
+	// if we cannot find it there, we check the export
+	isiPathFromParams, err := s.validateIsiPath(ctx, volName)
+	if err != nil {
+		log.Error("Failed to get isiPath: ", err.Error())
+		// if not in pv or sc, calculate it from the export
+		exportPath, err := getExportPathFromExportID(ctx, isiConfig, exportID, accessZone)
+		if err != nil {
+			log.Debugf("Failed to get export path: %s, using default: %s", err.Error(), isiPath)
+		} else {
+			isiPathFromParams = isilonfs.GetIsiPathFromExportPath(exportPath)
+		}
+	}
+	if isiPathFromParams != "" {
+		log.Debug("Found IsiPath from PV/SC/Export: ", isiPathFromParams)
 		isiPath = isiPathFromParams
+		// set service to utilize new path
+		isiConfigCopy.IsiPath = isiPath
+		isiConfigCopy.isiSvc, err = s.GetIsiService(ctx, isiConfigCopy, logging.GetCurrentLogLevel())
+		if err != nil {
+			log.Error("NodeGetVolumeStats: Failed to get isiService: ", err.Error())
+			return nil, err
+		}
 	}
 
 	// Probe the node if required and make sure startup called
@@ -489,7 +524,7 @@ func (s *service) NodeGetVolumeStats(
 		return nil, err
 	}
 
-	isiVol, err := isiConfig.isiSvc.GetVolume(ctx, "", volName)
+	isiVol, err := isiConfigCopy.isiSvc.GetVolume(ctx, "", volName)
 	if err != nil || isiVol == nil {
 		return nil, status.Error(codes.NotFound, logging.GetMessageWithRunID(runID, "volume %v does not exist at path %v", volName, volPath))
 	}
