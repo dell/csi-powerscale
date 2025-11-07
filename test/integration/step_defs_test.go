@@ -319,7 +319,7 @@ func (f *feature) thereIsAnExport(name string) error {
 	accessZone := f.vol.VolumeContext["AccessZone"]
 	path := isilonfs.GetPathForVolume(f.isiPath, name)
 	export, err := isiClient.GetExportByIDWithZone(ctx, f.exportID, accessZone)
-	//export, err := isiClient.GetExportWithPathAndZone(ctx, path, accessZone)
+	// export, err := isiClient.GetExportWithPathAndZone(ctx, path, accessZone)
 	fmt.Printf("export is: '%v'\n", export)
 	if err != nil || export == nil {
 		f.addError(err)
