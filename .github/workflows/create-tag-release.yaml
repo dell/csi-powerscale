@@ -6,64 +6,27 @@ on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
     inputs:
       option:
-        description: 'Select version to release'
+        description: "Select type of release. If first release, use major and it will release v1.0.0."
         required: true
         type: choice
-        default: 'minor'
+        default: "minor"
         options:
           - major
           - minor
           - patch
-          - n-1/n-2 patch (Provide input in the below box)
+          - version
       version:
-        description: "Patch version to release. example: 2.1.x (Use this only if n-1/n-2 patch is selected)"
+        description: "Specific semver version to release. Only used when 'version' is the selected option. Example: v2.1.x."
         required: false
         type: string
   repository_dispatch:
     types: [auto-release-workflow]
 
 jobs:
-  process-inputs:
-    name: Process Inputs
-    runs-on: ubuntu-latest
-    outputs:
-      processedVersion: ${{ steps.set-version.outputs.versionEnv }}
-    steps:
-      - name: Process input
-        id: set-version
-        shell: bash
-        run: |
-          echo "Triggered by: ${{ github.event_name }}"
-          if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
-            echo "versionEnv=minor" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          if [[ "${{ github.event.inputs.version }}" != "" && "${{ github.event.inputs.option }}" == "n-1/n-2 patch (Provide input in the below box)" ]]; then
-            echo "versionEnv=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          if [[ "${{ github.event.inputs.option }}" != "n-1/n-2 patch (Provide input in the below box)" ]]; then
-            echo "versionEnv=${{ github.event.inputs.option }}" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          echo "versionEnv=minor" >> $GITHUB_OUTPUT
-
   csm-release:
-    needs: process-inputs
-    uses: dell/common-github-actions/.github/workflows/create-tag-release.yaml@main
     name: Create Tag and Release
+    uses: dell/common-github-actions/.github/workflows/create-tag-release.yaml@main
     with:
-      version: ${{ needs.process-inputs.outputs.processedVersion }}
-      images: 'csi-isilon'
+      option: ${{ inputs.option || 'minor' }}
+      version: ${{ inputs.version || '' }}
     secrets: inherit
-
-  next-steps:
-    name: 📌 Next Steps for Release Process
-    runs-on: ubuntu-latest
-    needs: csm-release
-    steps:
-      - name: Share next steps with user
-        run: |
-          echo "✅ Tag and release completed."
-          echo "➡️ Please manually trigger the Jenkins image build job: CSM-Images-Build-Nightly."
-          echo "🚀 Once the Jenkins image build job is successful, trigger the Release Image workflow from GitHub Actions."
