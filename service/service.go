@@ -31,6 +31,7 @@ import (
 
 	"github.com/akutz/gournal"
 	"github.com/dell/csi-isilon/v2/common/k8sutils"
+	isilonfs "github.com/dell/csi-isilon/v2/common/utils/powerscale-fs"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -75,6 +76,8 @@ var (
 		"formed": core.CommitTime.Format(time.RFC1123),
 	}
 	noProbeOnStart bool
+
+	newIsiClientWithArgsFunc = isi.NewClientWithArgs
 )
 
 // Service is the CSI service provider.
@@ -463,7 +466,7 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 		gournal.DefaultLevel = gournalLevel
 	}
 
-	client, err := isi.NewClientWithArgs(
+	client, err := newIsiClientWithArgsFunc(
 		clientCtx,
 		isiConfig.EndpointURL,
 		*isiConfig.SkipCertificateValidation,
@@ -1242,28 +1245,65 @@ func (s *service) WithRP(key string) string {
 }
 
 func (s *service) validateIsiPath(ctx context.Context, volName string) (string, error) {
+	ctx, log := GetLogger(ctx)
 	if s.k8sclient == nil {
 		return "", errors.New("no k8s clientset")
 	}
 
-	pvc, err := s.k8sclient.CoreV1().PersistentVolumes().Get(ctx, volName, v1.GetOptions{})
+	pv, err := s.k8sclient.CoreV1().PersistentVolumes().Get(ctx, volName, v1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("unable to get PersistentVolume: %w", err)
 	}
 
-	if pvc.Spec.StorageClassName == "" {
+	// check pv for IsiPath
+	// will be in VolumeAttributes like:
+	// Path: IsiPath/volumeName
+	if pv.Spec.CSI != nil && pv.Spec.CSI.VolumeAttributes != nil {
+		if pv.Spec.CSI.VolumeAttributes[ExportPathParam] != "" {
+			exportPath := pv.Spec.CSI.VolumeAttributes[ExportPathParam]
+			isiPath := isilonfs.GetIsiPathFromExportPath(exportPath)
+			log.Debug("Found IsiPath from PersistentVolume: ", isiPath)
+			return isiPath, nil
+		}
+	}
+
+	log.Debug("IsiPath not found in PersistentVolume")
+
+	// if we cannot find IsiPath in VolumeAttributes, check StorageClass next
+	if pv.Spec.StorageClassName == "" {
+		log.Debug("StorageClass not found in PersistentVolume")
 		return "", nil
 	}
 
-	sc, err := s.k8sclient.StorageV1().StorageClasses().Get(ctx, pvc.Spec.StorageClassName, v1.GetOptions{})
+	log.Debug("Checking StorageClass: ", pv.Spec.StorageClassName)
+
+	sc, err := s.k8sclient.StorageV1().StorageClasses().Get(ctx, pv.Spec.StorageClassName, v1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("unable to get StorageClass: %w", err)
 	}
 
 	isiPath, ok := sc.Parameters[IsiPathParam]
 	if !ok || isiPath == "" {
+		log.Debug("IsiPath not found in StorageClass")
 		return "", nil
 	}
 
 	return isiPath, nil
+}
+
+func getExportPathFromExportID(ctx context.Context, isiConfig *IsilonClusterConfig, exportID int, accessZone string) (string, error) {
+	ctx, log, _ := GetRunIDLog(ctx)
+	export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
+	if err != nil {
+		log.Error("Failed to get export with error: " + err.Error())
+		return "", status.Error(codes.NotFound, err.Error())
+	}
+	if len(*export.Paths) == 0 {
+		return "", status.Error(codes.NotFound, fmt.Sprintf("can't find paths for export with ID %d", exportID))
+	}
+	log.Debugf("Export paths are: %v", export.Paths)
+	exportPath := (*export.Paths)[0]
+	log.Debugf("Returning export path: %s", exportPath)
+
+	return exportPath, nil
 }
