@@ -1,0 +1,7 @@
+site_name: 'csi-powerscale'
+site_description: 'csi-powerscale Documentation.'
+docs_dir: docs
+plugins:
+  - techdocs-core
+theme:
+  name: material

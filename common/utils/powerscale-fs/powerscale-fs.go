@@ -23,8 +23,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dell/csi-isilon/v2/common/utils/logging"
-	isi "github.com/dell/goisilon"
+	csmlog "github.com/dell/csmlog"
+	isi "github.com/dell/gopowerscale"
 )
 
 // CSIQuotaIDPrefix is the CSI tag for quota id stored in the export's description field set by csi driver
@@ -49,7 +49,7 @@ func GetQuotaIDWithCSITag(quotaID string) string {
 
 // GetQuotaIDFromDescription extracts quota id from the description field of export
 func GetQuotaIDFromDescription(ctx context.Context, export isi.Export) (string, error) {
-	log := logging.GetRunIDLogger(ctx)
+	log := csmlog.GetLogger().WithContext(ctx)
 
 	log.Debugf("try to extract quota id from the description field of export (id:'%d', path: '%s', description : '%s')", export.ID, export.Paths, export.Description)
 

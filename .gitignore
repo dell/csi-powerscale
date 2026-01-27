@@ -23,3 +23,5 @@ gocsi
 .idea
 csm-common.mk
 go-code-tester
+
+vendor/

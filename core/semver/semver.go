@@ -357,7 +357,7 @@ var OSExit = func(code int) {
 // GetExitError is a wrapper around exec.ExitError
 var GetExitError = func(err error) (e *exec.ExitError, ok bool) {
 	e, ok = err.(*exec.ExitError)
-	return
+	return e, ok
 }
 
 // GetStatusError is a wrapper around syscall.WaitStatus

@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/dell/csi-powerscale/v2/common/constants"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"

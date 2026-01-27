@@ -3,7 +3,7 @@ package constants
 import (
 	"time"
 
-	"github.com/sirupsen/logrus"
+	csmlog "github.com/dell/csmlog"
 )
 
 /*
@@ -64,7 +64,7 @@ const (
 	IsilonConfigFile = "/isilon-configs/config"
 
 	// DefaultLogLevel for csi logs
-	DefaultLogLevel = logrus.DebugLevel
+	DefaultLogLevel = csmlog.DebugLevel
 
 	// ParamCSILogLevel csi driver log level
 	ParamCSILogLevel = "CSI_LOG_LEVEL"

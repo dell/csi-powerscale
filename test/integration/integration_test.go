@@ -24,14 +24,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dell/csi-powerscale/v2/common/constants"
+	"github.com/dell/csi-powerscale/v2/common/k8sutils"
 	"github.com/Showmax/go-fqdn"
-	"github.com/dell/csi-isilon/v2/common/constants"
-	"github.com/dell/csi-isilon/v2/common/k8sutils"
 
+	"github.com/dell/csi-powerscale/v2/provider"
+	csiutils "github.com/dell/gocsi/utils/csi"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
-	"github.com/dell/csi-isilon/v2/provider"
-	csiutils "github.com/dell/gocsi/utils/csi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"

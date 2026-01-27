@@ -23,10 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	csmlog "github.com/dell/csmlog"
 	"github.com/dell/gofsutil"
+	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -63,9 +63,7 @@ var (
 		req *csi.NodePublishVolumeRequest,
 		nfsExportURL string,
 	) error {
-		// Fetch log handler
-		ctx, log := GetLogger(ctx)
-
+		log := log.WithContext(ctx)
 		volCap := req.GetVolumeCapability()
 		if volCap == nil {
 			return status.Error(codes.InvalidArgument,
@@ -105,13 +103,13 @@ var (
 
 		mntOptions = append(mntOptions, rwOption)
 
-		f := logrus.Fields{
+		f := csmlog.Fields{
 			"ID":         req.VolumeId,
 			"TargetPath": target,
 			"ExportPath": nfsExportURL,
 			"AccessMode": accMode.GetMode(),
 		}
-		logrus.WithFields(f).Info("Node publish volume params ")
+		log.WithFields(f).Info("Node publish volume params ")
 		mnts, err := getGetMountsFunc()(ctx)
 		if err != nil {
 			return status.Errorf(codes.Internal,
@@ -176,9 +174,7 @@ func unpublishVolume(
 	ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest, filterStr string,
 ) error {
-	// Fetch log handler
-	ctx, log := GetLogger(ctx)
-
+	log := log.WithContext(ctx)
 	target := req.GetTargetPath()
 	if target == "" {
 		return status.Error(codes.InvalidArgument,
@@ -212,7 +208,7 @@ func unpublishVolume(
 // mkdir creates the directory specified by path if needed.
 // return pair is a bool flag of whether dir was created, and an error
 func mkdir(ctx context.Context, path string) (bool, error) {
-	_, log := GetLogger(ctx)
+	log := log.WithContext(ctx)
 	st, err := os.Stat(path)
 	if err == nil {
 		if !st.IsDir() {
@@ -221,17 +217,17 @@ func mkdir(ctx context.Context, path string) (bool, error) {
 		return false, nil
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
-		log.WithField("dir", path).WithError(err).Error("Unable to stat dir")
+		log.WithFields(csmlog.Fields{"dir": path}).Errorf("Unable to stat dir : %v", err)
 		return false, err
 	}
 
 	// Case when there is error and the error is fs.ErrNotExists.
 	if err := os.MkdirAll(path, 0o750); err != nil {
-		log.WithField("dir", path).WithError(err).Error("Unable to create dir")
+		log.WithFields(csmlog.Fields{"dir": path}).Errorf("Unable to create dir : %v", err)
 		return false, err
 	}
 
-	log.WithField("path", path).Debug("created directory")
+	log.WithFields(csmlog.Fields{"path": path}).Debug("created directory")
 	return true, nil
 }
 
@@ -245,9 +241,7 @@ func contains(list []string, item string) bool {
 }
 
 func isVolumeMounted(ctx context.Context, filterStr string, target string) (bool, error) {
-	// Fetch log handler
-	ctx, log := GetLogger(ctx)
-
+	log := log.WithContext(ctx)
 	mnts, err := getGetMountsFunc()(ctx)
 	if err != nil {
 		return false, status.Errorf(codes.Internal,

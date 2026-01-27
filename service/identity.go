@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019-2023 Dell Inc, or its subsidiaries.
+Copyright (c) 2019-2026 Dell Inc, or its subsidiaries.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,10 +21,9 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-isilon/v2/common/constants"
-	"github.com/dell/csi-isilon/v2/core"
+	"github.com/dell/csi-powerscale/v2/common/constants"
 	csiext "github.com/dell/dell-csi-extensions/replication"
+	csi "github.com/container-storage-interface/spec/lib/go/csi"
 )
 
 func (s *service) GetPluginInfo(
@@ -32,9 +31,11 @@ func (s *service) GetPluginInfo(
 	_ *csi.GetPluginInfoRequest) (
 	*csi.GetPluginInfoResponse, error,
 ) {
+	Manifest["semver"] = ManifestSemver
+
 	return &csi.GetPluginInfoResponse{
 		Name:          constants.PluginName,
-		VendorVersion: core.SemVer,
+		VendorVersion: ManifestSemver,
 		Manifest:      Manifest,
 	}, nil
 }
@@ -78,7 +79,7 @@ func (s *service) Probe(
 	_ *csi.ProbeRequest) (
 	*csi.ProbeResponse, error,
 ) {
-	ctx, log := GetLogger(ctx)
+	log := log.WithContext(ctx)
 	ready := new(wrapperspb.BoolValue)
 	ready.Value = true
 	rep := new(csi.ProbeResponse)

@@ -29,15 +29,16 @@ import (
 
 	fPath "path"
 
+	"github.com/dell/csi-powerscale/v2/common/constants"
+	id "github.com/dell/csi-powerscale/v2/common/utils/identifiers"
+
+	isilonfs "github.com/dell/csi-powerscale/v2/common/utils/powerscale-fs"
+	csiutils "github.com/dell/csi-powerscale/v2/csi-utils"
+	csmlog "github.com/dell/csmlog"
+	isi "github.com/dell/gopowerscale"
+	isiApi "github.com/dell/gopowerscale/api"
+	v1 "github.com/dell/gopowerscale/api/v1"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-isilon/v2/common/constants"
-	id "github.com/dell/csi-isilon/v2/common/utils/identifiers"
-	"github.com/dell/csi-isilon/v2/common/utils/logging"
-	isilonfs "github.com/dell/csi-isilon/v2/common/utils/powerscale-fs"
-	csiutils "github.com/dell/csi-isilon/v2/csi-utils"
-	isi "github.com/dell/goisilon"
-	isiApi "github.com/dell/goisilon/api"
-	v1 "github.com/dell/goisilon/api/v1"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -121,6 +122,7 @@ const (
 // clusterToNodeIDMap is a map[clusterName][]*nodeIDToClientMap
 var clusterToNodeIDMap = new(sync.Map)
 
+var log = csmlog.GetLogger()
 var (
 	getGetExportWithPathAndZoneFunc = func(isiConfig *IsilonClusterConfig) func(context.Context, string, string) (isi.Export, error) {
 		return isiConfig.isiSvc.GetExportWithPathAndZone
@@ -273,18 +275,20 @@ func (s *service) CreateVolume(
 		}
 	}
 
-	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
+	logFields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", logFields["csi.requestid"])
+
 	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Error("Failed to get Isilon config with error ", err.Error())
+		log.Errorf("Failed to get Isilon config with error: %v ", err.Error())
 		return nil, err
 	}
-
-	ctx, log = setClusterContext(ctx, clusterName)
+	logFields[clusterName] = clusterName
+	ctx = csmlog.SetLogFields(ctx, logFields)
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	// auto probe
@@ -364,7 +368,7 @@ func (s *service) CreateVolume(
 		_, err := strconv.ParseBool(val)
 		// use the default if the boolean literal from the storage class is malformed
 		if err != nil {
-			log.WithField(RootClientEnabledParam, val).Debugf(
+			log.WithFields(csmlog.Fields{RootClientEnabledParam: val}).Debugf(
 				"invalid boolean value for '%s', defaulting to 'false'", RootClientEnabledParam)
 
 			rootClientEnabled = RootClientEnabledParamDefault
@@ -393,11 +397,11 @@ func (s *service) CreateVolume(
 			var snapshotSrcClusterName string
 			sourceSnapshotID, snapshotSrcClusterName, _, err = id.ParseNormalizedSnapshotID(ctx, normalizedSnapshotID)
 			if err != nil {
-				return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "failed to parse snapshot ID '%s', error : '%v'", normalizedSnapshotID, err))
+				return nil, status.Error(codes.InvalidArgument, GetMessageWithReqID(runID, "failed to parse snapshot ID '%s', error : '%v'", normalizedSnapshotID, err))
 			}
 
 			if snapshotSrcClusterName != "" && snapshotSrcClusterName != clusterName {
-				return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "source snapshot's cluster name '%s' and new volume's cluster name '%s' doesn't match", snapshotSrcClusterName, clusterName))
+				return nil, status.Error(codes.InvalidArgument, GetMessageWithReqID(runID, "source snapshot's cluster name '%s' and new volume's cluster name '%s' doesn't match", snapshotSrcClusterName, clusterName))
 			}
 
 			log.Infof("Creating volume from snapshot ID: '%s'", sourceSnapshotID)
@@ -415,17 +419,17 @@ func (s *service) CreateVolume(
 
 			vcs := req.GetVolumeCapabilities()
 			if len(vcs) == 0 {
-				return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "volume capabilty is required"))
+				return nil, status.Error(codes.InvalidArgument, GetMessageWithReqID(runID, "volume capabilty is required"))
 			}
 
 			for _, vc := range vcs {
 				if vc == nil {
-					return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "volume capabilty is required"))
+					return nil, status.Error(codes.InvalidArgument, GetMessageWithReqID(runID, "volume capabilty is required"))
 				}
 
 				am := vc.GetAccessMode()
 				if am == nil {
-					return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "access mode is required"))
+					return nil, status.Error(codes.InvalidArgument, GetMessageWithReqID(runID, "access mode is required"))
 				}
 
 				if am.Mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
@@ -468,7 +472,7 @@ func (s *service) CreateVolume(
 
 		remoteIsiConfig, err := s.getIsilonConfig(ctx, &remoteSystemName)
 		if err != nil {
-			log.Error("Failed to get Isilon config with error ", err.Error())
+			log.Errorf("Failed to get Isilon config with error %v ", err.Error())
 			return nil, status.Errorf(codes.InvalidArgument, "can't find cluster with name %s in driver config", remoteSystemName)
 		}
 
@@ -576,7 +580,7 @@ func (s *service) CreateVolume(
 		var errMsg string
 		if err == nil {
 			if foundVol {
-				return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "the export may not be ready yet and the path is %s", path))
+				return nil, status.Error(codes.Internal, GetMessageWithReqID(runID, "the export may not be ready yet and the path is %s", path))
 			}
 		} else {
 			// internal error
@@ -681,7 +685,7 @@ func (s *service) CreateVolume(
 					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork), nil
 				}
 				time.Sleep(RetrySleepTime)
-				log.Printf("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
+				log.Infof("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
 			}
 		} else {
 			return nil, err
@@ -712,7 +716,7 @@ func (s *service) CreateVolume(
 					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork), nil
 				}
 				time.Sleep(RetrySleepTime)
-				log.Printf("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
+				log.Infof("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, exportID, path)
 			}
 		} else {
 			// clear quota and delete volume since the export cannot be created
@@ -725,7 +729,7 @@ func (s *service) CreateVolume(
 			return nil, err
 		}
 	}
-	return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "the export id %d and path %s may not be ready yet after retrying", exportID, path))
+	return nil, status.Error(codes.Internal, GetMessageWithReqID(runID, "the export id %d and path %s may not be ready yet after retrying", exportID, path))
 }
 
 // Define function types for external function calls
@@ -882,9 +886,7 @@ func (s *service) getCSIVolume(ctx context.Context, exportID int, volName, path,
 		"ClusterName":       clusterName,
 	}
 
-	// Fetch log handler
-	ctx, log, _ := GetRunIDLog(ctx)
-
+	log := log.WithContext(ctx)
 	log.Debugf("Attributes '%v'", attributes)
 
 	// Set content source as part of create volume response if volume is created from snapshot or existing volume
@@ -924,14 +926,15 @@ func (s *service) DeleteVolume(
 	*csi.DeleteVolumeResponse, error,
 ) {
 	// TODO more checks need to be done, e.g. if access mode is VolumeCapability_AccessMode_MULTI_NODE_XXX, then other nodes might still be using this volume, thus the delete should be skipped
-	// Fetch log handler
-	ctx, log, _ := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
+	fields := csmlog.ExtractFieldsFromContext(ctx)
+
 	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
 
 	// validate request
 	if err := s.ValidateDeleteVolumeRequest(ctx, req); err != nil {
-		log.Error("invalid volume id ", err.Error())
+		log.Errorf("invalid volume id %v", err.Error())
 		return &csi.DeleteVolumeResponse{}, nil
 	}
 
@@ -943,11 +946,12 @@ func (s *service) DeleteVolume(
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Error("Failed to get Isilon config with error ", err.Error())
+		log.Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, err
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
+	fields[clusterName] = clusterName
+	ctx = csmlog.SetLogFields(ctx, fields)
 	log.Debugf("Cluster Name: %v", clusterName)
 	// probe
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
@@ -1078,9 +1082,7 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteVolume(
 ) error {
 	exportPath := (*export.Paths)[0]
 
-	// Fetch log handler
-	ctx, log, _ := GetRunIDLog(ctx)
-
+	log := log.WithContext(ctx)
 	// Get Zone Path
 	zone, err := getZoneByNameFunc(isiConfig)(ctx, accessZone)
 	if err != nil {
@@ -1151,9 +1153,8 @@ func (s *service) ControllerExpandVolume(
 	ctx context.Context,
 	req *csi.ControllerExpandVolumeRequest,
 ) (*csi.ControllerExpandVolumeResponse, error) {
-	// Fetch log handler
-	ctx, log, _ := GetRunIDLog(ctx)
-
+	log := log.WithContext(ctx)
+	fields := csmlog.ExtractFieldsFromContext(ctx)
 	volName, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, req.GetVolumeId())
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
@@ -1161,11 +1162,13 @@ func (s *service) ControllerExpandVolume(
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Error("Failed to get Isilon config with error ", err.Error())
+		log.Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, err
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
+	fields[clusterName] = clusterName
+	ctx = csmlog.SetLogFields(ctx, fields)
+
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	// auto probe
@@ -1232,16 +1235,17 @@ func (s *service) ControllerPublishVolume(
 		isROVolumeFromSnapshot bool
 	)
 
-	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
+	logFields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", logFields["csi.requestid"])
 	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
 
 	volumeContext := req.GetVolumeContext()
 	if volumeContext != nil {
-		log.Printf("VolumeContext:")
+		log.Infof("VolumeContext:")
 		for key, value := range volumeContext {
-			log.Printf("    [%s]=%s", key, value)
+			log.Infof("    [%s]=%s", key, value)
 		}
 		// Check volumeContext for AzNetwork and get the corresponding IP from node labels
 		if azNet, ok := volumeContext["AzNetwork"]; ok && azNet != "" {
@@ -1260,21 +1264,22 @@ func (s *service) ControllerPublishVolume(
 	volID := req.GetVolumeId()
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument,
-			logging.GetMessageWithRunID(runID, "volume ID is required"))
+			GetMessageWithReqID(runID, "volume ID is required"))
 	}
 
 	volName, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, volID)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, logging.GetMessageWithRunID(runID, "failed to parse volume ID '%s', error : '%v'", volID, err))
+		return nil, status.Error(codes.NotFound, GetMessageWithReqID(runID, "failed to parse volume ID '%s', error : '%v'", volID, err))
 	}
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Error("Failed to get Isilon config with error ", err.Error())
+		log.Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, err
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
+	logFields[clusterName] = clusterName
+	ctx = csmlog.SetLogFields(ctx, logFields)
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
@@ -1300,14 +1305,14 @@ func (s *service) ControllerPublishVolume(
 	if isROVolumeFromSnapshot {
 		log.Info("Volume source is snapshot")
 		if export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, exportPath, accessZone); err != nil || export == nil {
-			return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error retrieving export for %s", exportPath))
+			return nil, status.Error(codes.Internal, GetMessageWithReqID(runID, "error retrieving export for %s", exportPath))
 		}
 	} else {
 		isiPath = isilonfs.GetIsiPathFromExportPath(exportPath)
 		vol, err := isiConfig.isiSvc.GetVolumeWithIsiPath(ctx, isiPath, "", volName)
 		if err != nil || vol.Name == "" {
 			return nil, status.Error(codes.Internal,
-				logging.GetMessageWithRunID(runID, "failure checking volume status before controller publish: %s",
+				GetMessageWithReqID(runID, "failure checking volume status before controller publish: %s",
 					err.Error()))
 		}
 	}
@@ -1316,30 +1321,30 @@ func (s *service) ControllerPublishVolume(
 
 	if nodeID == "" {
 		return nil, status.Error(codes.NotFound,
-			logging.GetMessageWithRunID(runID, "node ID is required"))
+			GetMessageWithReqID(runID, "node ID is required"))
 	}
 
 	vc := req.GetVolumeCapability()
 	if vc == nil {
 		return nil, status.Error(codes.InvalidArgument,
-			logging.GetMessageWithRunID(runID, "volume capability is required"))
+			GetMessageWithReqID(runID, "volume capability is required"))
 	}
 
 	am := vc.GetAccessMode()
 	if am == nil {
 		return nil, status.Error(codes.InvalidArgument,
-			logging.GetMessageWithRunID(runID, "access mode is required"))
+			GetMessageWithReqID(runID, "access mode is required"))
 	}
 
 	if am.Mode == csi.VolumeCapability_AccessMode_UNKNOWN {
 		return nil, status.Error(codes.InvalidArgument,
-			logging.GetMessageWithRunID(runID, errUnknownAccessMode))
+			GetMessageWithReqID(runID, errUnknownAccessMode))
 	}
 
 	vcs := []*csi.VolumeCapability{req.GetVolumeCapability()}
 	if !checkValidAccessTypes(vcs) {
 		return nil, status.Error(codes.InvalidArgument,
-			logging.GetMessageWithRunID(runID, errUnknownAccessType))
+			GetMessageWithReqID(runID, errUnknownAccessType))
 	}
 
 	rootClientEnabled := false
@@ -1353,20 +1358,20 @@ func (s *service) ControllerPublishVolume(
 	if err != nil {
 		log.Errorf("failed to parse node id '%s' with error : %s", nodeID, err.Error())
 		return nil, status.Error(codes.NotFound,
-			logging.GetMessageWithRunID(runID, "failed to parse node id '%s'", nodeID))
+			GetMessageWithReqID(runID, "failed to parse node id '%s'", nodeID))
 	}
 
 	exportCount, err := isiConfig.isiSvc.GetExportsCountAttachedToNode(ctx, nodeIP)
 	if err != nil {
 		log.Errorf("failed to export count for node id '%s' with error : %s", nodeID, err.Error())
 		return nil, status.Error(codes.InvalidArgument,
-			logging.GetMessageWithRunID(runID, "failed to export count for node id '%s'", nodeID))
+			GetMessageWithReqID(runID, "failed to export count for node id '%s'", nodeID))
 	}
 
 	if s.opts.MaxVolumesPerNode > 0 && exportCount >= s.opts.MaxVolumesPerNode {
 		log.Errorf("maximum volume limit reached for node : '%s'", nodeID)
 		return nil, status.Error(codes.InvalidArgument,
-			logging.GetMessageWithRunID(runID, "maximum volume limit reached for node : '%s'", nodeID))
+			GetMessageWithReqID(runID, "maximum volume limit reached for node : '%s'", nodeID))
 	}
 
 	addClientFunc := s.getAddClientFunc(rootClientEnabled, isiConfig)
@@ -1427,7 +1432,7 @@ func (s *service) ControllerPublishVolume(
 			break
 		}
 		if isiConfig.isiSvc.OtherClientsAlreadyAdded(ctx, exportID, accessZone, nodeID) {
-			return nil, status.Error(codes.NotFound, logging.GetMessageWithRunID(runID,
+			return nil, status.Error(codes.NotFound, GetMessageWithReqID(runID,
 				"export %d in access zone %s already has other clients added to it, and the access mode is %s, thus the request fails", exportID, accessZone, am.Mode))
 		}
 
@@ -1453,11 +1458,11 @@ func (s *service) ControllerPublishVolume(
 			}
 		}
 	default:
-		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "unsupported access mode: %s", am.String()))
+		return nil, status.Error(codes.InvalidArgument, GetMessageWithReqID(runID, "unsupported access mode: %s", am.String()))
 	}
 
 	if err != nil {
-		return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID,
+		return nil, status.Error(codes.Internal, GetMessageWithReqID(runID,
 			"internal error occurred when attempting to add client ip %s to export %d, error : %v", nodeID, exportID, err))
 	}
 	return &csi.ControllerPublishVolumeResponse{}, nil
@@ -1473,9 +1478,8 @@ func (s *service) ValidateVolumeCapabilities(
 		isiPath    string
 	)
 
-	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
-
+	log := log.WithContext(ctx)
+	logFields := csmlog.ExtractFieldsFromContext(ctx)
 	// parse the input volume id and fetch it's components
 	volID := req.GetVolumeId()
 	volName, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, volID)
@@ -1485,11 +1489,14 @@ func (s *service) ValidateVolumeCapabilities(
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Error("Failed to get Isilon config with error ", err.Error())
+		log.Errorf("Failed to get Isilon config with error %v ", err.Error())
 		return nil, err
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
+	logFields[clusterName] = clusterName
+	ctx = csmlog.SetLogFields(ctx, logFields)
+	fields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", fields["csi.requestid"])
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
@@ -1507,11 +1514,10 @@ func (s *service) ValidateVolumeCapabilities(
 		}
 	}
 	isiPath = isilonfs.GetIsiPathFromExportPath(exportPath)
-
 	vol, err := s.getVolByName(ctx, isiPath, volName, isiConfig)
 	if err != nil {
 		return nil, status.Error(codes.Internal,
-			logging.GetMessageWithRunID(runID, "failure checking volume status for capabilities: %s",
+			GetMessageWithReqID(runID, "failure checking volume status for capabilities: %s",
 				err.Error()))
 	}
 
@@ -1604,7 +1610,9 @@ func (s *service) ListVolumes(_ context.Context,
 }
 
 func (s *service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
-	ctx, log, runID := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
+	fields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", fields["csi.requestid"])
 	var (
 		startToken  int
 		maxEntries  = int(req.GetMaxEntries())
@@ -1618,7 +1626,7 @@ func (s *service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 		i, err := strconv.ParseInt(token, 10, 64)
 		if err != nil {
 			log.Errorf("Failed to parse starting token: %s, error=%v", token, err)
-			return nil, status.Error(codes.Aborted, logging.GetMessageWithRunID(runID, "unable to parse StartingToken: %v into uint32", token))
+			return nil, status.Error(codes.Aborted, GetMessageWithReqID(runID, "unable to parse StartingToken: %v into uint32", token))
 		}
 		startToken = int(i)
 		log.Debugf("Parsed starting token: startToken=%d", startToken)
@@ -1627,7 +1635,7 @@ func (s *service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 	snapshots, nextToken, err := s.listPowerScaleSnapshots(ctx, startToken, maxEntries, snapshotID, sourceVolID)
 	if err != nil {
 		log.Errorf("Failed to list snapshots: %v", err)
-		return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "failed to list snapshots: %v", err.Error()))
+		return nil, status.Error(codes.Internal, GetMessageWithReqID(runID, "failed to list snapshots: %v", err.Error()))
 	}
 
 	if len(snapshots) == 0 {
@@ -1651,14 +1659,14 @@ func (s *service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 }
 
 func (s *service) listPowerScaleSnapshots(ctx context.Context, startToken, maxEntries int, snapID, srcID string) (isi.SnapshotList, string, error) {
-	ctx, log, _ := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
 	log.Infof("Entering listPowerScaleSnapshots: snapID=%s, srcID=%s", snapID, srcID)
 
 	var filteredSnapshots isi.SnapshotList
 	var totalSnapshots int
 
 	for _, config := range s.getIsilonClusters() {
-		log := log.WithField("cluster", config.ClusterName)
+		log := log.WithFields(csmlog.Fields{"cluster": config.ClusterName})
 		snapshots, err := config.isiSvc.GetSnapshots(ctx)
 		if err != nil {
 			log.Errorf("Failed to get snapshots: %v", err)
@@ -1732,8 +1740,8 @@ func shouldIncludeSnapshot(ctx context.Context, snap isi.Snapshot, snapID, srcID
 // It replaces the snapshot name with a normalized snapshot ID (e.g. 12345=_=_=cluster1=_=_=zone1)
 // and the snapshot path with a normalized volume ID of the source volume (e.g. k8s-e89c9d089e=_=_=19=_=_=csi0zone=_=_=cluster1).
 func normalizeSnapshot(ctx context.Context, snap isi.Snapshot, config *IsilonClusterConfig, s *service) {
-	ctx, log, _ := GetRunIDLog(ctx)
-	log = log.WithField("snapshotID", snap.ID)
+	log := log.WithContext(ctx)
+	log = log.WithFields(csmlog.Fields{"snapshotID": snap.ID})
 	log.Debugf("Normalizing snapshot: ID=%d", snap.ID)
 
 	snap.Name = id.GetNormalizedSnapshotID(ctx, strconv.FormatInt(snap.ID, 10), config.ClusterName, s.opts.AccessZone)
@@ -1751,19 +1759,20 @@ func (s *service) ControllerUnpublishVolume(
 	req *csi.ControllerUnpublishVolumeRequest) (
 	*csi.ControllerUnpublishVolumeResponse, error,
 ) {
-	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
+	logFields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", logFields["csi.requestid"])
 	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
 	azNetwork := ""
 
 	if req.VolumeId == "" {
-		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "ControllerUnpublishVolumeRequest.VolumeId is empty"))
+		return nil, status.Error(codes.InvalidArgument, GetMessageWithReqID(runID, "ControllerUnpublishVolumeRequest.VolumeId is empty"))
 	}
 
 	volumeName, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, req.VolumeId)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "failed to parse volume ID %s, error : %s", req.VolumeId, err.Error()))
+		return nil, status.Error(codes.InvalidArgument, GetMessageWithReqID(runID, "failed to parse volume ID %s, error : %s", req.VolumeId, err.Error()))
 	}
 
 	// Get the PV with the given volumeName
@@ -1778,16 +1787,17 @@ func (s *service) ControllerUnpublishVolume(
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Error("Failed to get Isilon config with error ", err.Error())
+		log.Errorf("Failed to get Isilon config with error : %v ", err.Error())
 		return nil, err
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
+	logFields[clusterName] = clusterName
+	ctx = csmlog.SetLogFields(ctx, logFields)
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	// auto probe
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
-		return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
+		return nil, status.Error(codes.FailedPrecondition, GetMessageWithReqID(runID, "error %s", err.Error()))
 	}
 
 	if volErr == nil {
@@ -1803,7 +1813,7 @@ func (s *service) ControllerUnpublishVolume(
 		ips, err := s.getIpsFromAZNetworkLabel(ctx, req.NodeId, azNetwork)
 		if err != nil {
 			log.Debugf("No matching IP(s) found from AZNetwork label %s", azNetwork)
-			return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "error %s", err.Error()))
+			return nil, status.Error(codes.FailedPrecondition, GetMessageWithReqID(runID, "error %s", err.Error()))
 		}
 		log.Debugf("Using IPs %s from AZNetwork %s to remove from export", ips, azNetwork)
 
@@ -1814,7 +1824,7 @@ func (s *service) ControllerUnpublishVolume(
 					return nil, delErr
 				}
 			} else {
-				return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error encountered when trying to remove clients %s from export %d with access zone %s on cluster %s, error %s", ips, exportID, accessZone, clusterName, err.Error()))
+				return nil, status.Error(codes.Internal, GetMessageWithReqID(runID, "error encountered when trying to remove clients %s from export %d with access zone %s on cluster %s, error %s", ips, exportID, accessZone, clusterName, err.Error()))
 			}
 		}
 	} else {
@@ -1824,7 +1834,7 @@ func (s *service) ControllerUnpublishVolume(
 		nodeID := req.GetNodeId()
 		if nodeID == "" {
 			return nil, status.Error(codes.InvalidArgument,
-				logging.GetMessageWithRunID(runID, "node ID is required"))
+				GetMessageWithReqID(runID, "node ID is required"))
 		}
 
 		log.Debugf("ignoreUnresolvableHosts value is '%t', for clusterName '%s'", *isiConfig.IgnoreUnresolvableHosts, clusterName)
@@ -1836,7 +1846,7 @@ func (s *service) ControllerUnpublishVolume(
 					return nil, delErr
 				}
 			} else {
-				return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error encountered when trying to remove client %s from export %d with access zone %s on cluster %s, error %s", nodeID, exportID, accessZone, clusterName, err.Error()))
+				return nil, status.Error(codes.Internal, GetMessageWithReqID(runID, "error encountered when trying to remove client %s from export %d with access zone %s on cluster %s, error %s", nodeID, exportID, accessZone, clusterName, err.Error()))
 			}
 		}
 	}
@@ -1858,18 +1868,16 @@ func (s *service) ControllerUnpublishVolume(
 //	[]string: The array of IP(s) associated with the matching AZNetwork label, or empty if not found
 //	error: Any error that occurs during the function call
 func (s *service) getIpsFromAZNetworkLabel(ctx context.Context, nodeID, azNetwork string) ([]string, error) {
-	// Fetch log handler
-	_, log, _ := GetRunIDLog(ctx)
-
+	log := log.WithContext(ctx)
 	// Get node labels
 	nodeName, _, _, err := id.ParseNodeID(ctx, nodeID)
 	if err != nil {
-		log.Error("failed to get Node Name with error", err.Error())
+		log.Errorf("failed to get Node Name with error %v", err.Error())
 		return nil, err
 	}
 	labels, err := getNodeLabelsWithNameFunc(s)(nodeName)
 	if err != nil {
-		log.Error("failed to get Node Labels with error", err.Error())
+		log.Errorf("failed to get Node Labels with error %v", err.Error())
 		return nil, err
 	}
 
@@ -1909,8 +1917,9 @@ func (s *service) GetCapacity(
 	var clusterName string
 	params := req.GetParameters()
 
-	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
+	logFields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", logFields["csi.requestid"])
 
 	if _, ok := params[ClusterNameParam]; ok {
 		if params[ClusterNameParam] == "" {
@@ -1922,11 +1931,12 @@ func (s *service) GetCapacity(
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Error("Failed to get Isilon config with error ", err.Error())
+		log.Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, err
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
+	logFields[clusterName] = clusterName
+	ctx = csmlog.SetLogFields(ctx, logFields)
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
@@ -1939,10 +1949,10 @@ func (s *service) GetCapacity(
 
 	stat, err := isiConfig.isiSvc.GetStatistics(ctx, keyArray)
 	if err != nil || len(stat.StatsList) < 1 {
-		return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "Could not retrieve capacity. %s", err.Error()))
+		return nil, status.Error(codes.Internal, GetMessageWithReqID(runID, "Could not retrieve capacity. %s", err.Error()))
 	}
 	if stat.StatsList[0].Error != "" {
-		return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "Could not retrieve capacity. Data returned error %s", stat.StatsList[0].Error))
+		return nil, status.Error(codes.Internal, GetMessageWithReqID(runID, "Could not retrieve capacity. Data returned error %s", stat.StatsList[0].Error))
 	}
 	remainingCapInBytes := stat.StatsList[0].Value
 
@@ -2049,15 +2059,14 @@ func (s *service) ControllerGetCapabilities(
 }
 
 func (s *service) controllerProbe(ctx context.Context, clusterConfig *IsilonClusterConfig) error {
-	// Fetch log handler
-	ctx, log, _ := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
 
 	if err := s.validateOptsParameters(clusterConfig); err != nil {
 		return fmt.Errorf("controller probe failed : '%v'", err)
 	}
 
 	if clusterConfig.isiSvc == nil {
-		logLevel := logging.GetCurrentLogLevel()
+		logLevel := csmlog.GetLevel()
 		var err error
 		clusterConfig.isiSvc, err = s.GetIsiService(ctx, clusterConfig, logLevel)
 		if clusterConfig.isiSvc == nil {
@@ -2085,28 +2094,30 @@ func (s *service) CreateSnapshot(
 	req *csi.CreateSnapshotRequest) (
 	*csi.CreateSnapshotResponse, error,
 ) {
-	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
+	logFields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", logFields["csi.requestid"])
 
 	log.Infof("CreateSnapshot started")
 	// parse the input volume id and fetch it's components
 	_, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
+		return nil, status.Errorf(codes.InvalidArgument, " ReqID=%s %s", runID, err.Error())
 	}
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Error("Failed to get Isilon config with error ", err.Error())
+		log.Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, err
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
+	logFields[clusterName] = clusterName
+	ctx = csmlog.SetLogFields(ctx, logFields)
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	// auto probe
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, " runid=%s %s", runID, err.Error())
+		return nil, status.Errorf(codes.FailedPrecondition, " ReqID=%s %s", runID, err.Error())
 	}
 
 	var (
@@ -2132,7 +2143,7 @@ func (s *service) CreateSnapshot(
 	// snapshotName: name of the snapshot that need to be created
 	srcVolumeID, snapshotName, err := s.validateCreateSnapshotRequest(ctx, req, isiPath, isiConfig)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
+		return nil, status.Errorf(codes.InvalidArgument, " ReqID=%s %s", runID, err.Error())
 	}
 
 	log.Infof("snapshot name is '%s' and source volume ID is '%s' access Zone is '%s'", snapshotName, srcVolumeID, accessZone)
@@ -2146,14 +2157,14 @@ func (s *service) CreateSnapshot(
 		}
 		// return already exists error
 		return nil, status.Error(codes.AlreadyExists,
-			logging.GetMessageWithRunID(runID, "a snapshot with name '%s' already exists but is "+
+			GetMessageWithReqID(runID, "a snapshot with name '%s' already exists but is "+
 				"incompatible with the specified source volume id '%s'", snapshotName, req.GetSourceVolumeId()))
 	}
 
 	// create new snapshot for source direcory
 	path := isilonfs.GetPathForVolume(isiPath, srcVolumeID)
 	if snapshotNew, err = isiConfig.isiSvc.CreateSnapshot(ctx, path, snapshotName); err != nil {
-		return nil, status.Errorf(codes.Internal, " runid=%s %s", runID, err.Error())
+		return nil, status.Errorf(codes.Internal, " ReqID=%s %s", runID, err.Error())
 	}
 	_, _ = isiConfig.isiSvc.GetSnapshot(ctx, snapshotName)
 
@@ -2167,26 +2178,28 @@ func (s *service) validateCreateSnapshotRequest(
 	ctx context.Context,
 	req *csi.CreateSnapshotRequest, isiPath string, isiConfig *IsilonClusterConfig,
 ) (string, string, error) {
-	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
+	logFields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", logFields["csi.requestid"])
 
 	srcVolumeID, _, _, clusterName, err := id.ParseNormalizedVolumeID(ctx, req.GetSourceVolumeId())
 	if err != nil {
-		return "", "", status.Errorf(codes.InvalidArgument, " runid=%s %s", runID, err.Error())
+		return "", "", status.Errorf(codes.InvalidArgument, " ReqID=%s %s", runID, err.Error())
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
+	logFields[clusterName] = clusterName
+	ctx = csmlog.SetLogFields(ctx, logFields)
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	if !isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, srcVolumeID, "") {
 		return "", "", status.Error(codes.InvalidArgument,
-			logging.GetMessageWithRunID(runID, "source volume id is invalid"))
+			GetMessageWithReqID(runID, "source volume id is invalid"))
 	}
 
 	snapshotName := req.GetName()
 	if snapshotName == "" {
 		return "", "", status.Error(codes.InvalidArgument,
-			logging.GetMessageWithRunID(runID, "name cannot be empty"))
+			GetMessageWithReqID(runID, "name cannot be empty"))
 	}
 
 	return srcVolumeID, snapshotName, nil
@@ -2222,11 +2235,12 @@ func (s *service) DeleteSnapshot(
 	req *csi.DeleteSnapshotRequest) (
 	*csi.DeleteSnapshotResponse, error,
 ) {
-	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
+	fields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", fields["csi.requestid"])
 	log.Infof("DeleteSnapshot started")
 	if req.GetSnapshotId() == "" {
-		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "snapshot id to be deleted is required"))
+		return nil, status.Error(codes.InvalidArgument, GetMessageWithReqID(runID, "snapshot id to be deleted is required"))
 	}
 	// parse the input snapshot id and fetch it's components
 	snapshotID, clusterName, accessZone, err := id.ParseNormalizedSnapshotID(ctx, req.GetSnapshotId())
@@ -2235,11 +2249,12 @@ func (s *service) DeleteSnapshot(
 	}
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Error("Failed to get Isilon config with error ", err.Error())
+		log.Errorf("Failed to get Isilon config with error %v ", err.Error())
 		return nil, err
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
+	fields[clusterName] = clusterName
+	ctx = csmlog.SetLogFields(ctx, fields)
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
@@ -2263,13 +2278,13 @@ func (s *service) DeleteSnapshot(
 				return &csi.DeleteSnapshotResponse{}, nil
 			}
 			// Internal server error if the error is not about "not found"
-			return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "cannot check the existence of the snapshot: %s", err.Error()))
+			return nil, status.Error(codes.Internal, GetMessageWithReqID(runID, "cannot check the existence of the snapshot: %s", err.Error()))
 		}
 
 		if jsonError.StatusCode == 404 {
 			return &csi.DeleteSnapshotResponse{}, nil
 		}
-		return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "cannot check the existence of the snapshot: %s", err.Error()))
+		return nil, status.Error(codes.Internal, GetMessageWithReqID(runID, "cannot check the existence of the snapshot: %s", err.Error()))
 	}
 
 	// Get snapshot path
@@ -2277,7 +2292,7 @@ func (s *service) DeleteSnapshot(
 	log.Infof("Snapshot source volume isiPath is '%s'", snapshotSourceVolumeIsiPath)
 	snapshotIsiPath, err := isiConfig.isiSvc.GetSnapshotIsiPath(ctx, snapshotSourceVolumeIsiPath, snapshotID, accessZone)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, " runid%s error %s", runID, err.Error())
+		return nil, status.Errorf(codes.Internal, " ReqID%s error %s", runID, err.Error())
 	}
 	log.Debugf("The Isilon directory path of snapshot is= %v", snapshotIsiPath)
 
@@ -2292,7 +2307,7 @@ func (s *service) DeleteSnapshot(
 	// Note: This is true only for RO volumes from snapshots
 	if export != nil {
 		if err := s.processSnapshotTrackingDirectoryDuringDeleteSnapshot(ctx, export, snapshotIsiPath, accessZone, &deleteSnapshot, isiConfig); err != nil {
-			log.Error("Failed to get RO volume from snapshot ", err.Error())
+			log.Errorf("Failed to get RO volume from snapshot %v ", err.Error())
 			return nil, err
 		}
 	}
@@ -2300,7 +2315,7 @@ func (s *service) DeleteSnapshot(
 	if deleteSnapshot {
 		err = isiConfig.isiSvc.DeleteSnapshot(ctx, id, "")
 		if err != nil {
-			return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error deleting snapshot: %s", err.Error()))
+			return nil, status.Error(codes.Internal, GetMessageWithReqID(runID, "error deleting snapshot: %s", err.Error()))
 		}
 	}
 	log.Infof("Snapshot with id '%s' deleted", snapshotID)
@@ -2315,9 +2330,7 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteSnapshot(
 	deleteSnapshot *bool,
 	isiConfig *IsilonClusterConfig,
 ) error {
-	// Fetch log handler
-	ctx, log, _ := GetRunIDLog(ctx)
-
+	log := log.WithContext(ctx)
 	// get Zone details
 	zone, err := isiConfig.isiSvc.GetZoneByName(ctx, accessZone)
 	if err != nil {
@@ -2438,8 +2451,9 @@ func addMetaData(params map[string]string) map[string]string {
 func (s *service) ControllerGetVolume(ctx context.Context,
 	req *csi.ControllerGetVolumeRequest,
 ) (*csi.ControllerGetVolumeResponse, error) {
-	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
+	logFields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", logFields["csi.requestid"])
 
 	abnormal := false
 	message := ""
@@ -2447,20 +2461,21 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 
 	volID := req.GetVolumeId()
 	if volID == "" {
-		return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "no VolumeID found in request"))
+		return nil, status.Error(codes.FailedPrecondition, GetMessageWithReqID(runID, "no VolumeID found in request"))
 	}
 
 	volName, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, volID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, " runid=%s error %s", runID, err.Error())
+		return nil, status.Errorf(codes.InvalidArgument, " ReqID=%s error %s", runID, err.Error())
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
+	logFields[clusterName] = clusterName
+	ctx = csmlog.SetLogFields(ctx, logFields)
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Error("Failed to get Isilon config with error ", err.Error())
+		log.Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, err
 	}
 
@@ -2468,16 +2483,16 @@ func (s *service) ControllerGetVolume(ctx context.Context,
 
 	isiPathFromParams, err := s.validateIsiPath(ctx, volName)
 	if err != nil {
-		log.Error("Failed get isiPath", err.Error())
+		log.Errorf("Failed get isiPath %v", err.Error())
 	}
 
 	if isiPathFromParams != isiPath && isiPathFromParams != "" {
-		log.Debug("overriding isiPath with value from StorageClass", isiPathFromParams)
+		log.Debugf("overriding isiPath with value from StorageClass %v", isiPathFromParams)
 		isiPath = isiPathFromParams
 	}
 
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, " runid=%s error %s", runID, err.Error())
+		return nil, status.Errorf(codes.FailedPrecondition, " ReqID=%s error %s", runID, err.Error())
 	}
 
 	// check if volume exists

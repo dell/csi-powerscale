@@ -20,12 +20,12 @@ import (
 	"context"
 	"fmt"
 
-	id "github.com/dell/csi-isilon/v2/common/utils/identifiers"
+	id "github.com/dell/csi-powerscale/v2/common/utils/identifiers"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 )
 
 func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmon.ValidateVolumeHostConnectivityRequest) (*podmon.ValidateVolumeHostConnectivityResponse, error) {
-	ctx, log, _ := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
 	log.Infof("ValidateVolumeHostConnectivity called %+v", req)
 	rep := &podmon.ValidateVolumeHostConnectivityResponse{
 		Messages: make([]string, 0),
@@ -66,7 +66,7 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 			// Get cluster config
 			isiConfig, err := s.getIsilonConfig(ctx, &systemID)
 			if err != nil {
-				log.Error("Failed to get Isilon config with error ", err.Error())
+				log.Errorf("Failed to get Isilon config with error %v ", err.Error())
 				return nil, err
 			}
 
@@ -90,7 +90,7 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 }
 
 func (s *service) getArrayIDsFromVolumes(ctx context.Context, systemIDs map[string]bool, requestVolumeIDs []string) bool {
-	ctx, log, _ := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
 	var err error
 	var systemID string
 	var foundAtLeastOne bool
@@ -115,7 +115,7 @@ func (s *service) getArrayIDsFromVolumes(ctx context.Context, systemIDs map[stri
 // checkIfNodeIsConnected looks at the 'nodeId' to determine if there is connectivity to the 'arrayId' array.
 // The 'rep' object will be filled with the results of the check.
 func (s *service) checkIfNodeIsConnected(ctx context.Context, arrayID string, nodeID string, rep *podmon.ValidateVolumeHostConnectivityResponse) error {
-	ctx, log, _ := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
 	log.Infof("Checking if array %s is connected to node %s", arrayID, nodeID)
 	var message string
 	rep.Connected = false

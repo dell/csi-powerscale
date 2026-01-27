@@ -23,12 +23,12 @@ import (
 	"reflect"
 	"testing"
 
-	isi "github.com/dell/goisilon"
-	"github.com/dell/goisilon/api"
-	apiv1 "github.com/dell/goisilon/api/v1"
-	apiv2 "github.com/dell/goisilon/api/v2"
-	apiv5 "github.com/dell/goisilon/api/v5"
-	isimocks "github.com/dell/goisilon/mocks"
+	isi "github.com/dell/gopowerscale"
+	"github.com/dell/gopowerscale/api"
+	apiv1 "github.com/dell/gopowerscale/api/v1"
+	apiv2 "github.com/dell/gopowerscale/api/v2"
+	apiv5 "github.com/dell/gopowerscale/api/v5"
+	isimocks "github.com/dell/gopowerscale/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

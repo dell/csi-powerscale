@@ -16,13 +16,13 @@ limitations under the License.
 package identifiers
 
 import (
-	"github.com/dell/csi-isilon/v2/common/utils/logging"
+	csmlog "github.com/dell/csmlog"
 	"github.com/google/uuid"
 )
 
 // GetNewUUID generates a UUID
 func GetNewUUID() (string, error) {
-	log := logging.GetLogger()
+	log := csmlog.GetLogger()
 	id, err := uuid.NewUUID()
 	if err != nil {
 		log.Errorf("error generating UUID : '%s'", err)

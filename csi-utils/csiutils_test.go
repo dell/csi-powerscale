@@ -22,8 +22,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/dell/csi-powerscale/v2/common/constants"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-isilon/v2/common/constants"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

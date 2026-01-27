@@ -27,17 +27,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dell/csi-powerscale/v2/common/constants"
+	fromctx "github.com/dell/csi-powerscale/v2/common/utils/fromcontext"
+	ident "github.com/dell/csi-powerscale/v2/common/utils/identifiers"
+	isilonfs "github.com/dell/csi-powerscale/v2/common/utils/powerscale-fs"
+	strutil "github.com/dell/csi-powerscale/v2/common/utils/string-utils"
+	csiutils "github.com/dell/csi-powerscale/v2/csi-utils"
+	"github.com/dell/csi-powerscale/v2/service"
+	isi "github.com/dell/gopowerscale"
+	apiv1 "github.com/dell/gopowerscale/api/v1"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
-	"github.com/dell/csi-isilon/v2/common/constants"
-	fromctx "github.com/dell/csi-isilon/v2/common/utils/fromcontext"
-	ident "github.com/dell/csi-isilon/v2/common/utils/identifiers"
-	isilonfs "github.com/dell/csi-isilon/v2/common/utils/powerscale-fs"
-	strutil "github.com/dell/csi-isilon/v2/common/utils/string-utils"
-	csiutils "github.com/dell/csi-isilon/v2/csi-utils"
-	"github.com/dell/csi-isilon/v2/service"
-	isi "github.com/dell/goisilon"
-	apiv1 "github.com/dell/goisilon/api/v1"
 	"gopkg.in/yaml.v3"
 )
 
@@ -154,7 +154,6 @@ func (f *feature) aBasicVolumeRequest(name string, size int64) error {
 func (f *feature) iCallCreateVolume() error {
 	time.Sleep(RetrySleepTime)
 	ctx := context.Background()
-	ctx, _, _ = service.GetRunIDLog(ctx)
 	volResp, err := f.createVolume(f.createVolumeRequest)
 	if err != nil {
 		fmt.Printf("CreateVolume: '%s'\n", err.Error())
@@ -619,7 +618,6 @@ func (f *feature) checkNodeExistsForOneExport(am *csi.VolumeCapability_AccessMod
 func (f *feature) checkIsilonClientExistsForOneExport(nodeIP string, exportID int, accessZone string) error {
 	isiClient, _ = createIsilonClient()
 	ctx := context.Background()
-	ctx, _, _ = service.GetRunIDLog(ctx)
 	export, _ := isiClient.GetExportByIDWithZone(ctx, exportID, accessZone)
 	if export == nil {
 		panic(fmt.Sprintf("failed to get export by id '%d' and zone '%s'\n", exportID, accessZone))
@@ -691,7 +689,6 @@ func (f *feature) nodeUnstageVolume(req *csi.NodeUnstageVolumeRequest) error {
 func (f *feature) checkIsilonClientNotExistsForOneExport(nodeIP string, exportID int, accessZone string) error {
 	isiClient, _ = createIsilonClient()
 	ctx := context.Background()
-	ctx, _, _ = service.GetRunIDLog(ctx)
 	export, _ := isiClient.GetExportByIDWithZone(ctx, exportID, accessZone)
 	if export == nil {
 		panic(fmt.Sprintf("failed to get export by id '%d' and zone '%s'\n", exportID, accessZone))
@@ -1065,7 +1062,6 @@ func (f *feature) iCallCreateVolumeFromVolume(newVolume, srcVolume string, size 
 func (f *feature) createAVolume(req *csi.CreateVolumeRequest, voltype string) error {
 	time.Sleep(SleepTime)
 	ctx := context.Background()
-	ctx, _, _ = service.GetRunIDLog(ctx)
 	client := csi.NewControllerClient(grpcClient)
 	volResp, err := client.CreateVolume(ctx, req)
 	if err != nil {
@@ -1148,7 +1144,6 @@ func (f *feature) getMountVolumeRequest(name string) *csi.CreateVolumeRequest {
 
 func (f *feature) iCreateVolumesInParallel(nVols int) error {
 	ctx := context.Background()
-	ctx, _, _ = service.GetRunIDLog(ctx)
 	idchan := make(chan string, nVols)
 	errchan := make(chan error, nVols)
 	t0 := time.Now()
@@ -1305,7 +1300,6 @@ func (f *feature) iNodeStageVolumesInParallel(nVols int) error {
 
 func (f *feature) checkIsilonClientsExist(nVols int) error {
 	ctx := context.Background()
-	ctx, _, _ = service.GetRunIDLog(ctx)
 	for i := 0; i < nVols; i++ {
 		volName := fmt.Sprintf("scale%d", i)
 		volID := f.volNameID[volName]
@@ -1321,7 +1315,6 @@ func (f *feature) checkIsilonClientsExist(nVols int) error {
 
 func (f *feature) checkIsilonClientsNotExist(nVols int) error {
 	ctx := context.Background()
-	ctx, _, _ = service.GetRunIDLog(ctx)
 	for i := 0; i < nVols; i++ {
 		volName := fmt.Sprintf("scale%d", i)
 		volID := f.volNameID[volName]

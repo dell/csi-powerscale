@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
+Copyright (c) 2019-2026 Dell Inc, or its subsidiaries.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,32 +26,31 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	"github.com/akutz/gournal"
-	"github.com/dell/csi-isilon/v2/common/k8sutils"
-	isilonfs "github.com/dell/csi-isilon/v2/common/utils/powerscale-fs"
+	"github.com/dell/csi-powerscale/v2/common/k8sutils"
+	isilonfs "github.com/dell/csi-powerscale/v2/common/utils/powerscale-fs"
+
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"gopkg.in/yaml.v3"
 
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-isilon/v2/common/constants"
-	fromctx "github.com/dell/csi-isilon/v2/common/utils/fromcontext"
-	id "github.com/dell/csi-isilon/v2/common/utils/identifiers"
-	"github.com/dell/csi-isilon/v2/common/utils/logging"
-	"github.com/dell/csi-isilon/v2/core"
+	"github.com/dell/csi-powerscale/v2/common/constants"
+	fromctx "github.com/dell/csi-powerscale/v2/common/utils/fromcontext"
+	id "github.com/dell/csi-powerscale/v2/common/utils/identifiers"
+
+	"github.com/dell/csi-powerscale/v2/core"
 	commonext "github.com/dell/dell-csi-extensions/common"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
-	isi "github.com/dell/goisilon"
+	isi "github.com/dell/gopowerscale"
+	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/fsnotify/fsnotify"
-	"github.com/sirupsen/logrus"
+
+	csmlog "github.com/dell/csmlog"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -64,17 +63,18 @@ import (
 
 var (
 	// To maintain runid for Non debug mode. Note: CSI will not generate runid if CSI_DEBUG=false
-	runid            int64
 	isilonConfigFile string
 	// DriverConfigParamsFile is the name of the input driver config params file
 	DriverConfigParamsFile string
-	updateMutex            sync.Mutex
-	Manifest               = map[string]string{
-		"url":    "http://github.com/dell/csi-isilon",
-		"semver": core.SemVer,
-		"commit": core.CommitSha32,
+
+	// Update when the manifest version changes.
+	ManifestSemver string
+
+	Manifest = map[string]string{
+		"semver": ManifestSemver,
 		"formed": core.CommitTime.Format(time.RFC1123),
 	}
+
 	noProbeOnStart bool
 
 	newIsiClientWithArgsFunc = isi.NewClientWithArgs
@@ -90,7 +90,7 @@ type Service interface {
 }
 
 type azNetworkLabels interface {
-	setAzReconcileInterval(log *logrus.Logger, v *viper.Viper)
+	setAzReconcileInterval(log *csmlog.CsmLog, v *viper.Viper)
 	getReconcileInterval() time.Duration
 	getUpdateIntervalChannel() <-chan time.Duration
 	ReconcileNodeAzLabels(ctx context.Context) error
@@ -175,7 +175,7 @@ func New() Service {
 }
 
 func (s *service) initializeServiceOpts(ctx context.Context) error {
-	log := logging.GetLogger()
+	log := log.WithContext(ctx)
 	// Get the SP's operating mode.
 	s.mode = csictx.Getenv(ctx, gocsi.EnvVarMode)
 
@@ -323,7 +323,7 @@ func (s *service) ValidateDeleteVolumeRequest(ctx context.Context,
 
 func (s *service) probeAllClusters(ctx context.Context) error {
 	isilonClusters := s.getIsilonClusters()
-	ctx, log := GetLogger(ctx)
+	log := log.WithContext(ctx)
 
 	probeSuccessCount := 0
 	for i := range isilonClusters {
@@ -343,7 +343,7 @@ func (s *service) probeAllClusters(ctx context.Context) error {
 }
 
 func (s *service) probe(ctx context.Context, clusterConfig *IsilonClusterConfig) error {
-	ctx, log := GetLogger(ctx)
+	log := log.WithContext(ctx)
 	log.Debugf("calling probe for cluster '%s'", clusterConfig.ClusterName)
 	// Do a controller probe
 	if strings.EqualFold(s.mode, constants.ModeController) {
@@ -374,7 +374,7 @@ func (s *service) probe(ctx context.Context, clusterConfig *IsilonClusterConfig)
 }
 
 func (s *service) probeOnStart(ctx context.Context) error {
-	ctx, log := GetLogger(ctx)
+	log := log.WithContext(ctx)
 	if noProbeOnStart {
 		log.Debugf("noProbeOnStart is true , skip probe")
 		return nil
@@ -384,7 +384,7 @@ func (s *service) probeOnStart(ctx context.Context) error {
 }
 
 func (s *service) setNoProbeOnStart(ctx context.Context) {
-	ctx, log := GetLogger(ctx)
+	log := log.WithContext(ctx)
 	if fromctx.GetBoolean(ctx, constants.EnvNoProbeOnStart) {
 		log.Debug("X_CSI_ISI_NO_PROBE_ON_START is true, set noProbeOnStart to true")
 		noProbeOnStart = true
@@ -395,7 +395,7 @@ func (s *service) setNoProbeOnStart(ctx context.Context) {
 }
 
 func (s *service) autoProbe(ctx context.Context, isiConfig *IsilonClusterConfig) error {
-	ctx, log := GetLogger(ctx)
+	log := log.WithContext(ctx)
 	if isiConfig.isiSvc != nil {
 		log.Debug("isiSvc already initialized, skip probing")
 		return nil
@@ -410,8 +410,8 @@ func (s *service) autoProbe(ctx context.Context, isiConfig *IsilonClusterConfig)
 	return s.probe(ctx, isiConfig)
 }
 
-func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClusterConfig, logLevel logrus.Level) (*isi.Client, error) {
-	clientCtx, log := GetLogger(clientCtx)
+func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClusterConfig, _ csmlog.Level) (*isi.Client, error) {
+	log := log.WithContext(clientCtx)
 
 	// First we fetch node labels using kubernetes API and check, if label
 	// <provisionerName>.dellemc.com/<powerscalefqdnorip>: <provisionerName>
@@ -448,24 +448,6 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 		log.Errorf("init client failed for custom topology")
 		return nil, errors.New("init client failed for custom topology")
 	}
-
-	if logLevel == logrus.DebugLevel {
-		clientCtx = context.WithValue(
-			clientCtx,
-			gournal.LevelKey(),
-			gournal.DebugLevel)
-
-		gournal.DefaultLevel = gournal.DebugLevel
-	} else {
-		gournalLevel := getGournalLevelFromLogrusLevel(logLevel)
-		clientCtx = context.WithValue(
-			clientCtx,
-			gournal.LevelKey(),
-			gournalLevel)
-
-		gournal.DefaultLevel = gournalLevel
-	}
-
 	client, err := newIsiClientWithArgsFunc(
 		clientCtx,
 		isiConfig.EndpointURL,
@@ -487,12 +469,7 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 	return client, nil
 }
 
-func getGournalLevelFromLogrusLevel(logLevel logrus.Level) gournal.Level {
-	gournalLevel := gournal.ParseLevel(logLevel.String())
-	return gournalLevel
-}
-
-func (s *service) GetIsiService(clientCtx context.Context, isiConfig *IsilonClusterConfig, logLevel logrus.Level) (*isiService, error) {
+func (s *service) GetIsiService(clientCtx context.Context, isiConfig *IsilonClusterConfig, logLevel csmlog.Level) (*isiService, error) {
 	var isiClient *isi.Client
 	var err error
 	if isiClient, err = s.GetIsiClient(clientCtx, isiConfig, logLevel); err != nil {
@@ -523,13 +500,13 @@ func (s *service) logServiceStats() {
 		"mode":                      s.mode,
 	}
 	// TODO: Replace logrus with log
-	logrus.WithFields(fields).Infof("Configured '%s'", constants.PluginName)
+	log.WithFields(fields).Infof("Configured '%s'", constants.PluginName)
 }
 
 func (s *service) BeforeServe(
 	ctx context.Context, _ *gocsi.StoragePlugin, _ net.Listener,
 ) error {
-	log := logging.GetLogger()
+	log := log.WithContext(ctx)
 
 	if err := s.initializeServiceOpts(ctx); err != nil {
 		return err
@@ -557,7 +534,7 @@ func (s *service) BeforeServe(
 	vc.OnConfigChange(func(_ fsnotify.Event) {
 		log.Infof("Driver config params file changed")
 		if err := s.updateDriverConfigParams(ctx, vc); err != nil {
-			log.Warn(err)
+			log.Warn(err.Error())
 		}
 	})
 
@@ -579,7 +556,6 @@ func (s *service) BeforeServe(
 
 // RegisterAdditionalServers registers any additional grpc services that use the CSI socket.
 func (s *service) RegisterAdditionalServers(server *grpc.Server) {
-	_, log := GetLogger(context.Background())
 	log.Info("Registering additional GRPC servers")
 	csiext.RegisterReplicationServer(server, s)
 	vgsext.RegisterVolumeGroupSnapshotServer(server, s)
@@ -587,13 +563,13 @@ func (s *service) RegisterAdditionalServers(server *grpc.Server) {
 }
 
 func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) error {
-	ctx, log := GetLogger(ctx)
+	log := log.WithContext(ctx)
 	log.Info("Updating cluster config details")
 	watcher, _ := fsnotify.NewWatcher()
 	defer watcher.Close()
 
 	parentFolder, _ := filepath.Abs(filepath.Dir(configFile))
-	log.Debug("Config folder: ", parentFolder)
+	log.Debugf("Config folder: %v", parentFolder)
 	done := make(chan bool)
 	go func() {
 		for {
@@ -608,8 +584,8 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 					noProbeOnStart = false
 					err := s.syncIsilonConfigs(ctx)
 					if err != nil {
-						log.Debug("Cluster configuration array length:", s.getIsilonClusterLength())
-						log.Error("Invalid configuration in secret.yaml. Error:", err)
+						log.Debugf("Cluster configuration array length: %v", s.getIsilonClusterLength())
+						log.Errorf("Invalid configuration in secret.yaml. Error: %v", err)
 					}
 				}
 
@@ -617,13 +593,13 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 				if !ok {
 					return
 				}
-				log.Error("cluster config file load error:", err)
+				log.Errorf("cluster config file load error: %v", err)
 			}
 		}
 	}()
 	err := watcher.Add(parentFolder)
 	if err != nil {
-		log.Error("Unable to add file watcher for folder ", parentFolder)
+		log.Errorf("Unable to add file watcher for folder %v", parentFolder)
 		return err
 	}
 	<-done
@@ -644,7 +620,7 @@ func (s *service) getUpdateIntervalChannel() <-chan time.Duration {
 
 // reconcileNodeAzLabels reconciles the node access zone labels
 func (r *reconciler) reconcileNodeAzLabels(ctx context.Context) error {
-	_, log := GetLogger(ctx)
+	log := log.WithContext(ctx)
 
 	azReconcileInterval := r.service.getReconcileInterval()
 
@@ -689,14 +665,14 @@ func (s *service) getIsilonClusterLength() (length int) {
 		length++
 		return true
 	})
-	return
+	return length
 }
 
 var syncMutex sync.Mutex
 
 // Reads the credentials from secrets and initialize all arrays.
 func (s *service) syncIsilonConfigs(ctx context.Context) error {
-	ctx, log := GetLogger(ctx)
+	log := log.WithContext(ctx)
 	log.Info("************* Synchronizing Isilon Clusters' config **************")
 	syncMutex.Lock()
 	defer syncMutex.Unlock()
@@ -745,8 +721,8 @@ func unmarshalYAMLContent(configBytes []byte) (*IsilonClusters, error) {
 func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (map[interface{}]interface{}, string, error) {
 	var noOfDefaultClusters int
 	var defaultIsiClusterName string
-	logLevel := logging.GetCurrentLogLevel()
-	log := logging.GetLogger()
+	logLevel := csmlog.GetLevel()
+	log := log.WithContext(ctx)
 
 	var inputConfigs *IsilonClusters
 	var yamlErr error
@@ -812,9 +788,10 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 		}
 
 		config.EndpointURL = fmt.Sprintf("https://%s:%s", config.Endpoint, config.EndpointPort)
-		clientCtx, _ := GetLogger(ctx)
+		// clientCtx, _ := GetLogger(ctx)
+		// Need to verify this part
 		if !noProbeOnStart {
-			config.isiSvc, err = s.GetIsiService(clientCtx, &config, logLevel)
+			config.isiSvc, err = s.GetIsiService(ctx, &config, logLevel)
 			if err != nil {
 				log.Errorf("failed to get isi client for  cluster %s, error: %v", config.ClusterName, err)
 			}
@@ -857,14 +834,13 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 			"IgnoreUnresolvableHosts":   *config.IgnoreUnresolvableHosts,
 		}
 		// TODO: Replace logrus with log
-		logrus.WithFields(fields).Infof("new config details set for cluster %s", config.ClusterName)
+		log.WithFields(fields).Infof("new config details set for cluster %s", config.ClusterName)
 	}
 
 	return newIsiClusters, defaultIsiClusterName, nil
 }
 
 func handler(_, value interface{}) bool {
-	_, log := GetLogger(context.Background())
 	log.Debug(value.(*IsilonClusterConfig).String())
 	return true
 }
@@ -889,20 +865,20 @@ func (s *service) getIsilonClusters() []*IsilonClusterConfig {
 
 // Update configurable params from configmap
 func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) error {
-	log := logging.GetLogger()
+	log := log.WithContext(ctx)
 	logLevel := constants.DefaultLogLevel
 	if v.IsSet(constants.ParamCSILogLevel) {
 		inputLogLevel := v.GetString(constants.ParamCSILogLevel)
 		if inputLogLevel != "" {
 			inputLogLevel = strings.ToLower(inputLogLevel)
 			var err error
-			logLevel, err = logging.ParseLogLevel(inputLogLevel)
+			logLevel, err = csmlog.ParseLevel(inputLogLevel)
 			if err != nil {
 				return fmt.Errorf("input log level %q is not valid", inputLogLevel)
 			}
 		}
 	}
-	logging.UpdateLogLevel(logLevel, &updateMutex)
+	csmlog.SetLevel(logLevel)
 	log.Infof("log level set to '%s'", logLevel)
 
 	// set access zone network label interval
@@ -916,7 +892,7 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 	return nil
 }
 
-func (s *service) setAzReconcileInterval(log *logrus.Logger, v *viper.Viper) {
+func (s *service) setAzReconcileInterval(log *csmlog.CsmLog, v *viper.Viper) {
 	var azReconcileIntervalStr string
 	if v.IsSet(constants.ParamAZReconcileInterval) {
 		azReconcileIntervalStr = v.GetString(constants.ParamAZReconcileInterval)
@@ -930,7 +906,7 @@ func (s *service) setAzReconcileInterval(log *logrus.Logger, v *viper.Viper) {
 
 	interval, err := time.ParseDuration(azReconcileIntervalStr)
 	if err != nil {
-		log.Error(err, fmt.Sprintf("parsing access zone reconcile interval %s, defaulting to %s", azReconcileIntervalStr, constants.DefaultAZReconcileInterval))
+		log.Errorf(err.Error(), fmt.Sprintf("parsing access zone reconcile interval %s, defaulting to %s", azReconcileIntervalStr, constants.DefaultAZReconcileInterval))
 		interval = constants.DefaultAZReconcileInterval
 	}
 	log.Infof("access zone reconcile interval set to %s", interval)
@@ -987,7 +963,7 @@ func (s *service) logStatistics() {
 			"StackSys":     memstats.StackSys,
 		}
 		// TODO: Replace logrus with log
-		logrus.WithFields(fields).Debugf("resource statistics counter: %d", s.statisticsCounter)
+		log.WithFields(fields).Debugf("resource statistics counter: %d", s.statisticsCounter)
 	}
 }
 
@@ -998,116 +974,24 @@ func (s *service) getIsiPathForVolumeFromClusterConfig(clusterConfig *IsilonClus
 	return clusterConfig.IsiPath
 }
 
-// Set cluster name in log messages and re-initialize the context
-func setClusterContext(ctx context.Context, clusterName string) (context.Context, *logrus.Entry) {
-	return setLogFieldsInContext(ctx, clusterName, logging.ClusterName)
+// GetMessageWithReqID returns message with reqID information
+func GetMessageWithReqID(ReqID string, format string, args ...interface{}) string {
+	str := fmt.Sprintf(format, args...)
+	return fmt.Sprintf(" ReqID=%s %s", ReqID, str)
 }
 
-// Set runID in log messages and re-initialize the context
-func setRunIDContext(ctx context.Context, runID string) (context.Context, *logrus.Entry) {
-	return setLogFieldsInContext(ctx, runID, logging.RunID)
-}
-
-var logMutex sync.Mutex
-
-// Common method to get log and context
-func setLogFieldsInContext(ctx context.Context, logParam string, logType string) (context.Context, *logrus.Entry) {
-	logMutex.Lock()
-	defer logMutex.Unlock()
-
-	fields := logrus.Fields{}
-	fields, ok := ctx.Value(logging.LogFields).(logrus.Fields)
-	if !ok {
-		fields = logrus.Fields{}
+// LogMap logs the key-value entries of a given map
+func LogMap(ctx context.Context, mapName string, m map[string]string) {
+	log := log.WithContext(ctx)
+	log.Debugf("map '%s':", mapName)
+	for key, value := range m {
+		log.Debugf("    [%s]='%s'", key, value)
 	}
-	if fields == nil {
-		fields = logrus.Fields{}
-	}
-	fields[logType] = logParam
-	ulog, ok := ctx.Value(logging.PowerScaleLogger).(*logrus.Entry)
-	if !ok {
-		ulog = logging.GetLogger().WithFields(fields)
-	}
-	ulog = ulog.WithFields(fields)
-	ctx = context.WithValue(ctx, logging.PowerScaleLogger, ulog)
-	ctx = context.WithValue(ctx, logging.LogFields, fields)
-	return ctx, ulog
-}
-
-// GetLogger creates custom logger handler
-func GetLogger(ctx context.Context) (context.Context, *logrus.Entry) {
-	var rid string
-	fields := logrus.Fields{}
-	if ctx == nil {
-		return ctx, logging.GetLogger().WithFields(fields)
-	}
-
-	headers, ok := metadata.FromIncomingContext(ctx)
-	if ok {
-		reqid, ok := headers[csictx.RequestIDKey]
-		if ok && len(reqid) > 0 {
-			rid = reqid[0]
-		}
-	}
-
-	fields, _ = ctx.Value(logging.LogFields).(logrus.Fields)
-	if fields == nil {
-		fields = logrus.Fields{}
-	}
-
-	if ok {
-		fields[logging.RequestID] = rid
-	}
-
-	logMutex.Lock()
-	defer logMutex.Unlock()
-	l := logging.GetLogger()
-	logWithFields := l.WithFields(fields)
-	ctx = context.WithValue(ctx, logging.PowerScaleLogger, logWithFields)
-	ctx = context.WithValue(ctx, logging.LogFields, fields)
-	return ctx, logWithFields
-}
-
-// GetRunIDLog function returns logger with runID
-func GetRunIDLog(ctx context.Context) (context.Context, *logrus.Entry, string) {
-	var rid string
-	fields := logrus.Fields{}
-	if ctx == nil {
-		return ctx, logging.GetLogger().WithFields(fields), rid
-	}
-
-	headers, ok := metadata.FromIncomingContext(ctx)
-	if ok {
-		reqid, ok := headers[csictx.RequestIDKey]
-		if ok && len(reqid) > 0 {
-			rid = reqid[0]
-		} else {
-			atomic.AddInt64(&runid, 1)
-			rid = fmt.Sprintf("%d", runid)
-		}
-	}
-
-	fields, _ = ctx.Value(logging.LogFields).(logrus.Fields)
-	if fields == nil {
-		fields = logrus.Fields{}
-	}
-
-	if ok {
-		fields[logging.RunID] = rid
-	}
-
-	logMutex.Lock()
-	defer logMutex.Unlock()
-	l := logging.GetLogger()
-	log := l.WithFields(fields)
-	ctx = context.WithValue(ctx, logging.PowerScaleLogger, log)
-	ctx = context.WithValue(ctx, logging.LogFields, fields)
-	return ctx, log, rid
 }
 
 // getIsilonConfig returns the cluster config
 func (s *service) getIsilonConfig(ctx context.Context, clusterName *string) (*IsilonClusterConfig, error) {
-	ctx, log := GetLogger(ctx)
+	log := log.WithContext(ctx)
 	if *clusterName == "" {
 		log.Infof("Request doesn't include cluster name. Use default cluster '%s'", s.defaultIsiClusterName)
 		*clusterName = s.defaultIsiClusterName
@@ -1125,7 +1009,6 @@ func (s *service) getIsilonConfig(ctx context.Context, clusterName *string) (*Is
 }
 
 func (s *service) GetNodeLabels() (map[string]string, error) {
-	log := logging.GetLogger()
 	k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
 	if err != nil {
 		log.Errorf("init client failed: '%s'", err.Error())
@@ -1151,7 +1034,6 @@ var (
 )
 
 func (s *service) GetNodeLabelsWithName(nodeName string) (map[string]string, error) {
-	log := logging.GetLogger()
 	k8sclientset, err := getKubeClientSet(s.opts.KubeConfigPath)
 	if err != nil {
 		log.Errorf("init client failed: '%s'", err.Error())
@@ -1168,8 +1050,6 @@ func (s *service) GetNodeLabelsWithName(nodeName string) (map[string]string, err
 }
 
 func (s *service) PatchNodeLabels(add map[string]string, remove []string) error {
-	log := logging.GetLogger()
-
 	node, err := s.k8sclient.CoreV1().Nodes().Get(context.TODO(), s.nodeID, v1.GetOptions{})
 	if err != nil {
 		log.Errorf("failed to get current node details: '%s'", err.Error())
@@ -1216,7 +1096,7 @@ func (s *service) ProbeController(ctx context.Context,
 	_ *commonext.ProbeControllerRequest) (
 	*commonext.ProbeControllerResponse, error,
 ) {
-	ctx, log := GetLogger(ctx)
+	log := log.WithContext(ctx)
 
 	if !strings.EqualFold(s.mode, "node") {
 		log.Debugf("controllerProbe")
@@ -1231,7 +1111,7 @@ func (s *service) ProbeController(ctx context.Context,
 	rep := new(commonext.ProbeControllerResponse)
 	rep.Ready = ready
 	rep.Name = constants.PluginName
-	rep.VendorVersion = core.SemVer
+	rep.VendorVersion = Manifest["semver"]
 	rep.Manifest = Manifest
 
 	log.Debug(fmt.Sprintf("ProbeController returning: %v", rep.Ready.GetValue()))
@@ -1245,7 +1125,7 @@ func (s *service) WithRP(key string) string {
 }
 
 func (s *service) validateIsiPath(ctx context.Context, volName string) (string, error) {
-	ctx, log := GetLogger(ctx)
+	log := log.WithContext(ctx)
 	if s.k8sclient == nil {
 		return "", errors.New("no k8s clientset")
 	}
@@ -1262,7 +1142,7 @@ func (s *service) validateIsiPath(ctx context.Context, volName string) (string, 
 		if pv.Spec.CSI.VolumeAttributes[ExportPathParam] != "" {
 			exportPath := pv.Spec.CSI.VolumeAttributes[ExportPathParam]
 			isiPath := isilonfs.GetIsiPathFromExportPath(exportPath)
-			log.Debug("Found IsiPath from PersistentVolume: ", isiPath)
+			log.Debugf("Found IsiPath from PersistentVolume: %v", isiPath)
 			return isiPath, nil
 		}
 	}
@@ -1275,7 +1155,7 @@ func (s *service) validateIsiPath(ctx context.Context, volName string) (string, 
 		return "", nil
 	}
 
-	log.Debug("Checking StorageClass: ", pv.Spec.StorageClassName)
+	log.Debugf("Checking StorageClass: %v", pv.Spec.StorageClassName)
 
 	sc, err := s.k8sclient.StorageV1().StorageClasses().Get(ctx, pv.Spec.StorageClassName, v1.GetOptions{})
 	if err != nil {
@@ -1292,7 +1172,7 @@ func (s *service) validateIsiPath(ctx context.Context, volName string) (string, 
 }
 
 func getExportPathFromExportID(ctx context.Context, isiConfig *IsilonClusterConfig, exportID int, accessZone string) (string, error) {
-	ctx, log, _ := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
 	export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
 	if err != nil {
 		log.Error("Failed to get export with error: " + err.Error())

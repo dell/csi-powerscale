@@ -29,11 +29,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/akutz/gournal"
+	"github.com/dell/csi-powerscale/v2/common/constants"
+	"github.com/dell/csmlog"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
-	"github.com/dell/csi-isilon/v2/common/constants"
-	"github.com/sirupsen/logrus"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/mock"
@@ -98,16 +98,6 @@ func TestMain(m *testing.M) {
 	fmt.Printf("status %d\n", status)
 
 	os.Exit(status)
-}
-
-func TestGetLoggerfunc(t *testing.T) {
-	ctx, _ := GetLogger(context.TODO())
-	assert.NotNil(t, ctx)
-}
-
-func TestGetRunIDLogfunc(t *testing.T) {
-	ctx, _, _ := GetRunIDLog(context.TODO())
-	assert.NotNil(t, ctx)
 }
 
 func TestGetIsiPathForVolumeFromClusterConfig(t *testing.T) {
@@ -605,13 +595,6 @@ func TestLoadIsilonConfigs(t *testing.T) {
 	time.Sleep(1 * time.Second)
 }
 
-func TestSetRunIDContext(t *testing.T) {
-	ctx := context.Background()
-	runID := "test-run-123"
-	newCtx, _ := setRunIDContext(ctx, runID)
-	require.NotNil(t, newCtx)
-}
-
 func TestGetIsiClient(t *testing.T) {
 	o := Opts{
 		CustomTopologyEnabled: true,
@@ -621,7 +604,7 @@ func TestGetIsiClient(t *testing.T) {
 	}
 	ctx := context.Background()
 	isiConfig := IsilonClusterConfig{}
-	logLevel := logrus.InfoLevel
+	logLevel := csmlog.InfoLevel
 	_, err := s.GetIsiClient(ctx, &isiConfig, logLevel)
 	assert.NotEqual(t, nil, err)
 }
@@ -902,12 +885,6 @@ func TestSetNoProbeOnStart(_ *testing.T) {
 	s.setNoProbeOnStart(ctx)
 }
 
-func TestGetGournalLevel(t *testing.T) {
-	logLevel := logrus.InfoLevel
-	level := getGournalLevelFromLogrusLevel(logLevel)
-	assert.Equal(t, gournal.ParseLevel(logLevel.String()), level)
-}
-
 func TestValidateIsiPath(t *testing.T) {
 	var mu sync.Mutex
 
@@ -1123,8 +1100,6 @@ func TestSetAzReconcileInterval(t *testing.T) {
 				v.Set(constants.ParamAZReconcileInterval, tt.intervalStr)
 			}
 
-			log := logrus.New()
-
 			s.setAzReconcileInterval(log, v)
 			assert.Equal(t, tt.expectedInterval, s.azReconcileInterval)
 		})
@@ -1149,7 +1124,7 @@ func (m *mockReconciler) ReconcileNodeAzLabels(ctx context.Context) error {
 	return m.reconcileNodeAzLabelsFunc(ctx)
 }
 
-func (m *mockReconciler) setAzReconcileInterval(_ *logrus.Logger, _ *viper.Viper) {}
+func (m *mockReconciler) setAzReconcileInterval(_ *csmlog.CsmLog, _ *viper.Viper) {}
 
 func TestGetReconcileInterval(t *testing.T) {
 	expectedInterval := 5 * time.Second
@@ -1287,4 +1262,35 @@ func TestService_reconcileNodeAzLabels(t *testing.T) {
 			t.Errorf("expected reconcile not to be called, but got %d calls", reconcileCalled.Load())
 		}
 	})
+}
+
+func TestGetMessageWithReqID(t *testing.T) {
+	tests := []struct {
+		name     string
+		ReqID    string
+		format   string
+		args     []interface{}
+		expected string
+	}{
+		{"Basic message", "12345", "Process started", nil, " ReqID=12345 Process started"},
+		{"Formatted message", "98765", "Error code: %d", []interface{}{404}, " ReqID=98765 Error code: 404"},
+		{"Multiple arguments", "56789", "User %s logged in at %s", []interface{}{"Alice", "10:00 AM"}, " ReqID=56789 User Alice logged in at 10:00 AM"},
+		{"Empty ReqID", "", "System rebooting", nil, " ReqID= System rebooting"},
+		{"Empty format", "54321", "", nil, " ReqID=54321 "},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GetMessageWithReqID(tt.ReqID, tt.format, tt.args...)
+			if got != tt.expected {
+				t.Errorf("Expected %q, got %q", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestLogMap(_ *testing.T) {
+	ctx := context.Background()
+	m := map[string]string{"key1": "value1", "key2": "value2"}
+	LogMap(ctx, "testMap", m)
 }

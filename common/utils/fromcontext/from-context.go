@@ -20,18 +20,20 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/dell/csi-isilon/v2/common/utils/logging"
+	csmlog "github.com/dell/csmlog"
 	csictx "github.com/dell/gocsi/context"
 	"gopkg.in/yaml.v3"
 )
 
+var log = csmlog.GetLogger()
+
 // GetBoolean parses an environment variable into a boolean value. If an error is encountered, default is set to false, and error is logged
 func GetBoolean(ctx context.Context, key string) bool {
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 	if val, ok := csictx.LookupEnv(ctx, key); ok {
 		b, err := strconv.ParseBool(val)
 		if err != nil {
-			log.WithField(key, val).Debugf(
+			log.WithFields(csmlog.Fields{key: val}).Debugf(
 				"invalid boolean value for '%s', defaulting to false", key)
 			return false
 		}
@@ -55,11 +57,11 @@ func GetArray(ctx context.Context, key string) ([]string, error) {
 
 // GetUint parses an environment variable into a uint value. If an error is encountered, default is set to 0, and error is logged
 func GetUint(ctx context.Context, key string) uint {
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 	if val, ok := csictx.LookupEnv(ctx, key); ok {
 		i, err := strconv.ParseUint(val, 10, 0)
 		if err != nil {
-			log.WithField(key, val).Debugf(
+			log.WithFields(csmlog.Fields{key: val}).Debugf(
 				"invalid int value for '%s', defaulting to 0", key)
 			return 0
 		}

@@ -25,18 +25,19 @@ import (
 	"sync"
 	"time"
 
+	csmlog "github.com/dell/csmlog"
+	"github.com/dell/gocsi/middleware/serialvolume"
 	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/gocsi/middleware/serialvolume"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	controller "github.com/dell/csi-isilon/v2/service"
+	controller "github.com/dell/csi-powerscale/v2/service"
 	csictx "github.com/dell/gocsi/context"
 	mwtypes "github.com/dell/gocsi/middleware/serialvolume/lockprovider"
-	log "github.com/sirupsen/logrus"
+
 	xctx "golang.org/x/net/context"
 
 	"github.com/dell/csi-metadata-retriever/retriever"
@@ -154,6 +155,7 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 }
 
 func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
+	log := csmlog.GetLogger().WithContext(ctx)
 	metricsManager := metrics.NewCSIMetricsManagerWithOptions("csi-metadata-retriever",
 		metrics.WithProcessStartTime(false),
 		metrics.WithSubsystem(metrics.SubsystemSidecar))
@@ -171,7 +173,7 @@ func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
 
 		i.opts.MetadataSidecarClient = retrieverClient
 	} else {
-		log.Warn("env var not found: ", "CSI_RETRIEVER_ENDPOINT")
+		log.Warnf("env var not found: %v", "CSI_RETRIEVER_ENDPOINT")
 	}
 }
 
@@ -196,6 +198,7 @@ func (i *interceptor) controllerUnpublishVolume(ctx context.Context, req *csi.Co
 func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
+	log := csmlog.GetLogger().WithContext(ctx)
 	lock, err := i.opts.locker.GetLockWithID(ctx, req.Name)
 	if err != nil {
 		return nil, err

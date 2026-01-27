@@ -1,7 +1,7 @@
 package main
 
 /*
- Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2026 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -25,16 +25,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dell/csi-isilon/v2/common/constants"
-	"github.com/dell/csi-isilon/v2/common/k8sutils"
-	"github.com/dell/csi-isilon/v2/provider"
-	"github.com/dell/csi-isilon/v2/service"
+	"github.com/dell/csi-powerscale/v2/common/constants"
+	"github.com/dell/csi-powerscale/v2/common/k8sutils"
+	"github.com/dell/csi-powerscale/v2/provider"
+	"github.com/dell/csi-powerscale/v2/service"
+	csmlog "github.com/dell/csmlog"
 	"github.com/dell/gocsi"
-	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 )
 
 var exitFunc = os.Exit
+
+var ManifestSemver string
 
 // sets environment variables
 func setEnvsFunc() {
@@ -44,6 +46,7 @@ func setEnvsFunc() {
 }
 
 func validateArgs(driverConfigParamsfile *string) {
+	log := csmlog.GetLogger()
 	log.Info("Validating driver config params file argument")
 	if *driverConfigParamsfile == "" {
 		fmt.Fprintf(os.Stderr, "driver-config-params argument is mandatory")
@@ -67,6 +70,13 @@ func main() {
 }
 
 func mainR(runFunc func(ctx context.Context, name, desc string, usage string, sp gocsi.StoragePluginProvider), createKubeClientSet func(kubeconfig string) (kubernetes.Interface, error), leaderElection func(clientset kubernetes.Interface, lockName, namespace string, renewDeadline, leaseDuration, retryPeriod time.Duration, run func(ctx context.Context))) {
+	log := csmlog.GetLogger()
+
+	if ManifestSemver != "" {
+		service.ManifestSemver = ManifestSemver
+		service.Manifest["semver"] = ManifestSemver
+	}
+
 	setEnvsFunc()
 	enableLeaderElection := flag.Bool("leader-election", false, "Enables leader election.")
 	log.Info("Enabling leader election")

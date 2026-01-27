@@ -23,15 +23,14 @@ import (
 	"strings"
 	"sync"
 
-	apiv1 "github.com/dell/goisilon/api/v1"
+	apiv1 "github.com/dell/gopowerscale/api/v1"
 
-	id "github.com/dell/csi-isilon/v2/common/utils/identifiers"
-	"github.com/dell/csi-isilon/v2/common/utils/logging"
-	isilonfs "github.com/dell/csi-isilon/v2/common/utils/powerscale-fs"
-	strutil "github.com/dell/csi-isilon/v2/common/utils/string-utils"
+	id "github.com/dell/csi-powerscale/v2/common/utils/identifiers"
+	isilonfs "github.com/dell/csi-powerscale/v2/common/utils/powerscale-fs"
+	strutil "github.com/dell/csi-powerscale/v2/common/utils/string-utils"
 
-	isi "github.com/dell/goisilon"
-	"github.com/dell/goisilon/api"
+	isi "github.com/dell/gopowerscale"
+	"github.com/dell/gopowerscale/api"
 )
 
 type isiService struct {
@@ -40,8 +39,7 @@ type isiService struct {
 }
 
 func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSourceVolumeIsiPath string, srcSnapshotID int64, dstVolumeName string, accessZone string) (isi.Volume, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin to copy snapshot '%d'", srcSnapshotID)
 
@@ -56,8 +54,7 @@ func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSource
 }
 
 func (svc *isiService) CopyVolume(ctx context.Context, isiPath, srcVolumeName, dstVolumeName string) (isi.Volume, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin to copy volume '%s'", srcVolumeName)
 
@@ -72,8 +69,7 @@ func (svc *isiService) CopyVolume(ctx context.Context, isiPath, srcVolumeName, d
 }
 
 func (svc *isiService) CreateSnapshot(ctx context.Context, path, snapshotName string) (isi.Snapshot, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin to create snapshot '%s'", snapshotName)
 
@@ -88,8 +84,7 @@ func (svc *isiService) CreateSnapshot(ctx context.Context, path, snapshotName st
 }
 
 func (svc *isiService) CreateVolume(ctx context.Context, isiPath, volName, isiVolumePathPermissions string) error {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin to create volume '%s'", volName)
 
@@ -101,8 +96,7 @@ func (svc *isiService) CreateVolume(ctx context.Context, isiPath, volName, isiVo
 }
 
 func (svc *isiService) CreateVolumeWithMetaData(ctx context.Context, isiPath, volName, isiVolumePathPermissions string, metadata map[string]string) error {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin to create volume '%s'", volName)
 	log.Debugf("header metadata '%v'", metadata)
@@ -115,8 +109,7 @@ func (svc *isiService) CreateVolumeWithMetaData(ctx context.Context, isiPath, vo
 }
 
 func (svc *isiService) GetExports(ctx context.Context) (isi.ExportList, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debug("begin getting exports for Isilon")
 
@@ -131,8 +124,7 @@ func (svc *isiService) GetExports(ctx context.Context) (isi.ExportList, error) {
 }
 
 func (svc *isiService) GetExportByIDWithZone(ctx context.Context, exportID int, accessZone string) (isi.Export, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin getting export by id '%d' with access zone '%s' for Isilon", exportID, accessZone)
 
@@ -147,8 +139,7 @@ func (svc *isiService) GetExportByIDWithZone(ctx context.Context, exportID int, 
 }
 
 func (svc *isiService) GetExportsCountAttachedToNode(ctx context.Context, nodeip string) (int64, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin getting export count for nodeip '%s' for Isilon", nodeip)
 	var count int64
@@ -161,8 +152,7 @@ func (svc *isiService) GetExportsCountAttachedToNode(ctx context.Context, nodeip
 }
 
 func (svc *isiService) ExportVolumeWithZone(ctx context.Context, isiPath, volName, accessZone, description string) (int, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin to export volume '%s' with access zone '%s' in Isilon path '%s'", volName, accessZone, isiPath)
 
@@ -180,8 +170,7 @@ func (svc *isiService) ExportVolumeWithZone(ctx context.Context, isiPath, volNam
 }
 
 func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit, advisoryLimit, softGracePrd string, sizeInBytes int64, quotaEnabled bool) (string, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 	log.Debugf("begin to create quota for '%s', size '%d', quota enabled: '%t'", volName, sizeInBytes, quotaEnabled)
 	var softi, advisoryi int64
 	var err error
@@ -264,8 +253,7 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit
 }
 
 func (svc *isiService) DeleteQuotaByExportIDWithZone(ctx context.Context, volName string, exportID int, accessZone string) error {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin to delete quota for volume name : '%s', export ID : '%d'", volName, exportID)
 
@@ -299,8 +287,7 @@ func (svc *isiService) DeleteQuotaByExportIDWithZone(ctx context.Context, volNam
 }
 
 func (svc *isiService) GetVolumeQuota(ctx context.Context, volName string, exportID int, accessZone string) (isi.Quota, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin to get quota for volume name : '%s', export ID : '%d'", volName, exportID)
 
@@ -331,8 +318,7 @@ func (svc *isiService) GetVolumeQuota(ctx context.Context, volName string, expor
 }
 
 func (svc *isiService) UpdateQuotaSize(ctx context.Context, quotaID string, updatedSize, updatedSoftLimit, updatedAdvisoryLimit, softGrace int64) error {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("updating quota by id '%s' with size '%d'", quotaID, updatedSize)
 
@@ -344,8 +330,7 @@ func (svc *isiService) UpdateQuotaSize(ctx context.Context, quotaID string, upda
 }
 
 func (svc *isiService) UnexportByIDWithZone(ctx context.Context, exportID int, accessZone string) error {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin to unexport NFS export with ID '%d' in access zone '%s'", exportID, accessZone)
 
@@ -357,8 +342,7 @@ func (svc *isiService) UnexportByIDWithZone(ctx context.Context, exportID int, a
 }
 
 func (svc *isiService) GetExportsWithParams(ctx context.Context, params api.OrderedValues) (isi.Exports, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin to get exports with params..")
 	var exports isi.Exports
@@ -371,8 +355,7 @@ func (svc *isiService) GetExportsWithParams(ctx context.Context, params api.Orde
 }
 
 func (svc *isiService) DeleteVolume(ctx context.Context, isiPath, volName string) error {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin to delete volume directory '%s'", volName)
 
@@ -393,9 +376,6 @@ func (svc *isiService) ClearQuotaByID(ctx context.Context, quotaID string) error
 }
 
 func (svc *isiService) TestConnection(ctx context.Context) error {
-	// Fetch log handler
-	ctx, log, _ := GetRunIDLog(ctx)
-
 	log.Debugf("test connection client, user name : '%s'", svc.client.API.User())
 	if _, err := svc.client.GetClusterConfig(ctx); err != nil {
 		log.Errorf("error encountered, test connection failed : '%v'", err)
@@ -412,8 +392,7 @@ func (svc *isiService) GetNFSExportURLForPath(ip string, dirPath string) string 
 }
 
 func (svc *isiService) GetVolumeWithIsiPath(ctx context.Context, isiPath, volID, volName string) (isi.Volume, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin getting volume with id '%s' and name '%s' for Isilon", volID, volName)
 
@@ -428,8 +407,7 @@ func (svc *isiService) GetVolumeWithIsiPath(ctx context.Context, isiPath, volID,
 }
 
 func (svc *isiService) GetVolume(ctx context.Context, volID, volName string) (isi.Volume, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin getting volume with name '%s' for Isilon", volName)
 
@@ -444,8 +422,7 @@ func (svc *isiService) GetVolume(ctx context.Context, volID, volName string) (is
 }
 
 func (svc *isiService) GetVolumeSize(ctx context.Context, isiPath, name string) int64 {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin getting volume size with name '%s' for Isilon", name)
 
@@ -459,8 +436,7 @@ func (svc *isiService) GetVolumeSize(ctx context.Context, isiPath, name string) 
 }
 
 func (svc *isiService) GetStatistics(ctx context.Context, keys []string) (isi.Stats, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	var stat isi.Stats
 	var err error
@@ -472,8 +448,7 @@ func (svc *isiService) GetStatistics(ctx context.Context, keys []string) (isi.St
 }
 
 func (svc *isiService) IsIOInProgress(ctx context.Context) (isi.Clients, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	var clients isi.Clients
 	var err error
@@ -485,8 +460,7 @@ func (svc *isiService) IsIOInProgress(ctx context.Context) (isi.Clients, error) 
 }
 
 func (svc *isiService) IsVolumeExistent(ctx context.Context, isiPath, volID, name string) bool {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("check if volume (id :'%s', name '%s') already exists", volID, name)
 
@@ -498,8 +472,7 @@ func (svc *isiService) IsVolumeExistent(ctx context.Context, isiPath, volID, nam
 }
 
 func (svc *isiService) OtherClientsAlreadyAdded(ctx context.Context, exportID int, accessZone string, nodeID string) bool {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	export, _ := svc.GetExportByIDWithZone(ctx, exportID, accessZone)
 
@@ -549,7 +522,7 @@ func (svc *isiService) OtherClientsAlreadyAdded(ctx context.Context, exportID in
 
 // updateClusterToNodeIDMap updates cluster to nodeID map from input clusterName, nodeID and clientToUse
 func updateClusterToNodeIDMap(ctx context.Context, clusterToNodeIDMap *sync.Map, clusterName, nodeID, clientToUse string) error {
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 	log.Debugf("updating ClusterToNodeIDMap map for cluster '%s', for nodeID '%s' with clientToUse '%s'", clusterName, nodeID, clientToUse)
 
 	var nodeIDToClientMaps []*nodeIDToClientMap
@@ -588,7 +561,7 @@ func updateClusterToNodeIDMap(ctx context.Context, clusterToNodeIDMap *sync.Map,
 // getClientToUseForNodeID returns client to use for an input nodeID from the cluster to nodeID map, if present.
 // Otherwise returns an error
 func getClientToUseForNodeID(ctx context.Context, clusterToNodeIDMap *sync.Map, clusterName, nodeID string) (string, error) {
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	var nodeIDToClientMaps []*nodeIDToClientMap
 
@@ -611,8 +584,7 @@ func getClientToUseForNodeID(ctx context.Context, clusterToNodeIDMap *sync.Map, 
 }
 
 func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.Context, clusterName string, exportID int, accessZone, nodeID string, ignoreUnresolvableHosts bool, addClientFunc func(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error) error {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 	var clientToUse string
 
 	// try adding by client FQDN first as it is preferred over IP for its stableness.
@@ -674,8 +646,7 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 // It iterates through the list of client IPs and calls the provided addClientFunc for each IP, passing the export ID,
 // access zone, and client IP as arguments.
 func (svc *isiService) AddExportClientByIPWithZone(ctx context.Context, clusterName string, exportID int, accessZone, nodeID string, clientIPs []string, addClientFunc func(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error) error {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 	var err error
 
 	for _, clientIP := range clientIPs {
@@ -694,8 +665,7 @@ func (svc *isiService) AddExportClientByIPWithZone(ctx context.Context, clusterN
 }
 
 func (svc *isiService) AddExportClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("AddExportClientByID client '%s'", clientIP)
 	if err := svc.client.AddExportClientsByIDWithZone(ctx, exportID, accessZone, []string{clientIP}, ignoreUnresolvableHosts); err != nil {
@@ -705,8 +675,7 @@ func (svc *isiService) AddExportClientByIDWithZone(ctx context.Context, exportID
 }
 
 func (svc *isiService) AddExportRootClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("AddExportRootClientByID client '%s'", clientIP)
 	if err := svc.client.AddExportRootClientsByIDWithZone(ctx, exportID, accessZone, []string{clientIP}, ignoreUnresolvableHosts); err != nil {
@@ -716,8 +685,7 @@ func (svc *isiService) AddExportRootClientByIDWithZone(ctx context.Context, expo
 }
 
 func (svc *isiService) AddExportReadOnlyClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("AddExportReadOnlyClientByID client '%s'", clientIP)
 	if err := svc.client.AddExportReadOnlyClientsByIDWithZone(ctx, exportID, accessZone, []string{clientIP}, ignoreUnresolvableHosts); err != nil {
@@ -727,8 +695,7 @@ func (svc *isiService) AddExportReadOnlyClientByIDWithZone(ctx context.Context, 
 }
 
 func (svc *isiService) RemoveExportClientByIDWithZone(ctx context.Context, exportID int, accessZone, nodeID string, ignoreUnresolvableHosts bool) error {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	// it could either be IP or FQDN that has been added to the export's client fields, should consider both during the removal
 	clientName, clientFQDN, clientIP, err := id.ParseNodeID(ctx, nodeID)
@@ -756,8 +723,7 @@ func (svc *isiService) RemoveExportClientByIDWithZone(ctx context.Context, expor
 }
 
 func (svc *isiService) RemoveExportClientByIPsWithZone(ctx context.Context, exportID int, accessZone string, clientIPs []string, ignoreUnresolvableHosts bool) error {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	if err := svc.client.RemoveExportClientsByIDWithZone(ctx, exportID, accessZone, clientIPs, ignoreUnresolvableHosts); err != nil {
 		if notFoundErr, ok := err.(*api.JSONError); ok {
@@ -773,8 +739,7 @@ func (svc *isiService) RemoveExportClientByIPsWithZone(ctx context.Context, expo
 }
 
 func (svc *isiService) GetExportsWithLimit(ctx context.Context, limit string) (isi.ExportList, string, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debug("begin getting exports for Isilon")
 	var exports isi.Exports
@@ -802,8 +767,7 @@ func (svc *isiService) GetExportsWithLimit(ctx context.Context, limit string) (i
 	}
 */
 func (svc *isiService) DeleteSnapshot(ctx context.Context, id int64, name string) error {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin to delete snapshot '%s'", name)
 	if err := svc.client.RemoveSnapshot(ctx, id, name); err != nil {
@@ -814,8 +778,7 @@ func (svc *isiService) DeleteSnapshot(ctx context.Context, id int64, name string
 }
 
 func (svc *isiService) GetSnapshot(ctx context.Context, identity string) (isi.Snapshot, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin getting snapshot with id|name '%s' for Isilon", identity)
 	var snapshot isi.Snapshot
@@ -829,8 +792,7 @@ func (svc *isiService) GetSnapshot(ctx context.Context, identity string) (isi.Sn
 }
 
 func (svc *isiService) GetSnapshots(ctx context.Context) (isi.SnapshotList, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 	log.Debugf("begin getting all the snapshot  for Isilon")
 	var snapshotList isi.SnapshotList
 	var err error
@@ -842,8 +804,7 @@ func (svc *isiService) GetSnapshots(ctx context.Context) (isi.SnapshotList, erro
 }
 
 func (svc *isiService) GetSnapshotSize(ctx context.Context, isiPath, name string, accessZone string) int64 {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin getting snapshot size with name '%s' for Isilon", name)
 	size, err := svc.client.GetSnapshotFolderSize(ctx, isiPath, name, accessZone)
@@ -856,8 +817,7 @@ func (svc *isiService) GetSnapshotSize(ctx context.Context, isiPath, name string
 }
 
 func (svc *isiService) GetExportWithPathAndZone(ctx context.Context, path, accessZone string) (isi.Export, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin getting export with target path '%s' and access zone '%s' for Isilon", path, accessZone)
 	var export isi.Export
@@ -871,8 +831,7 @@ func (svc *isiService) GetExportWithPathAndZone(ctx context.Context, path, acces
 }
 
 func (svc *isiService) GetExportWithPath(ctx context.Context, path string) (isi.Export, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	log.Debugf("begin getting export with target path '%s' for Isilon", path)
 	var export isi.Export
@@ -909,8 +868,7 @@ func (svc *isiService) isROVolumeFromSnapshot(exportPath, accessZone string) boo
 }
 
 func (svc *isiService) GetSnapshotNameFromIsiPath(ctx context.Context, snapshotIsiPath, accessZone, zonePath string) (string, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 	var snapShotName string
 	if !svc.isROVolumeFromSnapshot(snapshotIsiPath, accessZone) {
 		log.Debugf("invalid snapshot isilon path- '%s'", snapshotIsiPath)
@@ -963,9 +921,7 @@ func (svc *isiService) GetSnapshotTrackingDirName(snapshotName string) string {
 }
 
 func (svc *isiService) GetSubDirectoryCount(ctx context.Context, isiPath, directory string) (int64, error) {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
-
+	log := log.WithContext(ctx)
 	var totalSubDirectories int64
 	if svc.IsVolumeExistent(ctx, isiPath, "", directory) {
 		// Check if there are any entries for volumes present in snapshot tracking dir
@@ -996,8 +952,7 @@ func (svc *isiService) GetSubDirectoryCount(ctx context.Context, isiPath, direct
 }
 
 func (svc *isiService) IsHostAlreadyAdded(ctx context.Context, exportID int, accessZone string, nodeID string) bool {
-	// Fetch log handler
-	log := logging.GetRunIDLogger(ctx)
+	log := log.WithContext(ctx)
 
 	export, _ := svc.GetExportByIDWithZone(ctx, exportID, accessZone)
 

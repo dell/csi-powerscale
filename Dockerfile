@@ -1,4 +1,4 @@
-# Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,21 +11,23 @@
 # limitations under the License
 
 # some arguments that must be supplied
-ARG GOPROXY
 ARG GOIMAGE
 ARG BASEIMAGE
+ARG VERSION="2.16.0"
 
 # Stage to build the driver
 FROM $GOIMAGE as builder
-ARG GOPROXY
+ARG VERSION
+
 RUN mkdir -p /go/src
 COPY ./ /go/src/
+
 WORKDIR /go/src/
-RUN CGO_ENABLED=0 \
-    make build
+RUN make build IMAGE_VERSION=$VERSION
 
 # Stage to build the driver image
 FROM $BASEIMAGE AS final
+ARG VERSION
 
 # copy in the driver
 COPY --from=builder /go/src/csi-isilon /
@@ -36,8 +38,8 @@ LABEL vendor="Dell Technologies" \
     name="csi-isilon" \
     summary="CSI Driver for Dell EMC PowerScale" \
     description="CSI Driver for provisioning persistent storage from Dell EMC PowerScale" \
-    release="1.15.0" \
-    version="2.15.0" \
+    release="1.16.0" \
+    version=$VERSION \
     license="Apache-2.0"
 
 COPY ./licenses /licenses

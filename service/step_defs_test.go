@@ -1,7 +1,7 @@
 package service
 
 /*
- Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2026 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ import (
 	context2 "context"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"net/http/httptest"
 	"os"
@@ -28,20 +27,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dell/csi-isilon/v2/common/constants"
-	ident "github.com/dell/csi-isilon/v2/common/utils/identifiers"
-	"github.com/dell/csi-isilon/v2/common/utils/logging"
-	"github.com/dell/csi-isilon/v2/service/mock/k8s"
+	"github.com/dell/csi-powerscale/v2/common/constants"
+	ident "github.com/dell/csi-powerscale/v2/common/utils/identifiers"
+	"github.com/dell/csmlog"
+
+	"github.com/dell/csi-powerscale/v2/service/mock/k8s"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"google.golang.org/grpc"
 	"k8s.io/client-go/kubernetes/fake"
 
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/cucumber/godog"
 	commonext "github.com/dell/dell-csi-extensions/common"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 	"github.com/dell/gocsi"
 	"github.com/dell/gofsutil"
+	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/cucumber/godog"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"
 
@@ -146,6 +146,7 @@ const (
 	datadir2     = "test/tmp/datadir2"
 	clusterName1 = "cluster1"
 	logLevel     = constants.DefaultLogLevel
+	imageVersion = "1.0.0"
 )
 
 func (f *feature) aIsilonService() error {
@@ -192,7 +193,7 @@ func (f *feature) aIsilonService() error {
 		if f.server == nil {
 			f.server = httptest.NewServer(handler)
 		}
-		log.Printf("server url: %s\n", f.server.URL)
+		log.Infof("server url: %s\n", f.server.URL)
 		clusterConfig.EndpointURL = f.server.URL
 		// f.service.opts.EndpointURL = f.server.URL
 	} else {
@@ -204,6 +205,9 @@ func (f *feature) aIsilonService() error {
 	f.service.isiClusters.Store(clusterName1, updatedClusterConfig)
 	f.checkGoRoutines("end aIsilonService")
 	f.service.logServiceStats()
+
+	// Configure ManifestSemver
+	ManifestSemver = imageVersion
 	return nil
 }
 
@@ -500,11 +504,10 @@ func (f *feature) iSetPollingFeqTo(value string) error {
 
 func (f *feature) aValidGetPlugInfoResponseIsReturned() error {
 	rep := f.getPluginInfoResponse
-	url := rep.GetManifest()["url"]
-	if rep.GetName() == "" || rep.GetVendorVersion() == "" || url == "" {
+	if rep.GetName() == "" || rep.GetVendorVersion() == "" {
 		return errors.New("Expected GetPluginInfo to return name and version")
 	}
-	log.Printf("Name %s Version %s URL %s", rep.GetName(), rep.GetVendorVersion(), url)
+	log.Infof("Name %s Version %s", rep.GetName(), rep.GetVendorVersion())
 	return nil
 }
 
@@ -705,10 +708,10 @@ func (f *feature) iCallCreateVolume(name string) error {
 	req.Name = name
 	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+		log.Infof("CreateVolume call failed: %s\n", f.err.Error())
 	}
 	if f.createVolumeResponse != nil {
-		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+		log.Infof("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
 		stepHandlersErrors.ExportNotFoundError = false
 		stepHandlersErrors.VolumeNotExistError = false
 	}
@@ -721,10 +724,10 @@ func (f *feature) iCallCreateVolumeWithPersistentMetadata(name string) error {
 	req.Name = name
 	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+		log.Infof("CreateVolume call failed: %s\n", f.err.Error())
 	}
 	if f.createVolumeResponse != nil {
-		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+		log.Infof("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
 		stepHandlersErrors.ExportNotFoundError = false
 		stepHandlersErrors.VolumeNotExistError = false
 	}
@@ -739,10 +742,10 @@ func (f *feature) iCallCreateVolumeWithParams(name string, rangeInGiB int, acces
 	stepHandlersErrors.VolumeNotExistError = true
 	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+		log.Infof("CreateVolume call failed: %s\n", f.err.Error())
 	}
 	if f.createVolumeResponse != nil {
-		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+		log.Infof("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
 		stepHandlersErrors.ExportNotFoundError = false
 		stepHandlersErrors.VolumeNotExistError = false
 	}
@@ -757,11 +760,9 @@ func (f *feature) iCallDeleteVolume(name string) error {
 	req := f.deleteVolumeRequest
 	req.VolumeId = name
 
-	ctx, log, _ := GetRunIDLog(context.Background())
-
-	f.deleteVolumeResponse, f.err = f.service.DeleteVolume(ctx, req)
+	f.deleteVolumeResponse, f.err = f.service.DeleteVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("DeleteVolume call failed: '%v'\n", f.err)
+		log.Infof("DeleteVolume call failed: '%v'\n", f.err)
 	}
 
 	return nil
@@ -785,7 +786,7 @@ func (f *feature) aValidDeleteVolumeResponseIsReturned() error {
 }
 
 func (f *feature) iInduceError(errtype string) error {
-	log.Printf("set induce error %s\n", errtype)
+	log.Infof("set induce error %s\n", errtype)
 	switch errtype {
 	case "InstancesError":
 		stepHandlersErrors.InstancesError = true
@@ -1002,7 +1003,7 @@ func (f *feature) iCallControllerGetCapabilities(isHealthMonitorEnabled string) 
 	req := new(csi.ControllerGetCapabilitiesRequest)
 	f.controllerGetCapabilitiesResponse, f.err = f.service.ControllerGetCapabilities(context.Background(), req)
 	if f.err != nil {
-		log.Printf("ControllerGetCapabilities call failed: %s\n", f.err.Error())
+		log.Infof("ControllerGetCapabilities call failed: %s\n", f.err.Error())
 		return f.err
 	}
 	return nil
@@ -1102,9 +1103,8 @@ func (f *feature) iCallValidateVolumeCapabilitiesWithVoltypeAccess(voltype, acce
 	capabilities := make([]*csi.VolumeCapability, 0)
 	capabilities = append(capabilities, capability)
 	req.VolumeCapabilities = capabilities
-	log.Printf("Calling ValidateVolumeCapabilities")
-	ctx, _, _ := GetRunIDLog(context.Background())
-	f.validateVolumeCapabilitiesResponse, f.err = f.service.ValidateVolumeCapabilities(ctx, req)
+	log.Infof("Calling ValidateVolumeCapabilities")
+	f.validateVolumeCapabilitiesResponse, f.err = f.service.ValidateVolumeCapabilities(context.Background(), req)
 	if f.err != nil {
 		return nil
 	}
@@ -1220,14 +1220,15 @@ func getTypicalCapacityRequest(valid bool) *csi.GetCapacityRequest {
 	return req
 }
 
+// check if it works
 func (f *feature) iCallGetCapacity() error {
 	header := metadata.New(map[string]string{"csi.requestid": "1"})
-	ctx, _, _ := GetRunIDLog(context.Background())
-	ctx = metadata.NewIncomingContext(ctx, header)
+	ctx := context.Background()
+	ctx = metadata.NewIncomingContext(context.Background(), header)
 	req := getTypicalCapacityRequest(true)
 	f.getCapacityResponse, f.err = f.service.GetCapacity(ctx, req)
 	if f.err != nil {
-		log.Printf("GetCapacity call failed: %s\n", f.err.Error())
+		log.Infof("GetCapacity call failed: %s\n", f.err.Error())
 		return nil
 	}
 	return nil
@@ -1243,7 +1244,7 @@ func (f *feature) iCallGetCapacityWithParams(clusterName string) error {
 
 	f.getCapacityResponse, f.err = f.service.GetCapacity(ctx, req)
 	if f.err != nil {
-		log.Printf("GetCapacity call failed: %s\n", f.err.Error())
+		log.Infof("GetCapacity call failed: %s\n", f.err.Error())
 		return nil
 	}
 	return nil
@@ -1255,7 +1256,7 @@ func (f *feature) iCallGetCapacityWithInvalidAccessMode() error {
 	req := getTypicalCapacityRequest(false)
 	f.getCapacityResponse, f.err = f.service.GetCapacity(ctx, req)
 	if f.err != nil {
-		log.Printf("GetCapacity call failed: %s\n", f.err.Error())
+		log.Infof("GetCapacity call failed: %s\n", f.err.Error())
 		return nil
 	}
 	return nil
@@ -1281,7 +1282,7 @@ func (f *feature) iCallNodeGetInfo() error {
 	req := new(csi.NodeGetInfoRequest)
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
 	if f.err != nil {
-		log.Printf("NodeGetInfo call failed: %s\n", f.err.Error())
+		log.Infof("NodeGetInfo call failed: %s\n", f.err.Error())
 		return f.err
 	}
 	return nil
@@ -1298,7 +1299,7 @@ func (f *feature) iCallNodeGetInfoWithInvalidVolumeLimit(volumeLimit int64) erro
 	f.service.opts.MaxVolumesPerNode = volumeLimit
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
 	if f.err != nil {
-		log.Printf("NodeGetInfo call failed: %s\n", f.err.Error())
+		log.Infof("NodeGetInfo call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -1310,7 +1311,7 @@ func (f *feature) iCallNodeGetCapabilities(isHealthMonitorEnabled string) error 
 	}
 	f.nodeGetCapabilitiesResponse, f.err = f.service.NodeGetCapabilities(context.Background(), req)
 	if f.err != nil {
-		log.Printf("NodeGetCapabilities call failed: %s\n", f.err.Error())
+		log.Infof("NodeGetCapabilities call failed: %s\n", f.err.Error())
 		return f.err
 	}
 	return nil
@@ -1393,10 +1394,10 @@ func (f *feature) iCallControllerPublishVolumeWithTo(accessMode, nodeID string) 
 		req = f.getControllerPublishVolumeRequest(accessMode, nodeID)
 		f.publishVolumeRequest = req
 	}
-	log.Printf("Calling controllerPublishVolume")
+	log.Infof("Calling controllerPublishVolume")
 	f.publishVolumeResponse, f.err = f.service.ControllerPublishVolume(ctx, req)
 	if f.err != nil {
-		log.Printf("PublishVolume call failed: %s\n", f.err.Error())
+		log.Infof("PublishVolume call failed: %s\n", f.err.Error())
 	}
 	f.publishVolumeRequest = nil
 	return nil
@@ -1459,7 +1460,7 @@ func (f *feature) iCallNodeUnpublishVolume() error {
 
 	f.nodeUnpublishVolumeResponse, f.err = f.service.NodeUnpublishVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("NodePublishVolume call failed: %s\n", f.err.Error())
+		log.Infof("NodePublishVolume call failed: %s\n", f.err.Error())
 		if strings.Contains(f.err.Error(), "Target Path is required") {
 			// Rollback for the future calls
 			f.nodeUnpublishVolumeRequest.TargetPath = datadir
@@ -1470,7 +1471,7 @@ func (f *feature) iCallNodeUnpublishVolume() error {
 		if err != nil {
 			return nil
 		}
-		log.Printf("vol id %s\n", f.nodeUnpublishVolumeRequest.VolumeId)
+		log.Infof("vol id %s\n", f.nodeUnpublishVolumeRequest.VolumeId)
 	}
 	return nil
 }
@@ -1488,7 +1489,7 @@ func (f *feature) iCallEphemeralNodeUnpublishVolume() error {
 
 	f.nodeUnpublishVolumeResponse, f.err = f.service.NodeUnpublishVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("NodePublishVolume call failed: %s\n", f.err.Error())
+		log.Infof("NodePublishVolume call failed: %s\n", f.err.Error())
 		if strings.Contains(f.err.Error(), "Target Path is required") {
 			// Rollback for the future calls
 			f.nodeUnpublishVolumeRequest.TargetPath = datadir
@@ -1499,7 +1500,7 @@ func (f *feature) iCallEphemeralNodeUnpublishVolume() error {
 		if err != nil {
 			return nil
 		}
-		log.Printf("vol id %s\n", f.nodeUnpublishVolumeRequest.VolumeId)
+		log.Infof("vol id %s\n", f.nodeUnpublishVolumeRequest.VolumeId)
 	}
 	return nil
 }
@@ -1848,10 +1849,10 @@ func (f *feature) iCallControllerPublishVolume(volID string, accessMode string, 
 		req.VolumeId = volID
 	}
 
-	log.Printf("Calling controllerPublishVolume")
+	log.Infof("Calling controllerPublishVolume")
 	f.publishVolumeResponse, f.err = f.service.ControllerPublishVolume(ctx, req)
 	if f.err != nil {
-		log.Printf("PublishVolume call failed: %s\n", f.err.Error())
+		log.Infof("PublishVolume call failed: %s\n", f.err.Error())
 	}
 	f.publishVolumeRequest = nil
 	return nil
@@ -1870,7 +1871,7 @@ func (f *feature) iCallControllerGetVolume(volID string) error {
 	fmt.Printf("Calling controllerGetVolume")
 	f.controllerGetVolumeResponse, f.err = f.service.ControllerGetVolume(ctx, req)
 	if f.err != nil {
-		log.Printf("Controller GetVolume call failed: %s\n", f.err.Error())
+		log.Infof("Controller GetVolume call failed: %s\n", f.err.Error())
 	}
 	if f.controllerGetVolumeResponse != nil {
 		// check message and abnormal state returned in NodeGetVolumeStatsResponse.VolumeCondition
@@ -1917,7 +1918,7 @@ func (f *feature) iCallNodeGetVolumeStats(volID string) error {
 
 	f.nodeGetVolumeStatsResponse, f.err = f.service.NodeGetVolumeStats(ctx, req)
 	if f.err != nil {
-		log.Printf("Node GetVolumeStats call failed: %s\n", f.err.Error())
+		log.Infof("Node GetVolumeStats call failed: %s\n", f.err.Error())
 	}
 	if f.nodeGetVolumeStatsResponse != nil {
 		// check message and abnormal state returned in NodeGetVolumeStatsResponse.VolumeCondition
@@ -1948,11 +1949,11 @@ func (f *feature) iCallControllerUnPublishVolume(volID string, accessMode string
 	req.VolumeId = volID
 	f.unpublishVolumeResponse, f.err = f.service.ControllerUnpublishVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("ControllerUnPublishVolume call failed: %s\n", f.err.Error())
+		log.Infof("ControllerUnPublishVolume call failed: %s\n", f.err.Error())
 	}
 
 	if f.unpublishVolumeResponse != nil {
-		log.Printf("a unpublishVolumeResponse has been returned\n")
+		log.Infof("a unpublishVolumeResponse has been returned\n")
 	}
 	return nil
 }
@@ -1968,11 +1969,11 @@ func (f *feature) iCallNodeStageVolume(volID string, accessType string) error {
 
 	f.nodeStageVolumeResponse, f.err = f.service.NodeStageVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("NodeStageVolume call failed: %s\n", f.err.Error())
+		log.Infof("NodeStageVolume call failed: %s\n", f.err.Error())
 	}
 
 	if f.nodeStageVolumeResponse != nil {
-		log.Printf("a NodeStageVolumeResponse has been returned\n")
+		log.Infof("a NodeStageVolumeResponse has been returned\n")
 	}
 
 	return nil
@@ -1983,11 +1984,11 @@ func (f *feature) iCallNodeUnstageVolume(volID string) error {
 	f.nodeUnstageVolumeRequest = req
 	f.nodeUnstageVolumeResponse, f.err = f.service.NodeUnstageVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("NodeUnstageVolume call failed: %s\n", f.err.Error())
+		log.Infof("NodeUnstageVolume call failed: %s\n", f.err.Error())
 	}
 
 	if f.nodeStageVolumeResponse != nil {
-		log.Printf("a NodeUnstageVolumeResponse has been returned\n")
+		log.Infof("a NodeUnstageVolumeResponse has been returned\n")
 	}
 	return nil
 }
@@ -2002,7 +2003,7 @@ func (f *feature) iCallListVolumesWithMaxEntriesStartingToken(arg1 int, arg2 str
 	req.StartingToken = arg2
 	f.listVolumesResponse, f.err = f.service.ListVolumes(context.Background(), req)
 	if f.err != nil {
-		log.Printf("ListVolumes call failed: %s\n", f.err.Error())
+		log.Infof("ListVolumes call failed: %s\n", f.err.Error())
 		return nil
 	}
 	return nil
@@ -2023,7 +2024,7 @@ func (f *feature) iCallDeleteSnapshot(snapshotID string) error {
 	f.deleteSnapshotRequest = req
 	_, err := f.service.DeleteSnapshot(context.Background(), f.deleteSnapshotRequest)
 	if err != nil {
-		log.Printf("DeleteSnapshot call failed: %s\n", err.Error())
+		log.Infof("DeleteSnapshot call failed: %s\n", err.Error())
 		f.err = err
 		return nil
 	}
@@ -2043,10 +2044,10 @@ func (f *feature) iCallCreateSnapshot(srcVolumeID, name string) error {
 	req := f.createSnapshotRequest
 	f.createSnapshotResponse, f.err = f.service.CreateSnapshot(context.Background(), req)
 	if f.err != nil {
-		log.Printf("CreateSnapshot call failed: %s\n", f.err.Error())
+		log.Infof("CreateSnapshot call failed: %s\n", f.err.Error())
 	}
 	if f.createSnapshotResponse != nil {
-		log.Printf("snapshot id %s\n", f.createSnapshotResponse.GetSnapshot().SnapshotId)
+		log.Infof("snapshot id %s\n", f.createSnapshotResponse.GetSnapshot().SnapshotId)
 	}
 
 	return nil
@@ -2076,17 +2077,16 @@ func getControllerExpandVolumeRequest(volumeID string, requiredBytes int64) *csi
 }
 
 func (f *feature) iCallControllerExpandVolume(volumeID string, requiredBytes int64) error {
-	log.Printf("###")
+	log.Infof("###")
 	f.controllerExpandVolumeRequest = getControllerExpandVolumeRequest(volumeID, requiredBytes)
 	req := f.controllerExpandVolumeRequest
 
-	ctx, log, _ := GetRunIDLog(context.Background())
-	f.controllerExpandVolumeResponse, f.err = f.service.ControllerExpandVolume(ctx, req)
+	f.controllerExpandVolumeResponse, f.err = f.service.ControllerExpandVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("ControllerExpandVolume call failed: %s\n", f.err.Error())
+		log.Infof("ControllerExpandVolume call failed: %s\n", f.err.Error())
 	}
 	if f.controllerExpandVolumeResponse != nil {
-		log.Printf("Volume capacity %d\n", f.controllerExpandVolumeResponse.CapacityBytes)
+		log.Infof("Volume capacity %d\n", f.controllerExpandVolumeResponse.CapacityBytes)
 	}
 	return nil
 }
@@ -2133,10 +2133,10 @@ func (f *feature) iCallCreateVolumeFromSnapshot(srcSnapshotID, name string) erro
 	req = f.setVolumeContent(true, srcSnapshotID)
 	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("CreateVolume call failed: '%s'\n", f.err.Error())
+		log.Infof("CreateVolume call failed: '%s'\n", f.err.Error())
 	}
 	if f.createVolumeResponse != nil {
-		log.Printf("volume name '%s' created\n", name)
+		log.Infof("volume name '%s' created\n", name)
 	}
 	return nil
 }
@@ -2148,10 +2148,10 @@ func (f *feature) iCallCreateVolumeFromVolume(srcVolumeName, name string) error 
 	req = f.setVolumeContent(false, srcVolumeName)
 	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("CreateVolume call failed: '%s'\n", f.err.Error())
+		log.Infof("CreateVolume call failed: '%s'\n", f.err.Error())
 	}
 	if f.createVolumeResponse != nil {
-		log.Printf("volume name '%s' created\n", name)
+		log.Infof("volume name '%s' created\n", name)
 	}
 	return nil
 }
@@ -2205,7 +2205,7 @@ func (f *feature) aIsilonServiceWithParams(user, mode string) error {
 		if f.server == nil {
 			f.server = httptest.NewServer(handler)
 		}
-		log.Printf("server url: %s\n", f.server.URL)
+		log.Infof("server url: %s\n", f.server.URL)
 		clusterConfig.EndpointURL = f.server.URL
 	} else {
 		f.server = nil
@@ -2268,7 +2268,7 @@ func (f *feature) aIsilonservicewithIsiAuthTypeassessionbased() error {
 		if f.server == nil {
 			f.server = httptest.NewServer(handler)
 		}
-		log.Printf("server url: %s\n", f.server.URL)
+		log.Infof("server url: %s\n", f.server.URL)
 		clusterConfig.EndpointURL = f.server.URL
 	} else {
 		f.server = nil
@@ -2331,10 +2331,10 @@ func (f *feature) aIsilonServiceWithParamsForCustomTopology(user, mode string) e
 		if f.server == nil {
 			f.server = httptest.NewServer(handler)
 		}
-		log.Printf("server url: %s\n", f.server.URL)
+		log.Infof("server url: %s\n", f.server.URL)
 		clusterConfig.EndpointURL = f.server.URL
 		urlList := strings.Split(f.server.URL, ":")
-		log.Printf("urlList: %v", urlList)
+		log.Infof("urlList: %v", urlList)
 		clusterConfig.EndpointPort = urlList[2]
 	} else {
 		f.server = nil
@@ -2398,10 +2398,10 @@ func (f *feature) aIsilonServiceWithParamsForCustomTopologyNoLabel(user, mode st
 		if f.server == nil {
 			f.server = httptest.NewServer(handler)
 		}
-		log.Printf("server url: %s\n", f.server.URL)
+		log.Infof("server url: %s\n", f.server.URL)
 		clusterConfig.EndpointURL = f.server.URL
 		urlList := strings.Split(f.server.URL, ":")
-		log.Printf("urlList: %v", urlList)
+		log.Infof("urlList: %v", urlList)
 		clusterConfig.EndpointPort = urlList[2]
 	} else {
 		f.server = nil
@@ -2610,18 +2610,16 @@ func (f *feature) iCallBeforeServe() error {
 
 func (f *feature) iCallCreateQuotaInIsiServiceWithSizeInBytes(softLimit, advisoryLimit, softgraceprd string, sizeinBytes int) error {
 	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
-	ctx, _, _ := GetRunIDLog(context.Background())
-	_, f.err = clusterConfig.isiSvc.CreateQuota(ctx, f.service.opts.Path, "volume1", softLimit, advisoryLimit, softgraceprd, int64(sizeinBytes), true)
+	_, f.err = clusterConfig.isiSvc.CreateQuota(context.Background(), f.service.opts.Path, "volume1", softLimit, advisoryLimit, softgraceprd, int64(sizeinBytes), true)
 	return nil
 }
 
 func (f *feature) iCallGetExportRelatedFunctionsInIsiService() error {
 	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
-	ctx, _, _ := GetRunIDLog(context.Background())
-	_, f.err = clusterConfig.isiSvc.GetExports(ctx)
-	_, f.err = clusterConfig.isiSvc.GetExportByIDWithZone(ctx, 557, "System")
-	f.err = clusterConfig.isiSvc.DeleteQuotaByExportIDWithZone(ctx, "volume1", 557, "System")
-	_, _, f.err = clusterConfig.isiSvc.GetExportsWithLimit(ctx, "2")
+	_, f.err = clusterConfig.isiSvc.GetExports(context.Background())
+	_, f.err = clusterConfig.isiSvc.GetExportByIDWithZone(context.Background(), 557, "System")
+	f.err = clusterConfig.isiSvc.DeleteQuotaByExportIDWithZone(context.Background(), "volume1", 557, "System")
+	_, _, f.err = clusterConfig.isiSvc.GetExportsWithLimit(context.Background(), "2")
 	return nil
 }
 
@@ -2661,7 +2659,7 @@ func (f *feature) iCallNodeGetInfowithinvalidnetworks() error {
 	req := new(csi.NodeGetInfoRequest)
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
 	if f.err != nil {
-		log.Printf("NodeGetInfo call failed: %s\n", f.err.Error())
+		log.Infof("NodeGetInfo call failed: %s\n", f.err.Error())
 		return nil
 	}
 	return nil
@@ -2687,7 +2685,7 @@ func (f *feature) iCallCreateRemoteVolume() error {
 	f.createRemoteVolumeRequest = req
 	f.createRemoteVolumeResponse, f.err = f.service.CreateRemoteVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("CreateRemoteVolume call failed: %s\n", f.err.Error())
+		log.Infof("CreateRemoteVolume call failed: %s\n", f.err.Error())
 	}
 	if f.createRemoteVolumeResponse != nil {
 		stepHandlersErrors.ExportNotFoundError = false
@@ -2713,7 +2711,7 @@ func (f *feature) iCallCreateRemoteVolumeWithParams(volhand string, keyreplremsy
 	f.createRemoteVolumeRequest = req
 	f.createRemoteVolumeResponse, f.err = f.service.CreateRemoteVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("CreateRemoteVolume call failed: %s\n", f.err.Error())
+		log.Infof("CreateRemoteVolume call failed: %s\n", f.err.Error())
 	}
 	if f.createRemoteVolumeResponse != nil {
 		stepHandlersErrors.ExportNotFoundError = false
@@ -2743,7 +2741,7 @@ func (f *feature) iCallDeleteLocalVolume() error {
 	f.deleteLocalVolumeRequest = req
 	f.deleteLocalVolumeResponse, f.err = f.service.DeleteLocalVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("DeleteLocalVolume call failed: %s\n", f.err.Error())
+		log.Infof("DeleteLocalVolume call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -2759,7 +2757,7 @@ func (f *feature) iCallDeleteLocalVolumeWithParams(volhandle string) error {
 	f.deleteLocalVolumeRequest = req
 	f.deleteLocalVolumeResponse, f.err = f.service.DeleteLocalVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("DeleteLocalVolume call failed: %s\n", f.err.Error())
+		log.Infof("DeleteLocalVolume call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -2778,7 +2776,7 @@ func (f *feature) iCallCreateStorageProtectionGroup() error {
 	f.createStorageProtectionGroupRequest = req
 	f.createStorageProtectionGroupResponse, f.err = f.service.CreateStorageProtectionGroup(context.Background(), req)
 	if f.err != nil {
-		log.Printf("CreateStorageProtectionGroup call failed: %s\n", f.err.Error())
+		log.Infof("CreateStorageProtectionGroup call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -2797,7 +2795,7 @@ func (f *feature) iCallCreateStorageProtectionGroupWithParams(volhand string, ke
 	f.createStorageProtectionGroupRequest = req
 	f.createStorageProtectionGroupResponse, f.err = f.service.CreateStorageProtectionGroup(context.Background(), req)
 	if f.err != nil {
-		log.Printf("CreateStorageProtectionGroup call failed: %s\n", f.err.Error())
+		log.Infof("CreateStorageProtectionGroup call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -2828,7 +2826,7 @@ func (f *feature) iCallStorageProtectionGroupDelete(volume, systemName, clustern
 	f.deleteStorageProtectionGroupRequest = req
 	f.deleteStorageProtectionGroupResponse, f.err = f.service.DeleteStorageProtectionGroup(context.Background(), req)
 	if f.err != nil {
-		log.Printf("DeleteStorageProtectionGroup call failed: %s\n", f.err.Error())
+		log.Infof("DeleteStorageProtectionGroup call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -2845,7 +2843,7 @@ func (f *feature) iCallNodeGetInfoWithNoFQDN() error {
 	f.service.nodeIP = "192.0.2.0"
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(context.Background(), req)
 	if f.err != nil {
-		log.Printf("NodeGetInfo call failed: %s\n", f.err.Error())
+		log.Infof("NodeGetInfo call failed: %s\n", f.err.Error())
 		return f.err
 	}
 	return nil
@@ -2867,7 +2865,7 @@ func (f *feature) iCallGetStorageProtectionGroupStatus() error {
 	f.getStorageProtectionGroupStatusRequest = req
 	f.getStorageProtectionGroupStatusResponse, f.err = f.service.GetStorageProtectionGroupStatus(context.Background(), req)
 	if f.err != nil {
-		log.Printf("GetStorageProtectionGroupStatus call failed: %s\n", f.err.Error())
+		log.Infof("GetStorageProtectionGroupStatus call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -2883,7 +2881,7 @@ func (f *feature) iCallGetReplicationCapabilities() error {
 	req := new(csiext.GetReplicationCapabilityRequest)
 	f.getReplicationCapabilityResponse, f.err = f.service.GetReplicationCapabilities(context.Background(), req)
 	if f.err != nil {
-		log.Printf("GetReplicationCapabilities call failed: %s\n", f.err.Error())
+		log.Infof("GetReplicationCapabilities call failed: %s\n", f.err.Error())
 		return f.err
 	}
 	return nil
@@ -2905,7 +2903,7 @@ func (f *feature) iCallGetStorageProtectionGroupStatusWithParams(id, localSystem
 	f.getStorageProtectionGroupStatusRequest = req
 	f.getStorageProtectionGroupStatusResponse, f.err = f.service.GetStorageProtectionGroupStatus(context.Background(), req)
 	if f.err != nil {
-		log.Printf("GetStorageProtectionGroupStatus call failed: %s\n", f.err.Error())
+		log.Infof("GetStorageProtectionGroupStatus call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -2936,7 +2934,7 @@ func (f *feature) iCallExecuteAction(systemName, clusterNameOne, clusterNameTwo,
 	f.executeActionRequest = req
 	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
 	if f.err != nil {
-		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+		log.Infof("ExecuteAction call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -2974,7 +2972,7 @@ func (f *feature) iCallExecuteActionSuspend() error {
 	f.executeActionRequest = req
 	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
 	if f.err != nil {
-		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+		log.Infof("ExecuteAction call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -3005,7 +3003,7 @@ func (f *feature) iCallExecuteActionReprotect() error {
 	f.executeActionRequest = req
 	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
 	if f.err != nil {
-		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+		log.Infof("ExecuteAction call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -3036,7 +3034,7 @@ func (f *feature) iCallExecuteActionSync() error {
 	f.executeActionRequest = req
 	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
 	if f.err != nil {
-		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+		log.Infof("ExecuteAction call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -3067,7 +3065,7 @@ func (f *feature) iCallExecuteActionSyncFailoverUnplanned() error {
 	f.executeActionRequest = req
 	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
 	if f.err != nil {
-		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+		log.Infof("ExecuteAction call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -3098,7 +3096,7 @@ func (f *feature) iCallExecuteActionFailback() error {
 	f.executeActionRequest = req
 	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
 	if f.err != nil {
-		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+		log.Infof("ExecuteAction call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -3129,7 +3127,7 @@ func (f *feature) iCallExecuteActionFailbackDiscard() error {
 	f.executeActionRequest = req
 	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
 	if f.err != nil {
-		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+		log.Infof("ExecuteAction call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -3160,7 +3158,7 @@ func (f *feature) iCallExecuteActionSyncFailover() error {
 	f.executeActionRequest = req
 	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
 	if f.err != nil {
-		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+		log.Infof("ExecuteAction call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -3170,7 +3168,7 @@ func (f *feature) iCallExecuteActionBad() error {
 	f.executeActionRequest = req
 	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
 	if f.err != nil {
-		log.Printf("ExecuteAction call failed: %s\n", f.err.Error())
+		log.Infof("ExecuteAction call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -3204,7 +3202,7 @@ func (f *feature) iCallExecuteActionFailbackWithParams(systemName, clusterNameOn
 	f.executeActionRequest = req
 	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
 	if f.err != nil {
-		log.Printf("iCallExecuteActionFailbackWithParams call failed: %s\n", f.err.Error())
+		log.Infof("iCallExecuteActionFailbackWithParams call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -3217,7 +3215,7 @@ func (f *feature) iCallExecuteActionFailbackDiscardWithParams(systemName, cluste
 	f.executeActionRequest = req
 	f.executeActionResponse, f.err = f.service.ExecuteAction(context.Background(), req)
 	if f.err != nil {
-		log.Printf("iCallExecuteActionFailbackDiscardWithParams call failed: %s\n", f.err.Error())
+		log.Infof("iCallExecuteActionFailbackDiscardWithParams call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -3256,7 +3254,7 @@ func (f *feature) iCallCreateRemoteVolumeBad() error {
 	f.createRemoteVolumeRequest = req
 	f.createRemoteVolumeResponse, f.err = f.service.CreateRemoteVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("CreateRemoteVolume call failed: %s\n", f.err.Error())
+		log.Infof("CreateRemoteVolume call failed: %s\n", f.err.Error())
 	}
 	if f.createRemoteVolumeResponse != nil {
 		stepHandlersErrors.ExportNotFoundError = false
@@ -3281,7 +3279,7 @@ func (f *feature) iCallCreateStorageProtectionGroupBad() error {
 	f.createStorageProtectionGroupRequest = req
 	f.createStorageProtectionGroupResponse, f.err = f.service.CreateStorageProtectionGroup(context.Background(), req)
 	if f.err != nil {
-		log.Printf("CreateStorageProtectionGroup call failed: %s\n", f.err.Error())
+		log.Infof("CreateStorageProtectionGroup call failed: %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -3353,7 +3351,7 @@ func (f *feature) iCallValidateVolumeHostConnectivity() error {
 		f.err = errors.New(err.Error())
 		return nil
 	}
-	log.Printf("Node id is: %v", csiNodeID)
+	log.Infof("Node id is: %v", csiNodeID)
 
 	volIDs := make([]string, 0)
 
@@ -3445,21 +3443,21 @@ func (f *feature) iCallProbeController() error {
 }
 
 func (f *feature) iCallDynamicLogChange(file string) error {
-	log.Printf("level before change: %s", logging.GetCurrentLogLevel())
+	log.Infof("level before change: %s", csmlog.GetLevel())
 	DriverConfigParamsFile = "mock/loglevel/" + file
-	log.Printf("wait for config change %s", DriverConfigParamsFile)
+	log.Infof("wait for config change %s", DriverConfigParamsFile)
 	f.iCallBeforeServe()
 	time.Sleep(10 * time.Second)
 	return nil
 }
 
 func (f *feature) aValidDynamicLogChangeOccurs(_, expectedLevel string) error {
-	log.Printf("level after change: %s", logging.GetCurrentLogLevel())
-	if logging.GetCurrentLogLevel().String() != expectedLevel {
-		err := fmt.Errorf("level was expected to be %s, but was %s instead", expectedLevel, logging.GetCurrentLogLevel().String())
+	log.Infof("level after change: %s", csmlog.GetLevel())
+	if csmlog.GetLevel().String() != expectedLevel {
+		err := fmt.Errorf("level was expected to be %s, but was %s instead", expectedLevel, csmlog.GetLevel().String())
 		return err
 	}
-	log.Printf("Reverting log changes made")
+	log.Infof("Reverting log changes made")
 	DriverConfigParamsFile = "mock/loglevel/logConfig.yaml"
 	f.iCallBeforeServe()
 	time.Sleep(10 * time.Second)
@@ -3473,10 +3471,9 @@ func (f *feature) iSetNoProbeOnStart(value string) error {
 
 func (f *feature) iCallGetSnapshotNameFromIsiPathWith(exportPath string) error {
 	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
-	ctx, _, _ := GetRunIDLog(context.Background())
-	_, f.err = clusterConfig.isiSvc.GetSnapshotNameFromIsiPath(ctx, exportPath, "System", "/ifs")
+	_, f.err = clusterConfig.isiSvc.GetSnapshotNameFromIsiPath(context.Background(), exportPath, "System", "/ifs")
 	if f.err != nil {
-		log.Printf("inside iCallGetSnapshotNameFromIsiPath error %s\n", f.err.Error())
+		log.Infof("inside iCallGetSnapshotNameFromIsiPath error %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -3490,17 +3487,15 @@ func (f *feature) iCallGetSnapshotIsiPathComponents() error {
 
 func (f *feature) iCallGetSubDirectoryCount() error {
 	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
-	ctx, _, _ := GetRunIDLog(context.Background())
-	_, _ = clusterConfig.isiSvc.GetSubDirectoryCount(ctx, "/ifs/data/csi-isilon", "csi-isilon")
+	_, _ = clusterConfig.isiSvc.GetSubDirectoryCount(context.Background(), "/ifs/data/csi-isilon", "csi-isilon")
 	return nil
 }
 
 func (f *feature) iCallDeleteSnapshotIsiService() error {
 	clusterConfig := f.service.getIsilonClusterConfig(clusterName1)
-	ctx, _, _ := GetRunIDLog(context.Background())
-	f.err = clusterConfig.isiSvc.DeleteSnapshot(ctx, 64, "")
+	f.err = clusterConfig.isiSvc.DeleteSnapshot(context.Background(), 64, "")
 	if f.err != nil {
-		log.Printf("inside iCallDeleteSnapshotIsiService error %s\n", f.err.Error())
+		log.Infof("inside iCallDeleteSnapshotIsiService error %s\n", f.err.Error())
 	}
 	return nil
 }
@@ -3634,10 +3629,10 @@ func (f *feature) iCallCreateROVolumeFromSnapshot(name string) error {
 	req.Name = name
 	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+		log.Infof("CreateVolume call failed: %s\n", f.err.Error())
 	}
 	if f.createVolumeResponse != nil {
-		log.Printf("volume name '%s' created\n", name)
+		log.Infof("volume name '%s' created\n", name)
 	}
 	return nil
 }
@@ -3647,13 +3642,13 @@ func (f *feature) iCallCreateVolumeFromSnapshotMultiReader(srcSnapshotID, name s
 	f.createVolumeRequest = req
 	req.Name = name
 	req = f.setVolumeContent(true, srcSnapshotID)
-	log.Printf("called iCallCreateVolumeFromSnapshotMultiReader")
+	log.Infof("called iCallCreateVolumeFromSnapshotMultiReader")
 	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("CreateVolume call failed: '%s'\n", f.err.Error())
+		log.Infof("CreateVolume call failed: '%s'\n", f.err.Error())
 	}
 	if f.createVolumeResponse != nil {
-		log.Printf("volume name '%s' created\n", name)
+		log.Infof("volume name '%s' created\n", name)
 	}
 	return nil
 }
@@ -3666,11 +3661,9 @@ func (f *feature) iCallDeleteVolumeFromSnapshot(id string) error {
 	req := f.deleteVolumeRequest
 	req.VolumeId = id
 
-	ctx, log, _ := GetRunIDLog(context.Background())
-
-	f.deleteVolumeResponse, f.err = f.service.DeleteVolume(ctx, req)
+	f.deleteVolumeResponse, f.err = f.service.DeleteVolume(context.Background(), req)
 	if f.err != nil {
-		log.Printf("DeleteVolume call failed: '%v'\n", f.err)
+		log.Infof("DeleteVolume call failed: '%v'\n", f.err)
 	}
 	return nil
 }
@@ -3683,7 +3676,7 @@ func (f *feature) aValidDeleteSnapshotResponseIsReturned() error {
 }
 
 func (f *feature) iCallControllerPublishVolumeOnSnapshot(volID, accessMode, nodeID, path string) error {
-	log.Printf("iCallControllerPublishVolume called with %s and %s", accessMode, nodeID)
+	log.Infof("iCallControllerPublishVolume called with %s and %s", accessMode, nodeID)
 	header := metadata.New(map[string]string{"csi.requestid": "1"})
 	ctx := metadata.NewIncomingContext(context.Background(), header)
 	req := f.publishVolumeRequest
@@ -3697,10 +3690,10 @@ func (f *feature) iCallControllerPublishVolumeOnSnapshot(volID, accessMode, node
 		req.VolumeId = volID
 	}
 
-	log.Printf("Calling controllerPublishVolume with request %v", req)
+	log.Infof("Calling controllerPublishVolume with request %v", req)
 	f.publishVolumeResponse, f.err = f.service.ControllerPublishVolume(ctx, req)
 	if f.err != nil {
-		log.Printf("PublishVolume call failed: %s\n", f.err.Error())
+		log.Infof("PublishVolume call failed: %s\n", f.err.Error())
 	}
 	f.publishVolumeRequest = nil
 	return nil
@@ -3754,7 +3747,7 @@ func (f *feature) iCallQueryArrayStatus(apiPort string) error {
 	url := "http://" + "127.0.0.1:" + apiPort + arrayStatus + "/" + "cluster1"
 	_, err := f.service.queryArrayStatus(ctx, url)
 	if err != nil {
-		log.Printf("queryArrayStatus failed: %s", err)
+		log.Infof("queryArrayStatus failed: %s", err)
 	}
 	return nil
 }

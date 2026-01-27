@@ -17,18 +17,18 @@ package provider
 */
 
 import (
-	"github.com/dell/csi-isilon/v2/common/utils/logging"
-	csiutils "github.com/dell/csi-isilon/v2/csi-utils"
-	"github.com/dell/csi-isilon/v2/service"
-	"github.com/dell/csi-isilon/v2/service/interceptor"
+	csiutils "github.com/dell/csi-powerscale/v2/csi-utils"
+	"github.com/dell/csi-powerscale/v2/service"
+	"github.com/dell/csi-powerscale/v2/service/interceptor"
+	csmlog "github.com/dell/csmlog"
 	"github.com/dell/gocsi"
 	"google.golang.org/grpc"
 )
 
+var log = csmlog.GetLogger()
+
 // New returns a new Storage Plug-in Provider.
 func New() gocsi.StoragePluginProvider {
-	log := logging.GetLogger()
-
 	// TODO during the test, for some reason, when the controller & node pods start,
 	// the sock files always exist right from the beginning, even if you manually
 	// remove them prior to using helm to install the csi driver. Need to find out why.
