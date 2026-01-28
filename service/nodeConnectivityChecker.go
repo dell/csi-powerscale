@@ -25,10 +25,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dell/csi-isilon/v2/common/constants"
-	fromctx "github.com/dell/csi-isilon/v2/common/utils/fromcontext"
+	"github.com/dell/csi-powerscale/v2/common/constants"
+	fromctx "github.com/dell/csi-powerscale/v2/common/utils/fromcontext"
 	"github.com/gorilla/mux"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -55,6 +54,7 @@ type ArrayConnectivityStatus struct {
 }
 
 func setAPIPort(ctx context.Context) {
+	log := log.WithContext(ctx)
 	port := fromctx.GetUint(ctx, constants.EnvPodmonAPIPORT)
 	if port == 0 {
 		// If the port number cannot be fetched, set it to default
@@ -68,6 +68,7 @@ func setAPIPort(ctx context.Context) {
 
 // reads the pollingFrequency from Env, sets default if not found
 func setPollingFrequency(ctx context.Context) int64 {
+	log := log.WithContext(ctx)
 	pollRate, err := fromctx.GetInt64(ctx, constants.EnvPodmonArrayConnectivityPollRate)
 	if err != nil || pollRate == 0 {
 		log.Debugf("use default pollingFrequency %d seconds, err %v", constants.DefaultPodmonPollRate, err)
@@ -93,6 +94,7 @@ var MarshalSyncMapToJSON = func(m *sync.Map) ([]byte, error) {
 
 // startAPIService reads nodes to array status periodically
 func (s *service) startAPIService(ctx context.Context) {
+	log := log.WithContext(ctx)
 	isPodmonEnabled := fromctx.GetBoolean(ctx, constants.EnvPodmonEnabled)
 	if !isPodmonEnabled {
 		log.Info("podmon is not enabled")
@@ -194,6 +196,7 @@ func connectivityStatus(w http.ResponseWriter, _ *http.Request) {
 
 // startNodeToArrayConnectivityCheck starts connectivityTest as one goroutine for each cluster
 func (s *service) startNodeToArrayConnectivityCheck(ctx context.Context) {
+	log := log.WithContext(ctx)
 	log.Debug("startNodeToArrayConnectivityCheck called")
 	probeStatus = new(sync.Map)
 	isilonClusters := s.getIsilonClusters()
@@ -207,6 +210,7 @@ func (s *service) startNodeToArrayConnectivityCheck(ctx context.Context) {
 // testConnectivityAndUpdateStatus runs probe to test connectivity from node to array
 // updates probeStatus map[array]ArrayConnectivityStatus
 func (s *service) testConnectivityAndUpdateStatus(ctx context.Context, cluster *IsilonClusterConfig, timeout time.Duration) {
+	log := log.WithContext(ctx)
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("panic occurred in testConnectivityAndUpdateStatus:%s for clsuter %s", err, cluster)

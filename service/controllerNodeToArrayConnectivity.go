@@ -38,10 +38,10 @@ var (
 
 // queryStatus make API call to the specified url to retrieve connection status
 func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error) {
-	ctx, log, _ := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
 	defer func() {
 		if err := recover(); err != nil {
-			log.Println("panic occurred in queryStatus:", err)
+			log.Infof("panic occurred in queryStatus: %v", err)
 		}
 	}()
 	log.Infof("Calling API %s with timeout %v", url, timeout)
@@ -66,7 +66,7 @@ func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			log.Printf("Error closing HTTP response: %s", err.Error())
+			log.Infof("Error closing HTTP response: %s", err.Error())
 		}
 	}()
 	bodyBytes, err := GetIoReadAll(resp.Body)

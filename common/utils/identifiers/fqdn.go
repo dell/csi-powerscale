@@ -21,13 +21,13 @@ import (
 	"net"
 	"strings"
 
+	csmlog "github.com/dell/csmlog"
 	"github.com/Showmax/go-fqdn"
-	"github.com/dell/csi-isilon/v2/common/utils/logging"
 )
 
 // GetFQDNByIP returns the FQDN based on the parsed ip address
 func GetFQDNByIP(ctx context.Context, ip string) (string, error) {
-	log := logging.GetRunIDLogger(ctx)
+	log := csmlog.GetLogger().WithContext(ctx)
 	names, err := net.LookupAddr(ip)
 	if err != nil {
 		log.Debugf("error getting FQDN: '%s'", err)

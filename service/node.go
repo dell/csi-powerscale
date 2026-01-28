@@ -26,14 +26,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dell/csi-powerscale/v2/common/constants"
+	"github.com/dell/csi-powerscale/v2/common/k8sutils"
+	id "github.com/dell/csi-powerscale/v2/common/utils/identifiers"
+
+	isilonfs "github.com/dell/csi-powerscale/v2/common/utils/powerscale-fs"
+	csiutils "github.com/dell/csi-powerscale/v2/csi-utils"
+	csmlog "github.com/dell/csmlog"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-isilon/v2/common/constants"
-	"github.com/dell/csi-isilon/v2/common/k8sutils"
-	id "github.com/dell/csi-isilon/v2/common/utils/identifiers"
-	"github.com/dell/csi-isilon/v2/common/utils/logging"
-	isilonfs "github.com/dell/csi-isilon/v2/common/utils/powerscale-fs"
-	csiutils "github.com/dell/csi-isilon/v2/csi-utils"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -98,16 +98,17 @@ func (s *service) NodePublishVolume(
 	req *csi.NodePublishVolumeRequest) (
 	*csi.NodePublishVolumeResponse, error,
 ) {
-	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
+	logFields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", logFields["csi.requestid"])
 	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
 
 	volumeContext := req.GetVolumeContext()
 	if volumeContext == nil {
-		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "VolumeContext is nil, skip NodePublishVolume"))
+		return nil, status.Error(codes.InvalidArgument, GetMessageWithReqID(runID, "VolumeContext is nil, skip NodePublishVolume"))
 	}
-	logging.LogMap(ctx, "VolumeContext", volumeContext)
+	LogMap(ctx, "VolumeContext", volumeContext)
 
 	isEphemeralVolume := volumeContext["csi.storage.k8s.io/ephemeral"] == "true"
 	var clusterName string
@@ -124,7 +125,8 @@ func (s *service) NodePublishVolume(
 		return nil, err
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
+	logFields[clusterName] = clusterName
+	ctx = csmlog.SetLogFields(ctx, logFields)
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	// Probe the node if required and make sure startup called
@@ -139,18 +141,18 @@ func (s *service) NodePublishVolume(
 	path := volumeContext["Path"]
 
 	if path == "" {
-		return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "no entry keyed by 'Path' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
+		return nil, status.Error(codes.FailedPrecondition, GetMessageWithReqID(runID, "no entry keyed by 'Path' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
 	}
 	volName := volumeContext["Name"]
 	if volName == "" {
-		return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "no entry keyed by 'Name' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
+		return nil, status.Error(codes.FailedPrecondition, GetMessageWithReqID(runID, "no entry keyed by 'Name' found in VolumeContext of volume id : '%s', name '%s', skip NodePublishVolume", req.GetVolumeId(), volumeContext["name"]))
 	}
 	accessZone := volumeContext["AccessZone"]
 	isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(path, accessZone)
 	if isROVolumeFromSnapshot {
 		log.Info("Volume source is snapshot")
 		if export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, path, accessZone); err != nil || export == nil {
-			return nil, status.Error(codes.Internal, logging.GetMessageWithRunID(runID, "error retrieving export for %s", path))
+			return nil, status.Error(codes.Internal, GetMessageWithReqID(runID, "error retrieving export for %s", path))
 		}
 	} else {
 		// Parse the target path and empty volume name to get the volume
@@ -177,14 +179,14 @@ func (s *service) NodePublishVolume(
 		azServiceIP = isiConfig.MountEndpoint
 	}
 
-	f := map[string]interface{}{
+	f := csmlog.Fields{
 		"ID":          req.VolumeId,
 		"Name":        volumeContext["Name"],
 		"TargetPath":  req.GetTargetPath(),
 		"AzServiceIP": azServiceIP,
 	}
 	// TODO: Replace logrus with log
-	logrus.WithFields(f).Info("Calling publishVolume")
+	log.WithFields(f).Info("Calling publishVolume")
 	if err := publishVolume(ctx, req, isiConfig.isiSvc.GetNFSExportURLForPath(azServiceIP, path)); err != nil {
 		return nil, err
 	}
@@ -197,15 +199,16 @@ func (s *service) NodeUnpublishVolume(
 	req *csi.NodeUnpublishVolumeRequest) (
 	*csi.NodeUnpublishVolumeResponse, error,
 ) {
-	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
+	logFields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", logFields["csi.requestid"])
 
 	log.Debug("executing NodeUnpublishVolume")
 	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
 	volID := req.GetVolumeId()
 	if volID == "" {
-		return nil, status.Error(codes.FailedPrecondition, logging.GetMessageWithRunID(runID, "no VolumeID found in request"))
+		return nil, status.Error(codes.FailedPrecondition, GetMessageWithReqID(runID, "no VolumeID found in request"))
 	}
 	log.Infof("The volume ID fetched from NodeUnPublish req is %s", volID)
 
@@ -216,11 +219,12 @@ func (s *service) NodeUnpublishVolume(
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Error("Failed to get Isilon config with error ", err.Error())
+		log.Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, err
 	}
 
-	ctx, log = setClusterContext(ctx, clusterName)
+	logFields[clusterName] = clusterName
+	ctx = csmlog.SetLogFields(ctx, logFields)
 	log.Debugf("Cluster Name: %v", clusterName)
 
 	// Probe the node if required
@@ -270,7 +274,7 @@ func (s *service) NodeUnpublishVolume(
 	}
 
 	if err := unpublishVolume(ctx, req, volName); err != nil {
-		log.Error("Error while calling Unbuplish Volume", err.Error())
+		log.Errorf("Error while calling Unbuplish Volume %v", err.Error())
 		return nil, err
 	}
 
@@ -278,7 +282,7 @@ func (s *service) NodeUnpublishVolume(
 		req.VolumeId = string(data)
 		err := s.ephemeralNodeUnpublish(ctx, req)
 		if err != nil {
-			log.Error("Error while calling Ephemeral Node Unpublish", err.Error())
+			log.Errorf("Error while calling Ephemeral Node Unpublish  %v", err.Error())
 			return nil, err
 		}
 	}
@@ -286,15 +290,15 @@ func (s *service) NodeUnpublishVolume(
 }
 
 func (s *service) nodeProbe(ctx context.Context, isiConfig *IsilonClusterConfig) error {
-	// Fetch log handler
-	ctx, log, _ := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
+	logFields := csmlog.ExtractFieldsFromContext(ctx)
 
 	if err := s.validateOptsParameters(isiConfig); err != nil {
 		return fmt.Errorf("node probe failed : '%v'", err)
 	}
 
 	if isiConfig.isiSvc == nil {
-		logLevel := logging.GetCurrentLogLevel()
+		logLevel := csmlog.GetLevel()
 		var err error
 		isiConfig.isiSvc, err = s.GetIsiService(ctx, isiConfig, logLevel)
 		if isiConfig.isiSvc == nil {
@@ -309,7 +313,8 @@ func (s *service) nodeProbe(ctx context.Context, isiConfig *IsilonClusterConfig)
 		return fmt.Errorf("node probe failed : '%v'", err)
 	}
 
-	ctx, log = setClusterContext(ctx, isiConfig.ClusterName)
+	logFields[isiConfig.ClusterName] = isiConfig.ClusterName
+	ctx = csmlog.SetLogFields(ctx, logFields)
 	log.Debug("node probe succeeded")
 
 	return nil
@@ -361,13 +366,11 @@ func (s *service) NodeGetInfo(
 	_ *csi.NodeGetInfoRequest) (
 	*csi.NodeGetInfoResponse, error,
 ) {
-	// Fetch log handler
-	ctx, log, _ := GetRunIDLog(ctx)
-
+	log := log.WithContext(ctx)
 	nodeID, err := s.getPowerScaleNodeID(ctx)
 	log.Infof("Node ID of worker node is '%s'", nodeID)
 	if (err) != nil {
-		log.Error("Failed to create Node ID with error", err.Error())
+		log.Errorf("Failed to create Node ID with error %v", err.Error())
 		return nil, err
 	}
 	if noProbeOnStart {
@@ -415,7 +418,7 @@ func (s *service) NodeGetInfo(
 	var maxIsilonVolumesPerNode int64
 	labels, err := s.GetNodeLabels()
 	if err != nil {
-		log.Error("failed to get Node Labels with error", err.Error())
+		log.Errorf("failed to get Node Labels with error %v", err.Error())
 		return nil, err
 	}
 
@@ -448,16 +451,17 @@ func (s *service) NodeGetInfo(
 func (s *service) NodeGetVolumeStats(
 	ctx context.Context, req *csi.NodeGetVolumeStatsRequest,
 ) (*csi.NodeGetVolumeStatsResponse, error) {
-	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
+	fields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", fields["csi.requestid"])
 
 	volID := req.GetVolumeId()
 	if volID == "" {
-		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "no VolumeID found in request"))
+		return nil, status.Error(codes.InvalidArgument, GetMessageWithReqID(runID, "no VolumeID found in request"))
 	}
 	volPath := req.GetVolumePath()
 	if volPath == "" {
-		return nil, status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "no Volume Path found in request"))
+		return nil, status.Error(codes.InvalidArgument, GetMessageWithReqID(runID, "no Volume Path found in request"))
 	}
 
 	volName, exportID, accessZone, clusterName, _ := id.ParseNormalizedVolumeID(ctx, volID)
@@ -497,7 +501,7 @@ func (s *service) NodeGetVolumeStats(
 	// if we cannot find it there, we check the export
 	isiPathFromParams, err := s.validateIsiPath(ctx, volName)
 	if err != nil {
-		log.Error("Failed to get isiPath: ", err.Error())
+		log.Errorf("Failed to get isiPath %v", err.Error())
 		// if not in pv or sc, calculate it from the export
 		exportPath, err := getExportPathFromExportID(ctx, isiConfig, exportID, accessZone)
 		if err != nil {
@@ -507,38 +511,38 @@ func (s *service) NodeGetVolumeStats(
 		}
 	}
 	if isiPathFromParams != "" {
-		log.Debug("Found IsiPath from PV/SC/Export: ", isiPathFromParams)
+		log.Debugf("Found IsiPath from PV/SC/Export: %v ", isiPathFromParams)
 		isiPath = isiPathFromParams
 		// set service to utilize new path
 		isiConfigCopy.IsiPath = isiPath
-		isiConfigCopy.isiSvc, err = s.GetIsiService(ctx, isiConfigCopy, logging.GetCurrentLogLevel())
+		isiConfigCopy.isiSvc, err = s.GetIsiService(ctx, isiConfigCopy, csmlog.GetLevel())
 		if err != nil {
-			log.Error("NodeGetVolumeStats: Failed to get isiService: ", err.Error())
+			log.Errorf("NodeGetVolumeStats: Failed to get isiService %v ", err.Error())
 			return nil, err
 		}
 	}
 
 	// Probe the node if required and make sure startup called
-	if err := s.autoProbe(ctx, isiConfig); err != nil {
+	if err := s.autoProbe(ctx, isiConfigCopy); err != nil {
 		log.Error("nodeProbe failed with error :" + err.Error())
 		return nil, err
 	}
 
 	isiVol, err := isiConfigCopy.isiSvc.GetVolume(ctx, "", volName)
 	if err != nil || isiVol == nil {
-		return nil, status.Error(codes.NotFound, logging.GetMessageWithRunID(runID, "volume %v does not exist at path %v", volName, volPath))
+		return nil, status.Error(codes.NotFound, GetMessageWithReqID(runID, "volume %v does not exist at path %v", volName, volPath))
 	}
 
 	// check whether the original volume is mounted
 	isMounted, _ := getIsVolumeMounted(ctx, volName, volPath)
 	if !isMounted {
-		return nil, status.Error(codes.NotFound, logging.GetMessageWithRunID(runID, "no volume is mounted at path: %s", volPath))
+		return nil, status.Error(codes.NotFound, GetMessageWithReqID(runID, "no volume is mounted at path: %s", volPath))
 	}
 
 	// check whether volume path is accessible
 	_, err = getOsReadDir(volPath)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, logging.GetMessageWithRunID(runID, "volume path is not accessible: %s", err))
+		return nil, status.Error(codes.NotFound, GetMessageWithReqID(runID, "volume path is not accessible: %s", err))
 	}
 
 	// Get Volume stats metrics
@@ -583,9 +587,7 @@ func (s *service) NodeGetVolumeStats(
 }
 
 func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	// Fetch log handler
-	ctx, log, _ := GetRunIDLog(ctx)
-
+	log := log.WithContext(ctx)
 	log.Info("Received request to node publish Ephemeral Volume..")
 
 	volID := req.GetVolumeId()
@@ -732,14 +734,15 @@ func (s *service) ephemeralNodeUnpublish(
 var ephemeralNodeUnpublishFunc = func(s *service, ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest,
 ) error {
-	// Fetch log handler
-	ctx, log, runID := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
+	fields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", fields["csi.requestid"])
 
 	log.Infof("Request received for Ephemeral NodeUnpublish..")
 	volumeID := req.GetVolumeId()
 	log.Infof("The volID is %s", volumeID)
 	if volumeID == "" {
-		return status.Error(codes.InvalidArgument, logging.GetMessageWithRunID(runID, "volume ID is required"))
+		return status.Error(codes.InvalidArgument, GetMessageWithReqID(runID, "volume ID is required"))
 	}
 
 	nodeID, nodeIDErr := s.getPowerScaleNodeID(ctx)
@@ -786,8 +789,7 @@ func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
 	var nodeIP string
 	var err error
 
-	// Fetch log handler
-	ctx, log, _ := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
 
 	// When valid list of allowedNetworks is being given as part of values.yaml, we need
 	// to fetch first IP from matching network
@@ -795,7 +797,7 @@ func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
 		log.Debugf("Fetching IP address of custom network for NFS I/O traffic")
 		nodeIP, err = csiutils.GetNFSClientIP(s.opts.allowedNetworks)
 		if err != nil {
-			log.Error("Failed to find IP address corresponding to the allowed network with error", err.Error())
+			log.Errorf("Failed to find IP address corresponding to the allowed network with error %v", err.Error())
 			return "", err
 		}
 	} else {
@@ -822,8 +824,7 @@ func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
 }
 
 func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
-	ctx, log, _ := GetRunIDLog(ctx)
-
+	log := log.WithContext(ctx)
 	addrs, err := getInterfaceAddrsFunc()()
 	if err != nil {
 		log.Errorf("could not get network interface addresses: '%v'", err.Error())
@@ -850,7 +851,7 @@ func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
 
 	labels, err := getNodeLabelsFunc(s)()
 	if err != nil {
-		log.Error("failed to get node labels", err.Error())
+		log.Errorf("failed to get node labels %v", err.Error())
 	}
 
 	labelsToRemove := make([]string, 0)
@@ -865,7 +866,7 @@ func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
 	if nodeLabelsNeedPatching(labels, labelsToAdd, labelsToRemove) {
 		err = getPatchNodeLabelsFunc(s)(labelsToAdd, labelsToRemove)
 		if err != nil {
-			log.Error("failed to patch node labels", err.Error())
+			log.Errorf("failed to patch node labels %v", err.Error())
 			return err
 		}
 		log.Debugf("reconciled node network labels, added: %v, removed: %v", labelsToAdd, labelsToRemove)

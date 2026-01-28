@@ -21,7 +21,7 @@ import (
 	"errors"
 	"testing"
 
-	csiutils "github.com/dell/csi-isilon/v2/csi-utils"
+	csiutils "github.com/dell/csi-powerscale/v2/csi-utils"
 	"github.com/dell/gocsi"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"

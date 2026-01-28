@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dell/csi-isilon/v2/common/utils/logging"
+	csmlog "github.com/dell/csmlog"
 )
 
 // SnapshotIDSeparator is the separator that separates snapshot id and cluster name (two components that a normalized snapshot ID is comprised of)
@@ -29,7 +29,7 @@ const SnapshotIDSeparator = "=_=_="
 // GetNormalizedSnapshotID combines snapshotID ID and cluster name and access zone to form the normalized snapshot ID
 // e.g. 12345 + cluster1 + accessZone => 12345=_=_=cluster1=_=_=zone1
 func GetNormalizedSnapshotID(ctx context.Context, snapshotID, clusterName, accessZone string) string {
-	log := logging.GetRunIDLogger(ctx)
+	log := csmlog.GetLogger().WithContext(ctx)
 
 	snapID := fmt.Sprintf("%s%s%s%s%s", snapshotID, SnapshotIDSeparator, clusterName, SnapshotIDSeparator, accessZone)
 
@@ -43,7 +43,7 @@ func GetNormalizedSnapshotID(ctx context.Context, snapshotID, clusterName, acces
 // e.g. 12345 => 12345, ""
 // e.g. 12345=_=_=cluster1=_=_=zone => 12345, cluster1, zone
 func ParseNormalizedSnapshotID(ctx context.Context, snapID string) (string, string, string, error) {
-	log := logging.GetRunIDLogger(ctx)
+	log := csmlog.GetLogger().WithContext(ctx)
 	tokens := strings.Split(snapID, SnapshotIDSeparator)
 	if len(tokens) < 1 {
 		return "", "", "", fmt.Errorf("snapshot ID '%s' cannot be split into tokens", snapID)

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2025 Dell Inc, or its subsidiaries.
+Copyright (c) 2025-2026 Dell Inc, or its subsidiaries.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dell/csi-isilon/v2/common/constants"
+	"github.com/dell/csi-powerscale/v2/common/constants"
 	"github.com/dell/gocsi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -123,6 +123,9 @@ func TestMainFunctionWithLeaderElection(t *testing.T) {
 		os.Unsetenv("KUBERNETES_SERVICE_HOST")
 		os.Unsetenv("KUBERNETES_SERVICE_PORT")
 	}()
+
+	// Set Manifest version similar to how the image would be built.
+	ManifestSemver = "1.0.0"
 
 	// reset os.Args before next test
 	os.Args = origArgs

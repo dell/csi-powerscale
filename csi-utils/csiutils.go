@@ -21,9 +21,10 @@ import (
 	"net"
 	"os"
 
+	"github.com/dell/csi-powerscale/v2/common/constants"
+	csmlog "github.com/dell/csmlog"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-isilon/v2/common/constants"
-	"github.com/dell/csi-isilon/v2/common/utils/logging"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -36,9 +37,10 @@ var parseCIDR = func(s string) (net.IP, *net.IPNet, error) {
 	return net.ParseCIDR(s)
 }
 
+var log = csmlog.GetLogger()
+
 // RemoveExistingCSISockFile When the sock file that the gRPC server is going to be listening on already exists, error will be thrown saying the address is already in use, thus remove it first
 var RemoveExistingCSISockFile = func() error {
-	log := logging.GetLogger()
 	protoAddr := os.Getenv(constants.EnvCSIEndpoint)
 
 	log.Debugf("check if sock file '%s' has already been created", protoAddr)
@@ -53,7 +55,7 @@ var RemoveExistingCSISockFile = func() error {
 
 		if err := os.RemoveAll(protoAddr); err != nil {
 
-			log.WithError(err).Debugf("error removing sock file '%s'", protoAddr)
+			log.Debugf("error removing sock file '%s'"+"failed with error : %s", protoAddr, err.Error())
 
 			return fmt.Errorf(
 				"failed to remove sock file: '%s', error '%v'", protoAddr, err)
@@ -71,7 +73,6 @@ var RemoveExistingCSISockFile = func() error {
 // GetNFSClientIP is used to fetch IP address from networks on which NFS traffic is allowed
 func GetNFSClientIP(allowedNetworks []string) (string, error) {
 	var nodeIP string
-	log := logging.GetLogger()
 	addrs, err := interfaceAddrs()
 	if err != nil {
 		log.Errorf("Encountered error while fetching system IP addresses: %+v\n", err.Error())

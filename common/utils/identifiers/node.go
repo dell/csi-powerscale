@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/dell/csi-isilon/v2/common/utils/logging"
+	csmlog "github.com/dell/csmlog"
 )
 
 const (
@@ -36,7 +36,7 @@ var NodeIDPattern = regexp.MustCompile(fmt.Sprintf("^(.+)%s(.+)%s(.+)$", NodeIDS
 
 // ParseNodeID parses NodeID to node name, node FQDN and IP address using pattern '^(.+)=#=#=(.+)=#=#=(.+)'
 func ParseNodeID(ctx context.Context, nodeID string) (string, string, string, error) {
-	log := logging.GetRunIDLogger(ctx)
+	log := csmlog.GetLogger().WithContext(ctx)
 
 	matches := NodeIDPattern.FindStringSubmatch(nodeID)
 

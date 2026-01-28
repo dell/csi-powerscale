@@ -26,11 +26,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dell/csi-isilon/v2/service/mock/k8s"
+	"github.com/dell/csi-powerscale/v2/service/mock/k8s"
 
-	isiapi "github.com/dell/goisilon/api"
+	isiapi "github.com/dell/gopowerscale/api"
 	"github.com/gorilla/mux"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 )
 
@@ -128,7 +127,7 @@ var (
 func getHandler() http.Handler {
 	handler := http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("handler called: %s %s", r.Method, r.URL)
+			log.Infof("handler called: %s %s", r.Method, r.URL)
 			if isilonRouter == nil {
 				getRouter().ServeHTTP(w, r)
 			}
@@ -657,7 +656,7 @@ func writeError(w http.ResponseWriter, message string, httpStatus int, _ codes.C
 	encoder := json.NewEncoder(w)
 	err := encoder.Encode(resp)
 	if err != nil {
-		log.Printf("error encoding json: %s\n", err.Error())
+		log.Infof("error encoding json: %s\n", err.Error())
 	}
 }
 
@@ -1172,15 +1171,15 @@ func MockK8sAPI() {
 }
 
 func noderesponse(w http.ResponseWriter, req *http.Request) {
-	log.Printf("request in noderesponse -> %+v", req)
+	log.Infof("request in noderesponse -> %+v", req)
 	param1 := req.URL.Query().Get("nodeId")
 	fakeNode := k8s.GetFakeNode()
 	fn, err := json.Marshal(fakeNode)
 	if err != nil {
 		fmt.Printf("Error fake node: %s", err)
 	}
-	log.Printf("wrote fn for %v", param1)
-	log.Printf("labels sent were %+v", fakeNode.GetLabels())
+	log.Infof("wrote fn for %v", param1)
+	log.Infof("labels sent were %+v", fakeNode.GetLabels())
 	w.Header().Add("Content-Type", "application/json")
 	w.Header().Add("Content-Type", "v=v1")
 	w.Write(fn)

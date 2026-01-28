@@ -27,11 +27,11 @@ import (
 	"sync"
 	"testing"
 
+	isi "github.com/dell/gopowerscale"
+	v1 "github.com/dell/gopowerscale/api/v1"
+	v2 "github.com/dell/gopowerscale/api/v2"
+	isimocks "github.com/dell/gopowerscale/mocks"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	isi "github.com/dell/goisilon"
-	v1 "github.com/dell/goisilon/api/v1"
-	v2 "github.com/dell/goisilon/api/v2"
-	isimocks "github.com/dell/goisilon/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/net/context"
@@ -144,7 +144,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 	mockClient.On("VolumesPath").Return("/path/to/volumes")
 	mockClient.On(
 		"Get",
-		mock.AnythingOfType("*context.valueCtx"),
+		mock.AnythingOfType("context.backgroundCtx"),
 		"platform/2/protocols/nfs/exports",
 		mock.AnythingOfType("string"),
 		mock.AnythingOfType("api.OrderedValues"),
@@ -157,7 +157,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 
 	mockClient.On(
 		"Get",
-		mock.AnythingOfType("*context.valueCtx"),
+		mock.AnythingOfType("context.backgroundCtx"),
 		"namespace/path/to/volumes",
 		"volume-id",
 		mock.AnythingOfType("api.OrderedValues"),
