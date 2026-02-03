@@ -231,7 +231,7 @@ DRIVER="csi-isilon"
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 REPODIR="$( dirname "${SCRIPTDIR}" )"
 
-DRIVERVERSION="csi-isilon-2.15.0"
+DRIVERVERSION="csi-isilon-2.16.0"
 
 while getopts "cpr:v:h" opt; do
   case $opt in
