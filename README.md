@@ -49,4 +49,3 @@ Both the Controller and the Node portions of the driver can only be run on nodes
 ## Documentation
 
 For more detailed information on the driver, please refer to [Container Storage Modules documentation](https://dell.github.io/csm-docs/).
-

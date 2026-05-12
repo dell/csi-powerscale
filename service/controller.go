@@ -16,6 +16,7 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path"
@@ -24,8 +25,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 
 	fPath "path"
 
@@ -39,7 +38,6 @@ import (
 	isiApi "github.com/dell/gopowerscale/api"
 	v1 "github.com/dell/gopowerscale/api/v1"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -671,16 +669,18 @@ func (s *service) CreateVolume(
 							log.Debugf("Error while adding dummy localhost entry to export '%d'", exportID)
 						}
 					}
-					// return the createVolume response with actual array volume name
+					// For RO volumes from snapshots, preserve the original volume name (req.GetName())
+					// to ensure it matches the snapshot tracking directory entry created earlier.
+					// Using the source volume name from the export path would cause a mismatch
+					// that prevents cleanup during DeleteVolume, leaving stale tracking entries
+					// that block DeleteSnapshot from actually deleting the snapshot on the array.
 					exportPath := path
 					if export.Paths != nil {
 						if len(*export.Paths) > 0 {
 							exportPath = (*export.Paths)[0]
-							pathToken := strings.Split(exportPath, "/")
-							volumeName = pathToken[len(pathToken)-1]
-							log.Debugf("volume name at array '%s' and export path: %s", volumeName, exportPath)
 						}
 					}
+					log.Debugf("volume name '%s' and export path: %s", volumeName, exportPath)
 					// return the response
 					return s.getCreateVolumeResponse(ctx, exportID, volumeName, exportPath, accessZone, sizeInBytes, azServiceIP, rootClientEnabled, sourceSnapshotID, sourceVolumeID, clusterName, azNetwork), nil
 				}
@@ -2562,8 +2562,4 @@ func removeString(exportList []string, strToRemove string) []string {
 		}
 	}
 	return exportList
-}
-
-func (s *service) CreateVolumeGroupSnapshot(_ context.Context, _ *vgsext.CreateVolumeGroupSnapshotRequest) (*vgsext.CreateVolumeGroupSnapshotResponse, error) {
-	panic("implement me")
 }

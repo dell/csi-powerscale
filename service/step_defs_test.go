@@ -16,6 +16,7 @@ package service
  limitations under the License.
 */
 import (
+	"context"
 	context2 "context"
 	"errors"
 	"fmt"
@@ -42,7 +43,6 @@ import (
 	"github.com/dell/gofsutil"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"
 
 	corev1 "k8s.io/api/core/v1"

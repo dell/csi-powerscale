@@ -271,7 +271,7 @@ func TestErrorExit(t *testing.T) {
 		return
 	}
 	// call the test again with INVOKE_ERROR_EXIT=1 so the errorExit function is invoked and we can check the return code
-	cmd := exec.Command(os.Args[0], "-test.run=TestErrorExit") // #nosec G204
+	cmd := exec.Command(os.Args[0], "-test.run=TestErrorExit") // #nosec G204,G702 -- test-only: re-invoking test binary, not user input
 	cmd.Env = append(os.Environ(), "INVOKE_ERROR_EXIT=1")
 
 	stderr, err := cmd.StderrPipe()

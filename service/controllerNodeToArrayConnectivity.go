@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -58,7 +59,11 @@ func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error
 	log.Debugf("Making %s url request %+v", url, req)
 
 	client := &http.Client{}
-	resp, err := client.Do(req)
+	// Validate URL scheme before making request to prevent SSRF
+	if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
+		return false, fmt.Errorf("unsupported URL scheme: %s", req.URL.Scheme)
+	}
+	resp, err := client.Do(req) // #nosec G704 - URL scheme validation implemented above
 	log.Debugf("Received response %+v for url %s", resp, url)
 	if err != nil {
 		log.Errorf("failed to call API %s due to %s ", url, err.Error())

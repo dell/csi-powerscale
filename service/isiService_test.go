@@ -33,147 +33,8 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-type MockClient struct {
-	mock.Mock
-}
-
-func (m *MockClient) APIVersion() uint8 {
-	// Implement the logic for the APIVersion method
-	// Return the desired API version and error
-	return uint8(2)
-}
-
-func (m *MockClient) GetAuthToken() string {
-	// Implement the logic for the APIVersion method
-	// Return the desired API version and error
-	return ""
-}
-
-func (m *MockClient) GetCSRFToken() string {
-	// Implement the logic for the APIVersion method
-	// Return the desired API version and error
-	return ""
-}
-
-func (m *MockClient) GetReferer() string {
-	// Implement the logic for the APIVersion method
-	// Return the desired API version and error
-	return ""
-}
-
-func (m *MockClient) SetAuthToken(_ string) {
-}
-
-func (m *MockClient) SetCSRFToken(_ string) {
-}
-
-func (m *MockClient) SetReferer(_ string) {
-}
-
-func (m *MockClient) VolumePath(_ string) string {
-	return ""
-}
-
-func (m *MockClient) User() string {
-	return ""
-}
-
-func (m *MockClient) VolumesPath() string {
-	return ""
-}
-
-func (m *MockClient) Group() string {
-	return ""
-}
-
-func (m *MockClient) Delete(ctx context.Context, path string, id string, params api.OrderedValues, headers map[string]string, resp interface{}) error {
-	ret := m.Called(ctx, path, id, params, headers, resp)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Delete")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, api.OrderedValues, map[string]string, interface{}) error); ok {
-		r0 = rf(ctx, path, id, params, headers, resp)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-func (m *MockClient) Do(
-	_ context.Context,
-	_, _, _ string,
-	_ api.OrderedValues,
-	_, _ interface{},
-) error {
-	return nil
-}
-
-func (m *MockClient) DoWithHeaders(
-	_ context.Context,
-	_, _, _ string,
-	_ api.OrderedValues, _ map[string]string,
-	_, _ interface{},
-) error {
-	return nil
-}
-
-func (m *MockClient) Get(ctx context.Context, path string, id string, params api.OrderedValues, headers map[string]string, resp interface{}) error {
-	ret := m.Called(ctx, path, id, params, headers, resp)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Get")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, api.OrderedValues, map[string]string, interface{}) error); ok {
-		r0 = rf(ctx, path, id, params, headers, resp)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-func (m *MockClient) Post(ctx context.Context, path string, id string, params api.OrderedValues, headers map[string]string, body interface{}, resp interface{}) error {
-	ret := m.Called(ctx, path, id, params, headers, body, resp)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Post")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, api.OrderedValues, map[string]string, interface{}, interface{}) error); ok {
-		r0 = rf(ctx, path, id, params, headers, body, resp)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-func (m *MockClient) Put(ctx context.Context, path string, id string, params api.OrderedValues, headers map[string]string, body interface{}, resp interface{}) error {
-	ret := m.Called(ctx, path, id, params, headers, body, resp)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Put")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, api.OrderedValues, map[string]string, interface{}, interface{}) error); ok {
-		r0 = rf(ctx, path, id, params, headers, body, resp)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 func TestCopySnapshot(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -210,7 +71,7 @@ func TestCopySnapshot(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			mockClient.On("Get", anyArgs...).Return(errors.New("mock error")).Once()
 			volumeNew, err := svc.CopySnapshot(ctx, tc.isiPath, tc.snapshotSourceVolumeIsiPath, tc.srcSnapshotID, tc.dstVolumeName, tc.accessZone)
 			if err != nil {
 				if tc.err == nil {
@@ -233,7 +94,7 @@ func TestCopySnapshot(t *testing.T) {
 }
 
 func TestCopyVolume(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -266,7 +127,7 @@ func TestCopyVolume(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc.client.API.(*MockClient).On("Put", anyArgs...).Return(errors.New("mock error")).Once()
+			svc.client.API.(*isimocks.Client).On("Put", anyArgs...).Return(errors.New("mock error")).Once()
 			volumeNew, err := svc.CopyVolume(ctx, tc.isiPath, tc.srcVolumeName, tc.dstVolumeName)
 			if err != nil {
 				if tc.err == nil {
@@ -289,7 +150,7 @@ func TestCopyVolume(t *testing.T) {
 }
 
 func TestCreateVolume(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -322,7 +183,7 @@ func TestCreateVolume(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc.client.API.(*MockClient).On("Put", anyArgs...).Return(errors.New("mock error")).Once()
+			svc.client.API.(*isimocks.Client).On("Put", anyArgs...).Return(errors.New("mock error")).Once()
 			err := svc.CreateVolume(ctx, tc.isiPath, tc.volName, tc.isiVolumePathPermissions)
 			if err != nil {
 				if tc.err == nil {
@@ -340,7 +201,7 @@ func TestCreateVolume(t *testing.T) {
 }
 
 func TestCreateVolumeWithMetaData(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -377,7 +238,7 @@ func TestCreateVolumeWithMetaData(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc.client.API.(*MockClient).On("Put", anyArgs...).Return(errors.New("mock error")).Once()
+			svc.client.API.(*isimocks.Client).On("Put", anyArgs...).Return(errors.New("mock error")).Once()
 			err := svc.CreateVolumeWithMetaData(ctx, tc.isiPath, tc.volName, tc.isiVolumePathPermissions, tc.metadata)
 			if err != nil {
 				if tc.err == nil {
@@ -407,7 +268,7 @@ func TestGetVolumeQuota(t *testing.T) {
 		{
 			name: "failed to get export",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
 			},
 			volName:      "test_volume",
 			exportID:     456,
@@ -418,7 +279,7 @@ func TestGetVolumeQuota(t *testing.T) {
 		{
 			name: "nil export",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Once()
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Once()
 			},
 			volName:      "test_volume",
 			exportID:     456,
@@ -429,7 +290,7 @@ func TestGetVolumeQuota(t *testing.T) {
 		{
 			name: "no quota id for export",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(*apiv2.ExportList)
 					*resp = apiv2.ExportList{
 						&apiv2.Export{},
@@ -445,7 +306,7 @@ func TestGetVolumeQuota(t *testing.T) {
 		{
 			name: "success case",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(*apiv2.ExportList)
 					*resp = apiv2.ExportList{
 						&apiv2.Export{
@@ -480,7 +341,7 @@ func TestGetVolumeQuota(t *testing.T) {
 			svc := &isiService{
 				endpoint: "http://localhost:8080",
 				client: &isi.Client{
-					API: &MockClient{},
+					API: &isimocks.Client{},
 				},
 			}
 
@@ -526,7 +387,7 @@ func TestCreateQuota(t *testing.T) {
 		{
 			name: "quota not enabled skip creating quotas",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).RunFn = func(_ mock.Arguments) {
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).RunFn = func(_ mock.Arguments) {
 					panic("should not be called")
 				}
 			},
@@ -535,7 +396,7 @@ func TestCreateQuota(t *testing.T) {
 		{
 			name: "invalid smart quota value skip create",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(*apiv5.QuotaLicense)
 					*resp = apiv5.QuotaLicense{
 						STATUS: "invalid",
@@ -548,14 +409,14 @@ func TestCreateQuota(t *testing.T) {
 		{
 			name: "failed to create quota",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(*apiv5.QuotaLicense)
 					*resp = apiv5.QuotaLicense{
 						STATUS: "Licensed",
 					}
 				}).Once()
 
-				svc.client.API.(*MockClient).On("Post", anyArgs...).Return(errors.New("mock error"))
+				svc.client.API.(*isimocks.Client).On("Post", anyArgs...).Return(errors.New("mock error"))
 			},
 			sizeInBytes:   100,
 			quotaEnabled:  true,
@@ -564,14 +425,14 @@ func TestCreateQuota(t *testing.T) {
 		{
 			name: "invalid soft grace period use default",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(*apiv5.QuotaLicense)
 					*resp = apiv5.QuotaLicense{
 						STATUS: "Licensed",
 					}
 				}).Once()
 
-				svc.client.API.(*MockClient).On("Post", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+				svc.client.API.(*isimocks.Client).On("Post", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(6).(*apiv1.IsiQuota)
 					*resp = apiv1.IsiQuota{
 						ID: "mock-id",
@@ -590,7 +451,7 @@ func TestCreateQuota(t *testing.T) {
 		{
 			name: "invalid soft limit use default",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Once()
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Once()
 			},
 			isiPath:       "/ifs/data/csi-isilon",
 			volName:       "volume3",
@@ -603,7 +464,7 @@ func TestCreateQuota(t *testing.T) {
 		{
 			name: "invalid advisory limit use default", // TODO need to validate
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Once()
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Once()
 			},
 			isiPath:       "/ifs/data/csi-isilon",
 			volName:       "volume3",
@@ -616,7 +477,7 @@ func TestCreateQuota(t *testing.T) {
 		{
 			name: "size zero skip creating quotas",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).RunFn = func(_ mock.Arguments) {
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).RunFn = func(_ mock.Arguments) {
 					panic("should not be called")
 				}
 			},
@@ -626,7 +487,7 @@ func TestCreateQuota(t *testing.T) {
 		{
 			name: "size negative skip creating quotas",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).RunFn = func(_ mock.Arguments) {
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).RunFn = func(_ mock.Arguments) {
 					panic("should not be called")
 				}
 			},
@@ -641,7 +502,7 @@ func TestCreateQuota(t *testing.T) {
 			svc := &isiService{
 				endpoint: "http://localhost:8080",
 				client: &isi.Client{
-					API: &MockClient{},
+					API: &isimocks.Client{},
 				},
 			}
 
@@ -670,7 +531,7 @@ func TestCreateQuota(t *testing.T) {
 }
 
 func TestGetExportsWithParams(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -701,7 +562,7 @@ func TestGetExportsWithParams(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
 			exports, err := svc.GetExportsWithParams(ctx, tc.params)
 			if err != nil {
 				if tc.err == nil {
@@ -724,7 +585,7 @@ func TestGetExportsWithParams(t *testing.T) {
 }
 
 func TestGetVolumeSize(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -755,7 +616,7 @@ func TestGetVolumeSize(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
 			size := svc.GetVolumeSize(ctx, tc.isiPath, tc.volName)
 			assert.Equal(t, tc.expectedSize, size)
 		})
@@ -763,7 +624,7 @@ func TestGetVolumeSize(t *testing.T) {
 }
 
 func TestIsIOInProgress(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -790,7 +651,7 @@ func TestIsIOInProgress(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
 			clients, err := svc.IsIOInProgress(ctx)
 			if err != nil {
 				if tc.expectedErr == nil {
@@ -813,7 +674,7 @@ func TestIsIOInProgress(t *testing.T) {
 }
 
 func TestOtherClientsAlreadyAdded(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -844,7 +705,7 @@ func TestOtherClientsAlreadyAdded(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
 			result := svc.OtherClientsAlreadyAdded(ctx, tc.exportID, tc.accessZone, tc.nodeID)
 
 			if result != tc.expectedBool {
@@ -855,7 +716,7 @@ func TestOtherClientsAlreadyAdded(t *testing.T) {
 }
 
 func TestAddExportClientNetworkIdentifierByIDWithZone(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -889,7 +750,7 @@ func TestAddExportClientNetworkIdentifierByIDWithZone(t *testing.T) {
 	// Run the test cases
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("node ID '!@$%~^' cannot match the expected '^(.+)=#=#=(.+)=#=#=(.+)$' pattern")).Once()
+			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("node ID '!@$%~^' cannot match the expected '^(.+)=#=#=(.+)=#=#=(.+)$' pattern")).Once()
 			err := svc.AddExportClientNetworkIdentifierByIDWithZone(context.Background(), tc.clusterName, tc.exportID, tc.accessZone, tc.nodeID, tc.ignoreUnresolvableHosts, func(_ context.Context, _ int, _, _ string, _ bool) error {
 				// Simulate the addClientFunc behavior
 				if tc.expectedErr != nil {
@@ -914,7 +775,7 @@ func TestAddExportClientNetworkIdentifierByIDWithZone(t *testing.T) {
 }
 
 func TestAddExportClientByIDWithZone(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -946,7 +807,7 @@ func TestAddExportClientByIDWithZone(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
 			err := svc.AddExportClientByIDWithZone(ctx, tc.exportID, tc.accessZone, tc.clientIP, tc.ignoreUnresolvableHosts)
 
 			if err != nil {
@@ -965,7 +826,7 @@ func TestAddExportClientByIDWithZone(t *testing.T) {
 }
 
 func TestAddExportRootClientByIDWithZone(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -995,7 +856,7 @@ func TestAddExportRootClientByIDWithZone(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
 			err := svc.AddExportRootClientByIDWithZone(ctx, tc.exportID, tc.accessZone, tc.clientIP, false)
 
 			if err != nil {
@@ -1014,7 +875,7 @@ func TestAddExportRootClientByIDWithZone(t *testing.T) {
 }
 
 func TestAddExportReadOnlyClientByIDWithZone(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -1046,7 +907,7 @@ func TestAddExportReadOnlyClientByIDWithZone(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
 			err := svc.AddExportReadOnlyClientByIDWithZone(ctx, tc.exportID, tc.accessZone, tc.clientIP, tc.ignoreUnresolvableHosts)
 
 			if err != nil {
@@ -1121,7 +982,7 @@ func TestAddExportClientByIPWithZone(t *testing.T) {
 
 			svc := &isiService{
 				client: &isi.Client{
-					API: &MockClient{},
+					API: &isimocks.Client{},
 				},
 			}
 
@@ -1143,7 +1004,7 @@ func TestAddExportClientByIPWithZone(t *testing.T) {
 }
 
 func TestRemoveExportClientByIDWithZone(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -1183,7 +1044,7 @@ func TestRemoveExportClientByIDWithZone(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
 			err := svc.RemoveExportClientByIDWithZone(ctx, tc.exportID, tc.accessZone, tc.clientIP, tc.ignoreUnresolvableHosts)
 
 			if err != nil {
@@ -1215,7 +1076,7 @@ func TestCreateSnapshot(t *testing.T) {
 			path:         "/ifs/data/csi-isilon/volume2",
 			snapshotName: "ut-snapshot",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Post", anyArgs...).Return(nil)
+				svc.client.API.(*isimocks.Client).On("Post", anyArgs...).Return(nil)
 			},
 		},
 		{
@@ -1223,7 +1084,7 @@ func TestCreateSnapshot(t *testing.T) {
 			path:         "/ifs/data/csi-isilon/volume2",
 			snapshotName: "ut-snapshot",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Post", anyArgs...).Return(errors.New("mock error"))
+				svc.client.API.(*isimocks.Client).On("Post", anyArgs...).Return(errors.New("mock error"))
 			},
 			wantErr: errors.New("mock error"),
 		},
@@ -1234,7 +1095,7 @@ func TestCreateSnapshot(t *testing.T) {
 			svc := &isiService{
 				endpoint: "http://localhost:8080",
 				client: &isi.Client{
-					API: &MockClient{},
+					API: &isimocks.Client{},
 				},
 			}
 
@@ -1264,7 +1125,7 @@ func TestCreateSnapshot(t *testing.T) {
 }
 
 func TestDeleteSnapshot(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -1290,7 +1151,7 @@ func TestDeleteSnapshot(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Twice()
+			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Twice()
 			err := svc.DeleteSnapshot(ctx, tc.snapshotID, tc.snapshotName)
 			if err != nil {
 				if tc.expectedErr == nil {
@@ -1308,7 +1169,7 @@ func TestDeleteSnapshot(t *testing.T) {
 }
 
 func TestGetSnapshotIsiPathComponents(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -1363,7 +1224,7 @@ func TestGetSnapshotIsiPathComponents(t *testing.T) {
 }
 
 func TestIsHostAlreadyAdded(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -1393,7 +1254,7 @@ func TestIsHostAlreadyAdded(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
 			result := svc.IsHostAlreadyAdded(ctx, tc.exportID, tc.accessZone, tc.nodeID)
 
 			if result != tc.expectedBool {
@@ -1491,14 +1352,14 @@ func TestGetExports(t *testing.T) {
 		{
 			name: "Success case",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil)
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil)
 			},
 			wantErr: false,
 		},
 		{
 			name: "error case",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error"))
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error"))
 			},
 			wantErr: true,
 		},
@@ -1509,7 +1370,7 @@ func TestGetExports(t *testing.T) {
 			svc := &isiService{
 				endpoint: "http://localhost:8080",
 				client: &isi.Client{
-					API: &MockClient{},
+					API: &isimocks.Client{},
 				},
 			}
 
@@ -1547,7 +1408,7 @@ func TestExportVolumeWithZone(t *testing.T) {
 		{
 			name: "Test ExportVolumeWithZone Success",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Post", anyArgs...).Return(nil)
+				svc.client.API.(*isimocks.Client).On("Post", anyArgs...).Return(nil)
 			},
 			args: args{
 				isiPath:     "/ifs/data",
@@ -1561,7 +1422,7 @@ func TestExportVolumeWithZone(t *testing.T) {
 		{
 			name: "Test ExportVolumeWithZone Failure",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Post", anyArgs...).Return(errors.New("mock error"))
+				svc.client.API.(*isimocks.Client).On("Post", anyArgs...).Return(errors.New("mock error"))
 			},
 			args: args{
 				isiPath:     "/ifs/data",
@@ -1579,7 +1440,7 @@ func TestExportVolumeWithZone(t *testing.T) {
 			svc := &isiService{
 				endpoint: "http://localhost:8080",
 				client: &isi.Client{
-					API: &MockClient{},
+					API: &isimocks.Client{},
 				},
 			}
 
@@ -1615,7 +1476,7 @@ func TestDeleteQuotaByExportIDWithZone(t *testing.T) {
 		{
 			name: "failure to get export",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error"))
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error"))
 			},
 			args: args{
 				volName:    "test-volume",
@@ -1627,7 +1488,7 @@ func TestDeleteQuotaByExportIDWithZone(t *testing.T) {
 		{
 			name: "no quota set on the volume, skip deleting quota",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(*apiv2.ExportList)
 					*resp = apiv2.ExportList{
 						&apiv2.Export{
@@ -1646,7 +1507,7 @@ func TestDeleteQuotaByExportIDWithZone(t *testing.T) {
 		{
 			name: "successful quota delete",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(*apiv2.ExportList)
 					*resp = apiv2.ExportList{
 						&apiv2.Export{
@@ -1654,7 +1515,7 @@ func TestDeleteQuotaByExportIDWithZone(t *testing.T) {
 							Description: fmt.Sprintf("CSI_QUOTA_ID:%d", 123),
 						},
 					}
-					svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(nil)
+					svc.client.API.(*isimocks.Client).On("Delete", anyArgs...).Return(nil)
 				})
 			},
 			args: args{
@@ -1671,7 +1532,7 @@ func TestDeleteQuotaByExportIDWithZone(t *testing.T) {
 			svc := &isiService{
 				endpoint: "http://localhost:8080",
 				client: &isi.Client{
-					API: &MockClient{},
+					API: &isimocks.Client{},
 				},
 			}
 
@@ -1705,7 +1566,7 @@ func TestUpdateQuotaSize(t *testing.T) {
 		{
 			name: "success case",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Put", anyArgs...).Return(nil)
+				svc.client.API.(*isimocks.Client).On("Put", anyArgs...).Return(nil)
 			},
 			args: args{
 				quotaID:              "test-quota-id",
@@ -1719,7 +1580,7 @@ func TestUpdateQuotaSize(t *testing.T) {
 		{
 			name: "failure case",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Put", anyArgs...).Return(errors.New("mock error"))
+				svc.client.API.(*isimocks.Client).On("Put", anyArgs...).Return(errors.New("mock error"))
 			},
 			args: args{
 				quotaID:              "test-quota-id",
@@ -1736,7 +1597,7 @@ func TestUpdateQuotaSize(t *testing.T) {
 			svc := &isiService{
 				endpoint: "http://localhost:8080",
 				client: &isi.Client{
-					API: &MockClient{},
+					API: &isimocks.Client{},
 				},
 			}
 
@@ -1763,7 +1624,7 @@ func TestUnexportByIDWithZone(t *testing.T) {
 		{
 			name: "success case",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(nil)
+				svc.client.API.(*isimocks.Client).On("Delete", anyArgs...).Return(nil)
 			},
 			exportID:   123,
 			accessZone: "System",
@@ -1772,7 +1633,7 @@ func TestUnexportByIDWithZone(t *testing.T) {
 		{
 			name: "failure case",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(errors.New("mock error"))
+				svc.client.API.(*isimocks.Client).On("Delete", anyArgs...).Return(errors.New("mock error"))
 			},
 			exportID:   123,
 			accessZone: "System",
@@ -1785,7 +1646,7 @@ func TestUnexportByIDWithZone(t *testing.T) {
 			svc := &isiService{
 				endpoint: "http://localhost:8080",
 				client: &isi.Client{
-					API: &MockClient{},
+					API: &isimocks.Client{},
 				},
 			}
 
@@ -1812,7 +1673,7 @@ func TestDeleteVolume(t *testing.T) {
 		{
 			name: "success case",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(nil)
+				svc.client.API.(*isimocks.Client).On("Delete", anyArgs...).Return(nil)
 			},
 			isiPath: "/ifs/data",
 			volName: "test_volume",
@@ -1821,7 +1682,7 @@ func TestDeleteVolume(t *testing.T) {
 		{
 			name: "failure case",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(errors.New("mock error"))
+				svc.client.API.(*isimocks.Client).On("Delete", anyArgs...).Return(errors.New("mock error"))
 			},
 			isiPath: "/ifs/data",
 			volName: "test_volume",
@@ -1834,7 +1695,7 @@ func TestDeleteVolume(t *testing.T) {
 			svc := &isiService{
 				endpoint: "http://localhost:8080",
 				client: &isi.Client{
-					API: &MockClient{},
+					API: &isimocks.Client{},
 				},
 			}
 
@@ -1860,7 +1721,7 @@ func TestClearQuotaByID(t *testing.T) {
 		{
 			name: "success case",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(nil)
+				svc.client.API.(*isimocks.Client).On("Delete", anyArgs...).Return(nil)
 			},
 			quotaID: "123",
 			wantErr: false,
@@ -1868,7 +1729,7 @@ func TestClearQuotaByID(t *testing.T) {
 		{
 			name: "failure case",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(errors.New("mock error"))
+				svc.client.API.(*isimocks.Client).On("Delete", anyArgs...).Return(errors.New("mock error"))
 			},
 			quotaID: "123",
 			wantErr: true,
@@ -1879,7 +1740,7 @@ func TestClearQuotaByID(t *testing.T) {
 			svc := &isiService{
 				endpoint: "http://localhost:8080",
 				client: &isi.Client{
-					API: &MockClient{},
+					API: &isimocks.Client{},
 				},
 			}
 
@@ -1904,14 +1765,16 @@ func TestTestConnection(t *testing.T) {
 		{
 			name: "success case",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil)
+				svc.client.API.(*isimocks.Client).On("User").Return("test-user")
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil)
 			},
 			wantErr: false,
 		},
 		{
 			name: "failure case",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error"))
+				svc.client.API.(*isimocks.Client).On("User").Return("test-user")
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error"))
 			},
 			wantErr: true,
 		},
@@ -1921,7 +1784,7 @@ func TestTestConnection(t *testing.T) {
 			svc := &isiService{
 				endpoint: "http://localhost:8080",
 				client: &isi.Client{
-					API: &MockClient{},
+					API: &isimocks.Client{},
 				},
 			}
 
@@ -1950,7 +1813,7 @@ func TestGetVolumeWithIsiPath(t *testing.T) {
 		{
 			name: "success case",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(5).(**apiv1.GetIsiVolumeAttributesResp)
 					*resp = &apiv1.GetIsiVolumeAttributesResp{
 						AttributeMap: []struct {
@@ -1993,7 +1856,7 @@ func TestGetVolumeWithIsiPath(t *testing.T) {
 		{
 			name: "failure case",
 			setup: func(svc *isiService) {
-				svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error"))
+				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error"))
 			},
 			isiPath: "/ifs/data",
 			volID:   "123",
@@ -2007,7 +1870,7 @@ func TestGetVolumeWithIsiPath(t *testing.T) {
 			svc := &isiService{
 				endpoint: "http://localhost:8080",
 				client: &isi.Client{
-					API: &MockClient{},
+					API: &isimocks.Client{},
 				},
 			}
 

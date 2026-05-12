@@ -16,9 +16,9 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"strings"
 
-	"golang.org/x/net/context"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/dell/csi-powerscale/v2/common/constants"

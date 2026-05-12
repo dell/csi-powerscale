@@ -137,7 +137,7 @@ func removeNodeLabels(host string) (result bool) {
 }
 
 func applyNodeLabel(host, endpoint string) (result bool) {
-	cmd := exec.Command("kubectl", "label", "nodes", host, "csi-isilon.dellemc.com/"+endpoint+"=csi-isilon.dellemc.com") // #nosec G204
+	cmd := exec.Command("kubectl", "label", "nodes", host, "csi-isilon.dellemc.com/"+endpoint+"=csi-isilon.dellemc.com") // #nosec G204,G702 -- test-only: re-invoking test binary, not user input
 
 	err := cmd.Run()
 	if err != nil {

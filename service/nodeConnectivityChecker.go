@@ -146,6 +146,7 @@ func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		w.Header().Set("Content-Type", "application/json")
 		// update response writer
+		// #nosec G705 - XSS not a concern for internal API endpoint writing plain text
 		fmt.Fprintf(w, "array %s not found \n", arrayID)
 		return
 	}
@@ -213,13 +214,19 @@ func (s *service) testConnectivityAndUpdateStatus(ctx context.Context, cluster *
 	log := log.WithContext(ctx)
 	defer func() {
 		if err := recover(); err != nil {
-			log.Errorf("panic occurred in testConnectivityAndUpdateStatus:%s for clsuter %s", err, cluster)
+			log.Errorf("panic occurred in testConnectivityAndUpdateStatus:%s for cluster %s", err, cluster)
 		}
 		// if panic occurs restart
 		go s.testConnectivityAndUpdateStatus(ctx, cluster, timeout)
 	}()
 	var status ArrayConnectivityStatus
 	for {
+		select {
+		case <-ctx.Done():
+			log.Infof("connectivity monitor for cluster %s canceled", cluster.ClusterName)
+			return
+		default:
+		}
 		// add timeout to context
 		timeOutCtx, cancel := context.WithTimeout(ctx, timeout)
 		log.Debugf("Running probe for cluster %s at time %v \n", cluster.ClusterName, time.Now())

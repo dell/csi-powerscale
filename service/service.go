@@ -43,7 +43,6 @@ import (
 	commonext "github.com/dell/dell-csi-extensions/common"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 	csiext "github.com/dell/dell-csi-extensions/replication"
-	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
 	isi "github.com/dell/gopowerscale"
@@ -122,6 +121,11 @@ type Opts struct {
 }
 
 type service struct {
+	// satisfies the Service interface and provided unimplemented defaults to functions not implemented
+	csi.UnimplementedControllerServer
+	csi.UnimplementedIdentityServer
+	csi.UnimplementedNodeServer
+
 	opts                        Opts
 	mode                        string
 	nodeID                      string
@@ -558,7 +562,6 @@ func (s *service) BeforeServe(
 func (s *service) RegisterAdditionalServers(server *grpc.Server) {
 	log.Info("Registering additional GRPC servers")
 	csiext.RegisterReplicationServer(server, s)
-	vgsext.RegisterVolumeGroupSnapshotServer(server, s)
 	podmon.RegisterPodmonServer(server, s)
 }
 
