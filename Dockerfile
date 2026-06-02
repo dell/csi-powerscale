@@ -13,7 +13,7 @@
 # some arguments that must be supplied
 ARG GOIMAGE
 ARG BASEIMAGE
-ARG VERSION="2.16.0"
+ARG VERSION="2.17.0"
 
 # Stage to build the driver
 FROM $GOIMAGE as builder
@@ -38,7 +38,7 @@ LABEL vendor="Dell Technologies" \
     name="csi-isilon" \
     summary="CSI Driver for Dell EMC PowerScale" \
     description="CSI Driver for provisioning persistent storage from Dell EMC PowerScale" \
-    release="1.16.0" \
+    release="1.17.0" \
     version=$VERSION \
     license="Apache-2.0"
 

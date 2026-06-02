@@ -38,8 +38,6 @@ import (
 	csictx "github.com/dell/gocsi/context"
 	mwtypes "github.com/dell/gocsi/middleware/serialvolume/lockprovider"
 
-	xctx "golang.org/x/net/context"
-
 	"github.com/dell/csi-metadata-retriever/retriever"
 	"github.com/kubernetes-csi/csi-lib-utils/connection"
 	"github.com/kubernetes-csi/csi-lib-utils/metrics"
@@ -129,7 +127,7 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 
 	i.createMetadataRetrieverClient(context.Background())
 
-	handle := func(ctx xctx.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	handle := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		switch t := req.(type) {
 		case *csi.ControllerPublishVolumeRequest:
 			return i.controllerPublishVolume(ctx, t, info, handler)

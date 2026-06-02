@@ -19,7 +19,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -238,7 +237,7 @@ func (f *feature) thereAreNoErrors() error {
 
 func createIsilonClient() (*isi.Client, error) {
 	ctx := context.Background()
-	configBytes, err := ioutil.ReadFile(os.Getenv(constants.EnvIsilonConfigFile))
+	configBytes, err := os.ReadFile(os.Getenv(constants.EnvIsilonConfigFile)) // #nosec G703 -- config file path from trusted environment variable
 	if err != nil {
 		return nil, fmt.Errorf("file ('%s') error: %v", os.Getenv(constants.EnvIsilonConfigFile), err)
 	}

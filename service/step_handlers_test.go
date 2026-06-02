@@ -141,6 +141,7 @@ func getHandler() http.Handler {
 func getRouter() http.Handler {
 	isilonRouter := mux.NewRouter()
 	isilonRouter.HandleFunc("/platform/latest/", handleNewAPI)
+	isilonRouter.HandleFunc("/platform/1/", handleNewAPI)
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleExportUpdate).Methods("PUT")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/{export_id}", handleModifyExport).Methods("PUT")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/{export_id}", handleUnexportPath).Methods("DELETE").Queries("zone", "System")

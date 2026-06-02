@@ -303,3 +303,12 @@ func (c *mockMetadataSidecarClient) GetPVCLabels(_ context.Context, _ *retriever
 		},
 	}, nil
 }
+
+// GetPVCLabelsByPVName is a mock implementation of the GetPVCLabelsByPVName method
+func (c *mockMetadataSidecarClient) GetPVCLabelsByPVName(_ context.Context, _ *retriever.GetPVCLabelsByPVNameRequest) (*retriever.GetPVCLabelsByPVNameResponse, error) {
+	return &retriever.GetPVCLabelsByPVNameResponse{
+		Parameters: map[string]string{
+			"test-key": "test-value",
+		},
+	}, nil
+}

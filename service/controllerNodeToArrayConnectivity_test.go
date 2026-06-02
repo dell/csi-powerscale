@@ -17,6 +17,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -24,8 +25,6 @@ import (
 	_ "net/http/pprof" // #nosec G108
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 func TestQueryArrayStatus(t *testing.T) {

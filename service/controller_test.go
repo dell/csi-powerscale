@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/dell/csi-powerscale/v2/common/utils/identifiers"
-	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	isi "github.com/dell/gopowerscale"
 	apiv1 "github.com/dell/gopowerscale/api/v1"
 	v1 "github.com/dell/gopowerscale/api/v1"
@@ -201,62 +200,6 @@ func TestReadQuotaLimitParams(t *testing.T) {
 			}
 			if softGracePrd != tc.expectedSoftGrace {
 				t.Errorf("Expected soft grace period '%s', but got '%s'", tc.expectedSoftGrace, softGracePrd)
-			}
-		})
-	}
-}
-
-// Test function for CreateVolumeGroupSnapshot
-func TestCreateVolumeGroupSnapshot(t *testing.T) {
-	s := &service{}
-
-	tests := []struct {
-		name    string
-		req     *vgsext.CreateVolumeGroupSnapshotRequest
-		wantErr bool
-	}{
-		{
-			name: "Valid Request",
-			req: &vgsext.CreateVolumeGroupSnapshotRequest{
-				SourceVolumeIDs: []string{"volume1", "volume2"},
-				Name:            "snapshot-group-1",
-				Description:     "A test snapshot group",
-				Parameters:      map[string]string{"param1": "value1"},
-			},
-			wantErr: false,
-		},
-		{
-			name:    "Invalid Request - nil request",
-			req:     nil,
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.TODO()
-
-			// Capture the possible panic for unimplemented function
-			defer func() {
-				if r := recover(); r != nil {
-					t.Skip("Function not implemented")
-				}
-			}()
-
-			// Call the function
-			resp, err := s.CreateVolumeGroupSnapshot(ctx, tt.req)
-
-			// Check if error condition matches
-			if (err != nil) != tt.wantErr {
-				t.Errorf("CreateVolumeGroupSnapshot() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			// Add additional assertions if needed
-			if !tt.wantErr {
-				if resp == nil {
-					t.Errorf("Expected non-nil response, got nil")
-				}
 			}
 		})
 	}
@@ -1482,6 +1425,124 @@ func TestProcessSnapshotTrackingDirectoryDuringDeleteVolume(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestProcessSnapshotTrackingDirVolumeNameConsistency is a regression test for CSME-235.
+// It verifies that processSnapshotTrackingDirectoryDuringDeleteVolume correctly looks up
+// the tracking directory entry using the volume name from the volume ID. Before the fix,
+// CreateVolume for RO snapshot volumes would return a volume ID containing the source
+// volume name (from the export path) instead of the requested volume name, causing
+// the tracking entry lookup to fail during DeleteVolume.
+func TestProcessSnapshotTrackingDirVolumeNameConsistency(t *testing.T) {
+	ctx := context.Background()
+	originalGetZoneByNameFunc := getZoneByNameFunc
+	originalGetSnapshotIsiPathComponentsFunc := getSnapshotIsiPathComponentsFunc
+	originalGetSnapshotTrackingDirNameFunc := getSnapshotTrackingDirNameFunc
+	originalIsVolumeExistentFunc := isVolumeExistentFunc
+	originalDeleteVolumeFunc := deleteVolumeFunc
+	originalGetSubDirectoryCountFunc := getSubDirectoryCountFunc
+	originalUnexportByIDWithZoneFunc := unexportByIDWithZoneFunc
+	originalRemoveSnapshotFunc := removeSnapshotFunc
+
+	after := func() {
+		getZoneByNameFunc = originalGetZoneByNameFunc
+		getSnapshotIsiPathComponentsFunc = originalGetSnapshotIsiPathComponentsFunc
+		getSnapshotTrackingDirNameFunc = originalGetSnapshotTrackingDirNameFunc
+		isVolumeExistentFunc = originalIsVolumeExistentFunc
+		deleteVolumeFunc = originalDeleteVolumeFunc
+		getSubDirectoryCountFunc = originalGetSubDirectoryCountFunc
+		unexportByIDWithZoneFunc = originalUnexportByIDWithZoneFunc
+		removeSnapshotFunc = originalRemoveSnapshotFunc
+	}
+	defer after()
+
+	isiConfig := &IsilonClusterConfig{
+		isiSvc: &isiService{
+			endpoint: "http://testendpoint:8080",
+			client:   &isi.Client{},
+		},
+	}
+	s := &service{}
+
+	// Simulate the scenario from CSME-235:
+	// - Source volume: "sourceVol" (name in the snapshot export path)
+	// - Restored volume: "restoredVol" (req.GetName() used for tracking dir entry)
+	// - The volume ID should contain "restoredVol" so that DeleteVolume can find the tracking entry
+	//
+	// The tracking dir entry is: snapshotTrackingDir/restoredVol
+	// The volName passed to processSnapshotTrackingDirectoryDuringDeleteVolume comes from
+	// parsing the volume ID, so it must be "restoredVol" (not "sourceVol").
+	restoredVolName := "restoredVol"
+	snapshotTrackingDir := ".csi-snapshot-abc-tracking-dir"
+	expectedTrackingEntry := snapshotTrackingDir + "/" + restoredVolName
+
+	var deletedEntries []string
+	var checkedEntries []string
+
+	getZoneByNameFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, zoneName string) (*v1.IsiZone, error) {
+		return func(_ context.Context, _ string) (*v1.IsiZone, error) {
+			return &v1.IsiZone{Path: "/ifs"}, nil
+		}
+	}
+	getSnapshotIsiPathComponentsFunc = func(_ *IsilonClusterConfig) func(exportPath, zonePath string) (string, string, string) {
+		return func(_, _ string) (string, string, string) {
+			return "/ifs/data/csi", "snapshot-abc", "sourceVol"
+		}
+	}
+	getSnapshotTrackingDirNameFunc = func(_ *IsilonClusterConfig) func(snapshotName string) string {
+		return func(_ string) string {
+			return snapshotTrackingDir
+		}
+	}
+	isVolumeExistentFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeID, volumeEntry string) bool {
+		return func(_ context.Context, _, _, entry string) bool {
+			checkedEntries = append(checkedEntries, entry)
+			// Only the correct tracking entry (using restoredVol) should exist
+			return entry == expectedTrackingEntry
+		}
+	}
+	deleteVolumeFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeSelector string) error {
+		return func(_ context.Context, _, selector string) error {
+			deletedEntries = append(deletedEntries, selector)
+			return nil
+		}
+	}
+	getSubDirectoryCountFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeSelector string) (int64, error) {
+		return func(_ context.Context, _, _ string) (int64, error) {
+			// After deleting the entry: only ., .. remain
+			return 2, nil
+		}
+	}
+	unexportByIDWithZoneFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, exportID int, zoneName string) error {
+		return func(_ context.Context, _ int, _ string) error {
+			return nil
+		}
+	}
+	removeSnapshotFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, snapID int64, snapName string) error {
+		return func(_ context.Context, _ int64, _ string) error {
+			return nil
+		}
+	}
+
+	export := &v2.Export{
+		Paths: &[]string{"/ifs/.snapshot/snapshot-abc/data/csi/sourceVol"},
+	}
+
+	err := s.processSnapshotTrackingDirectoryDuringDeleteVolume(ctx, restoredVolName, "System", export, isiConfig)
+	assert.NoError(t, err)
+
+	// Verify the tracking entry was looked up using the restored volume name (not the source)
+	assert.Contains(t, checkedEntries, expectedTrackingEntry,
+		"tracking dir entry should be checked using the restored volume name from the volume ID")
+
+	// Verify the correct entry was deleted
+	assert.Contains(t, deletedEntries, expectedTrackingEntry,
+		"tracking dir entry for restored volume should be deleted")
+
+	// Verify that no entry using sourceVol was looked up
+	sourceEntry := snapshotTrackingDir + "/sourceVol"
+	assert.NotContains(t, checkedEntries, sourceEntry,
+		"should NOT look up tracking entry using source volume name")
 }
 
 func TestCreateVolumefunc(t *testing.T) {

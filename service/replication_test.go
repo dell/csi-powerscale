@@ -27,6 +27,7 @@ import (
 	isi "github.com/dell/gopowerscale"
 	v11 "github.com/dell/gopowerscale/api/v11"
 	"github.com/dell/gopowerscale/mocks"
+	isimocks "github.com/dell/gopowerscale/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -39,7 +40,7 @@ var anyArgs = []interface{}{mock.Anything, mock.Anything, mock.Anything, mock.An
 // failStep is used to determine which of the 9 calls shoud fail to test error handling. An int outside of 1-9 range means call will succeed.
 // TODO: function can be made more granular by replacing .Times() calls with seperate mocks to allow greater percision
 func setUpSvcForFailbackDiscardLocal(failStep int) (*IsilonClusterConfig, *IsilonClusterConfig) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -59,7 +60,7 @@ func setUpSvcForFailbackDiscardLocal(failStep int) (*IsilonClusterConfig, *Isilo
 	}
 
 	if failStep != 1 {
-		svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 			resp := args.Get(5).(**v11.Policies)
 			*resp = &v11.Policies{
 				Policy: []v11.Policy{
@@ -71,17 +72,17 @@ func setUpSvcForFailbackDiscardLocal(failStep int) (*IsilonClusterConfig, *Isilo
 			}
 		}).Times(3)
 	} else {
-		svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Times(3)
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Times(3)
 	}
 
 	if failStep != 2 {
-		svc.client.API.(*MockClient).On("Put", anyArgs...).Return(nil).Times(3)
+		svc.client.API.(*isimocks.Client).On("Put", anyArgs...).Return(nil).Times(3)
 	} else {
-		svc.client.API.(*MockClient).On("Put", anyArgs...).Return(errors.New("mock error")).Times(3)
+		svc.client.API.(*isimocks.Client).On("Put", anyArgs...).Return(errors.New("mock error")).Times(3)
 	}
 
 	if failStep != 3 {
-		svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 			resp := args.Get(5).(**v11.TargetPolicies)
 			*resp = &v11.TargetPolicies{
 				Policy: []v11.TargetPolicy{
@@ -94,11 +95,11 @@ func setUpSvcForFailbackDiscardLocal(failStep int) (*IsilonClusterConfig, *Isilo
 			}
 		}).Times(1)
 	} else {
-		svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Times(1)
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Times(1)
 	}
 
 	if failStep != 4 {
-		svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 			resp := args.Get(5).(**v11.Policies)
 			*resp = &v11.Policies{
 				Policy: []v11.Policy{
@@ -111,15 +112,15 @@ func setUpSvcForFailbackDiscardLocal(failStep int) (*IsilonClusterConfig, *Isilo
 			}
 		}).Times(2)
 	} else {
-		svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Times(2)
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Times(2)
 	}
 	if failStep != 5 {
-		svc.client.API.(*MockClient).On("Get", anyArgs[0:6]...).Return(nil).Times(2)
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs[0:6]...).Return(nil).Times(2)
 	} else {
-		svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Times(2)
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Times(2)
 	}
 	if failStep != 6 {
-		svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 			resp := args.Get(5).(**v11.TargetPolicies)
 			*resp = &v11.TargetPolicies{
 				Policy: []v11.TargetPolicy{
@@ -132,11 +133,11 @@ func setUpSvcForFailbackDiscardLocal(failStep int) (*IsilonClusterConfig, *Isilo
 			}
 		}).Times(2)
 	} else {
-		svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Times(2)
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Times(2)
 	}
 
 	if failStep != 7 {
-		svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 			resp := args.Get(5).(**v11.TargetPolicies)
 			*resp = &v11.TargetPolicies{
 				Policy: []v11.TargetPolicy{
@@ -149,16 +150,16 @@ func setUpSvcForFailbackDiscardLocal(failStep int) (*IsilonClusterConfig, *Isilo
 			}
 		}).Times(1)
 	} else {
-		svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Times(2)
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Times(2)
 	}
 
 	if failStep != 8 {
-		svc.client.API.(*MockClient).On("Get", anyArgs[0:6]...).Return(nil).Times(1)
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs[0:6]...).Return(nil).Times(1)
 	} else {
-		svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Times(1)
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Times(1)
 	}
 	if failStep != 9 {
-		svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 			resp := args.Get(5).(**v11.Policies)
 			*resp = &v11.Policies{
 				Policy: []v11.Policy{
@@ -171,11 +172,11 @@ func setUpSvcForFailbackDiscardLocal(failStep int) (*IsilonClusterConfig, *Isilo
 			}
 		}).Times(1)
 	} else {
-		svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("mock error")).Times(1)
+		svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Times(1)
 	}
 
-	svc.client.API.(*MockClient).On("Post", anyArgs...).Return(nil)
-	svc.client.API.(*MockClient).On("Delete", anyArgs...).Return(nil)
+	svc.client.API.(*isimocks.Client).On("Post", anyArgs...).Return(nil)
+	svc.client.API.(*isimocks.Client).On("Delete", anyArgs...).Return(nil)
 	return localIsiConfig, remoteIsiConfig
 }
 
@@ -227,7 +228,7 @@ func Test_failbackDiscardLocal(t *testing.T) {
 }
 
 func Test_synchronize(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -249,13 +250,13 @@ func Test_synchronize(t *testing.T) {
 	ppName := "vgstest-Five_Minutes"
 
 	// Negative case - when policy sync failed
-	svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("policy sync failed")).Run(nil).Times(1)
+	svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("policy sync failed")).Run(nil).Times(1)
 	err := synchronize(context.Background(), localIsiConfig, remoteIsiConfig, ppName, log.WithContext(context.Background()))
 	assert.Error(t, err)
 
 	// Positive cases
-	svc.client.API.(*MockClient).Calls = nil
-	svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+	svc.client.API.(*isimocks.Client).Calls = nil
+	svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 		resp := args.Get(5).(**v11.Policies)
 		*resp = &v11.Policies{
 			Policy: []v11.Policy{
@@ -267,7 +268,7 @@ func Test_synchronize(t *testing.T) {
 			},
 		}
 	}).Times(1)
-	svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+	svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 		resp := args.Get(5).(**v11.Jobs)
 		*resp = &v11.Jobs{
 			Job: []v11.Job{
@@ -279,10 +280,10 @@ func Test_synchronize(t *testing.T) {
 		}
 	}).Times(2)
 
-	svc.client.API.(*MockClient).On("Post", anyArgs...).Return(nil).Run(nil).Times(1)
-	svc.client.API.(*MockClient).On("Get", anyArgs[0:6]...).Return(nil).Times(1)
+	svc.client.API.(*isimocks.Client).On("Post", anyArgs...).Return(nil).Run(nil).Times(1)
+	svc.client.API.(*isimocks.Client).On("Get", anyArgs[0:6]...).Return(nil).Times(1)
 
-	svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+	svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 		resp := args.Get(5).(**v11.Policies)
 		*resp = &v11.Policies{
 			Policy: []v11.Policy{
@@ -294,8 +295,8 @@ func Test_synchronize(t *testing.T) {
 			},
 		}
 	}).Times(1)
-	svc.client.API.(*MockClient).On("Put", anyArgs...).Return(nil).Run(nil).Times(1)
-	svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+	svc.client.API.(*isimocks.Client).On("Put", anyArgs...).Return(nil).Run(nil).Times(1)
+	svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 		resp := args.Get(5).(**v11.Jobs)
 		*resp = &v11.Jobs{
 			Job: []v11.Job{
@@ -311,7 +312,7 @@ func Test_synchronize(t *testing.T) {
 }
 
 func Test_suspend(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -333,13 +334,13 @@ func Test_suspend(t *testing.T) {
 	ppName := "vgstest-Five_Minutes"
 
 	// Negative case - can't disable local policy
-	svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("can't disable local policy")).Run(nil).Times(1)
+	svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("can't disable local policy")).Run(nil).Times(1)
 	err := suspend(context.Background(), localIsiConfig, remoteIsiConfig, ppName, log.WithContext(context.Background()))
 	assert.Error(t, err)
 
 	// Negative case - policy couldn't reach disabled condition
-	svc.client.API.(*MockClient).Calls = nil
-	svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+	svc.client.API.(*isimocks.Client).Calls = nil
+	svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 		resp := args.Get(5).(**v11.Policies)
 		*resp = &v11.Policies{
 			Policy: []v11.Policy{
@@ -350,14 +351,14 @@ func Test_suspend(t *testing.T) {
 			},
 		}
 	}).Times(1)
-	svc.client.API.(*MockClient).On("Get", anyArgs...).Return(errors.New("policy couldn't reach disabled condition")).Run(nil).Times(1)
+	svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("policy couldn't reach disabled condition")).Run(nil).Times(1)
 
 	err = suspend(context.Background(), localIsiConfig, remoteIsiConfig, ppName, log.WithContext(context.Background()))
 	assert.Error(t, err)
 
 	// Positive cases
-	svc.client.API.(*MockClient).Calls = nil
-	svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+	svc.client.API.(*isimocks.Client).Calls = nil
+	svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 		resp := args.Get(5).(**v11.Policies)
 		*resp = &v11.Policies{
 			Policy: []v11.Policy{
@@ -375,7 +376,7 @@ func Test_suspend(t *testing.T) {
 
 // This test is a WIP, currently tests "happy path" in failbackDiscardRemote
 func Test_failbackDiscardRemote(t *testing.T) {
-	mockClient := &MockClient{}
+	mockClient := &isimocks.Client{}
 
 	// Create a new instance of the isiService struct
 	svc := &isiService{
@@ -394,7 +395,7 @@ func Test_failbackDiscardRemote(t *testing.T) {
 		isiSvc:  svc,
 	}
 
-	svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+	svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 		resp := args.Get(5).(**v11.Policies)
 		*resp = &v11.Policies{
 			Policy: []v11.Policy{
@@ -406,9 +407,9 @@ func Test_failbackDiscardRemote(t *testing.T) {
 		}
 	}).Times(2)
 
-	svc.client.API.(*MockClient).On("Put", anyArgs...).Return(nil).Times(3)
+	svc.client.API.(*isimocks.Client).On("Put", anyArgs...).Return(nil).Times(3)
 
-	svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+	svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 		resp := args.Get(5).(**v11.TargetPolicies)
 		*resp = &v11.TargetPolicies{
 			Policy: []v11.TargetPolicy{
@@ -421,7 +422,7 @@ func Test_failbackDiscardRemote(t *testing.T) {
 		}
 	}).Times(1)
 
-	svc.client.API.(*MockClient).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+	svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 		resp := args.Get(5).(**v11.Policies)
 		*resp = &v11.Policies{
 			Policy: []v11.Policy{

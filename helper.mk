@@ -9,7 +9,7 @@ generate:
 	GOPRIVATE=github.com go run core/semver/semver.go -f mk > semver.mk
 
 download-csm-common:
-	git clone --depth 1 git@github.com:CSM/csm.git temp-repo
+	git clone --depth 1 git@github.com:dell/csm.git temp-repo
 	cp temp-repo/config/csm-common.mk .
 	rm -rf temp-repo
 
