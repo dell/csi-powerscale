@@ -3,14 +3,14 @@ module github.com/dell/csi-powerscale/v2
 go 1.26
 
 require (
-	github.com/dell/csi-metadata-retriever v1.14.0
-	github.com/dell/csmlog v1.1.0
+	github.com/dell/csi-metadata-retriever v1.14.1-0.20260604183105-890fa5cc6e3c
+	github.com/dell/csmlog v1.1.1-0.20260602192201-a1f3f51990a8
 	github.com/dell/dell-csi-extensions/common v1.11.0
 	github.com/dell/dell-csi-extensions/podmon v1.11.0
 	github.com/dell/dell-csi-extensions/replication v1.14.0
-	github.com/dell/gocsi v1.17.0
-	github.com/dell/gofsutil v1.22.0
-	github.com/dell/gopowerscale v1.22.0
+	github.com/dell/gocsi v1.17.1-0.20260604162940-35d0aa613b85
+	github.com/dell/gofsutil v1.22.1-0.20260604183036-c90c11915e94
+	github.com/dell/gopowerscale v1.22.1-0.20260605220256-28a125832988
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/akutz/gosync v0.1.0
 	github.com/container-storage-interface/spec v1.11.0
@@ -20,7 +20,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/kubernetes-csi/csi-lib-utils v0.11.0
-	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.81.0
@@ -38,7 +37,7 @@ require (
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
-	github.com/coreos/go-systemd/v22 v22.6.0 // indirect
+	github.com/coreos/go-systemd/v22 v22.7.0 // indirect
 	github.com/cucumber/gherkin/go/v26 v26.2.0 // indirect
 	github.com/cucumber/messages/go/v21 v21.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect

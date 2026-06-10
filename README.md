@@ -44,5 +44,7 @@ You can run an integration test on a Linux system by populating the env files at
 
 ## Runtime Dependencies
 
-Both the Controller and the Node portions of the driver can only be run on nodes which have network connectivity to a “`PowerScale Cluster`” (which is used by the driver).
+Both the Controller and the Node portions of the driver can only be run on nodes which have network connectivity to a "PowerScale Cluster" (which is used by the driver).
 
+## Documentation
+For more detailed information on the driver, please refer to [Container Storage Modules documentation](https://www.dell.com/support/product-details/en-us/product/container-storage-modules/resources/manuals).

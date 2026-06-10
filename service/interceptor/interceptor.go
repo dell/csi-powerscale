@@ -153,7 +153,6 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 }
 
 func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
-	log := csmlog.GetLogger().WithContext(ctx)
 	metricsManager := metrics.NewCSIMetricsManagerWithOptions("csi-metadata-retriever",
 		metrics.WithProcessStartTime(false),
 		metrics.WithSubsystem(metrics.SubsystemSidecar))
@@ -161,17 +160,17 @@ func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
 	if retrieverAddress, ok := csictx.LookupEnv(ctx, "CSI_RETRIEVER_ENDPOINT"); ok {
 		rpcConn, err := connection.Connect(retrieverAddress, metricsManager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
 		if err != nil {
-			log.Error(err.Error())
+			csmlog.WithContext(ctx).Error(err.Error())
 		}
 
 		retrieverClient := retriever.NewMetadataRetrieverClient(rpcConn, 100*time.Second)
 		if retrieverClient == nil {
-			log.Error("Cannot get csi-metadata-retriever client")
+			csmlog.WithContext(ctx).Error("Cannot get csi-metadata-retriever client")
 		}
 
 		i.opts.MetadataSidecarClient = retrieverClient
 	} else {
-		log.Warnf("env var not found: %v", "CSI_RETRIEVER_ENDPOINT")
+		csmlog.WithContext(ctx).Warnf("env var not found: %v", "CSI_RETRIEVER_ENDPOINT")
 	}
 }
 
@@ -196,7 +195,6 @@ func (i *interceptor) controllerUnpublishVolume(ctx context.Context, req *csi.Co
 func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
-	log := csmlog.GetLogger().WithContext(ctx)
 	lock, err := i.opts.locker.GetLockWithID(ctx, req.Name)
 	if err != nil {
 		return nil, err
@@ -219,7 +217,7 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 	if i.opts.MetadataSidecarClient != nil {
 		metadataRes, err := i.opts.MetadataSidecarClient.GetPVCLabels(ctx, metadataReq)
 		if err != nil {
-			log.Errorf("Cannot retrieve labels for PVC %s in namespace: %s, error: %v",
+			csmlog.WithContext(ctx).Errorf("Cannot retrieve labels for PVC %s in namespace: %s, error: %v",
 				controller.KeyCSIPVCName,
 				controller.KeyCSIPVCNamespace,
 				err.Error())
@@ -230,7 +228,7 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 				req.Parameters[k] = v
 			}
 		} else {
-			log.Warnf("No Values Under Metadata")
+			csmlog.WithContext(ctx).Warnf("No Values Under Metadata")
 		}
 	}
 

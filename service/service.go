@@ -89,7 +89,7 @@ type Service interface {
 }
 
 type azNetworkLabels interface {
-	setAzReconcileInterval(log *csmlog.CsmLog, v *viper.Viper)
+	setAzReconcileInterval(ctx context.Context, v *viper.Viper)
 	getReconcileInterval() time.Duration
 	getUpdateIntervalChannel() <-chan time.Duration
 	ReconcileNodeAzLabels(ctx context.Context) error
@@ -179,7 +179,6 @@ func New() Service {
 }
 
 func (s *service) initializeServiceOpts(ctx context.Context) error {
-	log := log.WithContext(ctx)
 	// Get the SP's operating mode.
 	s.mode = csictx.Getenv(ctx, gocsi.EnvVarMode)
 
@@ -243,7 +242,7 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 		opts.replicationPrefix = replicationPrefix
 	}
 	if MaxVolumesPerNode, err := fromctx.GetInt64(ctx, constants.EnvMaxVolumesPerNode); err != nil {
-		log.Warnf("error while parsing env variable '%s', %s, defaulting to 0", constants.EnvMaxVolumesPerNode, err)
+		csmlog.WithContext(ctx).Warnf("error while parsing env variable '%s', %s, defaulting to 0", constants.EnvMaxVolumesPerNode, err)
 		opts.MaxVolumesPerNode = 0
 	} else {
 		opts.MaxVolumesPerNode = MaxVolumesPerNode
@@ -251,7 +250,7 @@ func (s *service) initializeServiceOpts(ctx context.Context) error {
 
 	allowedNetworks, err := fromctx.GetArray(ctx, constants.EnvAllowedNetworks)
 	if err != nil {
-		log.Errorf("error while parsing allowedNetworks, %v", err)
+		csmlog.WithContext(ctx).Errorf("error while parsing allowedNetworks, %v", err)
 		return err
 	}
 	opts.allowedNetworks = allowedNetworks
@@ -327,7 +326,6 @@ func (s *service) ValidateDeleteVolumeRequest(ctx context.Context,
 
 func (s *service) probeAllClusters(ctx context.Context) error {
 	isilonClusters := s.getIsilonClusters()
-	log := log.WithContext(ctx)
 
 	probeSuccessCount := 0
 	for i := range isilonClusters {
@@ -335,7 +333,7 @@ func (s *service) probeAllClusters(ctx context.Context) error {
 		if err == nil {
 			probeSuccessCount++
 		} else {
-			log.Debugf("Probe failed for isilon cluster '%s' error:'%s'", isilonClusters[i].ClusterName, err)
+			csmlog.WithContext(ctx).Debugf("Probe failed for isilon cluster '%s' error:'%s'", isilonClusters[i].ClusterName, err)
 		}
 	}
 
@@ -347,8 +345,7 @@ func (s *service) probeAllClusters(ctx context.Context) error {
 }
 
 func (s *service) probe(ctx context.Context, clusterConfig *IsilonClusterConfig) error {
-	log := log.WithContext(ctx)
-	log.Debugf("calling probe for cluster '%s'", clusterConfig.ClusterName)
+	csmlog.WithContext(ctx).Debugf("calling probe for cluster '%s'", clusterConfig.ClusterName)
 	// Do a controller probe
 	if strings.EqualFold(s.mode, constants.ModeController) {
 		if err := s.controllerProbe(ctx, clusterConfig); err != nil {
@@ -359,7 +356,7 @@ func (s *service) probe(ctx context.Context, clusterConfig *IsilonClusterConfig)
 			return err
 		}
 	} else if strings.EqualFold(s.mode, "") {
-		log.Warn("Service mode not set, attempting both controller and node probe")
+		csmlog.WithContext(ctx).Warn("Service mode not set, attempting both controller and node probe")
 		controllerErr := s.controllerProbe(ctx, clusterConfig)
 		if controllerErr != nil {
 			return fmt.Errorf("probe failed")
@@ -378,9 +375,8 @@ func (s *service) probe(ctx context.Context, clusterConfig *IsilonClusterConfig)
 }
 
 func (s *service) probeOnStart(ctx context.Context) error {
-	log := log.WithContext(ctx)
 	if noProbeOnStart {
-		log.Debugf("noProbeOnStart is true , skip probe")
+		csmlog.WithContext(ctx).Debugf("noProbeOnStart is true , skip probe")
 		return nil
 	}
 
@@ -388,20 +384,18 @@ func (s *service) probeOnStart(ctx context.Context) error {
 }
 
 func (s *service) setNoProbeOnStart(ctx context.Context) {
-	log := log.WithContext(ctx)
 	if fromctx.GetBoolean(ctx, constants.EnvNoProbeOnStart) {
-		log.Debug("X_CSI_ISI_NO_PROBE_ON_START is true, set noProbeOnStart to true")
+		csmlog.WithContext(ctx).Debug("X_CSI_ISI_NO_PROBE_ON_START is true, set noProbeOnStart to true")
 		noProbeOnStart = true
 		return
 	}
-	log.Debug("X_CSI_ISI_NO_PROBE_ON_START is false, set noProbeOnStart to false ")
+	csmlog.WithContext(ctx).Debug("X_CSI_ISI_NO_PROBE_ON_START is false, set noProbeOnStart to false ")
 	noProbeOnStart = false
 }
 
 func (s *service) autoProbe(ctx context.Context, isiConfig *IsilonClusterConfig) error {
-	log := log.WithContext(ctx)
 	if isiConfig.isiSvc != nil {
-		log.Debug("isiSvc already initialized, skip probing")
+		csmlog.WithContext(ctx).Debug("isiSvc already initialized, skip probing")
 		return nil
 	}
 
@@ -410,13 +404,11 @@ func (s *service) autoProbe(ctx context.Context, isiConfig *IsilonClusterConfig)
 			"isiSvc not initialized, but auto probe is not enabled")
 	}
 
-	log.Debug("start auto-probing")
+	csmlog.WithContext(ctx).Debug("start auto-probing")
 	return s.probe(ctx, isiConfig)
 }
 
-func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClusterConfig, _ csmlog.Level) (*isi.Client, error) {
-	log := log.WithContext(clientCtx)
-
+func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClusterConfig) (*isi.Client, error) {
 	// First we fetch node labels using kubernetes API and check, if label
 	// <provisionerName>.dellemc.com/<powerscalefqdnorip>: <provisionerName>
 	// exists on node, if exists we use corresponding PowerScale FQDN or IP for creating connection
@@ -431,16 +423,16 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 
 		// Iterate node labels and check if required label is available
 		for lkey, lval := range labels {
-			log.Infof("Label is: %s:%s\n", lkey, lval)
+			csmlog.WithContext(clientCtx).Infof("Label is: %s:%s\n", lkey, lval)
 			if strings.HasPrefix(lkey, constants.PluginName+"/") && lval == constants.PluginName {
-				log.Infof("Topology label %s:%s available on node", lkey, lval)
+				csmlog.WithContext(clientCtx).Infof("Topology label %s:%s available on node", lkey, lval)
 				tList := strings.SplitAfter(lkey, "/")
 				if len(tList) != 0 {
 					isiConfig.Endpoint = tList[1]
 					isiConfig.EndpointURL = fmt.Sprintf("https://%s:%s", isiConfig.Endpoint, isiConfig.EndpointPort)
 					customTopologyFound = true
 				} else {
-					log.Errorf("Fetching PowerScale FQDN/IP from topology label %s:%s failed, using endpoint "+
+					csmlog.WithContext(clientCtx).Errorf("Fetching PowerScale FQDN/IP from topology label %s:%s failed, using endpoint "+
 						"%s as PowerScale FQDN/IP", lkey, lval, isiConfig.Endpoint)
 				}
 				break
@@ -449,7 +441,7 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 	}
 
 	if s.opts.CustomTopologyEnabled && !customTopologyFound {
-		log.Errorf("init client failed for custom topology")
+		csmlog.WithContext(clientCtx).Errorf("init client failed for custom topology")
 		return nil, errors.New("init client failed for custom topology")
 	}
 	client, err := newIsiClientWithArgsFunc(
@@ -466,17 +458,17 @@ func (s *service) GetIsiClient(clientCtx context.Context, isiConfig *IsilonClust
 		s.opts.isiAuthType,
 	)
 	if err != nil {
-		log.Errorf("init client failed for isilon cluster '%s': '%s'", isiConfig.ClusterName, err.Error())
+		csmlog.WithContext(clientCtx).Errorf("init client failed for isilon cluster '%s': '%s'", isiConfig.ClusterName, err.Error())
 		return nil, err
 	}
 
 	return client, nil
 }
 
-func (s *service) GetIsiService(clientCtx context.Context, isiConfig *IsilonClusterConfig, logLevel csmlog.Level) (*isiService, error) {
+func (s *service) GetIsiService(clientCtx context.Context, isiConfig *IsilonClusterConfig) (*isiService, error) {
 	var isiClient *isi.Client
 	var err error
-	if isiClient, err = s.GetIsiClient(clientCtx, isiConfig, logLevel); err != nil {
+	if isiClient, err = s.GetIsiClient(clientCtx, isiConfig); err != nil {
 		return nil, err
 	}
 
@@ -503,15 +495,12 @@ func (s *service) logServiceStats() {
 		"quotaenabled":              s.opts.QuotaEnabled,
 		"mode":                      s.mode,
 	}
-	// TODO: Replace logrus with log
-	log.WithFields(fields).Infof("Configured '%s'", constants.PluginName)
+	csmlog.WithFields(fields).Infof("Configured '%s'", constants.PluginName)
 }
 
 func (s *service) BeforeServe(
 	ctx context.Context, _ *gocsi.StoragePlugin, _ net.Listener,
 ) error {
-	log := log.WithContext(ctx)
-
 	if err := s.initializeServiceOpts(ctx); err != nil {
 		return err
 	}
@@ -527,7 +516,7 @@ func (s *service) BeforeServe(
 	vc.AutomaticEnv()
 	vc.SetConfigFile(DriverConfigParamsFile)
 	if err := vc.ReadInConfig(); err != nil {
-		log.Warnf("unable to read driver config params from file '%s'. Using defaults.", DriverConfigParamsFile)
+		csmlog.WithContext(ctx).Warnf("unable to read driver config params from file '%s'. Using defaults.", DriverConfigParamsFile)
 	}
 	if err := s.updateDriverConfigParams(ctx, vc); err != nil {
 		return err
@@ -536,9 +525,9 @@ func (s *service) BeforeServe(
 	// Watch for changes to driver config params file
 	vc.WatchConfig()
 	vc.OnConfigChange(func(_ fsnotify.Event) {
-		log.Infof("Driver config params file changed")
+		csmlog.WithContext(ctx).Infof("Driver config params file changed")
 		if err := s.updateDriverConfigParams(ctx, vc); err != nil {
-			log.Warn(err.Error())
+			csmlog.WithContext(ctx).Warn(err.Error())
 		}
 	})
 
@@ -560,19 +549,18 @@ func (s *service) BeforeServe(
 
 // RegisterAdditionalServers registers any additional grpc services that use the CSI socket.
 func (s *service) RegisterAdditionalServers(server *grpc.Server) {
-	log.Info("Registering additional GRPC servers")
+	csmlog.Info("Registering additional GRPC servers")
 	csiext.RegisterReplicationServer(server, s)
 	podmon.RegisterPodmonServer(server, s)
 }
 
 func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) error {
-	log := log.WithContext(ctx)
-	log.Info("Updating cluster config details")
+	csmlog.WithContext(ctx).Info("Updating cluster config details")
 	watcher, _ := fsnotify.NewWatcher()
 	defer watcher.Close()
 
 	parentFolder, _ := filepath.Abs(filepath.Dir(configFile))
-	log.Debugf("Config folder: %v", parentFolder)
+	csmlog.WithContext(ctx).Debugf("Config folder: %v", parentFolder)
 	done := make(chan bool)
 	go func() {
 		for {
@@ -582,13 +570,13 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 					return
 				}
 				if event.Has(fsnotify.Create) && event.Name == parentFolder+"/..data" {
-					log.Infof("**************** Cluster config file modified. Updating cluster config details: %s****************", event.Name)
+					csmlog.WithContext(ctx).Infof("**************** Cluster config file modified. Updating cluster config details: %s****************", event.Name)
 					// set noProbeOnStart to false so subsequent calls can lead to probe
 					noProbeOnStart = false
 					err := s.syncIsilonConfigs(ctx)
 					if err != nil {
-						log.Debugf("Cluster configuration array length: %v", s.getIsilonClusterLength())
-						log.Errorf("Invalid configuration in secret.yaml. Error: %v", err)
+						csmlog.WithContext(ctx).Debugf("Cluster configuration array length: %v", s.getIsilonClusterLength())
+						csmlog.WithContext(ctx).Errorf("Invalid configuration in secret.yaml. Error: %v", err)
 					}
 				}
 
@@ -596,13 +584,13 @@ func (s *service) loadIsilonConfigs(ctx context.Context, configFile string) erro
 				if !ok {
 					return
 				}
-				log.Errorf("cluster config file load error: %v", err)
+				csmlog.WithContext(ctx).Errorf("cluster config file load error: %v", err)
 			}
 		}
 	}()
 	err := watcher.Add(parentFolder)
 	if err != nil {
-		log.Errorf("Unable to add file watcher for folder %v", parentFolder)
+		csmlog.WithContext(ctx).Errorf("Unable to add file watcher for folder %v", parentFolder)
 		return err
 	}
 	<-done
@@ -623,12 +611,10 @@ func (s *service) getUpdateIntervalChannel() <-chan time.Duration {
 
 // reconcileNodeAzLabels reconciles the node access zone labels
 func (r *reconciler) reconcileNodeAzLabels(ctx context.Context) error {
-	log := log.WithContext(ctx)
-
 	azReconcileInterval := r.service.getReconcileInterval()
 
 	if azReconcileInterval == 0 {
-		log.Info("Reconcile is invalid value of 0. Must be greater than 0 to enable label reconciler.")
+		csmlog.WithContext(ctx).Info("Reconcile is invalid value of 0. Must be greater than 0 to enable label reconciler.")
 		return nil
 	}
 
@@ -636,7 +622,7 @@ func (r *reconciler) reconcileNodeAzLabels(ctx context.Context) error {
 	if azReconcileInterval > 0 {
 		err := r.service.ReconcileNodeAzLabels(ctx)
 		if err != nil {
-			log.Errorf("node label reconciliation failed: %v", err)
+			csmlog.WithContext(ctx).Errorf("node label reconciliation failed: %v", err)
 		}
 	}
 
@@ -649,12 +635,12 @@ func (r *reconciler) reconcileNodeAzLabels(ctx context.Context) error {
 			case <-ticker.C:
 				err := r.service.ReconcileNodeAzLabels(ctx)
 				if err != nil {
-					log.Errorf("node label reconciliation failed: %v", err)
+					csmlog.WithContext(ctx).Errorf("node label reconciliation failed: %v", err)
 				}
 			case newInterval := <-r.service.getUpdateIntervalChannel():
 				ticker.Stop()
 				ticker = time.NewTicker(r.service.getReconcileInterval())
-				log.Infof("access zone reconcile interval changed to %s", newInterval)
+				csmlog.WithContext(ctx).Infof("access zone reconcile interval changed to %s", newInterval)
 			}
 		}
 	}()
@@ -675,8 +661,7 @@ var syncMutex sync.Mutex
 
 // Reads the credentials from secrets and initialize all arrays.
 func (s *service) syncIsilonConfigs(ctx context.Context) error {
-	log := log.WithContext(ctx)
-	log.Info("************* Synchronizing Isilon Clusters' config **************")
+	csmlog.WithContext(ctx).Info("************* Synchronizing Isilon Clusters' config **************")
 	syncMutex.Lock()
 	defer syncMutex.Unlock()
 
@@ -686,7 +671,7 @@ func (s *service) syncIsilonConfigs(ctx context.Context) error {
 	}
 
 	if string(configBytes) != "" {
-		log.Debugf("Current isilon configs:")
+		csmlog.WithContext(ctx).Debugf("Current isilon configs:")
 		s.isiClusters.Range(handler)
 		newIsilonConfigs, defaultClusterName, err := s.getNewIsilonConfigs(ctx, configBytes)
 		if err != nil {
@@ -702,12 +687,12 @@ func (s *service) syncIsilonConfigs(ctx context.Context) error {
 		for k, v := range newIsilonConfigs {
 			s.isiClusters.Store(k, v)
 		}
-		log.Debugf("New isilon configs:")
+		csmlog.WithContext(ctx).Debugf("New isilon configs:")
 		s.isiClusters.Range(handler)
 
 		s.defaultIsiClusterName = defaultClusterName
 		if s.defaultIsiClusterName == "" {
-			log.Errorf("no default cluster name/config available")
+			csmlog.WithContext(ctx).Errorf("no default cluster name/config available")
 		}
 	} else {
 		return errors.New("isilon cluster details are not provided in isilon-creds secret")
@@ -724,17 +709,15 @@ func unmarshalYAMLContent(configBytes []byte) (*IsilonClusters, error) {
 func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (map[interface{}]interface{}, string, error) {
 	var noOfDefaultClusters int
 	var defaultIsiClusterName string
-	logLevel := csmlog.GetLevel()
-	log := log.WithContext(ctx)
 
 	var inputConfigs *IsilonClusters
 	var yamlErr error
 	var err error
 
-	log.Info("reading secret file to validate cluster config details")
+	csmlog.WithContext(ctx).Info("reading secret file to validate cluster config details")
 	inputConfigs, yamlErr = unmarshalYAMLContent(configBytes)
 	if yamlErr != nil {
-		log.Errorf("failed to parse isilon clusters' config details as yaml data, error: %v", yamlErr)
+		csmlog.WithContext(ctx).Errorf("failed to parse isilon clusters' config details as yaml data, error: %v", yamlErr)
 		return nil, defaultIsiClusterName, fmt.Errorf("failed to parse isilon clusters' config details as yaml data")
 	}
 
@@ -749,7 +732,7 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 	newIsiClusters := make(map[interface{}]interface{})
 	for i, clusterConfig := range inputConfigs.IsilonClusters {
 		config := clusterConfig
-		log.Debugf("parsing config details for cluster %v", config.ClusterName)
+		csmlog.WithContext(ctx).Debugf("parsing config details for cluster %v", config.ClusterName)
 		if config.ClusterName == "" {
 			return nil, defaultIsiClusterName, fmt.Errorf("clusterName not provided in secret at index [%d]", i)
 		}
@@ -768,7 +751,7 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 		config.Endpoint = strings.TrimPrefix(config.Endpoint, "https://")
 
 		if config.EndpointPort == "" {
-			log.Warnf("using default as EndpointPort not provided for cluster %s in secret at index [%d]", config.ClusterName, i)
+			csmlog.WithContext(ctx).Warnf("using default as EndpointPort not provided for cluster %s in secret at index [%d]", config.ClusterName, i)
 			config.EndpointPort = s.opts.Port
 		}
 
@@ -777,12 +760,12 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 		}
 
 		if config.IsiPath == "" {
-			log.Warnf("using default as IsiPath not provided for cluster %s in secret at index [%d]", config.ClusterName, i)
+			csmlog.WithContext(ctx).Warnf("using default as IsiPath not provided for cluster %s in secret at index [%d]", config.ClusterName, i)
 			config.IsiPath = s.opts.Path
 		}
 
 		if config.IsiVolumePathPermissions == "" {
-			log.Warnf("using default as IsiVolumePathPermissions not provided for cluster %s in secret at index [%d]", config.ClusterName, i)
+			csmlog.WithContext(ctx).Warnf("using default as IsiVolumePathPermissions not provided for cluster %s in secret at index [%d]", config.ClusterName, i)
 			config.IsiVolumePathPermissions = s.opts.IsiVolumePathPermissions
 		}
 
@@ -794,9 +777,9 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 		// clientCtx, _ := GetLogger(ctx)
 		// Need to verify this part
 		if !noProbeOnStart {
-			config.isiSvc, err = s.GetIsiService(ctx, &config, logLevel)
+			config.isiSvc, err = s.GetIsiService(ctx, &config)
 			if err != nil {
-				log.Errorf("failed to get isi client for  cluster %s, error: %v", config.ClusterName, err)
+				csmlog.WithContext(ctx).Errorf("failed to get isi client for  cluster %s, error: %v", config.ClusterName, err)
 			}
 		}
 
@@ -837,14 +820,14 @@ func (s *service) getNewIsilonConfigs(ctx context.Context, configBytes []byte) (
 			"IgnoreUnresolvableHosts":   *config.IgnoreUnresolvableHosts,
 		}
 		// TODO: Replace logrus with log
-		log.WithFields(fields).Infof("new config details set for cluster %s", config.ClusterName)
+		csmlog.WithFields(fields).Infof("new config details set for cluster %s", config.ClusterName)
 	}
 
 	return newIsiClusters, defaultIsiClusterName, nil
 }
 
 func handler(_, value interface{}) bool {
-	log.Debug(value.(*IsilonClusterConfig).String())
+	csmlog.Debug(value.(*IsilonClusterConfig).String())
 	return true
 }
 
@@ -868,7 +851,6 @@ func (s *service) getIsilonClusters() []*IsilonClusterConfig {
 
 // Update configurable params from configmap
 func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) error {
-	log := log.WithContext(ctx)
 	logLevel := constants.DefaultLogLevel
 	if v.IsSet(constants.ParamCSILogLevel) {
 		inputLogLevel := v.GetString(constants.ParamCSILogLevel)
@@ -882,10 +864,10 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 		}
 	}
 	csmlog.SetLevel(logLevel)
-	log.Infof("log level set to '%s'", logLevel)
+	csmlog.WithContext(ctx).Infof("log level set to '%s'", logLevel)
 
 	// set access zone network label interval
-	s.setAzReconcileInterval(log, v)
+	s.setAzReconcileInterval(ctx, v)
 
 	err := s.syncIsilonConfigs(ctx)
 	if err != nil {
@@ -895,24 +877,24 @@ func (s *service) updateDriverConfigParams(ctx context.Context, v *viper.Viper) 
 	return nil
 }
 
-func (s *service) setAzReconcileInterval(log *csmlog.CsmLog, v *viper.Viper) {
+func (s *service) setAzReconcileInterval(ctx context.Context, v *viper.Viper) {
 	var azReconcileIntervalStr string
 	if v.IsSet(constants.ParamAZReconcileInterval) {
 		azReconcileIntervalStr = v.GetString(constants.ParamAZReconcileInterval)
 	}
 
 	if strings.TrimSpace(azReconcileIntervalStr) == "" || azReconcileIntervalStr == "0" {
-		log.Info("disabling access zone reconcile feature")
+		csmlog.WithContext(ctx).Info("disabling access zone reconcile feature")
 		s.azReconcileInterval = 0
 		return
 	}
 
 	interval, err := time.ParseDuration(azReconcileIntervalStr)
 	if err != nil {
-		log.Errorf(err.Error(), fmt.Sprintf("parsing access zone reconcile interval %s, defaulting to %s", azReconcileIntervalStr, constants.DefaultAZReconcileInterval))
+		csmlog.WithContext(ctx).Errorf("parsing access zone reconcile interval %s, defaulting to %s: %v", azReconcileIntervalStr, constants.DefaultAZReconcileInterval, err)
 		interval = constants.DefaultAZReconcileInterval
 	}
-	log.Infof("access zone reconcile interval set to %s", interval)
+	csmlog.WithContext(ctx).Infof("access zone reconcile interval set to %s", interval)
 	s.azReconcileInterval = interval
 	if s.updateAZReconcileIntervalCh != nil {
 		s.updateAZReconcileIntervalCh <- interval
@@ -920,7 +902,7 @@ func (s *service) setAzReconcileInterval(log *csmlog.CsmLog, v *viper.Viper) {
 }
 
 // GetCSINodeID gets the id of the CSI node which regards the node name as node id
-func (s *service) GetCSINodeID(_ context.Context) (string, error) {
+func (s *service) GetCSINodeID() (string, error) {
 	// if the node id has already been initialized, return it
 	if s.nodeID != "" {
 		return s.nodeID, nil
@@ -930,7 +912,7 @@ func (s *service) GetCSINodeID(_ context.Context) (string, error) {
 }
 
 // GetCSINodeIP gets the IP of the CSI node
-func (s *service) GetCSINodeIP(_ context.Context) (string, error) {
+func (s *service) GetCSINodeIP() (string, error) {
 	// if the node ip has already been initialized, return it
 	if s.nodeIP != "" {
 		return s.nodeIP, nil
@@ -966,7 +948,7 @@ func (s *service) logStatistics() {
 			"StackSys":     memstats.StackSys,
 		}
 		// TODO: Replace logrus with log
-		log.WithFields(fields).Debugf("resource statistics counter: %d", s.statisticsCounter)
+		csmlog.WithFields(fields).Debugf("resource statistics counter: %d", s.statisticsCounter)
 	}
 }
 
@@ -985,18 +967,16 @@ func GetMessageWithReqID(ReqID string, format string, args ...interface{}) strin
 
 // LogMap logs the key-value entries of a given map
 func LogMap(ctx context.Context, mapName string, m map[string]string) {
-	log := log.WithContext(ctx)
-	log.Debugf("map '%s':", mapName)
+	csmlog.WithContext(ctx).Debugf("map '%s':", mapName)
 	for key, value := range m {
-		log.Debugf("    [%s]='%s'", key, value)
+		csmlog.WithContext(ctx).Debugf("    [%s]='%s'", key, value)
 	}
 }
 
 // getIsilonConfig returns the cluster config
 func (s *service) getIsilonConfig(ctx context.Context, clusterName *string) (*IsilonClusterConfig, error) {
-	log := log.WithContext(ctx)
 	if *clusterName == "" {
-		log.Infof("Request doesn't include cluster name. Use default cluster '%s'", s.defaultIsiClusterName)
+		csmlog.WithContext(ctx).Infof("Request doesn't include cluster name. Use default cluster '%s'", s.defaultIsiClusterName)
 		*clusterName = s.defaultIsiClusterName
 		if s.defaultIsiClusterName == "" {
 			return nil, fmt.Errorf("no default cluster config available to continue with request")
@@ -1014,7 +994,7 @@ func (s *service) getIsilonConfig(ctx context.Context, clusterName *string) (*Is
 func (s *service) GetNodeLabels() (map[string]string, error) {
 	k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
 	if err != nil {
-		log.Errorf("init client failed: '%s'", err.Error())
+		csmlog.Errorf("init client failed: '%s'", err.Error())
 		return nil, err
 	}
 	// access the API to fetch node object
@@ -1022,7 +1002,7 @@ func (s *service) GetNodeLabels() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("Node details: %s", node)
+	csmlog.Debugf("Node details: %s", node)
 
 	return node.Labels, nil
 }
@@ -1039,7 +1019,7 @@ var (
 func (s *service) GetNodeLabelsWithName(nodeName string) (map[string]string, error) {
 	k8sclientset, err := getKubeClientSet(s.opts.KubeConfigPath)
 	if err != nil {
-		log.Errorf("init client failed: '%s'", err.Error())
+		csmlog.Errorf("init client failed: '%s'", err.Error())
 		return nil, err
 	}
 	// access the API to fetch node object
@@ -1047,7 +1027,7 @@ func (s *service) GetNodeLabelsWithName(nodeName string) (map[string]string, err
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("Node details: %s", node)
+	csmlog.Debugf("Node details: %s", node)
 
 	return node.Labels, nil
 }
@@ -1055,13 +1035,13 @@ func (s *service) GetNodeLabelsWithName(nodeName string) (map[string]string, err
 func (s *service) PatchNodeLabels(add map[string]string, remove []string) error {
 	node, err := s.k8sclient.CoreV1().Nodes().Get(context.TODO(), s.nodeID, v1.GetOptions{})
 	if err != nil {
-		log.Errorf("failed to get current node details: '%s'", err.Error())
+		csmlog.Errorf("failed to get current node details: '%s'", err.Error())
 		return err
 	}
 
 	currentNode, err := json.Marshal(node)
 	if err != nil {
-		log.Errorf("failed to marshal current node details: '%s'", err.Error())
+		csmlog.Errorf("failed to marshal current node details: '%s'", err.Error())
 		return err
 	}
 
@@ -1075,23 +1055,23 @@ func (s *service) PatchNodeLabels(add map[string]string, remove []string) error 
 
 	newNode, err := json.Marshal(node)
 	if err != nil {
-		log.Errorf("failed to marshal new node details: '%s'", err.Error())
+		csmlog.Errorf("failed to marshal new node details: '%s'", err.Error())
 		return err
 	}
 
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(currentNode, newNode, node)
 	if err != nil {
-		log.Errorf("failed to create patch: '%s'", err.Error())
+		csmlog.Errorf("failed to create patch: '%s'", err.Error())
 		return err
 	}
 
 	node, err = s.k8sclient.CoreV1().Nodes().Patch(context.TODO(), s.nodeID, types.StrategicMergePatchType, patchBytes, v1.PatchOptions{})
 	if err != nil {
-		log.Errorf("failed to patch node labels: '%s'", err.Error())
+		csmlog.Errorf("failed to patch node labels: '%s'", err.Error())
 		return err
 	}
 
-	log.Debugf("Node details after patching labels: %s", node)
+	csmlog.Debugf("Node details after patching labels: %s", node)
 	return err
 }
 
@@ -1099,12 +1079,10 @@ func (s *service) ProbeController(ctx context.Context,
 	_ *commonext.ProbeControllerRequest) (
 	*commonext.ProbeControllerResponse, error,
 ) {
-	log := log.WithContext(ctx)
-
 	if !strings.EqualFold(s.mode, "node") {
-		log.Debugf("controllerProbe")
+		csmlog.WithContext(ctx).Debugf("controllerProbe")
 		if err := s.probeAllClusters(ctx); err != nil {
-			log.Errorf("error in controllerProbe: %s", err.Error())
+			csmlog.WithContext(ctx).Errorf("error in controllerProbe: %s", err.Error())
 			return nil, err
 		}
 	}
@@ -1117,7 +1095,7 @@ func (s *service) ProbeController(ctx context.Context,
 	rep.VendorVersion = Manifest["semver"]
 	rep.Manifest = Manifest
 
-	log.Debug(fmt.Sprintf("ProbeController returning: %v", rep.Ready.GetValue()))
+	csmlog.WithContext(ctx).Debug(fmt.Sprintf("ProbeController returning: %v", rep.Ready.GetValue()))
 
 	return rep, nil
 }
@@ -1128,7 +1106,6 @@ func (s *service) WithRP(key string) string {
 }
 
 func (s *service) validateIsiPath(ctx context.Context, volName string) (string, error) {
-	log := log.WithContext(ctx)
 	if s.k8sclient == nil {
 		return "", errors.New("no k8s clientset")
 	}
@@ -1145,20 +1122,20 @@ func (s *service) validateIsiPath(ctx context.Context, volName string) (string, 
 		if pv.Spec.CSI.VolumeAttributes[ExportPathParam] != "" {
 			exportPath := pv.Spec.CSI.VolumeAttributes[ExportPathParam]
 			isiPath := isilonfs.GetIsiPathFromExportPath(exportPath)
-			log.Debugf("Found IsiPath from PersistentVolume: %v", isiPath)
+			csmlog.WithContext(ctx).Debugf("Found IsiPath from PersistentVolume: %v", isiPath)
 			return isiPath, nil
 		}
 	}
 
-	log.Debug("IsiPath not found in PersistentVolume")
+	csmlog.WithContext(ctx).Debug("IsiPath not found in PersistentVolume")
 
 	// if we cannot find IsiPath in VolumeAttributes, check StorageClass next
 	if pv.Spec.StorageClassName == "" {
-		log.Debug("StorageClass not found in PersistentVolume")
+		csmlog.WithContext(ctx).Debug("StorageClass not found in PersistentVolume")
 		return "", nil
 	}
 
-	log.Debugf("Checking StorageClass: %v", pv.Spec.StorageClassName)
+	csmlog.WithContext(ctx).Debugf("Checking StorageClass: %v", pv.Spec.StorageClassName)
 
 	sc, err := s.k8sclient.StorageV1().StorageClasses().Get(ctx, pv.Spec.StorageClassName, v1.GetOptions{})
 	if err != nil {
@@ -1167,7 +1144,7 @@ func (s *service) validateIsiPath(ctx context.Context, volName string) (string, 
 
 	isiPath, ok := sc.Parameters[IsiPathParam]
 	if !ok || isiPath == "" {
-		log.Debug("IsiPath not found in StorageClass")
+		csmlog.WithContext(ctx).Debug("IsiPath not found in StorageClass")
 		return "", nil
 	}
 
@@ -1175,18 +1152,17 @@ func (s *service) validateIsiPath(ctx context.Context, volName string) (string, 
 }
 
 func getExportPathFromExportID(ctx context.Context, isiConfig *IsilonClusterConfig, exportID int, accessZone string) (string, error) {
-	log := log.WithContext(ctx)
 	export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
 	if err != nil {
-		log.Error("Failed to get export with error: " + err.Error())
+		csmlog.WithContext(ctx).Error("Failed to get export with error: " + err.Error())
 		return "", status.Error(codes.NotFound, err.Error())
 	}
 	if len(*export.Paths) == 0 {
 		return "", status.Error(codes.NotFound, fmt.Sprintf("can't find paths for export with ID %d", exportID))
 	}
-	log.Debugf("Export paths are: %v", export.Paths)
+	csmlog.WithContext(ctx).Debugf("Export paths are: %v", export.Paths)
 	exportPath := (*export.Paths)[0]
-	log.Debugf("Returning export path: %s", exportPath)
+	csmlog.WithContext(ctx).Debugf("Returning export path: %s", exportPath)
 
 	return exportPath, nil
 }

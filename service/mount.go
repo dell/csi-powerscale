@@ -27,12 +27,10 @@ import (
 	csmlog "github.com/dell/csmlog"
 	"github.com/dell/gofsutil"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-// TODO: All WithFields call containing logrus have to be converted to log
 func publishVolume(
 	ctx context.Context,
 	req *csi.NodePublishVolumeRequest,
@@ -63,7 +61,6 @@ var (
 		req *csi.NodePublishVolumeRequest,
 		nfsExportURL string,
 	) error {
-		log := log.WithContext(ctx)
 		volCap := req.GetVolumeCapability()
 		if volCap == nil {
 			return status.Error(codes.InvalidArgument,
@@ -82,7 +79,7 @@ var (
 
 		var mntOptions []string
 		mntOptions = mntVol.GetMountFlags()
-		log.Infof("The mountOptions received are: %s", mntOptions)
+		csmlog.WithContext(ctx).Infof("The mountOptions received are: %s", mntOptions)
 
 		target := req.GetTargetPath()
 		if target == "" {
@@ -109,7 +106,7 @@ var (
 			"ExportPath": nfsExportURL,
 			"AccessMode": accMode.GetMode(),
 		}
-		log.WithFields(f).Info("Node publish volume params ")
+		csmlog.WithContext(ctx).WithFields(f).Info("Node publish volume params ")
 		mnts, err := getGetMountsFunc()(ctx)
 		if err != nil {
 			return status.Errorf(codes.Internal,
@@ -125,33 +122,33 @@ var (
 					if m.Path == target {
 						// as per specs, T1=T2, P1=P2 - return OK
 						if contains(m.Opts, rwOption) {
-							logrus.WithFields(f).Debug(
+							csmlog.WithContext(ctx).WithFields(f).Debug(
 								"mount already in place with same options")
 							return nil
 						}
 						// T1=T2, P1!=P2 - return AlreadyExists
-						logrus.WithFields(f).Error("Mount point already in use by device with different options")
+						csmlog.WithContext(ctx).WithFields(f).Error("Mount point already in use by device with different options")
 						return status.Error(codes.AlreadyExists, "Mount point already in use by device with different options")
 					}
 					// T1!=T2, P1==P2 || P1 != P2 - return FailedPrecondition for single node
 					if accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER ||
 						accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY ||
 						accMode.GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER {
-						logrus.WithFields(f).Error("Mount point already in use for same device")
+						csmlog.WithContext(ctx).WithFields(f).Error("Mount point already in use for same device")
 						return status.Error(codes.FailedPrecondition, "Mount point already in use for same device")
 					}
 				}
 			}
 		}
 
-		log.Infof("The mountOptions being used for mount are: %s", mntOptions)
+		csmlog.WithContext(ctx).Infof("The mountOptions being used for mount are: %s", mntOptions)
 		if err := getMountFunc()(context.Background(), nfsExportURL, target, "nfs", mntOptions...); err != nil {
 			count := 0
 			errmsg := err.Error()
 			// Both substring validation is for NFSv3 and NFSv4 errors resp.
 			for (strings.Contains(strings.ToLower(errmsg), "access denied by server while mounting") || (strings.Contains(strings.ToLower(errmsg), "no such file or directory"))) && count < 5 {
 				time.Sleep(2 * time.Second)
-				log.Infof("Mount retry attempt-%d", count)
+				csmlog.WithContext(ctx).Infof("Mount retry attempt-%d", count)
 				err = getMountFunc()(context.Background(), nfsExportURL, target, "nfs", mntOptions...)
 				if err != nil {
 					errmsg = err.Error()
@@ -161,7 +158,7 @@ var (
 				count++
 			}
 			if err != nil {
-				log.Errorf("%v", err)
+				csmlog.WithContext(ctx).Errorf("%v", err)
 				return err
 			}
 		}
@@ -174,14 +171,13 @@ func unpublishVolume(
 	ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest, filterStr string,
 ) error {
-	log := log.WithContext(ctx)
 	target := req.GetTargetPath()
 	if target == "" {
 		return status.Error(codes.InvalidArgument,
 			"Target Path is required")
 	}
 
-	log.Debugf("attempting to unmount '%s'", target)
+	csmlog.WithContext(ctx).Debugf("attempting to unmount '%s'", target)
 	isMounted, err := isVolumeMounted(ctx, filterStr, target)
 	if err != nil {
 		return err
@@ -193,14 +189,14 @@ func unpublishVolume(
 		return status.Errorf(codes.Internal,
 			"error unmounting target '%s': '%s'", target, err.Error())
 	}
-	log.Debugf("unmounting '%s' succeeded", target)
+	csmlog.WithContext(ctx).Debugf("unmounting '%s' succeeded", target)
 
 	// Remove the target path after unmounting
 	if err := getOsRemoveAllFunc()(target); err != nil {
 		return status.Errorf(codes.Internal,
 			"error removing target path '%s': '%s'", target, err.Error())
 	}
-	log.Debugf("removing target path '%s' succeeded", target)
+	csmlog.WithContext(ctx).Debugf("removing target path '%s' succeeded", target)
 
 	return nil
 }
@@ -208,7 +204,6 @@ func unpublishVolume(
 // mkdir creates the directory specified by path if needed.
 // return pair is a bool flag of whether dir was created, and an error
 func mkdir(ctx context.Context, path string) (bool, error) {
-	log := log.WithContext(ctx)
 	st, err := os.Stat(path)
 	if err == nil {
 		if !st.IsDir() {
@@ -217,17 +212,17 @@ func mkdir(ctx context.Context, path string) (bool, error) {
 		return false, nil
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
-		log.WithFields(csmlog.Fields{"dir": path}).Errorf("Unable to stat dir : %v", err)
+		csmlog.WithContext(ctx).WithFields(csmlog.Fields{"dir": path}).Errorf("Unable to stat dir : %v", err)
 		return false, err
 	}
 
 	// Case when there is error and the error is fs.ErrNotExists.
 	if err := os.MkdirAll(path, 0o750); err != nil {
-		log.WithFields(csmlog.Fields{"dir": path}).Errorf("Unable to create dir : %v", err)
+		csmlog.WithContext(ctx).WithFields(csmlog.Fields{"dir": path}).Errorf("Unable to create dir : %v", err)
 		return false, err
 	}
 
-	log.WithFields(csmlog.Fields{"path": path}).Debug("created directory")
+	csmlog.WithContext(ctx).WithFields(csmlog.Fields{"path": path}).Debug("created directory")
 	return true, nil
 }
 
@@ -241,7 +236,6 @@ func contains(list []string, item string) bool {
 }
 
 func isVolumeMounted(ctx context.Context, filterStr string, target string) (bool, error) {
-	log := log.WithContext(ctx)
 	mnts, err := getGetMountsFunc()(ctx)
 	if err != nil {
 		return false, status.Errorf(codes.Internal,
@@ -261,11 +255,11 @@ func isVolumeMounted(ctx context.Context, filterStr string, target string) (bool
 			}
 		}
 		if mounted == false {
-			log.Debugf("target '%s' does not exist", target)
+			csmlog.WithContext(ctx).Debugf("target '%s' does not exist", target)
 			return mounted, nil
 		}
 	}
 	// No mount exists also means not published
-	log.Debugf("target '%s' does not exist", target)
+	csmlog.WithContext(ctx).Debugf("target '%s' does not exist", target)
 	return false, nil
 }

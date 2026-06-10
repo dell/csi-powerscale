@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 
+	csmlog "github.com/dell/csmlog"
 	apiv1 "github.com/dell/gopowerscale/api/v1"
 
 	id "github.com/dell/csi-powerscale/v2/common/utils/identifiers"
@@ -39,14 +40,12 @@ type isiService struct {
 }
 
 func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSourceVolumeIsiPath string, srcSnapshotID int64, dstVolumeName string, accessZone string) (isi.Volume, error) {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin to copy snapshot '%d'", srcSnapshotID)
+	csmlog.WithContext(ctx).Debugf("begin to copy snapshot '%d'", srcSnapshotID)
 
 	var volumeNew isi.Volume
 	var err error
 	if volumeNew, err = svc.client.CopySnapshotWithIsiPath(ctx, isiPath, snapshotSourceVolumeIsiPath, srcSnapshotID, "", dstVolumeName, accessZone); err != nil {
-		log.Errorf("copy snapshot failed, '%s'", err.Error())
+		csmlog.WithContext(ctx).Errorf("copy snapshot failed, '%s'", err.Error())
 		return nil, err
 	}
 
@@ -54,14 +53,12 @@ func (svc *isiService) CopySnapshot(ctx context.Context, isiPath, snapshotSource
 }
 
 func (svc *isiService) CopyVolume(ctx context.Context, isiPath, srcVolumeName, dstVolumeName string) (isi.Volume, error) {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin to copy volume '%s'", srcVolumeName)
+	csmlog.WithContext(ctx).Debugf("begin to copy volume '%s'", srcVolumeName)
 
 	var volumeNew isi.Volume
 	var err error
 	if volumeNew, err = svc.client.CopyVolumeWithIsiPath(ctx, isiPath, srcVolumeName, dstVolumeName); err != nil {
-		log.Errorf("copy volume failed, '%s'", err.Error())
+		csmlog.WithContext(ctx).Errorf("copy volume failed, '%s'", err.Error())
 		return nil, err
 	}
 
@@ -69,14 +66,12 @@ func (svc *isiService) CopyVolume(ctx context.Context, isiPath, srcVolumeName, d
 }
 
 func (svc *isiService) CreateSnapshot(ctx context.Context, path, snapshotName string) (isi.Snapshot, error) {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin to create snapshot '%s'", snapshotName)
+	csmlog.WithContext(ctx).Debugf("begin to create snapshot '%s'", snapshotName)
 
 	var snapshot isi.Snapshot
 	var err error
 	if snapshot, err = svc.client.CreateSnapshotWithPath(ctx, path, snapshotName); err != nil {
-		log.Errorf("create snapshot failed, '%s'", err.Error())
+		csmlog.WithContext(ctx).Errorf("create snapshot failed, '%s'", err.Error())
 		return nil, err
 	}
 
@@ -84,39 +79,33 @@ func (svc *isiService) CreateSnapshot(ctx context.Context, path, snapshotName st
 }
 
 func (svc *isiService) CreateVolume(ctx context.Context, isiPath, volName, isiVolumePathPermissions string) error {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin to create volume '%s'", volName)
+	csmlog.WithContext(ctx).Debugf("begin to create volume '%s'", volName)
 
 	if _, err := svc.client.CreateVolumeWithIsipath(ctx, isiPath, volName, isiVolumePathPermissions); err != nil {
-		log.Errorf("create volume failed, '%s'", err.Error())
+		csmlog.WithContext(ctx).Errorf("create volume failed, '%s'", err.Error())
 		return err
 	}
 	return nil
 }
 
 func (svc *isiService) CreateVolumeWithMetaData(ctx context.Context, isiPath, volName, isiVolumePathPermissions string, metadata map[string]string) error {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin to create volume '%s'", volName)
-	log.Debugf("header metadata '%v'", metadata)
+	csmlog.WithContext(ctx).Debugf("begin to create volume '%s'", volName)
+	csmlog.WithContext(ctx).Debugf("header metadata '%v'", metadata)
 
 	if _, err := svc.client.CreateVolumeWithIsipathMetaData(ctx, isiPath, volName, isiVolumePathPermissions, metadata); err != nil {
-		log.Errorf("create volume failed, '%s'", err.Error())
+		csmlog.WithContext(ctx).Errorf("create volume failed, '%s'", err.Error())
 		return err
 	}
 	return nil
 }
 
 func (svc *isiService) GetExports(ctx context.Context) (isi.ExportList, error) {
-	log := log.WithContext(ctx)
-
-	log.Debug("begin getting exports for Isilon")
+	csmlog.WithContext(ctx).Debug("begin getting exports for Isilon")
 
 	var exports isi.ExportList
 	var err error
 	if exports, err = svc.client.GetExports(ctx); err != nil {
-		log.Error("failed to get exports")
+		csmlog.WithContext(ctx).Error("failed to get exports")
 		return nil, err
 	}
 
@@ -124,14 +113,12 @@ func (svc *isiService) GetExports(ctx context.Context) (isi.ExportList, error) {
 }
 
 func (svc *isiService) GetExportByIDWithZone(ctx context.Context, exportID int, accessZone string) (isi.Export, error) {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin getting export by id '%d' with access zone '%s' for Isilon", exportID, accessZone)
+	csmlog.WithContext(ctx).Debugf("begin getting export by id '%d' with access zone '%s' for Isilon", exportID, accessZone)
 
 	var export isi.Export
 	var err error
 	if export, err = svc.client.GetExportByIDWithZone(ctx, exportID, accessZone); err != nil {
-		log.Error("failed to get export by id with access zone")
+		csmlog.WithContext(ctx).Error("failed to get export by id with access zone")
 		return nil, err
 	}
 
@@ -139,52 +126,47 @@ func (svc *isiService) GetExportByIDWithZone(ctx context.Context, exportID int, 
 }
 
 func (svc *isiService) GetExportsCountAttachedToNode(ctx context.Context, nodeip string) (int64, error) {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin getting export count for nodeip '%s' for Isilon", nodeip)
+	csmlog.WithContext(ctx).Debugf("begin getting export count for nodeip '%s' for Isilon", nodeip)
 	var count int64
 	var err error
 	if count, err = svc.client.GetExportsCountAttachedToNode(ctx, nodeip); err != nil {
-		log.Errorf("failed to get export count for node ip %s err %s", nodeip, err.Error())
+		csmlog.WithContext(ctx).Errorf("failed to get export count for node ip %s err %s", nodeip, err.Error())
 		return 0, err
 	}
 	return count, nil
 }
 
 func (svc *isiService) ExportVolumeWithZone(ctx context.Context, isiPath, volName, accessZone, description string) (int, error) {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin to export volume '%s' with access zone '%s' in Isilon path '%s'", volName, accessZone, isiPath)
+	csmlog.WithContext(ctx).Debugf("begin to export volume '%s' with access zone '%s' in Isilon path '%s'", volName, accessZone, isiPath)
 
 	var exportID int
 	var err error
 
 	path := isilonfs.GetPathForVolume(isiPath, volName)
 	if exportID, err = svc.client.ExportVolumeWithZoneAndPath(ctx, path, accessZone, description); err != nil {
-		log.Errorf("Export volume failed, volume '%s', access zone '%s' , id %d error '%s'", volName, accessZone, exportID, err.Error())
+		csmlog.WithContext(ctx).Errorf("Export volume failed, volume '%s', access zone '%s' , id %d error '%s'", volName, accessZone, exportID, err.Error())
 		return -1, err
 	}
 
-	log.Infof("Exported volume '%s' successfully, id '%d'", volName, exportID)
+	csmlog.WithContext(ctx).Infof("Exported volume '%s' successfully, id '%d'", volName, exportID)
 	return exportID, nil
 }
 
 func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit, advisoryLimit, softGracePrd string, sizeInBytes int64, quotaEnabled bool) (string, error) {
-	log := log.WithContext(ctx)
-	log.Debugf("begin to create quota for '%s', size '%d', quota enabled: '%t'", volName, sizeInBytes, quotaEnabled)
+	csmlog.WithContext(ctx).Debugf("begin to create quota for '%s', size '%d', quota enabled: '%t'", volName, sizeInBytes, quotaEnabled)
 	var softi, advisoryi int64
 	var err error
 	var softlimitInt, advisoryLimitInt, softGracePrdInt int64
 	softGracePrdInt, err = strconv.ParseInt(softGracePrd, 10, 64)
 	if err != nil {
-		log.Debugf("Invalid softGracePrd value. Setting it to default.")
+		csmlog.WithContext(ctx).Debugf("Invalid softGracePrd value. Setting it to default.")
 		softGracePrdInt = 0
 	}
 	// converting soft limit from %ge to value
 	if softLimit != "" {
 		softi, err = strconv.ParseInt(softLimit, 10, 64)
 		if err != nil {
-			log.Debugf("Invalid softLimit value. Setting it to default.")
+			csmlog.WithContext(ctx).Debugf("Invalid softLimit value. Setting it to default.")
 			softlimitInt = 0
 		} else {
 			softlimitInt = (softi * sizeInBytes) / 100
@@ -193,7 +175,7 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit
 	if advisoryLimit != "" {
 		advisoryi, err = strconv.ParseInt(advisoryLimit, 10, 64)
 		if err != nil {
-			log.Debugf("Invalid advisoryLimit value. Setting it to default.")
+			csmlog.WithContext(ctx).Debugf("Invalid advisoryLimit value. Setting it to default.")
 			advisoryLimitInt = 0
 
 		} else {
@@ -206,27 +188,27 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit
 		// need to set the quota based on the requested pv size
 		// if a size isn't requested, skip creating the quota
 		if sizeInBytes <= 0 {
-			log.Debugf("SmartQuotas is enabled, but storage size is not requested, skip creating quotas for volume '%s'", volName)
+			csmlog.WithContext(ctx).Debugf("SmartQuotas is enabled, but storage size is not requested, skip creating quotas for volume '%s'", volName)
 			return "", nil
 		}
 		// Check if soft and advisory < 100
 		if (softlimitInt >= sizeInBytes) || (advisoryLimitInt >= sizeInBytes) {
-			log.Warnf("Soft and advisory thresholds must be smaller than the hard threshold. Setting it to default for Volume '%s'", volName)
+			csmlog.WithContext(ctx).Warnf("Soft and advisory thresholds must be smaller than the hard threshold. Setting it to default for Volume '%s'", volName)
 			softlimitInt, advisoryLimitInt, softGracePrdInt = 0, 0, 0
 		}
 		// Check if Soft Grace period is set along with soft limit
 		if (softlimitInt != 0) && (softGracePrdInt == 0) {
-			log.Warnf("Soft Grace Period must be configured along with Soft threshold, Setting it to default for Volume '%s'", volName)
+			csmlog.WithContext(ctx).Warnf("Soft Grace Period must be configured along with Soft threshold, Setting it to default for Volume '%s'", volName)
 			softlimitInt, softGracePrdInt = 0, 0
 		}
 
 		isQuotaActivated, checkLicErr := svc.client.IsQuotaLicenseActivated(ctx)
 		if checkLicErr != nil {
-			log.Errorf("failed to check SmartQuotas license info: '%v'", checkLicErr)
+			csmlog.WithContext(ctx).Errorf("failed to check SmartQuotas license info: '%v'", checkLicErr)
 		}
 
 		if (!isQuotaActivated) && (checkLicErr == nil) {
-			log.Debugf("SmartQuotas is not activated, cannot add capacity limit '%d' bytes via quota, skip creating quota", sizeInBytes)
+			csmlog.WithContext(ctx).Debugf("SmartQuotas is not activated, cannot add capacity limit '%d' bytes via quota, skip creating quota", sizeInBytes)
 			return "", nil
 		}
 
@@ -242,20 +224,18 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit
 			return "", fmt.Errorf("creating quota failed with error, it might or might not be because SmartQuotas license has not been activated: '%v'", err)
 		}
 
-		log.Infof("quota set to: %d on directory: '%s'", sizeInBytes, volName)
+		csmlog.WithContext(ctx).Infof("quota set to: %d on directory: '%s'", sizeInBytes, volName)
 
 		return quotaID, nil
 	}
 
-	log.Debugf("quota is disabled, skip creating quota for '%s'", volName)
+	csmlog.WithContext(ctx).Debugf("quota is disabled, skip creating quota for '%s'", volName)
 
 	return "", nil
 }
 
 func (svc *isiService) DeleteQuotaByExportIDWithZone(ctx context.Context, volName string, exportID int, accessZone string) error {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin to delete quota for volume name : '%s', export ID : '%d'", volName, exportID)
+	csmlog.WithContext(ctx).Debugf("begin to delete quota for volume name : '%s', export ID : '%d'", volName, exportID)
 
 	var export isi.Export
 	var err error
@@ -266,16 +246,16 @@ func (svc *isiService) DeleteQuotaByExportIDWithZone(ctx context.Context, volNam
 	}
 
 	if export != nil {
-		log.Debugf("export (id : '%d') corresponding to path '%s' found, description field is '%s'", export.ID, volName, export.Description)
+		csmlog.WithContext(ctx).Debugf("export (id : '%d') corresponding to path '%s' found, description field is '%s'", export.ID, volName, export.Description)
 
 		quotaID, _ = isilonfs.GetQuotaIDFromDescription(ctx, export)
 
 		if quotaID == "" {
-			log.Debugf("No quota set on the volume, skip deleting quota")
+			csmlog.WithContext(ctx).Debugf("No quota set on the volume, skip deleting quota")
 			return nil
 		}
 
-		log.Debugf("deleting quota with id '%s' for path '%s'", quotaID, volName)
+		csmlog.WithContext(ctx).Debugf("deleting quota with id '%s' for path '%s'", quotaID, volName)
 
 		if err = svc.client.ClearQuotaByID(ctx, quotaID); err != nil {
 			return err
@@ -287,9 +267,7 @@ func (svc *isiService) DeleteQuotaByExportIDWithZone(ctx context.Context, volNam
 }
 
 func (svc *isiService) GetVolumeQuota(ctx context.Context, volName string, exportID int, accessZone string) (isi.Quota, error) {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin to get quota for volume name : '%s', export ID : '%d'", volName, exportID)
+	csmlog.WithContext(ctx).Debugf("begin to get quota for volume name : '%s', export ID : '%d'", volName, exportID)
 
 	var export isi.Export
 	var err error
@@ -300,16 +278,16 @@ func (svc *isiService) GetVolumeQuota(ctx context.Context, volName string, expor
 	}
 
 	if export != nil {
-		log.Debugf("export (id : '%d') corresponding to path '%s' found, description field is '%s'", export.ID, volName, export.Description)
+		csmlog.WithContext(ctx).Debugf("export (id : '%d') corresponding to path '%s' found, description field is '%s'", export.ID, volName, export.Description)
 
 		quotaID, err = isilonfs.GetQuotaIDFromDescription(ctx, export)
 
 		if quotaID == "" {
-			log.Debugf("No quota set on the volume")
+			csmlog.WithContext(ctx).Debugf("No quota set on the volume")
 			return nil, fmt.Errorf("failed to get quota: No quota set on the volume '%s'", volName)
 		}
 
-		log.Debugf("get quota by id '%s'", quotaID)
+		csmlog.WithContext(ctx).Debugf("get quota by id '%s'", quotaID)
 		return svc.client.GetQuotaByID(ctx, quotaID)
 
 	}
@@ -318,9 +296,7 @@ func (svc *isiService) GetVolumeQuota(ctx context.Context, volName string, expor
 }
 
 func (svc *isiService) UpdateQuotaSize(ctx context.Context, quotaID string, updatedSize, updatedSoftLimit, updatedAdvisoryLimit, softGrace int64) error {
-	log := log.WithContext(ctx)
-
-	log.Debugf("updating quota by id '%s' with size '%d'", quotaID, updatedSize)
+	csmlog.WithContext(ctx).Debugf("updating quota by id '%s' with size '%d'", quotaID, updatedSize)
 
 	if err := svc.client.UpdateQuotaSizeByID(ctx, quotaID, updatedSize, updatedSoftLimit, updatedAdvisoryLimit, softGrace); err != nil {
 		return fmt.Errorf("failed to update quota '%s' with size '%d', error: '%s'", quotaID, updatedSize, err.Error())
@@ -330,9 +306,7 @@ func (svc *isiService) UpdateQuotaSize(ctx context.Context, quotaID string, upda
 }
 
 func (svc *isiService) UnexportByIDWithZone(ctx context.Context, exportID int, accessZone string) error {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin to unexport NFS export with ID '%d' in access zone '%s'", exportID, accessZone)
+	csmlog.WithContext(ctx).Debugf("begin to unexport NFS export with ID '%d' in access zone '%s'", exportID, accessZone)
 
 	if err := svc.client.UnexportByIDWithZone(ctx, exportID, accessZone); err != nil {
 		return fmt.Errorf("failed to unexport volume directory '%d' in access zone '%s' : '%s'", exportID, accessZone, err.Error())
@@ -342,9 +316,7 @@ func (svc *isiService) UnexportByIDWithZone(ctx context.Context, exportID int, a
 }
 
 func (svc *isiService) GetExportsWithParams(ctx context.Context, params api.OrderedValues) (isi.Exports, error) {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin to get exports with params..")
+	csmlog.WithContext(ctx).Debugf("begin to get exports with params..")
 	var exports isi.Exports
 	var err error
 
@@ -355,9 +327,7 @@ func (svc *isiService) GetExportsWithParams(ctx context.Context, params api.Orde
 }
 
 func (svc *isiService) DeleteVolume(ctx context.Context, isiPath, volName string) error {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin to delete volume directory '%s'", volName)
+	csmlog.WithContext(ctx).Debugf("begin to delete volume directory '%s'", volName)
 
 	if err := svc.client.DeleteVolumeWithIsiPath(ctx, isiPath, volName); err != nil {
 		return fmt.Errorf("failed to delete volume directory '%v' : '%v'", volName, err)
@@ -376,13 +346,13 @@ func (svc *isiService) ClearQuotaByID(ctx context.Context, quotaID string) error
 }
 
 func (svc *isiService) TestConnection(ctx context.Context) error {
-	log.Debugf("test connection client, user name : '%s'", svc.client.API.User())
+	csmlog.WithContext(ctx).Debugf("test connection client, user name : '%s'", svc.client.API.User())
 	if _, err := svc.client.GetClusterConfig(ctx); err != nil {
-		log.Errorf("error encountered, test connection failed : '%v'", err)
+		csmlog.WithContext(ctx).Errorf("error encountered, test connection failed : '%v'", err)
 		return err
 	}
 
-	log.Debug("test connection succeeded")
+	csmlog.WithContext(ctx).Debug("test connection succeeded")
 
 	return nil
 }
@@ -392,14 +362,12 @@ func (svc *isiService) GetNFSExportURLForPath(ip string, dirPath string) string 
 }
 
 func (svc *isiService) GetVolumeWithIsiPath(ctx context.Context, isiPath, volID, volName string) (isi.Volume, error) {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin getting volume with id '%s' and name '%s' for Isilon", volID, volName)
+	csmlog.WithContext(ctx).Debugf("begin getting volume with id '%s' and name '%s' for Isilon", volID, volName)
 
 	var vol isi.Volume
 	var err error
 	if vol, err = svc.client.GetVolumeWithIsiPath(ctx, isiPath, volID, volName); err != nil {
-		log.Errorf("failed to get volume '%s'", err)
+		csmlog.WithContext(ctx).Errorf("failed to get volume '%s'", err)
 		return nil, err
 	}
 
@@ -407,14 +375,12 @@ func (svc *isiService) GetVolumeWithIsiPath(ctx context.Context, isiPath, volID,
 }
 
 func (svc *isiService) GetVolume(ctx context.Context, volID, volName string) (isi.Volume, error) {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin getting volume with name '%s' for Isilon", volName)
+	csmlog.WithContext(ctx).Debugf("begin getting volume with name '%s' for Isilon", volName)
 
 	var vol isi.Volume
 	var err error
 	if vol, err = svc.client.GetVolume(ctx, volID, volName); err != nil {
-		log.Errorf("failed to get volume '%s'", err)
+		csmlog.WithContext(ctx).Errorf("failed to get volume '%s'", err)
 		return nil, err
 	}
 
@@ -422,13 +388,11 @@ func (svc *isiService) GetVolume(ctx context.Context, volID, volName string) (is
 }
 
 func (svc *isiService) GetVolumeSize(ctx context.Context, isiPath, name string) int64 {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin getting volume size with name '%s' for Isilon", name)
+	csmlog.WithContext(ctx).Debugf("begin getting volume size with name '%s' for Isilon", name)
 
 	size, err := svc.client.GetVolumeSize(ctx, isiPath, name)
 	if err != nil {
-		log.Errorf("failed to get volume size '%s'", err.Error())
+		csmlog.WithContext(ctx).Errorf("failed to get volume size '%s'", err.Error())
 		return 0
 	}
 
@@ -436,54 +400,46 @@ func (svc *isiService) GetVolumeSize(ctx context.Context, isiPath, name string) 
 }
 
 func (svc *isiService) GetStatistics(ctx context.Context, keys []string) (isi.Stats, error) {
-	log := log.WithContext(ctx)
-
 	var stat isi.Stats
 	var err error
 	if stat, err = svc.client.GetStatistics(ctx, keys); err != nil {
-		log.Errorf("failed to get array statistics '%s'", err)
+		csmlog.WithContext(ctx).Errorf("failed to get array statistics '%s'", err)
 		return nil, err
 	}
 	return stat, nil
 }
 
 func (svc *isiService) IsIOInProgress(ctx context.Context) (isi.Clients, error) {
-	log := log.WithContext(ctx)
-
 	var clients isi.Clients
 	var err error
 	if clients, err = svc.client.IsIOInProgress(ctx); err != nil {
-		log.Errorf("failed to get array Clients '%s'", err)
+		csmlog.WithContext(ctx).Errorf("failed to get array Clients '%s'", err)
 		return nil, err
 	}
 	return clients, nil
 }
 
 func (svc *isiService) IsVolumeExistent(ctx context.Context, isiPath, volID, name string) bool {
-	log := log.WithContext(ctx)
-
-	log.Debugf("check if volume (id :'%s', name '%s') already exists", volID, name)
+	csmlog.WithContext(ctx).Debugf("check if volume (id :'%s', name '%s') already exists", volID, name)
 
 	isExistent := svc.client.IsVolumeExistentWithIsiPath(ctx, isiPath, volID, name)
 
-	log.Debugf("volume (id :'%s', name '%s') already exists : '%v'", volID, name, isExistent)
+	csmlog.WithContext(ctx).Debugf("volume (id :'%s', name '%s') already exists : '%v'", volID, name, isExistent)
 
 	return isExistent
 }
 
 func (svc *isiService) OtherClientsAlreadyAdded(ctx context.Context, exportID int, accessZone string, nodeID string) bool {
-	log := log.WithContext(ctx)
-
 	export, _ := svc.GetExportByIDWithZone(ctx, exportID, accessZone)
 
 	if export == nil {
-		log.Debugf("failed to get export by id '%d' with access zone '%s', return true for otherClientsAlreadyAdded as a safer return value", exportID, accessZone)
+		csmlog.WithContext(ctx).Debugf("failed to get export by id '%d' with access zone '%s', return true for otherClientsAlreadyAdded as a safer return value", exportID, accessZone)
 		return true
 	}
 
 	clientName, clientFQDN, clientIP, err := id.ParseNodeID(ctx, nodeID)
 	if err != nil {
-		log.Debugf("failed to parse node ID '%s', return true for otherClientsAlreadyAdded as a safer return value", nodeID)
+		csmlog.WithContext(ctx).Debugf("failed to parse node ID '%s', return true for otherClientsAlreadyAdded as a safer return value", nodeID)
 		return true
 	}
 
@@ -501,7 +457,7 @@ func (svc *isiService) OtherClientsAlreadyAdded(ctx context.Context, exportID in
 
 	clientName, clientFQDN, clientIP, err = id.ParseNodeID(ctx, id.DummyHostNodeID)
 	if err != nil {
-		log.Debugf("failed to parse node ID '%s', return true for otherClientsAlreadyAdded as a safer return value", nodeID)
+		csmlog.WithContext(ctx).Debugf("failed to parse node ID '%s', return true for otherClientsAlreadyAdded as a safer return value", nodeID)
 		return true
 	}
 
@@ -522,13 +478,12 @@ func (svc *isiService) OtherClientsAlreadyAdded(ctx context.Context, exportID in
 
 // updateClusterToNodeIDMap updates cluster to nodeID map from input clusterName, nodeID and clientToUse
 func updateClusterToNodeIDMap(ctx context.Context, clusterToNodeIDMap *sync.Map, clusterName, nodeID, clientToUse string) error {
-	log := log.WithContext(ctx)
-	log.Debugf("updating ClusterToNodeIDMap map for cluster '%s', for nodeID '%s' with clientToUse '%s'", clusterName, nodeID, clientToUse)
+	csmlog.WithContext(ctx).Debugf("updating ClusterToNodeIDMap map for cluster '%s', for nodeID '%s' with clientToUse '%s'", clusterName, nodeID, clientToUse)
 
 	var nodeIDToClientMaps []*nodeIDToClientMap
 
 	if m, found := clusterToNodeIDMap.Load(clusterName); found {
-		log.Debugf("entry for cluster '%s' found in cluster to nodeID map", clusterName)
+		csmlog.WithContext(ctx).Debugf("entry for cluster '%s' found in cluster to nodeID map", clusterName)
 		var ok bool
 		if nodeIDToClientMaps, ok = m.([]*nodeIDToClientMap); !ok {
 			return fmt.Errorf("failed to extract nodeIDToClientMap for cluster '%s'", clusterName)
@@ -561,12 +516,10 @@ func updateClusterToNodeIDMap(ctx context.Context, clusterToNodeIDMap *sync.Map,
 // getClientToUseForNodeID returns client to use for an input nodeID from the cluster to nodeID map, if present.
 // Otherwise returns an error
 func getClientToUseForNodeID(ctx context.Context, clusterToNodeIDMap *sync.Map, clusterName, nodeID string) (string, error) {
-	log := log.WithContext(ctx)
-
 	var nodeIDToClientMaps []*nodeIDToClientMap
 
 	if m, found := clusterToNodeIDMap.Load(clusterName); found {
-		log.Debugf("entry for cluster '%s' found in cluster to nodeID map", clusterName)
+		csmlog.WithContext(ctx).Debugf("entry for cluster '%s' found in cluster to nodeID map", clusterName)
 		var ok bool
 		if nodeIDToClientMaps, ok = m.([]*nodeIDToClientMap); !ok {
 			return "", fmt.Errorf("failed to extract nodeIDToClientMap for cluster '%s'", clusterName)
@@ -574,7 +527,7 @@ func getClientToUseForNodeID(ctx context.Context, clusterToNodeIDMap *sync.Map, 
 
 		for _, nodeIDMap := range nodeIDToClientMaps {
 			if client, ok := (*nodeIDMap)[nodeID]; ok {
-				log.Debugf("node id to client mapping found for nodeID '%s' client '%s'", nodeID, client)
+				csmlog.WithContext(ctx).Debugf("node id to client mapping found for nodeID '%s' client '%s'", nodeID, client)
 				return client, nil
 			}
 		}
@@ -584,7 +537,6 @@ func getClientToUseForNodeID(ctx context.Context, clusterToNodeIDMap *sync.Map, 
 }
 
 func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.Context, clusterName string, exportID int, accessZone, nodeID string, ignoreUnresolvableHosts bool, addClientFunc func(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error) error {
-	log := log.WithContext(ctx)
 	var clientToUse string
 
 	// try adding by client FQDN first as it is preferred over IP for its stableness.
@@ -596,10 +548,10 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 		return err
 	}
 
-	log.Debugf("ignoreUnresolvableHosts set to '%v' for cluster '%s'", ignoreUnresolvableHosts, clusterName)
+	csmlog.WithContext(ctx).Debugf("ignoreUnresolvableHosts set to '%v' for cluster '%s'", ignoreUnresolvableHosts, clusterName)
 	if ignoreUnresolvableHosts {
 		if err = addClientFunc(ctx, exportID, accessZone, clientIP, true); err != nil {
-			log.Errorf("failed to add client '%s' to export id '%d': '%v'", clientIP, exportID, err)
+			csmlog.WithContext(ctx).Errorf("failed to add client '%s' to export id '%d': '%v'", clientIP, exportID, err)
 			return fmt.Errorf("failed to add client '%s' to the export id '%d'", clientIP, exportID)
 		}
 		return nil
@@ -607,37 +559,37 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 
 	currentClient, err := getClientToUseForNodeID(ctx, clusterToNodeIDMap, clusterName, nodeID)
 	if err != nil {
-		log.Debug(err.Error())
+		csmlog.WithContext(ctx).Debug(err.Error())
 		clientToUse = clientFQDN
 	} else {
 		clientToUse = currentClient
 	}
 
-	log.Debugf("AddExportClientNetworkIdentifierByID adding '%s' as client to export id '%d'", clientToUse, exportID)
+	csmlog.WithContext(ctx).Debugf("AddExportClientNetworkIdentifierByID adding '%s' as client to export id '%d'", clientToUse, exportID)
 	if err = addClientFunc(ctx, exportID, accessZone, clientToUse, false); err == nil {
 		if err := updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, clientToUse); err != nil {
 			// not returning with error as export is already updated with client
-			log.Warnf("failed to update cluster to nodeID map: '%v'", err)
+			csmlog.WithContext(ctx).Warnf("failed to update cluster to nodeID map: '%v'", err)
 		}
 
 		return nil
 	}
-	log.Warnf("failed to add client '%s' to export id '%d': '%v'", clientToUse, exportID, err)
+	csmlog.WithContext(ctx).Warnf("failed to add client '%s' to export id '%d': '%v'", clientToUse, exportID, err)
 
 	// try updating export with other client
 	otherClientToUse := clientFQDN
 	if clientToUse == clientFQDN {
 		otherClientToUse = clientIP
 	}
-	log.Debugf("AddExportClientNetworkIdentifierByID trying to add '%s' as client to export id '%d'", otherClientToUse, exportID)
+	csmlog.WithContext(ctx).Debugf("AddExportClientNetworkIdentifierByID trying to add '%s' as client to export id '%d'", otherClientToUse, exportID)
 	if err = addClientFunc(ctx, exportID, accessZone, otherClientToUse, false); err == nil {
 		if err := updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, otherClientToUse); err != nil {
 			// not returning with error as export is already updated with client
-			log.Warnf("failed to update cluster to nodeID map '%s'", err)
+			csmlog.WithContext(ctx).Warnf("failed to update cluster to nodeID map '%s'", err)
 		}
 		return nil
 	}
-	log.Warnf("failed to add client '%s' to export id '%d': '%v'", otherClientToUse, exportID, err)
+	csmlog.WithContext(ctx).Warnf("failed to add client '%s' to export id '%d': '%v'", otherClientToUse, exportID, err)
 
 	return fmt.Errorf("failed to add clients '%s' or '%s' to export id '%d'", clientToUse, otherClientToUse, exportID)
 }
@@ -646,28 +598,25 @@ func (svc *isiService) AddExportClientNetworkIdentifierByIDWithZone(ctx context.
 // It iterates through the list of client IPs and calls the provided addClientFunc for each IP, passing the export ID,
 // access zone, and client IP as arguments.
 func (svc *isiService) AddExportClientByIPWithZone(ctx context.Context, clusterName string, exportID int, accessZone, nodeID string, clientIPs []string, addClientFunc func(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error) error {
-	log := log.WithContext(ctx)
 	var err error
 
 	for _, clientIP := range clientIPs {
-		log.Debugf("AddExportClientByIPWithZone adding '%s' as client to export id '%d'", clientIP, exportID)
+		csmlog.WithContext(ctx).Debugf("AddExportClientByIPWithZone adding '%s' as client to export id '%d'", clientIP, exportID)
 		if err = addClientFunc(ctx, exportID, accessZone, clientIP, false); err == nil {
 			if err = updateClusterToNodeIDMap(ctx, clusterToNodeIDMap, clusterName, nodeID, clientIP); err != nil {
 				// not returning with error as export is already updated with client
-				log.Warnf("failed to update cluster to nodeID map: '%v'", err)
+				csmlog.WithContext(ctx).Warnf("failed to update cluster to nodeID map: '%v'", err)
 			}
 
 			return nil
 		}
-		log.Warnf("failed to add client '%s' to export id '%d': '%v'", clientIP, exportID, err)
+		csmlog.WithContext(ctx).Warnf("failed to add client '%s' to export id '%d': '%v'", clientIP, exportID, err)
 	}
 	return fmt.Errorf("failed to add clients '%v' to export id '%d'", clientIPs, exportID)
 }
 
 func (svc *isiService) AddExportClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error {
-	log := log.WithContext(ctx)
-
-	log.Debugf("AddExportClientByID client '%s'", clientIP)
+	csmlog.WithContext(ctx).Debugf("AddExportClientByID client '%s'", clientIP)
 	if err := svc.client.AddExportClientsByIDWithZone(ctx, exportID, accessZone, []string{clientIP}, ignoreUnresolvableHosts); err != nil {
 		return fmt.Errorf("failed to add client to export id '%d' with access zone '%s' : '%s'", exportID, accessZone, err.Error())
 	}
@@ -675,9 +624,7 @@ func (svc *isiService) AddExportClientByIDWithZone(ctx context.Context, exportID
 }
 
 func (svc *isiService) AddExportRootClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error {
-	log := log.WithContext(ctx)
-
-	log.Debugf("AddExportRootClientByID client '%s'", clientIP)
+	csmlog.WithContext(ctx).Debugf("AddExportRootClientByID client '%s'", clientIP)
 	if err := svc.client.AddExportRootClientsByIDWithZone(ctx, exportID, accessZone, []string{clientIP}, ignoreUnresolvableHosts); err != nil {
 		return fmt.Errorf("failed to add client to export id '%d' with access zone '%s' : '%s'", exportID, accessZone, err.Error())
 	}
@@ -685,9 +632,7 @@ func (svc *isiService) AddExportRootClientByIDWithZone(ctx context.Context, expo
 }
 
 func (svc *isiService) AddExportReadOnlyClientByIDWithZone(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error {
-	log := log.WithContext(ctx)
-
-	log.Debugf("AddExportReadOnlyClientByID client '%s'", clientIP)
+	csmlog.WithContext(ctx).Debugf("AddExportReadOnlyClientByID client '%s'", clientIP)
 	if err := svc.client.AddExportReadOnlyClientsByIDWithZone(ctx, exportID, accessZone, []string{clientIP}, ignoreUnresolvableHosts); err != nil {
 		return fmt.Errorf("failed to add read only client to export id '%d' with access zone '%s' : '%s'", exportID, accessZone, err.Error())
 	}
@@ -695,24 +640,22 @@ func (svc *isiService) AddExportReadOnlyClientByIDWithZone(ctx context.Context, 
 }
 
 func (svc *isiService) RemoveExportClientByIDWithZone(ctx context.Context, exportID int, accessZone, nodeID string, ignoreUnresolvableHosts bool) error {
-	log := log.WithContext(ctx)
-
 	// it could either be IP or FQDN that has been added to the export's client fields, should consider both during the removal
 	clientName, clientFQDN, clientIP, err := id.ParseNodeID(ctx, nodeID)
 	if err != nil {
 		return err
 	}
 
-	log.Debugf("RemoveExportClientByIDWithZone client Name '%s', client FQDN '%s' client IP '%s'", clientName, clientFQDN, clientIP)
+	csmlog.WithContext(ctx).Debugf("RemoveExportClientByIDWithZone client Name '%s', client FQDN '%s' client IP '%s'", clientName, clientFQDN, clientIP)
 
 	clientsToRemove := []string{clientIP, clientName, clientFQDN}
 
-	log.Debugf("RemoveExportClientByName client '%v'", clientsToRemove)
+	csmlog.WithContext(ctx).Debugf("RemoveExportClientByName client '%v'", clientsToRemove)
 
 	if err := svc.client.RemoveExportClientsByIDWithZone(ctx, exportID, accessZone, clientsToRemove, ignoreUnresolvableHosts); err != nil {
 		if notFoundErr, ok := err.(*api.JSONError); ok {
 			if notFoundErr.StatusCode == 404 {
-				log.Debugf("Export id '%d' does not exist", exportID)
+				csmlog.WithContext(ctx).Debugf("Export id '%d' does not exist", exportID)
 				return nil
 			}
 		}
@@ -723,12 +666,10 @@ func (svc *isiService) RemoveExportClientByIDWithZone(ctx context.Context, expor
 }
 
 func (svc *isiService) RemoveExportClientByIPsWithZone(ctx context.Context, exportID int, accessZone string, clientIPs []string, ignoreUnresolvableHosts bool) error {
-	log := log.WithContext(ctx)
-
 	if err := svc.client.RemoveExportClientsByIDWithZone(ctx, exportID, accessZone, clientIPs, ignoreUnresolvableHosts); err != nil {
 		if notFoundErr, ok := err.(*api.JSONError); ok {
 			if notFoundErr.StatusCode == 404 {
-				log.Debugf("Export id '%d' does not exist", exportID)
+				csmlog.WithContext(ctx).Debugf("Export id '%d' does not exist", exportID)
 				return nil
 			}
 		}
@@ -739,13 +680,11 @@ func (svc *isiService) RemoveExportClientByIPsWithZone(ctx context.Context, expo
 }
 
 func (svc *isiService) GetExportsWithLimit(ctx context.Context, limit string) (isi.ExportList, string, error) {
-	log := log.WithContext(ctx)
-
-	log.Debug("begin getting exports for Isilon")
+	csmlog.WithContext(ctx).Debug("begin getting exports for Isilon")
 	var exports isi.Exports
 	var err error
 	if exports, err = svc.client.GetExportsWithLimit(ctx, limit); err != nil {
-		log.Error("failed to get exports")
+		csmlog.WithContext(ctx).Error("failed to get exports")
 		return nil, "", err
 	}
 	return exports.Exports, exports.Resume, nil
@@ -756,35 +695,31 @@ func (svc *isiService) GetExportsWithLimit(ctx context.Context, limit string) (i
 		// Fetch log handler
 		log := logging.GetRunIDLogger(ctx)
 
-		log.Debug("begin getting exports for Isilon")
+		csmlog.WithContext(ctx).Debug("begin getting exports for Isilon")
 		var exports isi.Exports
 		var err error
 		if exports, err = svc.client.GetExportsWithResume(ctx, resume); err != nil {
-			log.Error("failed to get exports: " + err.Error())
+			csmlog.WithContext(ctx).Error("failed to get exports: " + err.Error())
 			return nil, "", err
 		}
 		return exports.Exports, exports.Resume, nil
 	}
 */
 func (svc *isiService) DeleteSnapshot(ctx context.Context, id int64, name string) error {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin to delete snapshot '%s'", name)
+	csmlog.WithContext(ctx).Debugf("begin to delete snapshot '%s'", name)
 	if err := svc.client.RemoveSnapshot(ctx, id, name); err != nil {
-		log.Errorf("delete snapshot failed, '%s'", err.Error())
+		csmlog.WithContext(ctx).Errorf("delete snapshot failed, '%s'", err.Error())
 		return err
 	}
 	return nil
 }
 
 func (svc *isiService) GetSnapshot(ctx context.Context, identity string) (isi.Snapshot, error) {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin getting snapshot with id|name '%s' for Isilon", identity)
+	csmlog.WithContext(ctx).Debugf("begin getting snapshot with id|name '%s' for Isilon", identity)
 	var snapshot isi.Snapshot
 	var err error
 	if snapshot, err = svc.client.GetIsiSnapshotByIdentity(ctx, identity); err != nil {
-		log.Errorf("failed to get snapshot '%s'", err.Error())
+		csmlog.WithContext(ctx).Errorf("failed to get snapshot '%s'", err.Error())
 		return nil, err
 	}
 
@@ -792,24 +727,21 @@ func (svc *isiService) GetSnapshot(ctx context.Context, identity string) (isi.Sn
 }
 
 func (svc *isiService) GetSnapshots(ctx context.Context) (isi.SnapshotList, error) {
-	log := log.WithContext(ctx)
-	log.Debugf("begin getting all the snapshot  for Isilon")
+	csmlog.WithContext(ctx).Debugf("begin getting all the snapshot  for Isilon")
 	var snapshotList isi.SnapshotList
 	var err error
 	if snapshotList, err = svc.client.GetSnapshots(ctx); err != nil {
-		log.Errorf("failed to get snapshots '%s'", err.Error())
+		csmlog.WithContext(ctx).Errorf("failed to get snapshots '%s'", err.Error())
 		return nil, err
 	}
 	return snapshotList, nil
 }
 
 func (svc *isiService) GetSnapshotSize(ctx context.Context, isiPath, name string, accessZone string) int64 {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin getting snapshot size with name '%s' for Isilon", name)
+	csmlog.WithContext(ctx).Debugf("begin getting snapshot size with name '%s' for Isilon", name)
 	size, err := svc.client.GetSnapshotFolderSize(ctx, isiPath, name, accessZone)
 	if err != nil {
-		log.Errorf("failed to get snapshot size '%s'", err.Error())
+		csmlog.WithContext(ctx).Errorf("failed to get snapshot size '%s'", err.Error())
 		return 0
 	}
 
@@ -817,13 +749,11 @@ func (svc *isiService) GetSnapshotSize(ctx context.Context, isiPath, name string
 }
 
 func (svc *isiService) GetExportWithPathAndZone(ctx context.Context, path, accessZone string) (isi.Export, error) {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin getting export with target path '%s' and access zone '%s' for Isilon", path, accessZone)
+	csmlog.WithContext(ctx).Debugf("begin getting export with target path '%s' and access zone '%s' for Isilon", path, accessZone)
 	var export isi.Export
 	var err error
 	if export, err = svc.client.GetExportWithPathAndZone(ctx, path, accessZone); err != nil {
-		log.Error("failed to get export with target path '" + path + "' and access zone '" + accessZone + "': '" + err.Error() + "'")
+		csmlog.WithContext(ctx).Error("failed to get export with target path '" + path + "' and access zone '" + accessZone + "': '" + err.Error() + "'")
 		return nil, err
 	}
 
@@ -831,13 +761,11 @@ func (svc *isiService) GetExportWithPathAndZone(ctx context.Context, path, acces
 }
 
 func (svc *isiService) GetExportWithPath(ctx context.Context, path string) (isi.Export, error) {
-	log := log.WithContext(ctx)
-
-	log.Debugf("begin getting export with target path '%s' for Isilon", path)
+	csmlog.WithContext(ctx).Debugf("begin getting export with target path '%s' for Isilon", path)
 	var export isi.Export
 	var err error
 	if export, err = svc.client.GetExportWithPath(ctx, path); err != nil {
-		log.Error("failed to get export with target path '" + path + "' : '" + err.Error() + "'")
+		csmlog.WithContext(ctx).Error("failed to get export with target path '" + path + "' : '" + err.Error() + "'")
 		return nil, err
 	}
 
@@ -868,10 +796,9 @@ func (svc *isiService) isROVolumeFromSnapshot(exportPath, accessZone string) boo
 }
 
 func (svc *isiService) GetSnapshotNameFromIsiPath(ctx context.Context, snapshotIsiPath, accessZone, zonePath string) (string, error) {
-	log := log.WithContext(ctx)
 	var snapShotName string
 	if !svc.isROVolumeFromSnapshot(snapshotIsiPath, accessZone) {
-		log.Debugf("invalid snapshot isilon path- '%s'", snapshotIsiPath)
+		csmlog.WithContext(ctx).Debugf("invalid snapshot isilon path- '%s'", snapshotIsiPath)
 		return "", fmt.Errorf("invalid snapshot isilon path")
 	}
 	// Snapshot isi path format /<ifs>/.snapshot/<snapshot_name>/<volume_path_without_ifs_prefix>
@@ -880,7 +807,7 @@ func (svc *isiService) GetSnapshotNameFromIsiPath(ctx context.Context, snapshotI
 	directories := strings.Split(pathWithoutZonePath, "/")
 	// If there is no snapshot name in snapshot isi path or if it is empty
 	if len(directories) < 2 || directories[2] == "" {
-		log.Debugf("invalid snapshot isilon path- '%s'", snapshotIsiPath)
+		csmlog.WithContext(ctx).Debugf("invalid snapshot isilon path- '%s'", snapshotIsiPath)
 		return "", fmt.Errorf("invalid snapshot isilon path")
 	}
 	snapShotName = directories[2]
@@ -921,7 +848,6 @@ func (svc *isiService) GetSnapshotTrackingDirName(snapshotName string) string {
 }
 
 func (svc *isiService) GetSubDirectoryCount(ctx context.Context, isiPath, directory string) (int64, error) {
-	log := log.WithContext(ctx)
 	var totalSubDirectories int64
 	if svc.IsVolumeExistent(ctx, isiPath, "", directory) {
 		// Check if there are any entries for volumes present in snapshot tracking dir
@@ -929,7 +855,7 @@ func (svc *isiService) GetSubDirectoryCount(ctx context.Context, isiPath, direct
 		if err != nil {
 			return 0, err
 		}
-		log.Debugf("directory details for directory '%s' are '%s'", directory, dirDetails)
+		csmlog.WithContext(ctx).Debugf("directory details for directory '%s' are '%s'", directory, dirDetails)
 
 		// Get nlinks(i.e., subdirectories present) for snapshotTrackingDir
 		for _, attr := range dirDetails.AttributeMap {
@@ -943,7 +869,7 @@ func (svc *isiService) GetSubDirectoryCount(ctx context.Context, isiPath, direct
 			}
 		}
 		// Every directory will have two subdirectory entries . and ..
-		log.Debugf("total number of subdirectories present under directory '%s' is '%v'",
+		csmlog.WithContext(ctx).Debugf("total number of subdirectories present under directory '%s' is '%v'",
 			directory, totalSubDirectories)
 		return totalSubDirectories, nil
 	}
@@ -952,18 +878,16 @@ func (svc *isiService) GetSubDirectoryCount(ctx context.Context, isiPath, direct
 }
 
 func (svc *isiService) IsHostAlreadyAdded(ctx context.Context, exportID int, accessZone string, nodeID string) bool {
-	log := log.WithContext(ctx)
-
 	export, _ := svc.GetExportByIDWithZone(ctx, exportID, accessZone)
 
 	if export == nil {
-		log.Debugf("failed to get export by id '%d' with access zone '%s', return true for LocalhostAlreadyAdded as a safer return value", exportID, accessZone)
+		csmlog.WithContext(ctx).Debugf("failed to get export by id '%d' with access zone '%s', return true for LocalhostAlreadyAdded as a safer return value", exportID, accessZone)
 		return true
 	}
 
 	clientName, clientFQDN, clientIP, err := id.ParseNodeID(ctx, nodeID)
 	if err != nil {
-		log.Debugf("failed to parse node ID '%s', return true for LocalhostAlreadyAdded as a safer return value", nodeID)
+		csmlog.WithContext(ctx).Debugf("failed to parse node ID '%s', return true for LocalhostAlreadyAdded as a safer return value", nodeID)
 		return true
 	}
 

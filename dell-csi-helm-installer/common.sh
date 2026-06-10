@@ -7,7 +7,7 @@
 #      http://www.apache.org/licenses/LICENSE-2.0
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied
 # See the License for the specific language governing permissions and
 # limitations under the License
 
@@ -196,6 +196,104 @@ function OpenShiftVersion() {
     local MAJOR=$(echo "${V}" | awk -F '.' '{print $1}')
     local MINOR=$(echo "${V}" | awk -F '.' '{print $2}')
     echo "${MAJOR}.${MINOR}"
+  fi
+}
+
+# detect_helm_version detects the installed Helm client major.minor.patch version.
+# Sets HELM_MAJOR_VERSION, HELM_MINOR_VERSION, HELM_PATCH_VERSION, HELM_VERSION_STRING.
+# Exits 1 if helm is not found or version cannot be parsed.
+function detect_helm_version() {
+  local raw
+  if ! command -v helm >/dev/null 2>&1; then
+    echo "helm not found on PATH. Install Helm from https://helm.sh/docs/intro/install/" >&2
+    debuglog_only "helm not found on PATH"
+    exit 1
+  fi
+  raw=$(helm version --short 2>/dev/null)
+  if [[ $? -ne 0 || -z "${raw}" ]]; then
+    echo "helm found on PATH but 'helm version --short' failed. Check your Helm installation." >&2
+    debuglog_only "helm version check failed"
+    exit 1
+  fi
+  if [[ "${raw}" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+    HELM_MAJOR_VERSION="${BASH_REMATCH[1]}"
+    HELM_MINOR_VERSION="${BASH_REMATCH[2]}"
+    HELM_PATCH_VERSION="${BASH_REMATCH[3]}"
+    HELM_VERSION_STRING="v${HELM_MAJOR_VERSION}.${HELM_MINOR_VERSION}.${HELM_PATCH_VERSION}"
+    debuglog_only "helm_version_detected: ${HELM_VERSION_STRING} (major=${HELM_MAJOR_VERSION})"
+    return 0
+  else
+    echo "Unable to parse Helm version from: ${raw}" >&2
+    debuglog_only "Unable to parse Helm version from: ${raw}"
+    exit 1
+  fi
+}
+
+# validate_helm_version checks that the detected Helm major version is supported (>= 3).
+# Argument $1: major version integer.
+# Exits 1 with stderr message if unsupported (<= 2).
+function validate_helm_version() {
+  local major="${1}"
+  local version_str="${HELM_VERSION_STRING:-unknown}"
+  if [[ -z "${major}" || "${major}" -lt 3 ]]; then
+    echo "Unsupported Helm version detected: ${version_str}. Minimum supported: v3.x. Upgrade Helm: https://helm.sh/docs/intro/install/" >&2
+    debuglog_only "Unsupported helm version: ${version_str}"
+    exit 1
+  fi
+}
+
+# record_helm_telemetry writes a structured telemetry entry to DEBUGLOG.
+# Arguments: $1=operation (install|upgrade|uninstall), $2=driver_name, $3=result (pending|success|failure)
+function record_helm_telemetry() {
+  local op="${1}"
+  local driver="${2}"
+  local result="${3}"
+  debuglog_only "helm_telemetry: version=${HELM_VERSION_STRING} major=${HELM_MAJOR_VERSION} operation=${op} driver=${driver} result=${result} timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+
+# helm_registry_login performs helm registry login with Helm v3/v4 format normalization.
+# Arguments: $1=registry_url (with or without scheme), $2=username, $3=registry auth value, $4=use_plain_http (optional)
+# Auth value is passed via stdin only — never in command args or logs.
+function helm_registry_login() {
+  local registry="${1}"
+  local username="${2}"
+  local registry_auth="${3}"
+  local use_plain_http="${4:-false}"
+  if [[ -z "${registry}" ]]; then
+    echo "helm_registry_login: registry URL argument is required" >&2
+    return 1
+  fi
+  registry="${registry#https://}"
+  registry="${registry#http://}"
+  debuglog_only "helm_registry_login: registry=${registry} plain_http=${use_plain_http}"
+  
+  local plain_http_flag=""
+  if [[ "${use_plain_http}" == "true" ]]; then
+    plain_http_flag="--plain-http"
+  fi
+  
+  echo "${registry_auth}" | helm registry login "${registry}" -u "${username}" --password-stdin "${plain_http_flag}"
+  local rc=$?
+  if [[ "${rc}" -ne 0 ]]; then
+    echo "Registry login failed for ${registry}" >&2
+    return 1
+  fi
+  return 0
+}
+
+# detect_ssa_conflict_in_output parses a Helm v4 stderr output file for SSA field ownership conflicts.
+# Emits a structured error message to stderr when a conflict is detected.
+# Argument $1: path to the file containing helm error output.
+function detect_ssa_conflict_in_output() {
+  local output_file="${1}"
+  if grep -q "Apply failed with" "${output_file}" 2>/dev/null; then
+    local field manager resource namespace
+    field=$(grep -oP '(?<=\.)[a-zA-Z.]+(?= is immutable| owned by)' "${output_file}" 2>/dev/null | head -1)
+    manager=$(grep -oP '(?<=manager ")([^"]+)(?=")' "${output_file}" 2>/dev/null | head -1)
+    resource=$(grep -oP '(?<=resource ")[^"]+' "${output_file}" 2>/dev/null | head -1)
+    namespace=$(grep -oP '(?<=namespace ")([^"]+)(?=")' "${output_file}" 2>/dev/null | head -1)
+    echo "SSA conflict: field=${field}, conflicting_manager=${manager}, resource=${resource}, namespace=${namespace}. See Helm v4 migration guide for resolution steps." >&2
+    debuglog_only "ssa_conflict: field=${field} manager=${manager} resource=${resource} namespace=${namespace}"
   fi
 }
 

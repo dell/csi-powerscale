@@ -22,10 +22,9 @@ import (
 
 // GetNewUUID generates a UUID
 func GetNewUUID() (string, error) {
-	log := csmlog.GetLogger()
 	id, err := uuid.NewUUID()
 	if err != nil {
-		log.Errorf("error generating UUID : '%s'", err)
+		csmlog.Errorf("error generating UUID : '%s'", err)
 		return "", err
 	}
 

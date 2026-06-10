@@ -21,7 +21,7 @@ function verify-csi-isilon() {
   verify_optional_secrets "${RELEASE}-certs"
   verify_alpha_snap_resources
   verify_snap_requirements
-  verify_helm_3
+  verify_helm
   verify_helm_values_version "${DRIVER_VERSION}"
   verify_authorization_proxy_server
 }

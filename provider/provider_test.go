@@ -17,28 +17,12 @@ limitations under the License.
 package provider
 
 import (
-	"bytes"
 	"errors"
 	"testing"
 
 	csiutils "github.com/dell/csi-powerscale/v2/csi-utils"
 	"github.com/dell/gocsi"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-)
-
-// Mocking utility functions
-var (
-	mockGetLogger = func() *logrus.Entry {
-		logger := logrus.New()
-		logger.SetLevel(logrus.DebugLevel)
-		var logBuffer bytes.Buffer
-		logger.SetOutput(&logBuffer)
-		return logrus.NewEntry(logger)
-	}
-	mockRemoveExistingCSISockFile = func() error {
-		return errors.New("failed to remove existing CSI sock file")
-	}
 )
 
 func TestNew(t *testing.T) {

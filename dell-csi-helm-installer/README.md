@@ -20,7 +20,7 @@ Installing any of the Dell EMC CSI Drivers requires a few utilities to be instal
 | Dependency    | Usage  |
 | ------------- | ----- |
 | `kubectl`     | Kubectl is used to validate that the Kubernetes system meets the requirements of the driver. |
-| `helm`        | Helm v3 is used as the deployment tool for Charts. See, [Install Helm 3](https://helm.sh/docs/intro/install/) for instructions to install Helm 3. |
+| `helm`        | Helm v3 or v4 is used as the deployment tool for Charts. See, [Install Helm](https://helm.sh/docs/intro/install/) for instructions to install Helm. |
 | `sshpass`     | sshpass is used to check certain pre-requisities in worker nodes (in chosen drivers). |
 
 In order to use these tools, a valid `KUBECONFIG` is required. Ensure that either a valid configuration is in the default location or that the `KUBECONFIG` environment variable points to a valid confiugration before using these tools.
@@ -62,6 +62,32 @@ Installing a driver is performed via the `csi-install.sh` script. This script re
 ./csi-install.sh --namespace isilon --values ./my-isilon-settings.yaml
 ```
 
+#### Installing from OCI Registry
+
+The driver can be installed from an OCI-compliant registry instead of using local Helm charts. This requires:
+
+1. A Kubernetes secret containing registry credentials (if authentication is required)
+2. The OCI registry URI for the Helm chart
+
+**Create a registry credentials secret:**
+```bash
+kubectl create secret generic registry-creds \
+  --from-literal=username=<your-username> \
+  --from-literal=password=<your-password> \
+  --namespace isilon
+```
+
+**Install from OCI registry:**
+```bash
+./csi-install.sh \
+  --namespace isilon \
+  --values ./my-isilon-settings.yaml \
+  --oci-chart oci://registry.example.com/charts/csi-isilon \
+  --registry-auth-secret registry-creds
+```
+
+**Note:** If the OCI registry does not require authentication, you can omit the `--registry-auth-secret` parameter.
+
 For usage information:
 
 ```sh
@@ -79,8 +105,31 @@ Options:
   --node-verify-user[=]<username>          Username to SSH to worker nodes as, used to validate node requirements. Default is root
   --skip-verify                            Skip the kubernetes configuration verification to use the CSI driver, default will run verification
   --skip-verify-node                       Skip worker node verification checks
+  --oci-chart[=]<oci-uri>                  OCI registry URI for Helm chart (e.g., oci://registry.example.com/charts/csi-isilon)
+  --registry-auth-secret[=]<secret-name>   Kubernetes secret containing registry credentials (username/password keys)
   -h                                       Help
 ```
+
+### Install A Driver Using OCI Chart
+
+The installer supports pulling Helm charts from OCI registries. This is useful when charts are stored in container registries rather than local files or traditional Helm chart repositories. To install using an OCI chart:
+
+```sh
+./csi-install.sh --namespace isilon --values ./my-isilon-settings.yaml --oci-chart oci://registry.example.com/charts/csi-isilon --registry-auth-secret my-registry-secret
+```
+
+The `--oci-chart` flag specifies the OCI registry URI for the Helm chart. The `--registry-auth-secret` flag specifies a Kubernetes secret containing registry credentials (username and password keys). The secret must exist in the target namespace before running the installer.
+
+Example of creating the registry secret:
+
+```sh
+kubectl create secret generic my-registry-secret \
+  --from-literal=username=<username> \
+  --from-literal=password=<password> \
+  --namespace isilon
+```
+
+Note: If the OCI registry does not require authentication, the `--registry-auth-secret` flag can be omitted. A warning will be displayed indicating that registry login will be skipped.
 
 ### Upgrade A Driver
 
@@ -90,6 +139,18 @@ Upgrading a driver is very similar to installation. The `csi-install.sh` script 
 ./csi-install.sh --namespace isilon --values ./my-isilon-settings.yaml --upgrade
 ```
 
+#### Upgrading from OCI Registry
+
+To upgrade from an OCI registry:
+```bash
+./csi-install.sh \
+  --namespace isilon \
+  --values ./my-isilon-settings.yaml \
+  --upgrade \
+  --oci-chart oci://registry.example.com/charts/csi-isilon \
+  --registry-auth-secret registry-creds
+```
+
 For usage information:
 
 ```sh
@@ -107,6 +168,8 @@ Options:
   --node-verify-user[=]<username>          Username to SSH to worker nodes as, used to validate node requirements. Default is root
   --skip-verify                            Skip the kubernetes configuration verification to use the CSI driver, default will run verification
   --skip-verify-node                       Skip worker node verification checks
+  --oci-chart[=]<oci-uri>                  OCI registry URI for Helm chart (e.g., oci://registry.example.com/charts/csi-isilon)
+  --registry-auth-secret[=]<secret-name>   Kubernetes secret containing registry credentials (username/password keys)
   -h                                       Help
 ```
 

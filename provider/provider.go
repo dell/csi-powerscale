@@ -20,12 +20,10 @@ import (
 	csiutils "github.com/dell/csi-powerscale/v2/csi-utils"
 	"github.com/dell/csi-powerscale/v2/service"
 	"github.com/dell/csi-powerscale/v2/service/interceptor"
-	csmlog "github.com/dell/csmlog"
+	"github.com/dell/csmlog"
 	"github.com/dell/gocsi"
 	"google.golang.org/grpc"
 )
-
-var log = csmlog.GetLogger()
 
 // New returns a new Storage Plug-in Provider.
 func New() gocsi.StoragePluginProvider {
@@ -35,7 +33,7 @@ func New() gocsi.StoragePluginProvider {
 	// For the time being, manually remove the sock files right at the beginning to
 	// avoid the "...address is in use..." error
 	if err := csiutils.RemoveExistingCSISockFile(); err != nil {
-		log.Error("failed to call utils.RemoveExistingCSISockFile")
+		csmlog.Error("failed to call utils.RemoveExistingCSISockFile")
 	}
 	// Get the MaxConcurrentStreams server option and configure it.
 	maxStreams := grpc.MaxConcurrentStreams(8)

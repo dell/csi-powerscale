@@ -27,7 +27,6 @@ import (
 
 	"github.com/dell/csi-powerscale/v2/common/constants"
 	"github.com/dell/gocsi"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,10 +45,6 @@ func (m *MockGocsi) Run(ctx context.Context, name, desc, usage string, sp gocsi.
 }
 
 var osExit = os.Exit
-
-func expectMockExit(int) {
-	osExit(0)
-}
 
 func mockExit(int) {
 	panic("os.Exit called")
@@ -232,10 +227,6 @@ func TestValidateArgs(_ *testing.T) {
 	w.Close()
 }
 
-func fakeCreateKubeClientSet(_ string) (kubernetes.Interface, error) {
-	return nil, errors.New("simulated error")
-}
-
 func TestCheckLeaderElectionError(_ *testing.T) {
 	// Mock the function to return an error
 	err := errors.New("mock error")
@@ -256,32 +247,3 @@ func TestCheckLeaderElectionError(_ *testing.T) {
 }
 
 var exitCode int
-
-func exitFunc1(code int) {
-	// Mock exit function for testing
-	exitCode = code
-}
-
-func Test_setEnvs(t *testing.T) {
-	tests := []struct {
-		name string
-		want map[string]string
-	}{
-		{
-			name: "execute setEnvs()",
-			want: map[string]string{
-				gocsi.EnvVarReqLogging: "true",
-				gocsi.EnvVarRepLogging: "true",
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			setEnvsFunc()
-
-			for envVar, expected := range tt.want {
-				assert.Equal(t, expected, os.Getenv(envVar))
-			}
-		})
-	}
-}

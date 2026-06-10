@@ -47,7 +47,6 @@ const (
 func (s *service) CreateRemoteVolume(ctx context.Context,
 	req *csiext.CreateRemoteVolumeRequest,
 ) (*csiext.CreateRemoteVolumeResponse, error) {
-	log := log.WithContext(ctx)
 	logFields := csmlog.ExtractFieldsFromContext(ctx)
 
 	volID := req.GetVolumeHandle()
@@ -60,12 +59,12 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
 
-	log.Infof("volume name : %s", volName)
-	log.Infof("export ID : %v", exportID)
+	csmlog.WithContext(ctx).Infof("volume name : %s", volName)
+	csmlog.WithContext(ctx).Infof("export ID : %v", exportID)
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Errorf("Failed to get Isilon config with error %v ", err.Error())
+		csmlog.WithContext(ctx).Errorf("Failed to get Isilon config with error %v ", err.Error())
 		return nil, err
 	}
 
@@ -76,13 +75,13 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 
 	remoteIsiConfig, err := s.getIsilonConfig(ctx, &remoteClusterName)
 	if err != nil {
-		log.Errorf("Failed to get Isilon config with error %v", err.Error())
+		csmlog.WithContext(ctx).Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, status.Errorf(codes.InvalidArgument, "can't find cluster with name %s in driver config", remoteClusterName)
 	}
 
 	logFields[clusterName] = clusterName
-	ctx = csmlog.SetLogFields(ctx, logFields)
-	log.Debugf("Cluster Name: %v", clusterName)
+
+	csmlog.WithContext(ctx).Debugf("Cluster Name: %v", clusterName)
 
 	// auto probe
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
@@ -126,7 +125,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	if sourceQuota != nil {
 		volumeSize = sourceQuota.Thresholds.Hard
 	}
-	log.Infof("Volume size: %v", volumeSize)
+	csmlog.WithContext(ctx).Infof("Volume size: %v", volumeSize)
 
 	remoteAccessZone, ok := req.Parameters[s.WithRP(KeyReplicationRemoteAccessZone)]
 	if !ok {
@@ -136,7 +135,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	// Check if export exists
 	remoteExport, err := remoteIsiConfig.isiSvc.GetExportWithPathAndZone(ctx, exportPath, remoteAccessZone)
 	if err != nil {
-		log.Info("Remote export error")
+		csmlog.WithContext(ctx).Info("Remote export error")
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
 
@@ -145,13 +144,13 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	// If export does not exist we need to create it
 	if remoteExport == nil {
 		// Check if quota already exists
-		log.Info("Remote export doesn't exist, create it")
+		csmlog.WithContext(ctx).Info("Remote export doesn't exist, create it")
 		var quotaID string
 		quota, err := remoteIsiConfig.isiSvc.client.GetQuotaWithPath(ctx, exportPath)
-		log.Infof("Get quota : %v", quota)
+		csmlog.WithContext(ctx).Infof("Get quota : %v", quota)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found:") {
-				log.Info("Remote quota doesn't exist, create it")
+				csmlog.WithContext(ctx).Info("Remote quota doesn't exist, create it")
 				quotaID, err = remoteIsiConfig.isiSvc.CreateQuota(ctx, exportPath, volName, "0", "0", "0", volumeSize, s.opts.QuotaEnabled)
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "can't create remote quota %s", err.Error())
@@ -170,13 +169,13 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 					if !remoteIsiConfig.isiSvc.IsHostAlreadyAdded(ctx, remoteExportID, remoteAccessZone, id.DummyHostNodeID) {
 						err = remoteIsiConfig.isiSvc.AddExportClientNetworkIdentifierByIDWithZone(ctx, remoteClusterName, remoteExportID, remoteAccessZone, id.DummyHostNodeID, *remoteIsiConfig.IgnoreUnresolvableHosts, remoteIsiConfig.isiSvc.AddExportClientByIDWithZone)
 						if err != nil {
-							log.Debugf("Error while adding dummy localhost entry to export '%d'", remoteExportID)
+							csmlog.WithContext(ctx).Debugf("Error while adding dummy localhost entry to export '%d'", remoteExportID)
 						}
 					}
 					break
 				}
 				time.Sleep(RetrySleepTime)
-				log.Infof("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, remoteExportID, exportPath)
+				csmlog.WithContext(ctx).Infof("Begin to retry '%d' time(s), for export id '%d' and path '%s'\n", i+1, remoteExportID, exportPath)
 			}
 		} else {
 			return nil, status.Errorf(codes.Internal, "failed to create export: %s", err.Error())
@@ -192,7 +191,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 	}
 
 	if strings.Contains(remoteAzServiceIP, "localhost") {
-		log.Debugf("Authorization is enabled, reading MountEndpoint: '%s'", remoteIsiConfig.MountEndpoint)
+		csmlog.WithContext(ctx).Debugf("Authorization is enabled, reading MountEndpoint: '%s'", remoteIsiConfig.MountEndpoint)
 		remoteAzServiceIP = remoteIsiConfig.MountEndpoint
 	}
 	remoteRootClientEnabled, ok := req.Parameters[s.WithRP(KeyReplicationRemoteRootClientEnabled)]
@@ -216,7 +215,7 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 		volumeContext[AzNetwork] = remoteAzNetwork
 	}
 
-	log.Infof("Volume Context : %v", volumeContext)
+	csmlog.WithContext(ctx).Infof("Volume Context : %v", volumeContext)
 	remoteVolume.VolumeContext = volumeContext
 
 	return &csiext.CreateRemoteVolumeResponse{
@@ -227,7 +226,6 @@ func (s *service) CreateRemoteVolume(ctx context.Context,
 func (s *service) CreateStorageProtectionGroup(ctx context.Context,
 	req *csiext.CreateStorageProtectionGroupRequest,
 ) (*csiext.CreateStorageProtectionGroupResponse, error) {
-	log := log.WithContext(ctx)
 	logFields := csmlog.ExtractFieldsFromContext(ctx)
 
 	volID := req.GetVolumeHandle()
@@ -240,12 +238,12 @@ func (s *service) CreateStorageProtectionGroup(ctx context.Context,
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
 
-	log.Infof("volume name : %s", volName)
-	log.Infof("export ID : %v", exportID)
+	csmlog.WithContext(ctx).Infof("volume name : %s", volName)
+	csmlog.WithContext(ctx).Infof("export ID : %v", exportID)
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Errorf("Failed to get Isilon config with error %v ", err.Error())
+		csmlog.WithContext(ctx).Errorf("Failed to get Isilon config with error %v ", err.Error())
 		return nil, err
 	}
 
@@ -256,13 +254,13 @@ func (s *service) CreateStorageProtectionGroup(ctx context.Context,
 
 	remoteIsiConfig, err := s.getIsilonConfig(ctx, &remoteClusterName)
 	if err != nil {
-		log.Errorf("Failed to get Isilon config with error %v", err.Error())
+		csmlog.WithContext(ctx).Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, status.Errorf(codes.InvalidArgument, "can't find cluster with name %s in driver config", remoteClusterName)
 	}
 
 	logFields[clusterName] = clusterName
-	ctx = csmlog.SetLogFields(ctx, logFields)
-	log.Debugf("Cluster Name: %v", clusterName)
+
+	csmlog.WithContext(ctx).Debugf("Cluster Name: %v", clusterName)
 
 	// auto probe
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
@@ -291,14 +289,14 @@ func (s *service) CreateStorageProtectionGroup(ctx context.Context,
 	ManagementAddress := isiConfig.Endpoint
 
 	if strings.Contains(ManagementAddress, "localhost") {
-		log.Debugf("Authorization is enabled, reading MountEndpoint: '%s'", remoteIsiConfig.MountEndpoint)
+		csmlog.WithContext(ctx).Debugf("Authorization is enabled, reading MountEndpoint: '%s'", remoteIsiConfig.MountEndpoint)
 		ManagementAddress = isiConfig.MountEndpoint
 	}
 
 	RemoteManagementAddress := remoteIsiConfig.Endpoint
 
 	if strings.Contains(RemoteManagementAddress, "localhost") {
-		log.Debugf("Authorization is enabled, reading MountEndpoint: '%s'", remoteIsiConfig.MountEndpoint)
+		csmlog.WithContext(ctx).Debugf("Authorization is enabled, reading MountEndpoint: '%s'", remoteIsiConfig.MountEndpoint)
 		RemoteManagementAddress = remoteIsiConfig.MountEndpoint
 	}
 
@@ -331,12 +329,11 @@ func (s *service) CreateStorageProtectionGroup(ctx context.Context,
 func (s *service) DeleteLocalVolume(ctx context.Context,
 	req *csiext.DeleteLocalVolumeRequest,
 ) (*csiext.DeleteLocalVolumeResponse, error) {
-	log := log.WithContext(ctx)
 	logFields := csmlog.ExtractFieldsFromContext(ctx)
 
 	volumeID := req.GetVolumeHandle()
 
-	log.Infof("Deleting export for volume %s per request from remote replication controller", volumeID)
+	csmlog.WithContext(ctx).Infof("Deleting export for volume %s per request from remote replication controller", volumeID)
 
 	// Parse the input volume ID and fetch its components
 	volName, exportID, accessZone, clusterName, err := id.ParseNormalizedVolumeID(ctx, volumeID)
@@ -346,13 +343,13 @@ func (s *service) DeleteLocalVolume(ctx context.Context,
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Errorf("Failed to get Isilon config with error %v", err.Error())
+		csmlog.WithContext(ctx).Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, err
 	}
 
 	logFields[clusterName] = clusterName
-	ctx = csmlog.SetLogFields(ctx, logFields)
-	log.Debugf("Cluster Name: %v", clusterName)
+
+	csmlog.WithContext(ctx).Debugf("Cluster Name: %v", clusterName)
 
 	// Ideally the remote directory would be gone due to sync event but the sync may take longer if the policy has greater RPO.
 	// Check if there is a NFS export for this directory (i.e only localhost as client) and then delete the export.
@@ -360,7 +357,7 @@ func (s *service) DeleteLocalVolume(ctx context.Context,
 	export, err := isiConfig.isiSvc.GetExportByIDWithZone(ctx, exportID, accessZone)
 	if err != nil {
 		if jsonError, ok := err.(*isiApi.JSONError); ok && jsonError.StatusCode == 404 {
-			log.Info("Export with ID does not exist, may have been already deleted.")
+			csmlog.WithContext(ctx).Info("Export with ID does not exist, may have been already deleted.")
 			return &csiext.DeleteLocalVolumeResponse{}, nil
 		}
 		return nil, err
@@ -368,7 +365,7 @@ func (s *service) DeleteLocalVolume(ctx context.Context,
 
 	isiPath := isilonfs.GetIsiPathFromExportPath((*export.Paths)[0])
 	if isiConfig.isiSvc.IsVolumeExistent(ctx, isiPath, "", volName) {
-		log.Debugf("Local volume %s still exists, SyncIQ job has not run yet.", volName)
+		csmlog.WithContext(ctx).Debugf("Local volume %s still exists, SyncIQ job has not run yet.", volName)
 	}
 
 	clients := *export.Clients
@@ -380,7 +377,7 @@ func (s *service) DeleteLocalVolume(ctx context.Context,
 		return nil, fmt.Errorf("export for volume %s has other clients in AccessZone %s. It is not safe to delete the export", volName, accessZone)
 	}
 
-	log.Infof("Export for volume %s deleted successfully.", volumeID)
+	csmlog.WithContext(ctx).Infof("Export for volume %s deleted successfully.", volumeID)
 	return &csiext.DeleteLocalVolumeResponse{}, nil
 }
 
@@ -388,29 +385,28 @@ func (s *service) DeleteLocalVolume(ctx context.Context,
 func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 	req *csiext.DeleteStorageProtectionGroupRequest,
 ) (*csiext.DeleteStorageProtectionGroupResponse, error) {
-	log := log.WithContext(ctx)
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
 	isiPath := isilonfs.GetIsiPathFromPgID(groupID) // includes both replication IsiPath AND replication directory name
-	log.Infof("IsiPath: %s", isiPath)
+	csmlog.WithContext(ctx).Infof("IsiPath: %s", isiPath)
 	if isiPath == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "Error: Can't obtain valid isiPath from PG")
 	}
 	clusterName, ok := localParams[s.opts.replicationContextPrefix+"systemName"]
 	if !ok {
-		log.Error("Can't get systemName from PG params")
+		csmlog.WithContext(ctx).Error("Can't get systemName from PG params")
 		return nil, status.Errorf(codes.InvalidArgument, "Error: Can't get systemName from PG params")
 	}
 
 	vgName, ok := localParams[s.opts.replicationContextPrefix+"VolumeGroupName"]
 	if !ok {
-		log.Error("Can't get protection policy name from PG params")
+		csmlog.WithContext(ctx).Error("Can't get protection policy name from PG params")
 		return nil, status.Errorf(codes.InvalidArgument, "can't find `VolumeGroupName` parameter from PG params")
 	}
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Errorf("Failed to get Isilon config with error %v", err.Error())
+		csmlog.WithContext(ctx).Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, err
 	}
 
@@ -418,7 +414,7 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 		"ProtectedStorageGroup": groupID,
 	}
 
-	log.WithFields(fields).Info("Deleting storage protection group")
+	csmlog.WithContext(ctx).WithFields(fields).Info("Deleting storage protection group")
 
 	volume, err := isiConfig.isiSvc.GetVolumeWithIsiPath(ctx, isiPath, "", "")
 	if err != nil {
@@ -449,18 +445,18 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 	if policy != nil {
 		err = isiConfig.isiSvc.client.SyncPolicy(ctx, ppName)
 		if err != nil {
-			log.Errorf("Failed to sync before deletion %v", err.Error())
+			csmlog.WithContext(ctx).Errorf("Failed to sync before deletion %v", err.Error())
 		}
 
 		err = isiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Unknown error while deleting PP "+ppName, err.Error())
 		}
-		log.Info("Protection Policy deleted.")
+		csmlog.WithContext(ctx).Info("Protection Policy deleted.")
 	} else { // policy does not exist or was not able to be retrieved
 		if e, ok := err.(*isiApi.JSONError); ok {
 			if e.StatusCode == 404 {
-				log.Info("Policy PP" + ppName + " was not found. This may be the target-side in replication.")
+				csmlog.WithContext(ctx).Info("Policy PP" + ppName + " was not found. This may be the target-side in replication.")
 			} else {
 				return nil, status.Errorf(codes.Internal, "Unknown error while retrieving PP "+ppName, err.Error())
 			}
@@ -472,17 +468,15 @@ func (s *service) DeleteStorageProtectionGroup(ctx context.Context,
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Unknown error while deleting volume group's directory "+isiPath, err.Error())
 		}
-		log.Info("Contents of Volume Group deleted.")
+		csmlog.WithContext(ctx).Info("Contents of Volume Group deleted.")
 	} else {
-		log.Info("No directory for this Volume Group was found. It may have already been deleted.")
+		csmlog.WithContext(ctx).Info("No directory for this Volume Group was found. It may have already been deleted.")
 	}
 
 	return &csiext.DeleteStorageProtectionGroupResponse{}, nil
 }
 
 func (s *service) ExecuteAction(ctx context.Context, req *csiext.ExecuteActionRequest) (*csiext.ExecuteActionResponse, error) {
-	log := log.WithContext(ctx)
-
 	var reqID string
 	localParams := req.GetProtectionGroupAttributes()
 	protectionGroupID := req.GetProtectionGroupId()
@@ -496,7 +490,7 @@ func (s *service) ExecuteAction(ctx context.Context, req *csiext.ExecuteActionRe
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Errorf("Failed to get Isilon config with error %v", err.Error())
+		csmlog.WithContext(ctx).Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, status.Errorf(codes.InvalidArgument, "can't find cluster with name %s in driver config: %s", clusterName, err.Error())
 	}
 
@@ -508,7 +502,7 @@ func (s *service) ExecuteAction(ctx context.Context, req *csiext.ExecuteActionRe
 
 	remoteIsiConfig, err := s.getIsilonConfig(ctx, &remoteClusterName)
 	if err != nil {
-		log.Errorf("Failed to get Isilon config with error %v", err.Error())
+		csmlog.WithContext(ctx).Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, status.Errorf(codes.InvalidArgument, "can't find cluster with name %s in driver config: %s", remoteClusterName, err.Error())
 	}
 
@@ -535,31 +529,47 @@ func (s *service) ExecuteAction(ctx context.Context, req *csiext.ExecuteActionRe
 		"Action":                action,
 	}
 
-	log.WithFields(fields).Info("Executing ExecuteAction with following fields")
-	var actionFunc func(context.Context, *IsilonClusterConfig, *IsilonClusterConfig, string, *csmlog.CsmLog) error
+	csmlog.WithContext(ctx).WithFields(fields).Info("Executing ExecuteAction with following fields")
+	var actionFunc func(context.Context, string) error
 
 	switch action {
 	case csiext.ActionTypes_FAILOVER_REMOTE.String(): // FAILOVER_LOCAL is not supported. Need to handle failover steps in the mirrored perspective.
-		actionFunc = failover
+		actionFunc = func(ctx context.Context, vgName string) error {
+			return failover(ctx, isiConfig, remoteIsiConfig, vgName)
+		}
 	case csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL.String(): // UNPLANNED_FAILOVER_REMOTE is not supported.
-		actionFunc = failoverUnplanned
+		actionFunc = func(ctx context.Context, vgName string) error {
+			return failoverUnplanned(ctx, isiConfig, vgName)
+		}
 	case csiext.ActionTypes_FAILBACK_LOCAL.String(): // FAILBACK_REMOTE is not supported.
-		actionFunc = failbackDiscardLocal
+		actionFunc = func(ctx context.Context, vgName string) error {
+			return failbackDiscardLocal(ctx, isiConfig, remoteIsiConfig, vgName)
+		}
 	case csiext.ActionTypes_ACTION_FAILBACK_DISCARD_CHANGES_LOCAL.String(): // ACTION_FAILBACK_DISCARD_CHANGES_REMOTE is not supported.
-		actionFunc = failbackDiscardRemote
+		actionFunc = func(ctx context.Context, vgName string) error {
+			return failbackDiscardRemote(ctx, isiConfig, remoteIsiConfig, vgName)
+		}
 	case csiext.ActionTypes_REPROTECT_LOCAL.String(): // REPROTECT_REMOTE is not supported.
-		actionFunc = reprotect
+		actionFunc = func(ctx context.Context, vgName string) error {
+			return reprotect(ctx, isiConfig, remoteIsiConfig, vgName)
+		}
 	case csiext.ActionTypes_SYNC.String():
-		actionFunc = synchronize
+		actionFunc = func(ctx context.Context, vgName string) error {
+			return synchronize(ctx, isiConfig, vgName)
+		}
 	case csiext.ActionTypes_SUSPEND.String():
-		actionFunc = suspend
+		actionFunc = func(ctx context.Context, vgName string) error {
+			return suspend(ctx, isiConfig, vgName)
+		}
 	case csiext.ActionTypes_RESUME.String():
-		actionFunc = resume
+		actionFunc = func(ctx context.Context, vgName string) error {
+			return resume(ctx, isiConfig, vgName)
+		}
 	default:
 		return nil, status.Errorf(codes.Unknown, "The requested action does not match with supported actions")
 	}
 
-	if err := actionFunc(ctx, isiConfig, remoteIsiConfig, vgName, log.WithFields(fields)); err != nil {
+	if err := actionFunc(ctx, vgName); err != nil {
 		return nil, status.Error(codes.Unknown, err.Error()) // Error while executing action, shouldn't be retried.
 	}
 
@@ -582,9 +592,7 @@ func (s *service) ExecuteAction(ctx context.Context, req *csiext.ExecuteActionRe
 }
 
 func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csiext.GetStorageProtectionGroupStatusRequest) (*csiext.GetStorageProtectionGroupStatusResponse, error) {
-	log := log.WithContext(ctx)
-
-	log.Info("Getting storage protection group status")
+	csmlog.WithContext(ctx).Info("Getting storage protection group status")
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
 	clusterName, ok := localParams[s.opts.replicationContextPrefix+"systemName"]
@@ -594,7 +602,7 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Errorf("Failed to get Isilon config with error %v", err.Error())
+		csmlog.WithContext(ctx).Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, status.Errorf(codes.InvalidArgument, "can't find cluster with name %s in driver config: %s", clusterName, err.Error())
 	}
 
@@ -605,7 +613,7 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 
 	remoteIsiConfig, err := s.getIsilonConfig(ctx, &remoteClusterName)
 	if err != nil {
-		log.Errorf("Failed to get Isilon config with error %v", err.Error())
+		csmlog.WithContext(ctx).Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, status.Errorf(codes.InvalidArgument, "can't find cluster with name %s in driver config: %s", remoteClusterName, err.Error())
 	}
 
@@ -619,25 +627,25 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	// obtain local policy for local cluster
 	localP, err := isiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 	if err != nil {
-		log.Warnf("Can't find local replication policy on local cluster, unexpected error %v", err.Error())
+		csmlog.WithContext(ctx).Warnf("Can't find local replication policy on local cluster, unexpected error %v", err.Error())
 	}
 
 	// obtain target policy for local cluster
 	localTP, err := isiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
 	if err != nil {
-		log.Warnf("Can't find target replication policy on local cluster, unexpected error %v", err.Error())
+		csmlog.WithContext(ctx).Warnf("Can't find target replication policy on local cluster, unexpected error %v", err.Error())
 	}
 
 	// obtain local policy for remote cluster
 	remoteP, err := remoteIsiConfig.isiSvc.client.GetPolicyByName(ctx, ppName)
 	if err != nil {
-		log.Warnf("Can't find local replication policy on remote cluster, unexpected error %v", err.Error())
+		csmlog.WithContext(ctx).Warnf("Can't find local replication policy on remote cluster, unexpected error %v", err.Error())
 	}
 
 	// obtain target policy for remote cluster
 	remoteTP, err := remoteIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
 	if err != nil {
-		log.Warnf("Can't find target replication policy on remote cluster, unexpected error %v", err.Error())
+		csmlog.WithContext(ctx).Warnf("Can't find target replication policy on remote cluster, unexpected error %v", err.Error())
 	}
 
 	// Check if any of the policy jobs are currently running
@@ -645,7 +653,7 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	localJob, err := isiConfig.isiSvc.client.GetJobsByPolicyName(ctx, ppName)
 	if err != nil {
 		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode != 404 {
-			log.Warnf("Unexpected error while querying active jobs for local policy %v", err.Error())
+			csmlog.WithContext(ctx).Warnf("Unexpected error while querying active jobs for local policy %v", err.Error())
 			isSyncCheckFailed = true
 		}
 	}
@@ -658,7 +666,7 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	remoteJob, err := remoteIsiConfig.isiSvc.client.GetJobsByPolicyName(ctx, ppName)
 	if err != nil {
 		if apiErr, ok := err.(*isiApi.JSONError); ok && apiErr.StatusCode != 404 {
-			log.Warnf("Unexpected error while querying active jobs for remote policy %v", err.Error())
+			csmlog.WithContext(ctx).Warnf("Unexpected error while querying active jobs for remote policy %v", err.Error())
 			isSyncCheckFailed = true
 		}
 	}
@@ -669,14 +677,14 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 	}
 
 	linkState := getGroupLinkState(localP, localTP, remoteP, remoteTP, isSyncInProgress)
-	log.Infof("The current state for group (%s) is (%s).", groupID, linkState.String())
+	csmlog.WithContext(ctx).Infof("The current state for group (%s) is (%s).", groupID, linkState.String())
 
 	if linkState == csiext.StorageProtectionGroupStatus_UNKNOWN || isSyncCheckFailed {
 		errMsg := "unexpected error while getting link state"
 		if isSyncCheckFailed {
 			errMsg = "unexpected error while querying active jobs for local or remote policy"
 		}
-		log.Error(errMsg)
+		csmlog.WithContext(ctx).Error(errMsg)
 		resp := &csiext.GetStorageProtectionGroupStatusResponse{
 			Status: &csiext.StorageProtectionGroupStatus{
 				State: csiext.StorageProtectionGroupStatus_UNKNOWN,
@@ -686,11 +694,11 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 		return resp, status.Error(codes.Internal, errMsg)
 	}
 
-	log.Info("Trying to get replication direction")
+	csmlog.WithContext(ctx).Info("Trying to get replication direction")
 	source := false
 	if localP != nil { // Policy can exist only on the source side
 		source = true
-		log.Info("Current side is source")
+		csmlog.WithContext(ctx).Info("Current side is source")
 	}
 
 	resp := &csiext.GetStorageProtectionGroupStatusResponse{
@@ -699,22 +707,22 @@ func (s *service) GetStorageProtectionGroupStatus(ctx context.Context, req *csie
 			IsSource: source,
 		},
 	}
-	log.Info("Get storage protection group status completed")
+	csmlog.WithContext(ctx).Info("Get storage protection group status completed")
 	return resp, nil
 }
 
-func failover(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *csmlog.CsmLog) error {
-	log.Info("Running failover action")
+func failover(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string) error {
+	csmlog.WithContext(ctx).Info("Running failover action")
 
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 
-	log.Info("Running sync on SRC policy")
+	csmlog.WithContext(ctx).Info("Running sync on SRC policy")
 	err := localIsiConfig.isiSvc.client.SyncPolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failover: encountered error when trying to sync policy %s", err.Error())
 	}
 
-	log.Info("Disabling policy on SRC site")
+	csmlog.WithContext(ctx).Info("Disabling policy on SRC site")
 	err = localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failover: can't disable local policy %s", err.Error())
@@ -725,34 +733,34 @@ func failover(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIs
 		return status.Errorf(codes.Internal, "failover: policy couldn't reach disabled condition %s", err.Error())
 	}
 
-	log.Info("Enabling writes on TGT site")
+	csmlog.WithContext(ctx).Info("Enabling writes on TGT site")
 	err = remoteIsiConfig.isiSvc.client.AllowWrites(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failover: can't allow writes on target site %s", err.Error())
 	}
 
-	log.Info("Failover action completed")
+	csmlog.WithContext(ctx).Info("Failover action completed")
 	return nil
 }
 
-func failoverUnplanned(ctx context.Context, localIsiConfig *IsilonClusterConfig, _ *IsilonClusterConfig, vgName string, log *csmlog.CsmLog) error {
-	log.Info("Running unplanned failover action")
+func failoverUnplanned(ctx context.Context, localIsiConfig *IsilonClusterConfig, vgName string) error {
+	csmlog.WithContext(ctx).Info("Running unplanned failover action")
 	// With unplanned failover -- do minimum requests, we will ensure mirrored policy is created in further reprotect call
 	// We can't use remote config (source site) because we need to assume it's down
 
-	log.Info("Enabling writes on TGT site")
+	csmlog.WithContext(ctx).Info("Enabling writes on TGT site")
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 	err := localIsiConfig.isiSvc.client.AllowWrites(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "unplanned failover: allow writes on target site failed %s", err.Error())
 	}
 
-	log.Info("Unplanned failover action completed")
+	csmlog.WithContext(ctx).Info("Unplanned failover action completed")
 	return nil
 }
 
-func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *csmlog.CsmLog) error {
-	log.Info("Running reprotect action")
+func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string) error {
+	csmlog.WithContext(ctx).Info("Running reprotect action")
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 
 	// Ensure local array's target policy exists and is write enabled (original target)
@@ -771,7 +779,7 @@ func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteI
 	}
 
 	// Delete the remote policy
-	log.Info("Deleting SyncIQ policy on the remote")
+	csmlog.WithContext(ctx).Info("Deleting SyncIQ policy on the remote")
 	err = remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "reprotect: delete policy on remote site failed %s", err.Error())
@@ -779,12 +787,12 @@ func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteI
 
 	remoteManagementAddress := remoteIsiConfig.Endpoint
 	if strings.Contains(remoteManagementAddress, "localhost") {
-		log.Debugf("Authorization is enabled, reading MountEndpoint: '%s'", remoteIsiConfig.MountEndpoint)
+		csmlog.WithContext(ctx).Debugf("Authorization is enabled, reading MountEndpoint: '%s'", remoteIsiConfig.MountEndpoint)
 		remoteManagementAddress = remoteIsiConfig.MountEndpoint
 	}
 
 	// Create a new local policy based on previous remote policy's parameters
-	log.Info("Creating new local SyncIQ policy")
+	csmlog.WithContext(ctx).Info("Creating new local SyncIQ policy")
 	err = localIsiConfig.isiSvc.client.CreatePolicy(ctx, ppName, remotePolicy.JobDelay,
 		remotePolicy.TargetPath, remotePolicy.SourcePath, remoteManagementAddress, remoteIsiConfig.ReplicationCertificateID, true)
 	if err != nil {
@@ -795,44 +803,44 @@ func reprotect(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteI
 		return status.Errorf(codes.Internal, "reprotect: policy job did not return one of RUNNING or FINISHED state %s", err.Error())
 	}
 
-	log.Info("Reprotect action completed")
+	csmlog.WithContext(ctx).Info("Reprotect action completed")
 	return nil
 }
 
-func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *csmlog.CsmLog) error {
-	log.Info("Running failback action - discard local")
+func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string) error {
+	csmlog.WithContext(ctx).Info("Running failback action - discard local")
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 	ppNameMirror := ppName + "_mirror"
 
-	log.Info("Obtaining RPO value from policy name")
+	csmlog.WithContext(ctx).Info("Obtaining RPO value from policy name")
 	rpoInt := getRpoInt(vgName)
 	if rpoInt == -1 {
 		return status.Errorf(codes.InvalidArgument, "unable to parse RPO seconds")
 	}
 
 	// If source policy is not disabled (unplanned failover), disable it
-	log.Info("Ensuring SRC policy is disabled")
+	csmlog.WithContext(ctx).Info("Ensuring SRC policy is disabled")
 	err := localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): can't disable local policy %s", err.Error())
 	}
 
 	// Edit the source policy to manual.
-	log.Info("Setting SRC policy to manual")
+	csmlog.WithContext(ctx).Info("Setting SRC policy to manual")
 	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, PolicySchedulingManual, 0)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): can't set local policy to manual %s", err.Error())
 	}
 
 	// Enable the source policy
-	log.Info("Enabling SRC policy")
+	csmlog.WithContext(ctx).Info("Enabling SRC policy")
 	err = localIsiConfig.isiSvc.client.EnablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): can't enable local policy %s", err.Error())
 	}
 
 	// Run Resync-prep on source (also disables source policy)
-	log.Info("Running resync-prep on SRC policy")
+	csmlog.WithContext(ctx).Info("Running resync-prep on SRC policy")
 	err = localIsiConfig.isiSvc.client.ResyncPrep(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): can't run resync-prep on local policy %s", err.Error())
@@ -847,21 +855,21 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 	}
 
 	// Run Sync-Job on target policy (_mirror)
-	log.Info("Running sync job on TGT mirror policy")
+	csmlog.WithContext(ctx).Info("Running sync job on TGT mirror policy")
 	err = remoteIsiConfig.isiSvc.client.SyncPolicy(ctx, ppNameMirror)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): policy sync failed %s", err.Error())
 	}
 
 	// Allow write on source
-	log.Info("Allowing write on SRC")
+	csmlog.WithContext(ctx).Info("Allowing write on SRC")
 	err = localIsiConfig.isiSvc.client.AllowWrites(ctx, ppNameMirror)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): allow writes on local site failed %s", err.Error())
 	}
 
 	// Run resync-prep on target (also disables target policy)
-	log.Info("Running resync-prep on TGT mirror policy")
+	csmlog.WithContext(ctx).Info("Running resync-prep on TGT mirror policy")
 	err = remoteIsiConfig.isiSvc.client.ResyncPrep(ctx, ppNameMirror)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): can't run resync-prep on remote mirror policy %s", err.Error())
@@ -876,74 +884,74 @@ func failbackDiscardLocal(ctx context.Context, localIsiConfig *IsilonClusterConf
 	}
 
 	// Delete the target mirror policy as recommended
-	log.Info("Deleting TGT mirror policy")
+	csmlog.WithContext(ctx).Info("Deleting TGT mirror policy")
 	err = remoteIsiConfig.isiSvc.client.DeletePolicy(ctx, ppNameMirror)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): delete mirror policy on target site failed %s", err.Error())
 	}
 
 	// Edit source policy to automatic
-	log.Info("Setting SRC policy to automatic")
+	csmlog.WithContext(ctx).Info("Setting SRC policy to automatic")
 	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, PolicySchedulingAutomatic, rpoInt)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard local): can't set local policy to automatic %s", err.Error())
 	}
 
-	log.Info("Failback action - discard local completed")
+	csmlog.WithContext(ctx).Info("Failback action - discard local completed")
 	return nil
 }
 
-func failbackDiscardRemote(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string, log *csmlog.CsmLog) error {
-	log.Info("Running failback action - discard remote")
+func failbackDiscardRemote(ctx context.Context, localIsiConfig *IsilonClusterConfig, remoteIsiConfig *IsilonClusterConfig, vgName string) error {
+	csmlog.WithContext(ctx).Info("Running failback action - discard remote")
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 
-	log.Info("Obtaining RPO value from policy name")
+	csmlog.WithContext(ctx).Info("Obtaining RPO value from policy name")
 	rpoInt := getRpoInt(vgName)
 	if rpoInt == -1 {
 		return status.Errorf(codes.InvalidArgument, "unable to parse RPO seconds")
 	}
 
 	// If source policy is not disabled (unplanned failover), disable it
-	log.Info("Ensuring SRC policy is disabled")
+	csmlog.WithContext(ctx).Info("Ensuring SRC policy is disabled")
 	err := localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard remote): can't disable local policy %s", err.Error())
 	}
 
 	// Edit the source policy to manual.
-	log.Info("Setting SRC policy to manual")
+	csmlog.WithContext(ctx).Info("Setting SRC policy to manual")
 	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, PolicySchedulingManual, 0)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard remote): can't set local policy to manual %s", err.Error())
 	}
 
 	// disallow writes on target
-	log.Info("Disabling writes on TGT site")
+	csmlog.WithContext(ctx).Info("Disabling writes on TGT site")
 	err = remoteIsiConfig.isiSvc.client.DisallowWrites(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard remote): disallow writes on target site failed %s", err.Error())
 	}
 
 	// set source policy to automatic
-	log.Info("Setting SRC policy to automatic")
+	csmlog.WithContext(ctx).Info("Setting SRC policy to automatic")
 	err = localIsiConfig.isiSvc.client.ModifyPolicy(ctx, ppName, PolicySchedulingAutomatic, rpoInt)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard remote): can't set local policy to automatic %s", err.Error())
 	}
 
 	// enable source policy
-	log.Info("Enabling SRC policy")
+	csmlog.WithContext(ctx).Info("Enabling SRC policy")
 	err = localIsiConfig.isiSvc.client.EnablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failback (discard remote): can't enable local policy %s", err.Error())
 	}
 
-	log.Info("Failback action - discard remote completed")
+	csmlog.WithContext(ctx).Info("Failback action - discard remote completed")
 	return nil
 }
 
-func synchronize(ctx context.Context, localIsiConfig *IsilonClusterConfig, _ *IsilonClusterConfig, vgName string, log *csmlog.CsmLog) error {
-	log.Info("Running sync action")
+func synchronize(ctx context.Context, localIsiConfig *IsilonClusterConfig, vgName string) error {
+	csmlog.WithContext(ctx).Info("Running sync action")
 	// get all running
 	// if running - wait for it and succeed
 	// if no running - start new - wait for it and succeed
@@ -953,16 +961,16 @@ func synchronize(ctx context.Context, localIsiConfig *IsilonClusterConfig, _ *Is
 		return status.Errorf(codes.Internal, "sync: policy sync failed %s", err.Error())
 	}
 
-	log.Info("Sync action completed")
+	csmlog.WithContext(ctx).Info("Sync action completed")
 	return nil
 }
 
-func suspend(ctx context.Context, localIsiConfig *IsilonClusterConfig, _ *IsilonClusterConfig, vgName string, log *csmlog.CsmLog) error {
-	log.Info("Running suspend action")
+func suspend(ctx context.Context, localIsiConfig *IsilonClusterConfig, vgName string) error {
+	csmlog.WithContext(ctx).Info("Running suspend action")
 
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 
-	log.Info("Disabling policy on SRC site")
+	csmlog.WithContext(ctx).Info("Disabling policy on SRC site")
 	err := localIsiConfig.isiSvc.client.DisablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "suspend: can't disable local policy %s", err.Error())
@@ -973,16 +981,16 @@ func suspend(ctx context.Context, localIsiConfig *IsilonClusterConfig, _ *Isilon
 		return status.Errorf(codes.Internal, "suspend: policy couldn't reach disabled condition %s", err.Error())
 	}
 
-	log.Info("Suspend action completed")
+	csmlog.WithContext(ctx).Info("Suspend action completed")
 	return nil
 }
 
-func resume(ctx context.Context, localIsiConfig *IsilonClusterConfig, _ *IsilonClusterConfig, vgName string, log *csmlog.CsmLog) error {
-	log.Info("Running resume action")
+func resume(ctx context.Context, localIsiConfig *IsilonClusterConfig, vgName string) error {
+	csmlog.WithContext(ctx).Info("Running resume action")
 
 	ppName := strings.ReplaceAll(vgName, ".", "-")
 
-	log.Info("Enabling policy on SRC site")
+	csmlog.WithContext(ctx).Info("Enabling policy on SRC site")
 	err := localIsiConfig.isiSvc.client.EnablePolicy(ctx, ppName)
 	if err != nil {
 		return status.Errorf(codes.Internal, "resume: can't enable local policy %s", err.Error())
@@ -993,7 +1001,7 @@ func resume(ctx context.Context, localIsiConfig *IsilonClusterConfig, _ *IsilonC
 		return status.Errorf(codes.Internal, "resume: policy couldn't reach enabled condition %s", err.Error())
 	}
 
-	log.Info("Resume action completed")
+	csmlog.WithContext(ctx).Info("Resume action completed")
 	return nil
 }
 

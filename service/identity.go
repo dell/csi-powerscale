@@ -22,6 +22,7 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/dell/csi-powerscale/v2/common/constants"
+	csmlog "github.com/dell/csmlog"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 )
@@ -79,14 +80,13 @@ func (s *service) Probe(
 	_ *csi.ProbeRequest) (
 	*csi.ProbeResponse, error,
 ) {
-	log := log.WithContext(ctx)
 	ready := new(wrapperspb.BoolValue)
 	ready.Value = true
 	rep := new(csi.ProbeResponse)
 	rep.Ready = ready
 
 	if noProbeOnStart {
-		log.Debugf("noProbeOnStart is set to true, skip probe")
+		csmlog.WithContext(ctx).Debugf("noProbeOnStart is set to true, skip probe")
 		return rep, nil
 	}
 
@@ -94,7 +94,7 @@ func (s *service) Probe(
 		rep.Ready.Value = false
 		return rep, err
 	}
-	log.Debugf("Probe returning: %v", rep.Ready.GetValue())
+	csmlog.WithContext(ctx).Debugf("Probe returning: %v", rep.Ready.GetValue())
 	return rep, nil
 }
 

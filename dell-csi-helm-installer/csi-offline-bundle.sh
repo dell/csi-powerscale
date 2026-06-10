@@ -46,7 +46,7 @@ run_command() {
   CMDOUT=$(eval "${@}" 2>&1)
   local rc=$?
 
-  if [ $rc -ne 0 ]; then
+  if [ "${rc}" -ne 0 ]; then
     echo
     echo "ERROR"
     echo "Received a non-zero return code ($rc) from the following comand:"

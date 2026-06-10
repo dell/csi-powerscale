@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/dell/csi-powerscale/v2/common/constants"
-	"github.com/dell/csmlog"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
 
@@ -125,8 +124,7 @@ func TestGetCSINodeIP(t *testing.T) {
 	s := service{
 		nodeIP: "",
 	}
-	ctx := context.Background()
-	_, err := s.GetCSINodeIP(ctx)
+	_, err := s.GetCSINodeIP()
 	assert.Equal(t, errors.New("cannot get node IP"), err)
 }
 
@@ -134,8 +132,7 @@ func TestGetCSINodeID(t *testing.T) {
 	s := service{
 		nodeID: "",
 	}
-	ctx := context.Background()
-	_, err := s.GetCSINodeID(ctx)
+	_, err := s.GetCSINodeID()
 	assert.Equal(t, errors.New("cannot get node id"), err)
 }
 
@@ -542,23 +539,6 @@ func writeToFileandRead(filePath, content string) ([]byte, error) {
 	return configBytes, nil
 }
 
-// Mocking the logger
-type MockLogger struct {
-	mock.Mock
-}
-
-func (m *MockLogger) Info(args ...interface{}) {
-	m.Called(args...)
-}
-
-func (m *MockLogger) Debug(args ...interface{}) {
-	m.Called(args...)
-}
-
-func (m *MockLogger) Error(args ...interface{}) {
-	m.Called(args...)
-}
-
 func TestLoadIsilonConfigs(t *testing.T) {
 	// Create a temporary directory to simulate the config file path
 	tmpDir := t.TempDir()
@@ -604,8 +584,7 @@ func TestGetIsiClient(t *testing.T) {
 	}
 	ctx := context.Background()
 	isiConfig := IsilonClusterConfig{}
-	logLevel := csmlog.InfoLevel
-	_, err := s.GetIsiClient(ctx, &isiConfig, logLevel)
+	_, err := s.GetIsiClient(ctx, &isiConfig)
 	assert.NotEqual(t, nil, err)
 }
 
@@ -1100,7 +1079,7 @@ func TestSetAzReconcileInterval(t *testing.T) {
 				v.Set(constants.ParamAZReconcileInterval, tt.intervalStr)
 			}
 
-			s.setAzReconcileInterval(log, v)
+			s.setAzReconcileInterval(context.Background(), v)
 			assert.Equal(t, tt.expectedInterval, s.azReconcileInterval)
 		})
 	}
@@ -1124,7 +1103,7 @@ func (m *mockReconciler) ReconcileNodeAzLabels(ctx context.Context) error {
 	return m.reconcileNodeAzLabelsFunc(ctx)
 }
 
-func (m *mockReconciler) setAzReconcileInterval(_ *csmlog.CsmLog, _ *viper.Viper) {}
+func (m *mockReconciler) setAzReconcileInterval(_ context.Context, _ *viper.Viper) {}
 
 func TestGetReconcileInterval(t *testing.T) {
 	expectedInterval := 5 * time.Second

@@ -22,7 +22,7 @@ import (
 	"os"
 
 	"github.com/dell/csi-powerscale/v2/common/constants"
-	csmlog "github.com/dell/csmlog"
+	"github.com/dell/csmlog"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -37,13 +37,11 @@ var parseCIDR = func(s string) (net.IP, *net.IPNet, error) {
 	return net.ParseCIDR(s)
 }
 
-var log = csmlog.GetLogger()
-
 // RemoveExistingCSISockFile When the sock file that the gRPC server is going to be listening on already exists, error will be thrown saying the address is already in use, thus remove it first
 var RemoveExistingCSISockFile = func() error {
 	protoAddr := os.Getenv(constants.EnvCSIEndpoint)
 
-	log.Debugf("check if sock file '%s' has already been created", protoAddr)
+	csmlog.Debugf("check if sock file '%s' has already been created", protoAddr)
 
 	if protoAddr == "" {
 		return nil
@@ -51,20 +49,20 @@ var RemoveExistingCSISockFile = func() error {
 
 	if _, err := os.Stat(protoAddr); !os.IsNotExist(err) {
 
-		log.Debugf("sock file '%s' already exists, remove it", protoAddr)
+		csmlog.Debugf("sock file '%s' already exists, remove it", protoAddr)
 
 		if err := os.RemoveAll(protoAddr); err != nil {
 
-			log.Debugf("error removing sock file '%s'"+"failed with error : %s", protoAddr, err.Error())
+			csmlog.Debugf("error removing sock file '%s'"+"failed with error : %s", protoAddr, err.Error())
 
 			return fmt.Errorf(
 				"failed to remove sock file: '%s', error '%v'", protoAddr, err)
 		}
 
-		log.Debugf("sock file '%s' removed", protoAddr)
+		csmlog.Debugf("sock file '%s' removed", protoAddr)
 
 	} else {
-		log.Debugf("sock file '%s' does not exist yet, move along", protoAddr)
+		csmlog.Debugf("sock file '%s' does not exist yet, move along", protoAddr)
 	}
 
 	return nil
@@ -75,7 +73,7 @@ func GetNFSClientIP(allowedNetworks []string) (string, error) {
 	var nodeIP string
 	addrs, err := interfaceAddrs()
 	if err != nil {
-		log.Errorf("Encountered error while fetching system IP addresses: %+v\n", err.Error())
+		csmlog.Errorf("Encountered error while fetching system IP addresses: %+v\n", err.Error())
 		return "", err
 	}
 
@@ -90,14 +88,14 @@ func GetNFSClientIP(allowedNetworks []string) (string, error) {
 		case *net.IPNet:
 			if v.IP.To4() != nil {
 				ip, cnet, err := parseCIDR(a.String())
-				log.Debugf("IP address: %s and Network: %s", ip, cnet)
+				csmlog.Debugf("IP address: %s and Network: %s", ip, cnet)
 				if err != nil {
-					log.Errorf("Encountered error while parsing IP address %v", a)
+					csmlog.Errorf("Encountered error while parsing IP address %v", a)
 					continue
 				}
 
 				if _, ok := networks[cnet.String()]; ok {
-					log.Infof("Found IP address: %s", ip)
+					csmlog.Infof("Found IP address: %s", ip)
 					nodeIP = ip.String()
 					return nodeIP, nil
 				}

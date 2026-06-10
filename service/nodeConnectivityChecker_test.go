@@ -30,7 +30,6 @@ import (
 
 	"github.com/dell/csi-powerscale/v2/common/constants"
 	"github.com/gorilla/mux"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -130,10 +129,6 @@ func (m *MockMarshal) MarshalSyncMapToJSON(_ *sync.Map) ([]byte, error) {
 }
 
 func TestConnectivityStatus_Success(t *testing.T) {
-	// Set up the test logger
-	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
-
 	// Initialize probeStatus
 	probeStatus = &sync.Map{}
 
@@ -167,10 +162,6 @@ func TestConnectivityStatus_Success(t *testing.T) {
 }
 
 func TestConnectivityStatus_ErrorDuringMarshal(t *testing.T) {
-	// Set up the test logger
-	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
-
 	// Initialize probeStatus
 	probeStatus = &sync.Map{}
 

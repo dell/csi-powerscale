@@ -98,9 +98,8 @@ func (s *service) NodePublishVolume(
 	req *csi.NodePublishVolumeRequest) (
 	*csi.NodePublishVolumeResponse, error,
 ) {
-	log := log.WithContext(ctx)
-	logFields := csmlog.ExtractFieldsFromContext(ctx)
-	runID := fmt.Sprintf("%v", logFields["csi.requestid"])
+	fields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", fields["csi.requestid"])
 	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
 
@@ -125,13 +124,17 @@ func (s *service) NodePublishVolume(
 		return nil, err
 	}
 
-	logFields[clusterName] = clusterName
-	ctx = csmlog.SetLogFields(ctx, logFields)
-	log.Debugf("Cluster Name: %v", clusterName)
+	f := csmlog.Fields{
+		csmlog.FieldOperation: "NodePublishVolume",
+		csmlog.FieldVolumeID:  req.GetVolumeId(),
+		csmlog.FieldArrayID:   clusterName,
+	}
+	csmlog.WithContext(ctx).WithFields(f).Info("NodePublishVolume called")
+	csmlog.WithContext(ctx).Debugf("Cluster Name: %v", clusterName)
 
 	// Probe the node if required and make sure startup called
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
-		log.Error("nodeProbe failed with error :" + err.Error())
+		csmlog.WithContext(ctx).Error("nodeProbe failed with error :" + err.Error())
 		return nil, err
 	}
 
@@ -150,7 +153,7 @@ func (s *service) NodePublishVolume(
 	accessZone := volumeContext["AccessZone"]
 	isROVolumeFromSnapshot := isiConfig.isiSvc.isROVolumeFromSnapshot(path, accessZone)
 	if isROVolumeFromSnapshot {
-		log.Info("Volume source is snapshot")
+		csmlog.WithContext(ctx).Info("Volume source is snapshot")
 		if export, err := isiConfig.isiSvc.GetExportWithPathAndZone(ctx, path, accessZone); err != nil || export == nil {
 			return nil, status.Error(codes.Internal, GetMessageWithReqID(runID, "error retrieving export for %s", path))
 		}
@@ -159,7 +162,7 @@ func (s *service) NodePublishVolume(
 		isiPath := isilonfs.GetIsiPathFromExportPath(path)
 
 		if _, err := s.getVolByName(ctx, isiPath, volName, isiConfig); err != nil {
-			log.Errorf("Error in getting '%s' Volume '%v'", volName, err)
+			csmlog.WithContext(ctx).Errorf("Error in getting '%s' Volume '%v'", volName, err)
 			return nil, err
 		}
 	}
@@ -174,19 +177,18 @@ func (s *service) NodePublishVolume(
 	}
 
 	if strings.Contains(azServiceIP, "localhost") {
-		log.Debugf("Authorization is enabled, reading MountEndpoint: '%s'", isiConfig.MountEndpoint)
+		csmlog.WithContext(ctx).Debugf("Authorization is enabled, reading MountEndpoint: '%s'", isiConfig.MountEndpoint)
 
 		azServiceIP = isiConfig.MountEndpoint
 	}
 
-	f := csmlog.Fields{
+	publishFields := csmlog.Fields{
 		"ID":          req.VolumeId,
 		"Name":        volumeContext["Name"],
 		"TargetPath":  req.GetTargetPath(),
 		"AzServiceIP": azServiceIP,
 	}
-	// TODO: Replace logrus with log
-	log.WithFields(f).Info("Calling publishVolume")
+	csmlog.WithContext(ctx).WithFields(publishFields).Info("Calling publishVolume")
 	if err := publishVolume(ctx, req, isiConfig.isiSvc.GetNFSExportURLForPath(azServiceIP, path)); err != nil {
 		return nil, err
 	}
@@ -199,18 +201,17 @@ func (s *service) NodeUnpublishVolume(
 	req *csi.NodeUnpublishVolumeRequest) (
 	*csi.NodeUnpublishVolumeResponse, error,
 ) {
-	log := log.WithContext(ctx)
-	logFields := csmlog.ExtractFieldsFromContext(ctx)
-	runID := fmt.Sprintf("%v", logFields["csi.requestid"])
+	fields := csmlog.ExtractFieldsFromContext(ctx)
+	runID := fmt.Sprintf("%v", fields["csi.requestid"])
 
-	log.Debug("executing NodeUnpublishVolume")
+	csmlog.WithContext(ctx).Debug("executing NodeUnpublishVolume")
 	// set noProbeOnStart to false so subsequent calls can lead to probe
 	noProbeOnStart = false
 	volID := req.GetVolumeId()
 	if volID == "" {
 		return nil, status.Error(codes.FailedPrecondition, GetMessageWithReqID(runID, "no VolumeID found in request"))
 	}
-	log.Infof("The volume ID fetched from NodeUnPublish req is %s", volID)
+	csmlog.WithContext(ctx).Infof("The volume ID fetched from NodeUnPublish req is %s", volID)
 
 	volName, exportID, accessZone, clusterName, _ := id.ParseNormalizedVolumeID(ctx, req.GetVolumeId())
 	if volName == "" {
@@ -219,17 +220,21 @@ func (s *service) NodeUnpublishVolume(
 
 	isiConfig, err := s.getIsilonConfig(ctx, &clusterName)
 	if err != nil {
-		log.Errorf("Failed to get Isilon config with error %v", err.Error())
+		csmlog.WithContext(ctx).Errorf("Failed to get Isilon config with error %v", err.Error())
 		return nil, err
 	}
 
-	logFields[clusterName] = clusterName
-	ctx = csmlog.SetLogFields(ctx, logFields)
-	log.Debugf("Cluster Name: %v", clusterName)
+	f := csmlog.Fields{
+		csmlog.FieldOperation: "NodeUnpublishVolume",
+		csmlog.FieldVolumeID:  volID,
+		csmlog.FieldArrayID:   clusterName,
+	}
+	csmlog.WithContext(ctx).WithFields(f).Info("NodeUnpublishVolume called")
+	csmlog.WithContext(ctx).Debugf("Cluster Name: %v", clusterName)
 
 	// Probe the node if required
 	if err := s.autoProbe(ctx, isiConfig); err != nil {
-		log.Error("nodeProbe failed with error :" + err.Error())
+		csmlog.WithContext(ctx).Error("nodeProbe failed with error :" + err.Error())
 		return nil, err
 	}
 
@@ -252,7 +257,7 @@ func (s *service) NodeUnpublishVolume(
 		isExportIDEmpty = true
 	}
 
-	log.Infof("Ephemeral volume check: %t", isEphemeralVolume)
+	csmlog.WithContext(ctx).Infof("Ephemeral volume check: %t", isEphemeralVolume)
 
 	// Check if it is a RO volume from snapshot
 	// We need not execute this logic for ephemeral volumes.
@@ -261,7 +266,7 @@ func (s *service) NodeUnpublishVolume(
 		if err != nil {
 			// Export doesn't exist - this is OK during unpublish
 			// Log it but don't fail the operation
-			log.Infof("Export ID %d not found during unpublish (may already be cleaned up): %v", exportID, err)
+			csmlog.WithContext(ctx).Infof("Export ID %d not found during unpublish (may already be cleaned up): %v", exportID, err)
 			// Continue with unpublish using just the volume name
 		} else if export != nil && export.Paths != nil && len(*export.Paths) > 0 {
 			exportPath := (*export.Paths)[0]
@@ -274,7 +279,7 @@ func (s *service) NodeUnpublishVolume(
 	}
 
 	if err := unpublishVolume(ctx, req, volName); err != nil {
-		log.Errorf("Error while calling Unbuplish Volume %v", err.Error())
+		csmlog.WithContext(ctx).Errorf("Error while calling Unbuplish Volume %v", err.Error())
 		return nil, err
 	}
 
@@ -282,7 +287,7 @@ func (s *service) NodeUnpublishVolume(
 		req.VolumeId = string(data)
 		err := s.ephemeralNodeUnpublish(ctx, req)
 		if err != nil {
-			log.Errorf("Error while calling Ephemeral Node Unpublish  %v", err.Error())
+			csmlog.WithContext(ctx).Errorf("Error while calling Ephemeral Node Unpublish  %v", err.Error())
 			return nil, err
 		}
 	}
@@ -290,17 +295,13 @@ func (s *service) NodeUnpublishVolume(
 }
 
 func (s *service) nodeProbe(ctx context.Context, isiConfig *IsilonClusterConfig) error {
-	log := log.WithContext(ctx)
-	logFields := csmlog.ExtractFieldsFromContext(ctx)
-
 	if err := s.validateOptsParameters(isiConfig); err != nil {
 		return fmt.Errorf("node probe failed : '%v'", err)
 	}
 
 	if isiConfig.isiSvc == nil {
-		logLevel := csmlog.GetLevel()
 		var err error
-		isiConfig.isiSvc, err = s.GetIsiService(ctx, isiConfig, logLevel)
+		isiConfig.isiSvc, err = s.GetIsiService(ctx, isiConfig)
 		if isiConfig.isiSvc == nil {
 			return errors.New("clusterConfig.isiSvc (type isiService) is nil, probe failed")
 		}
@@ -313,9 +314,11 @@ func (s *service) nodeProbe(ctx context.Context, isiConfig *IsilonClusterConfig)
 		return fmt.Errorf("node probe failed : '%v'", err)
 	}
 
-	logFields[isiConfig.ClusterName] = isiConfig.ClusterName
-	ctx = csmlog.SetLogFields(ctx, logFields)
-	log.Debug("node probe succeeded")
+	f := csmlog.Fields{
+		csmlog.FieldOperation: "nodeProbe",
+		csmlog.FieldArrayID:   isiConfig.ClusterName,
+	}
+	csmlog.WithContext(ctx).WithFields(f).Info("node probe succeeded")
 
 	return nil
 }
@@ -366,15 +369,14 @@ func (s *service) NodeGetInfo(
 	_ *csi.NodeGetInfoRequest) (
 	*csi.NodeGetInfoResponse, error,
 ) {
-	log := log.WithContext(ctx)
 	nodeID, err := s.getPowerScaleNodeID(ctx)
-	log.Infof("Node ID of worker node is '%s'", nodeID)
+	csmlog.WithContext(ctx).Infof("Node ID of worker node is '%s'", nodeID)
 	if (err) != nil {
-		log.Errorf("Failed to create Node ID with error %v", err.Error())
+		csmlog.WithContext(ctx).Errorf("Failed to create Node ID with error %v", err.Error())
 		return nil, err
 	}
 	if noProbeOnStart {
-		log.Debugf("noProbeOnStart is set to true, skip probe")
+		csmlog.WithContext(ctx).Debugf("noProbeOnStart is set to true, skip probe")
 		return &csi.NodeGetInfoResponse{NodeId: nodeID}, nil
 	}
 	// If Custom Topology is enabled we do not add node labels to the worker node
@@ -418,7 +420,7 @@ func (s *service) NodeGetInfo(
 	var maxIsilonVolumesPerNode int64
 	labels, err := s.GetNodeLabels()
 	if err != nil {
-		log.Errorf("failed to get Node Labels with error %v", err.Error())
+		csmlog.WithContext(ctx).Errorf("failed to get Node Labels with error %v", err.Error())
 		return nil, err
 	}
 
@@ -427,7 +429,7 @@ func (s *service) NodeGetInfo(
 		if err != nil {
 			return nil, fmt.Errorf("invalid value '%s' specified for 'max-isilon-volumes-per-node' node label", val)
 		}
-		log.Infof("node label 'max-isilon-volumes-per-node' is available and is set to value '%v'", maxIsilonVolumesPerNode)
+		csmlog.WithContext(ctx).Infof("node label 'max-isilon-volumes-per-node' is available and is set to value '%v'", maxIsilonVolumesPerNode)
 	} else {
 		// As per the csi spec the plugin MUST NOT set negative values to
 		// 'MaxVolumesPerNode' in the NodeGetInfoResponse response
@@ -435,7 +437,7 @@ func (s *service) NodeGetInfo(
 			return nil, fmt.Errorf("maxIsilonVolumesPerNode MUST NOT be set to negative value")
 		}
 		maxIsilonVolumesPerNode = s.opts.MaxVolumesPerNode
-		log.Infof("node label 'max-isilon-volumes-per-node' is not available. Using default volume limit '%v'", maxIsilonVolumesPerNode)
+		csmlog.WithContext(ctx).Infof("node label 'max-isilon-volumes-per-node' is not available. Using default volume limit '%v'", maxIsilonVolumesPerNode)
 	}
 
 	// Create NodeGetInfoResponse including nodeID and AccessibleTopology information
@@ -451,7 +453,6 @@ func (s *service) NodeGetInfo(
 func (s *service) NodeGetVolumeStats(
 	ctx context.Context, req *csi.NodeGetVolumeStatsRequest,
 ) (*csi.NodeGetVolumeStatsResponse, error) {
-	log := log.WithContext(ctx)
 	fields := csmlog.ExtractFieldsFromContext(ctx)
 	runID := fmt.Sprintf("%v", fields["csi.requestid"])
 
@@ -501,30 +502,30 @@ func (s *service) NodeGetVolumeStats(
 	// if we cannot find it there, we check the export
 	isiPathFromParams, err := s.validateIsiPath(ctx, volName)
 	if err != nil {
-		log.Errorf("Failed to get isiPath %v", err.Error())
+		csmlog.WithContext(ctx).Errorf("Failed to get isiPath %v", err.Error())
 		// if not in pv or sc, calculate it from the export
 		exportPath, err := getExportPathFromExportID(ctx, isiConfig, exportID, accessZone)
 		if err != nil {
-			log.Debugf("Failed to get export path: %s, using default: %s", err.Error(), isiPath)
+			csmlog.WithContext(ctx).Debugf("Failed to get export path: %s, using default: %s", err.Error(), isiPath)
 		} else {
 			isiPathFromParams = isilonfs.GetIsiPathFromExportPath(exportPath)
 		}
 	}
 	if isiPathFromParams != "" {
-		log.Debugf("Found IsiPath from PV/SC/Export: %v ", isiPathFromParams)
+		csmlog.WithContext(ctx).Debugf("Found IsiPath from PV/SC/Export: %v ", isiPathFromParams)
 		isiPath = isiPathFromParams
 		// set service to utilize new path
 		isiConfigCopy.IsiPath = isiPath
-		isiConfigCopy.isiSvc, err = s.GetIsiService(ctx, isiConfigCopy, csmlog.GetLevel())
+		isiConfigCopy.isiSvc, err = s.GetIsiService(ctx, isiConfigCopy)
 		if err != nil {
-			log.Errorf("NodeGetVolumeStats: Failed to get isiService %v ", err.Error())
+			csmlog.WithContext(ctx).Errorf("NodeGetVolumeStats: Failed to get isiService %v ", err.Error())
 			return nil, err
 		}
 	}
 
 	// Probe the node if required and make sure startup called
 	if err := s.autoProbe(ctx, isiConfigCopy); err != nil {
-		log.Error("nodeProbe failed with error :" + err.Error())
+		csmlog.WithContext(ctx).Error("nodeProbe failed with error :" + err.Error())
 		return nil, err
 	}
 
@@ -587,8 +588,7 @@ func (s *service) NodeGetVolumeStats(
 }
 
 func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	log := log.WithContext(ctx)
-	log.Info("Received request to node publish Ephemeral Volume..")
+	csmlog.WithContext(ctx).Info("Received request to node publish Ephemeral Volume..")
 
 	volID := req.GetVolumeId()
 	volName := fmt.Sprintf("ephemeral-%s", volID)
@@ -600,11 +600,11 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 		Secrets:            req.Secrets,
 	})
 	if err != nil {
-		log.Error("Create ephemeral volume failed with error :" + err.Error())
+		csmlog.WithContext(ctx).Error("Create ephemeral volume failed with error :" + err.Error())
 		return nil, err
 	}
 	filePath := req.TargetPath + "/" + volName
-	log.Infof("Ephemeral Volume %s creation was successful %s", volID, createEphemeralVolResp)
+	csmlog.WithContext(ctx).Infof("Ephemeral Volume %s creation was successful %s", volID, createEphemeralVolResp)
 
 	// Build nodeUnPublish object for rollbacks
 	nodeUnpublishRequest := &csi.NodeUnpublishVolumeRequest{
@@ -626,14 +626,14 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 		VolumeContext:    createEphemeralVolResp.Volume.VolumeContext,
 	})
 	if err != nil {
-		log.Error("Need to rollback because ControllerPublish ephemeral volume failed with error :" + err.Error())
+		csmlog.WithContext(ctx).Error("Need to rollback because ControllerPublish ephemeral volume failed with error :" + err.Error())
 		if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
-			log.Error("Rollback failed with error :" + err.Error())
+			csmlog.WithContext(ctx).Error("Rollback failed with error :" + err.Error())
 			return nil, err
 		}
 		return nil, err
 	}
-	log.Infof("Ephemeral ControllerPublish for volume %s was successful %v", volID, controllerPublishEphemeralVolResp)
+	csmlog.WithContext(ctx).Infof("Ephemeral ControllerPublish for volume %s was successful %v", volID, controllerPublishEphemeralVolResp)
 
 	delete(createEphemeralVolResp.Volume.VolumeContext, "csi.storage.k8s.io/ephemeral")
 	_, err = s.NodePublishVolume(ctx, &csi.NodePublishVolumeRequest{
@@ -646,54 +646,54 @@ func (s *service) ephemeralNodePublish(ctx context.Context, req *csi.NodePublish
 		VolumeContext:    createEphemeralVolResp.Volume.VolumeContext,
 	})
 	if err != nil {
-		log.Error("Need to rollback because NodePublish ephemeral volume failed with error :" + err.Error())
+		csmlog.WithContext(ctx).Error("Need to rollback because NodePublish ephemeral volume failed with error :" + err.Error())
 		if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
-			log.Error("Rollback failed with error :" + err.Error())
+			csmlog.WithContext(ctx).Error("Rollback failed with error :" + err.Error())
 			return nil, err
 		}
 		return nil, err
 	}
-	log.Infof("NodePublish step for volume %s was successful", volID)
+	csmlog.WithContext(ctx).Infof("NodePublish step for volume %s was successful", volID)
 
 	if _, err := statFileFunc(filePath); os.IsNotExist(err) {
-		log.Infof("path %s does not exists", filePath)
+		csmlog.WithContext(ctx).Infof("path %s does not exists", filePath)
 		err = mkDirAllFunc(filePath, 0o750)
 		if err != nil {
-			log.Error("Create directory in target path for ephemeral vol failed with error :" + err.Error())
+			csmlog.WithContext(ctx).Error("Create directory in target path for ephemeral vol failed with error :" + err.Error())
 			if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
-				log.Error("Rollback failed with error :" + err.Error())
+				csmlog.WithContext(ctx).Error("Rollback failed with error :" + err.Error())
 				return nil, err
 			}
 			return nil, err
 		}
 	}
-	log.Infof("Created dir in target path %s", filePath)
+	csmlog.WithContext(ctx).Infof("Created dir in target path %s", filePath)
 
 	f, err := createFileFunc(filepath.Clean(filePath) + "/id")
 	if err != nil {
-		log.Error("Create id file in target path for ephemeral vol failed with error :" + err.Error())
+		csmlog.WithContext(ctx).Error("Create id file in target path for ephemeral vol failed with error :" + err.Error())
 		if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
-			log.Error("Rollback failed with error :" + err.Error())
+			csmlog.WithContext(ctx).Error("Rollback failed with error :" + err.Error())
 			return nil, err
 		}
 		return nil, err
 	}
-	log.Infof("Created file in target path %s", filePath+"/id")
+	csmlog.WithContext(ctx).Infof("Created file in target path %s", filePath+"/id")
 
 	defer func() {
 		if err := closeFileFunc(f); err != nil {
-			log.Errorf("Error closing file: %s \n", err)
+			csmlog.WithContext(ctx).Errorf("Error closing file: %s \n", err)
 		}
 	}()
 	_, err2 := writeStringFunc(f, createEphemeralVolResp.Volume.VolumeId)
 	if err2 != nil {
-		log.Error("Writing to id file in target path for ephemeral vol failed with error :" + err2.Error())
+		csmlog.WithContext(ctx).Error("Writing to id file in target path for ephemeral vol failed with error :" + err2.Error())
 		if rollbackError := s.ephemeralNodeUnpublish(ctx, nodeUnpublishRequest); rollbackError != nil {
-			log.Error("Rollback failed with error :" + rollbackError.Error())
+			csmlog.WithContext(ctx).Error("Rollback failed with error :" + rollbackError.Error())
 		}
 		return nil, err2
 	}
-	log.Infof("Ephemeral Node Publish was successful...")
+	csmlog.WithContext(ctx).Infof("Ephemeral Node Publish was successful...")
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
@@ -734,13 +734,12 @@ func (s *service) ephemeralNodeUnpublish(
 var ephemeralNodeUnpublishFunc = func(s *service, ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest,
 ) error {
-	log := log.WithContext(ctx)
 	fields := csmlog.ExtractFieldsFromContext(ctx)
 	runID := fmt.Sprintf("%v", fields["csi.requestid"])
 
-	log.Infof("Request received for Ephemeral NodeUnpublish..")
+	csmlog.WithContext(ctx).Infof("Request received for Ephemeral NodeUnpublish..")
 	volumeID := req.GetVolumeId()
-	log.Infof("The volID is %s", volumeID)
+	csmlog.WithContext(ctx).Infof("The volID is %s", volumeID)
 	if volumeID == "" {
 		return status.Error(codes.InvalidArgument, GetMessageWithReqID(runID, "volume ID is required"))
 	}
@@ -755,10 +754,10 @@ var ephemeralNodeUnpublishFunc = func(s *service, ctx context.Context,
 		NodeId:   nodeID,
 	})
 	if err != nil {
-		log.Error("ControllerUnPublish ephemeral volume failed with error :" + err.Error())
+		csmlog.WithContext(ctx).Error("ControllerUnPublish ephemeral volume failed with error :" + err.Error())
 		return err
 	}
-	log.Infof("Controller UnPublish for Ephemeral inline volume %s sucessful..", volumeID)
+	csmlog.WithContext(ctx).Infof("Controller UnPublish for Ephemeral inline volume %s sucessful..", volumeID)
 
 	// Before deleting the volume on PowerScale,
 	// Cleaning up the directories we created.
@@ -767,7 +766,7 @@ var ephemeralNodeUnpublishFunc = func(s *service, ctx context.Context,
 		return err
 	}
 	tmpPath := req.TargetPath + "/" + volName
-	log.Infof("Going to clean up the temporary directory on path %s", tmpPath)
+	csmlog.WithContext(ctx).Infof("Going to clean up the temporary directory on path %s", tmpPath)
 	err = os.RemoveAll(tmpPath)
 	if err != nil {
 		return errors.New("failed to cleanup lock files")
@@ -777,10 +776,10 @@ var ephemeralNodeUnpublishFunc = func(s *service, ctx context.Context,
 		VolumeId: volumeID,
 	})
 	if err != nil {
-		log.Error("Delete ephemeral volume failed with error :" + err.Error())
+		csmlog.WithContext(ctx).Error("Delete ephemeral volume failed with error :" + err.Error())
 		return err
 	}
-	log.Infof("Delete volume for Ephemeral inline volume %s successful..", volumeID)
+	csmlog.WithContext(ctx).Infof("Delete volume for Ephemeral inline volume %s successful..", volumeID)
 
 	return nil
 }
@@ -789,19 +788,17 @@ func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
 	var nodeIP string
 	var err error
 
-	log := log.WithContext(ctx)
-
 	// When valid list of allowedNetworks is being given as part of values.yaml, we need
 	// to fetch first IP from matching network
 	if len(s.opts.allowedNetworks) > 0 {
-		log.Debugf("Fetching IP address of custom network for NFS I/O traffic")
+		csmlog.WithContext(ctx).Debugf("Fetching IP address of custom network for NFS I/O traffic")
 		nodeIP, err = csiutils.GetNFSClientIP(s.opts.allowedNetworks)
 		if err != nil {
-			log.Errorf("Failed to find IP address corresponding to the allowed network with error %v", err.Error())
+			csmlog.WithContext(ctx).Errorf("Failed to find IP address corresponding to the allowed network with error %v", err.Error())
 			return "", err
 		}
 	} else {
-		nodeIP, err = s.GetCSINodeIP(ctx)
+		nodeIP, err = s.GetCSINodeIP()
 		if (err) != nil {
 			return "", err
 		}
@@ -810,10 +807,10 @@ func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
 	nodeFQDN, err := getUtilsGetFQDNByIP(ctx, nodeIP)
 	if (err) != nil {
 		nodeFQDN = nodeIP
-		log.Warnf("Setting nodeFQDN to %s as failed to resolve IP to FQDN due to %v", nodeIP, err)
+		csmlog.WithContext(ctx).Warnf("Setting nodeFQDN to %s as failed to resolve IP to FQDN due to %v", nodeIP, err)
 	}
 
-	nodeID, err := s.GetCSINodeID(ctx)
+	nodeID, err := s.GetCSINodeID()
 	if (err) != nil {
 		return "", err
 	}
@@ -824,10 +821,9 @@ func (s *service) getPowerScaleNodeID(ctx context.Context) (string, error) {
 }
 
 func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
-	log := log.WithContext(ctx)
 	addrs, err := getInterfaceAddrsFunc()()
 	if err != nil {
-		log.Errorf("could not get network interface addresses: '%v'", err.Error())
+		csmlog.WithContext(ctx).Errorf("could not get network interface addresses: '%v'", err.Error())
 		return err
 	}
 
@@ -838,12 +834,12 @@ func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
 			if v.IP.To4() != nil && !v.IP.IsLoopback() {
 				ip, cnet, err := net.ParseCIDR(addr.String())
 				if err != nil {
-					log.Errorf("encountered error while parsing IP address %v", addr)
+					csmlog.WithContext(ctx).Errorf("encountered error while parsing IP address %v", addr)
 				} else {
 					sanitizedNet := strings.ReplaceAll(cnet.String(), "/", "-")
 					key := fmt.Sprintf("%s/az-%s-%s", constants.PluginName, sanitizedNet, ip.String())
 					labelsToAdd[key] = "true"
-					log.Debugf("discovered label %s -> %s", key, labelsToAdd[key])
+					csmlog.WithContext(ctx).Debugf("discovered label %s -> %s", key, labelsToAdd[key])
 				}
 			}
 		}
@@ -851,7 +847,7 @@ func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
 
 	labels, err := getNodeLabelsFunc(s)()
 	if err != nil {
-		log.Errorf("failed to get node labels %v", err.Error())
+		csmlog.WithContext(ctx).Errorf("failed to get node labels %v", err.Error())
 	}
 
 	labelsToRemove := make([]string, 0)
@@ -866,10 +862,10 @@ func (s *service) ReconcileNodeAzLabels(ctx context.Context) error {
 	if nodeLabelsNeedPatching(labels, labelsToAdd, labelsToRemove) {
 		err = getPatchNodeLabelsFunc(s)(labelsToAdd, labelsToRemove)
 		if err != nil {
-			log.Errorf("failed to patch node labels %v", err.Error())
+			csmlog.WithContext(ctx).Errorf("failed to patch node labels %v", err.Error())
 			return err
 		}
-		log.Debugf("reconciled node network labels, added: %v, removed: %v", labelsToAdd, labelsToRemove)
+		csmlog.WithContext(ctx).Debugf("reconciled node network labels, added: %v, removed: %v", labelsToAdd, labelsToRemove)
 	}
 
 	return nil
