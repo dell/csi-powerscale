@@ -226,7 +226,7 @@ CREATE="false"
 PREPARE="false"
 REGISTRY=""
 DRIVER="csi-isilon"
-DEFAULT_VERSION="v2.17.0"
+DEFAULT_VERSION="v2.17.1"
 
 # some directories
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"

@@ -22,12 +22,14 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/dell/csi-powerscale/v2/common/utils/identifiers"
 	isi "github.com/dell/gopowerscale"
+	isiapi "github.com/dell/gopowerscale/api"
 	apiv1 "github.com/dell/gopowerscale/api/v1"
 	v1 "github.com/dell/gopowerscale/api/v1"
 	v2 "github.com/dell/gopowerscale/api/v2"
@@ -1543,6 +1545,147 @@ func TestProcessSnapshotTrackingDirVolumeNameConsistency(t *testing.T) {
 	sourceEntry := snapshotTrackingDir + "/sourceVol"
 	assert.NotContains(t, checkedEntries, sourceEntry,
 		"should NOT look up tracking entry using source volume name")
+}
+
+// TestCSME244_DeleteVolumePassesAccessZoneToUnexport is a regression test for CSME-244.
+// It verifies that processSnapshotTrackingDirectoryDuringDeleteVolume forwards the
+// accessZone argument to UnexportByIDWithZone rather than passing an empty string.
+func TestCSME244_DeleteVolumePassesAccessZoneToUnexport(t *testing.T) {
+	ctx := context.Background()
+
+	originalGetZoneByNameFunc := getZoneByNameFunc
+	originalGetSnapshotIsiPathComponentsFunc := getSnapshotIsiPathComponentsFunc
+	originalGetSnapshotTrackingDirNameFunc := getSnapshotTrackingDirNameFunc
+	originalIsVolumeExistentFunc := isVolumeExistentFunc
+	originalDeleteVolumeFunc := deleteVolumeFunc
+	originalGetSubDirectoryCountFunc := getSubDirectoryCountFunc
+	originalUnexportByIDWithZoneFunc := unexportByIDWithZoneFunc
+	originalRemoveSnapshotFunc := removeSnapshotFunc
+	defer func() {
+		getZoneByNameFunc = originalGetZoneByNameFunc
+		getSnapshotIsiPathComponentsFunc = originalGetSnapshotIsiPathComponentsFunc
+		getSnapshotTrackingDirNameFunc = originalGetSnapshotTrackingDirNameFunc
+		isVolumeExistentFunc = originalIsVolumeExistentFunc
+		deleteVolumeFunc = originalDeleteVolumeFunc
+		getSubDirectoryCountFunc = originalGetSubDirectoryCountFunc
+		unexportByIDWithZoneFunc = originalUnexportByIDWithZoneFunc
+		removeSnapshotFunc = originalRemoveSnapshotFunc
+	}()
+
+	isiConfig := &IsilonClusterConfig{
+		isiSvc: &isiService{
+			endpoint: "http://testendpoint:8080",
+			client:   &isi.Client{},
+		},
+	}
+	s := &service{}
+	const testAccessZone = "az-sust070a-tst"
+
+	getZoneByNameFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, zoneName string) (*v1.IsiZone, error) {
+		return func(_ context.Context, _ string) (*v1.IsiZone, error) {
+			return &v1.IsiZone{Path: "/ifs/az-sust070a-tst"}, nil
+		}
+	}
+	getSnapshotIsiPathComponentsFunc = func(_ *IsilonClusterConfig) func(exportPath, zonePath string) (string, string, string) {
+		return func(_, _ string) (string, string, string) {
+			return "/ifs/az-sust070a-tst", "snapshot-c998475a", ""
+		}
+	}
+	getSnapshotTrackingDirNameFunc = func(_ *IsilonClusterConfig) func(snapshotName string) string {
+		return func(_ string) string {
+			return ".csi-snapshot-c998475a-tracking-dir"
+		}
+	}
+	isVolumeExistentFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeID, volumeEntry string) bool {
+		return func(_ context.Context, _, _, _ string) bool { return true }
+	}
+	deleteVolumeFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeSelector string) error {
+		return func(_ context.Context, _, _ string) error { return nil }
+	}
+	getSubDirectoryCountFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, volumePath, volumeSelector string) (int64, error) {
+		return func(_ context.Context, _, _ string) (int64, error) { return 3, nil }
+	}
+
+	var capturedZone string
+	unexportByIDWithZoneFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, exportID int, zoneName string) error {
+		return func(_ context.Context, _ int, zone string) error {
+			capturedZone = zone
+			return nil
+		}
+	}
+	removeSnapshotFunc = func(_ *IsilonClusterConfig) func(ctx context.Context, snapID int64, snapName string) error {
+		return func(_ context.Context, _ int64, _ string) error { return nil }
+	}
+
+	export := &v2.Export{
+		ID:    289846,
+		Paths: &[]string{"/ifs/az-sust070a-tst/.snapshot/snapshot-c998475a/tst-dr-off-csi-sebshift/infraver01-15a91bd3df"},
+	}
+
+	err := s.processSnapshotTrackingDirectoryDuringDeleteVolume(ctx, "infraver01-b033196589", testAccessZone, export, isiConfig)
+	assert.NoError(t, err)
+	assert.Equal(t, testAccessZone, capturedZone,
+		"CSME-244 regression: UnexportByIDWithZone must be called with accessZone, not empty string")
+}
+
+// TestCSME244_DeleteSnapshotPassesAccessZoneToUnexport is a regression test for CSME-244.
+// It verifies that processSnapshotTrackingDirectoryDuringDeleteSnapshot forwards the
+// accessZone argument to UnexportByIDWithZone rather than passing an empty string.
+func TestCSME244_DeleteSnapshotPassesAccessZoneToUnexport(t *testing.T) {
+	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	const testAccessZone = "az-sust070a-tst"
+	const exportID = 289846
+
+	mockAPIClient := &isimocks.Client{}
+	isiConfig := &IsilonClusterConfig{
+		isiSvc: &isiService{
+			client: &isi.Client{API: mockAPIClient},
+		},
+	}
+	s := &service{}
+
+	mockAPIClient.On("Get",
+		mock.Anything, "platform/1/zones", testAccessZone, mock.Anything, mock.Anything, mock.Anything,
+	).Return(nil).Once().Run(func(args mock.Arguments) {
+		resp := args.Get(5).(*apiv1.GetIsiZonesResp)
+		zone := apiv1.IsiZone{Name: testAccessZone, Path: "/ifs/az-sust070a-tst"}
+		resp.Zones = []*apiv1.IsiZone{&zone}
+	})
+
+	mockAPIClient.On("Get",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+	).Return(errors.New("not found"))
+
+	var capturedZone string
+	mockAPIClient.On("Delete",
+		mock.Anything, mock.Anything, strconv.Itoa(exportID), mock.Anything, mock.Anything, mock.Anything,
+	).Return(nil).Run(func(args mock.Arguments) {
+		if params, ok := args.Get(3).(isiapi.OrderedValues); ok {
+			for _, kv := range params {
+				if string(kv[0]) == "zone" {
+					capturedZone = string(kv[1])
+				}
+			}
+		}
+	})
+	mockAPIClient.On("Delete",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+	).Return(nil)
+
+	snapshotIsiPath := "/ifs/az-sust070a-tst/.snapshot/snapshot-c998475a-cf7b-4313-88f0-8c341f1d44f8/tst-dr-off-csi-sebshift/infraver01-15a91bd3df"
+	export := &v2.Export{
+		ID:    exportID,
+		Paths: &[]string{snapshotIsiPath},
+	}
+	deleteSnapshot := true
+
+	err := s.processSnapshotTrackingDirectoryDuringDeleteSnapshot(ctx, export, snapshotIsiPath, testAccessZone, &deleteSnapshot, isiConfig)
+	assert.NoError(t, err)
+	assert.Equal(t, testAccessZone, capturedZone,
+		"CSME-244 regression: UnexportByIDWithZone must be called with accessZone, not empty string")
 }
 
 func TestCreateVolumefunc(t *testing.T) {

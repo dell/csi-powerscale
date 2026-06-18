@@ -1119,7 +1119,7 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteVolume(
 		// There are no more volumes present which were created using this snapshot
 		// This indicates that there are only three subdirectories ., .. and snapshot delete marker.
 		if totalSubDirectories == 3 {
-			err = unexportByIDWithZoneFunc(isiConfig)(ctx, export.ID, "")
+			err = unexportByIDWithZoneFunc(isiConfig)(ctx, export.ID, accessZone)
 			if err != nil {
 				log.Errorf("failed to delete snapshot directory export with id '%v'", export.ID)
 				return nil
@@ -2351,7 +2351,7 @@ func (s *service) processSnapshotTrackingDirectoryDuringDeleteSnapshot(
 	// There are no more volumes present which were created using this snapshot
 	// Every directory will have two subdirectories . and ..
 	if totalSubDirectories == IgnoreDotAndDotDotSubDirs || totalSubDirectories == 0 {
-		if err := isiConfig.isiSvc.UnexportByIDWithZone(ctx, export.ID, ""); err != nil {
+		if err := isiConfig.isiSvc.UnexportByIDWithZone(ctx, export.ID, accessZone); err != nil {
 			return err
 		}
 
