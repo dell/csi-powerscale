@@ -20,7 +20,7 @@ PROG="${0}"
 NODE_VERIFY=1
 VERIFY=1
 MODE="install"
-DEFAULT_VERSION="v2.17.0"
+DEFAULT_VERSION="v2.17.1"
 WATCHLIST=""
 
 # export the name of the debug log, so child processes will see it
