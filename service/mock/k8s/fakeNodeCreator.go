@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/Ecosystems/container-storage-modules/src/csmlog"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,27 +41,27 @@ const K8sLabel = "label"
 // WriteK8sValueToFile writes the values to a file to used in fakeNode
 func WriteK8sValueToFile(inputType, value string) {
 	DeleteK8sValuesFile()
-	log.Printf("writing k8s values input=%s, value=%s", inputType, value)
+	csmlog.Infof("writing k8s values input=%s, value=%s", inputType, value)
 	pwd, _ := os.Getwd()
-	log.Printf("cwd is path is %s", pwd)
+	csmlog.Infof("cwd is path is %s", pwd)
 	file, err := os.Create(K8sValueFile)
 	if err != nil {
-		log.Printf("Unable to create file to write kubernetes values - %s", err)
+		csmlog.Infof("Unable to create file to write kubernetes values - %s", err)
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			log.Printf("Error closing file: %s\n", err)
+			csmlog.Errorf("Error closing file: %s", err)
 		}
 	}()
 	valuesCsvStr := fmt.Sprintf("%s,%s", inputType, value)
-	log.Printf("values str is %s", valuesCsvStr)
+	csmlog.Infof("values str is %s", valuesCsvStr)
 	_, err = file.WriteString(valuesCsvStr)
 	if err != nil {
-		log.Printf("Unable to create file to write kubernetes values - %s", err)
+		csmlog.Infof("Unable to create file to write kubernetes values - %s", err)
 	}
 	absPath, err := filepath.Abs(file.Name())
 	if err != nil {
-		log.Printf("Unable to create abspath of file  - %s", err)
+		csmlog.Infof("Unable to create abspath of file  - %s", err)
 	}
 	fmt.Printf("wrote the values to file - %s \n", absPath)
 }
@@ -70,17 +70,17 @@ func WriteK8sValueToFile(inputType, value string) {
 func DeleteK8sValuesFile() bool {
 	abspath, err := filepath.Abs(K8sValueFile)
 	if err != nil {
-		log.Errorf("unable get abs path of file for deletion - %s", err)
+		csmlog.Errorf("unable get abs path of file for deletion - %s", err)
 	}
-	log.Infof("abs path for deletion is %s", abspath)
+	csmlog.Infof("abs path for deletion is %s", abspath)
 	pwd, _ := os.Getwd()
-	log.Infof("cwd for deletion is %s", pwd)
+	csmlog.Infof("cwd for deletion is %s", pwd)
 	err = os.Remove(K8sValueFile)
 	if err != nil {
-		log.Errorf("unable to remove file %s - %s", K8sValueFile, err)
+		csmlog.Errorf("unable to remove file %s - %s", K8sValueFile, err)
 		return false
 	}
-	log.Infof("deleted file %s", abspath)
+	csmlog.Infof("deleted file %s", abspath)
 	return true
 }
 
@@ -89,18 +89,18 @@ func readAppliedLabels() (string, string) {
 	var value string
 	abspath, err := filepath.Abs(K8sValueFile)
 	if err != nil {
-		log.Errorf("unable to get abs path of filei to read due to - %s", err)
+		csmlog.Errorf("unable to get abs path of filei to read due to - %s", err)
 	}
-	log.Infof("abs path to read is is %s", abspath)
+	csmlog.Infof("abs path to read is is %s", abspath)
 	pwd, _ := os.Getwd()
-	log.Infof("cwd while reading is path is %s", pwd)
+	csmlog.Infof("cwd while reading is path is %s", pwd)
 	content, err := os.ReadFile(K8sValueFile)
 	if err != nil {
-		log.Errorf("unable to read file - %s", err)
+		csmlog.Errorf("unable to read file - %s", err)
 		return label, value
 	}
 	valueStr := string(content)
-	log.Infof("content read is %s", valueStr)
+	csmlog.Infof("content read is %s", valueStr)
 	values := strings.Split(valueStr, ",")
 	if len(values) > 0 {
 		labelnValues := strings.Split(values[1], "=")
@@ -109,7 +109,7 @@ func readAppliedLabels() (string, string) {
 			value = labelnValues[1]
 		}
 	}
-	log.Printf("sent label values %s - %s ", label, value)
+	csmlog.Infof("sent label values %s - %s ", label, value)
 	return label, value
 }
 
@@ -119,9 +119,9 @@ func GetFakeNode() *v1.Node {
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "fake-host"
-		log.Errorf("setting hostname as %s as call to get hostname failed", hostname)
+		csmlog.Errorf("setting hostname as %s as call to get hostname failed", hostname)
 	}
-	log.Print(hostname)
+	csmlog.Info(hostname)
 	labelMap := make(map[string]string)
 	labelMap["beta.kubernetes.io/arch"] = "amd64"
 	labelMap["beta.kubernetes.io/os"] = "linux"
@@ -163,7 +163,7 @@ func GetFakeNode() *v1.Node {
 
 	fakeNode, err := client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 	if err != nil {
-		log.Errorf("Error occured while creating pod %s: %s", node.Name, err.Error())
+		csmlog.Errorf("Error occured while creating pod %s: %s", node.Name, err.Error())
 	}
 	return fakeNode
 }

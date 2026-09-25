@@ -1,20 +1,17 @@
+// Copyright © 2019-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//      http://www.apache.org/licenses/LICENSE-2.0
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 package constants
-
-/*
- Copyright (c) 2019 Dell Inc, or its subsidiaries.
-
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
 
 const (
 
@@ -79,6 +76,9 @@ const (
 	// EnvAllowedNetworks indicates list of networks on which NFS traffic is allowed
 	EnvAllowedNetworks = "X_CSI_ALLOWED_NETWORKS"
 
+	// EnvAllowedNetworksMode indicates the NFS network selection mode (single or multi)
+	EnvAllowedNetworksMode = "X_CSI_ALLOWED_NETWORKS_MODE"
+
 	// EnvIsilonConfigFile specifies the filepath containing Isilon cluster's config details
 	EnvIsilonConfigFile = "X_CSI_ISI_CONFIG_PATH"
 
@@ -103,6 +103,84 @@ const (
 	// EnvPodmonArrayConnectivityPollRate indicates the polling frequency to check array connectivity
 	EnvPodmonArrayConnectivityPollRate = "X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE"
 
+	// EnvPodmonAPIToken is the shared secret token used to authenticate requests
+	// between the CSI controller and node podmon API endpoints.
+	// When set, both the node HTTP server and the controller HTTP client
+	// will use Bearer token authentication. If unset, authentication is skipped
+	// for backward compatibility.
+	EnvPodmonAPIToken = "X_CSI_PODMON_API_TOKEN" // #nosec G101
+
 	// EnvMetadataRetrieverEndpoint specifies the endpoint address for csi-metadata-retriever sidecar
 	EnvMetadataRetrieverEndpoint = "CSI_RETRIEVER_ENDPOINT"
+
+	// EnvMetricsEnabled enables the Prometheus metrics HTTP server on the driver pods
+	EnvMetricsEnabled = "X_CSI_METRICS_ENABLED"
+
+	// EnvMetricsPort is the port on which the Prometheus metrics HTTP server listens
+	EnvMetricsPort = "X_CSI_METRICS_PORT"
+
+	// EnvMetricsTLSCertFile is the TLS certificate file for the metrics endpoint
+	EnvMetricsTLSCertFile = "X_CSI_METRICS_TLS_CERT_FILE"
+
+	// EnvMetricsTLSKeyFile is the TLS private key file for the metrics endpoint
+	EnvMetricsTLSKeyFile = "X_CSI_METRICS_TLS_KEY_FILE"
+
+	// EnvMetricsCollectionInterval is the background metrics collection interval
+	EnvMetricsCollectionInterval = "X_CSI_METRICS_COLLECTION_INTERVAL"
+
+	// EnvMetricsCollectionCacheTTL is the cache TTL for metrics collection responses
+	EnvMetricsCollectionCacheTTL = "X_CSI_METRICS_COLLECTION_CACHE_TTL"
+
+	// EnvMetricsArrayRateLimit is the OneFS metrics request budget per minute per endpoint
+	EnvMetricsArrayRateLimit = "X_CSI_METRICS_ARRAY_RATE_LIMIT"
+
+	// EnvMetricsArrayTimeout is the timeout for OneFS metrics calls
+	EnvMetricsArrayTimeout = "X_CSI_METRICS_ARRAY_TIMEOUT"
+
+	// EnvMetricsArrayCBThreshold is the circuit breaker failure threshold for OneFS metrics calls
+	EnvMetricsArrayCBThreshold = "X_CSI_METRICS_ARRAY_CB_THRESHOLD"
+
+	// EnvMetricsArrayCBResetTimeout is the circuit breaker reset timeout for OneFS metrics calls
+	EnvMetricsArrayCBResetTimeout = "X_CSI_METRICS_ARRAY_CB_RESET_TIMEOUT"
+
+	// EnvMetricsLeaderElectionEnabled enables leader election for metrics collection in multi-controller deployments
+	EnvMetricsLeaderElectionEnabled = "X_CSI_METRICS_LEADER_ELECTION_ENABLED"
+
+	// EnvMetricsLeaderElectionLeaseDuration is the lease duration for metrics leader election
+	EnvMetricsLeaderElectionLeaseDuration = "X_CSI_METRICS_LEADER_ELECTION_LEASE_DURATION"
+
+	// EnvMetricsLeaderElectionRenewDeadline is the renew deadline for metrics leader election
+	EnvMetricsLeaderElectionRenewDeadline = "X_CSI_METRICS_LEADER_ELECTION_RENEW_DEADLINE"
+
+	// EnvMetricsLeaderElectionRetryPeriod is the retry period for metrics leader election
+	EnvMetricsLeaderElectionRetryPeriod = "X_CSI_METRICS_LEADER_ELECTION_RETRY_PERIOD"
+
+	// EnvPodName is the name of the pod where the driver is running
+	EnvPodName = "POD_NAME"
+
+	// EnvCSIMode is the mode of the CSI driver (controller or node)
+	EnvCSIMode = "X_CSI_MODE"
+
+	// EnvDriverNamespace is the namespace where the PowerScale driver is deployed
+	EnvDriverNamespace = "X_CSI_DRIVER_NAMESPACE"
+
+	// EnvEnableDriverFSGroupChown enables driver-side recursive fsGroup chown for export-backed volumes.
+	// When disabled, the driver still advertises VOLUME_MOUNT_GROUP (required for directory-backed volumes),
+	// but export-backed volumes fall back to a sequential recursive chown within the configured timeout.
+	EnvEnableDriverFSGroupChown = "X_CSI_ISILON_ENABLE_DRIVER_FSGROUP_CHOWN"
+
+	// EnvChownWorkers sets the number of parallel os.Chown workers for recursive fsGroup application.
+	EnvChownWorkers = "X_CSI_ISILON_CHOWN_WORKERS"
+
+	// EnvChownWriteBatch sets how many completed file paths are buffered before the resumable state file is written.
+	EnvChownWriteBatch = "X_CSI_ISILON_CHOWN_WRITEBATCH"
+
+	// EnvChownTimeoutSeconds sets the per-NodeStageVolume/NodePublishVolume timeout for recursive chown.
+	EnvChownTimeoutSeconds = "X_CSI_ISILON_CHOWN_TIMEOUT_SECONDS"
+
+	// EnvNFSMountFQDN is the global default FQDN for NFS mounts (lowest precedence)
+	EnvNFSMountFQDN = "X_CSI_ISI_NFS_MOUNT_FQDN"
+
+	// EnvTLSHandshakeTimeoutSeconds is the TLS handshake timeout in seconds
+	EnvTLSHandshakeTimeoutSeconds = "X_CSI_ISI_TLS_HANDSHAKE_TIMEOUT_SECONDS"
 )

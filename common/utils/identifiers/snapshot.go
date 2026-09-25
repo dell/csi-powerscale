@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	csmlog "github.com/dell/csmlog"
+	csmlog "github.com/Ecosystems/container-storage-modules/src/csmlog"
 )
 
 // SnapshotIDSeparator is the separator that separates snapshot id and cluster name (two components that a normalized snapshot ID is comprised of)
@@ -29,11 +29,9 @@ const SnapshotIDSeparator = "=_=_="
 // GetNormalizedSnapshotID combines snapshotID ID and cluster name and access zone to form the normalized snapshot ID
 // e.g. 12345 + cluster1 + accessZone => 12345=_=_=cluster1=_=_=zone1
 func GetNormalizedSnapshotID(ctx context.Context, snapshotID, clusterName, accessZone string) string {
-	log := csmlog.GetLogger().WithContext(ctx)
-
 	snapID := fmt.Sprintf("%s%s%s%s%s", snapshotID, SnapshotIDSeparator, clusterName, SnapshotIDSeparator, accessZone)
 
-	log.Debugf("combined snapshot id '%s' access zone '%s' and cluster name '%s' to form normalized snapshot ID '%s'",
+	csmlog.WithContext(ctx).Debugf("combined snapshot id '%s' access zone '%s' and cluster name '%s' to form normalized snapshot ID '%s'",
 		snapshotID, accessZone, clusterName, snapID)
 
 	return snapID
@@ -43,7 +41,6 @@ func GetNormalizedSnapshotID(ctx context.Context, snapshotID, clusterName, acces
 // e.g. 12345 => 12345, ""
 // e.g. 12345=_=_=cluster1=_=_=zone => 12345, cluster1, zone
 func ParseNormalizedSnapshotID(ctx context.Context, snapID string) (string, string, string, error) {
-	log := csmlog.GetLogger().WithContext(ctx)
 	tokens := strings.Split(snapID, SnapshotIDSeparator)
 	if len(tokens) < 1 {
 		return "", "", "", fmt.Errorf("snapshot ID '%s' cannot be split into tokens", snapID)
@@ -60,7 +57,7 @@ func ParseNormalizedSnapshotID(ctx context.Context, snapID string) (string, stri
 		}
 	}
 
-	log.Debugf("normalized snapshot ID '%s' parsed into snapshot ID '%s' and cluster name '%s'",
+	csmlog.WithContext(ctx).Debugf("normalized snapshot ID '%s' parsed into snapshot ID '%s' and cluster name '%s'",
 		snapID, snapshotID, clusterName)
 
 	return snapshotID, clusterName, accessZone, nil

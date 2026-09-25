@@ -25,9 +25,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dell/csi-metadata-retriever/retriever"
-	controller "github.com/dell/csi-powerscale/v2/service"
-	csictx "github.com/dell/gocsi/context"
+	"github.com/Ecosystems/container-storage-modules/src/csi-metadata-retriever/retriever"
+	controller "github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/service"
+	csictx "github.com/Ecosystems/container-storage-modules/src/gocsi/context"
 	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"

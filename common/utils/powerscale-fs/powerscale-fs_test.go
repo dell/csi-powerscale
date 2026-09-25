@@ -24,8 +24,8 @@ import (
 	"path"
 	"testing"
 
-	isi "github.com/dell/gopowerscale"
-	apiv2 "github.com/dell/gopowerscale/api/v2"
+	isi "github.com/Ecosystems/container-storage-modules/src/gopowerscale"
+	apiv2 "github.com/Ecosystems/container-storage-modules/src/gopowerscale/api/v2"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -1,18 +1,15 @@
-/*
-Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright © 2019-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//      http://www.apache.org/licenses/LICENSE-2.0
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 
 package service
 
@@ -23,12 +20,167 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dell/gofsutil"
+	"github.com/Ecosystems/container-storage-modules/src/gofsutil"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+// Test_publishVolume_AuthFailureMetric verifies that authentication failure metric
+// is recorded when NFS mount fails with "access denied by server while mounting"
+func Test_publishVolume_AuthFailureMetric(t *testing.T) {
+	// Save original functions
+	defaultGetMountFunc := getMountFunc
+	defaultGetGetMountsFunc := getGetMountsFunc
+	defaultRecordAuthFailureFunc := recordAuthFailureFunc
+	defaultMetricsEnabled := metricsEnabled
+
+	defer func() {
+		getMountFunc = defaultGetMountFunc
+		getGetMountsFunc = defaultGetGetMountsFunc
+		recordAuthFailureFunc = defaultRecordAuthFailureFunc
+		metricsEnabled = defaultMetricsEnabled
+	}()
+
+	t.Run("metrics disabled - no recording", func(t *testing.T) {
+		authFailureCalled := false
+		recordAuthFailureFunc = func() {
+			authFailureCalled = true
+		}
+		metricsEnabled = false
+
+		// Mock GetMounts to return empty list
+		getGetMountsFunc = func() func(ctx context.Context) ([]gofsutil.Info, error) {
+			return func(_ context.Context) ([]gofsutil.Info, error) {
+				return []gofsutil.Info{}, nil
+			}
+		}
+
+		// Simulate auth failure on mount
+		getMountFunc = func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
+			return func(_ context.Context, _, _, _ string, _ ...string) error {
+				return fmt.Errorf("access denied by server while mounting")
+			}
+		}
+
+		req := &csi.NodePublishVolumeRequest{
+			VolumeId:   "vol-1",
+			TargetPath: filepath.Join(t.TempDir(), "target"),
+			VolumeCapability: &csi.VolumeCapability{
+				AccessMode: &csi.VolumeCapability_AccessMode{
+					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				},
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{
+						MountFlags: []string{},
+					},
+				},
+			},
+		}
+
+		err := publishVolume(context.Background(), req, "192.0.2.181:/ifs/data/csi/vol-1")
+
+		// Should fail with auth error
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "access denied")
+
+		// Auth failure metric should NOT have been called (metrics disabled)
+		assert.False(t, authFailureCalled, "RecordAuthFailure should NOT be called when metrics disabled")
+	})
+
+	t.Run("metrics enabled - recording occurs", func(t *testing.T) {
+		authFailureCalled := false
+		recordAuthFailureFunc = func() {
+			authFailureCalled = true
+		}
+		metricsEnabled = true
+
+		// Mock GetMounts to return empty list
+		getGetMountsFunc = func() func(ctx context.Context) ([]gofsutil.Info, error) {
+			return func(_ context.Context) ([]gofsutil.Info, error) {
+				return []gofsutil.Info{}, nil
+			}
+		}
+
+		// Simulate auth failure on mount
+		getMountFunc = func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
+			return func(_ context.Context, _, _, _ string, _ ...string) error {
+				return fmt.Errorf("access denied by server while mounting")
+			}
+		}
+
+		req := &csi.NodePublishVolumeRequest{
+			VolumeId:   "vol-1",
+			TargetPath: filepath.Join(t.TempDir(), "target"),
+			VolumeCapability: &csi.VolumeCapability{
+				AccessMode: &csi.VolumeCapability_AccessMode{
+					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				},
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{
+						MountFlags: []string{},
+					},
+				},
+			},
+		}
+
+		err := publishVolume(context.Background(), req, "192.0.2.181:/ifs/data/csi/vol-1")
+
+		// Should fail with auth error
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "access denied")
+
+		// Auth failure metric should have been called (metrics enabled)
+		assert.True(t, authFailureCalled, "RecordAuthFailure should be called when metrics enabled")
+	})
+
+	t.Run("metrics enabled - other error no recording", func(t *testing.T) {
+		authFailureCalled := false
+		recordAuthFailureFunc = func() {
+			authFailureCalled = true
+		}
+		metricsEnabled = true
+
+		// Mock GetMounts to return empty list
+		getGetMountsFunc = func() func(ctx context.Context) ([]gofsutil.Info, error) {
+			return func(_ context.Context) ([]gofsutil.Info, error) {
+				return []gofsutil.Info{}, nil
+			}
+		}
+
+		// Simulate non-auth error on mount
+		getMountFunc = func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
+			return func(_ context.Context, _, _, _ string, _ ...string) error {
+				return fmt.Errorf("network unreachable")
+			}
+		}
+
+		req := &csi.NodePublishVolumeRequest{
+			VolumeId:   "vol-1",
+			TargetPath: filepath.Join(t.TempDir(), "target"),
+			VolumeCapability: &csi.VolumeCapability{
+				AccessMode: &csi.VolumeCapability_AccessMode{
+					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				},
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{
+						MountFlags: []string{},
+					},
+				},
+			},
+		}
+
+		err := publishVolume(context.Background(), req, "192.0.2.181:/ifs/data/csi/vol-1")
+
+		// Should fail with error
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "network unreachable")
+
+		// Auth failure metric should NOT have been called (not an auth error)
+		assert.False(t, authFailureCalled, "RecordAuthFailure should NOT be called for non-auth errors")
+	})
+}
 
 // Split TestMkdir into separate tests to test each case
 func TestMkdirCreateDir(t *testing.T) {
@@ -924,6 +1076,139 @@ func Test_publishVolume(t *testing.T) {
 			if tt.wantErr && err != nil && tt.errorChecker != nil {
 				tt.errorChecker(t, err)
 			}
+		})
+	}
+}
+
+func Test_containsPrefix(t *testing.T) {
+	tests := []struct {
+		name   string
+		list   []string
+		prefix string
+		want   bool
+	}{
+		{"empty list", []string{}, "xprtsec=", false},
+		{"no match", []string{"rw", "hard"}, "xprtsec=", false},
+		{"exact match", []string{"xprtsec=mtls"}, "xprtsec=", true},
+		{"case insensitive", []string{"Xprtsec=MTLS"}, "xprtsec=", true},
+		{"among others", []string{"rw", "xprtsec=mtls", "hard"}, "xprtsec=", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := containsPrefix(tt.list, tt.prefix)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// Test_publishVolume_mTLS_xprtsec_injection verifies that when
+// NFSTransportSecurity is set to "mtls" in VolumeContext, the mount command
+// automatically receives the "xprtsec=mtls" option. Non-mTLS requests must
+// remain untouched for backward compatibility.
+func Test_publishVolume_mTLS_xprtsec_injection(t *testing.T) {
+	defaultGetGetMountsFunc := getGetMountsFunc
+	defaultGetMountFunc := getMountFunc
+
+	defer func() {
+		getGetMountsFunc = defaultGetGetMountsFunc
+		getMountFunc = defaultGetMountFunc
+	}()
+
+	// stub GetMounts to return nothing (fresh mount)
+	getGetMountsFunc = func() func(ctx context.Context) ([]gofsutil.Info, error) {
+		return func(_ context.Context) ([]gofsutil.Info, error) {
+			return []gofsutil.Info{}, nil
+		}
+	}
+
+	tests := []struct {
+		name           string
+		volumeContext  map[string]string
+		userMountFlags []string
+		wantXprtsec    bool // expect xprtsec=mtls in mount options
+		wantDuplicate  bool // must NOT see a duplicate
+	}{
+		{
+			name:          "mTLS enabled - injects xprtsec=mtls",
+			volumeContext: map[string]string{"NFSTransportSecurity": "mtls"},
+			wantXprtsec:   true,
+		},
+		{
+			name:          "mTLS enabled case insensitive",
+			volumeContext: map[string]string{"NFSTransportSecurity": "MTLS"},
+			wantXprtsec:   true,
+		},
+		{
+			name:          "no transport security - no injection",
+			volumeContext: map[string]string{},
+			wantXprtsec:   false,
+		},
+		{
+			name:          "none transport security - no injection",
+			volumeContext: map[string]string{"NFSTransportSecurity": "none"},
+			wantXprtsec:   false,
+		},
+		{
+			name:          "tls transport security - no injection (mTLS only)",
+			volumeContext: map[string]string{"NFSTransportSecurity": "tls"},
+			wantXprtsec:   false,
+		},
+		{
+			name:           "user already provides xprtsec=mtls - no duplicate",
+			volumeContext:  map[string]string{"NFSTransportSecurity": "mtls"},
+			userMountFlags: []string{"xprtsec=mtls"},
+			wantXprtsec:    true,
+			wantDuplicate:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var capturedOpts []string
+
+			getMountFunc = func() func(ctx context.Context, source, target, fsType string, opts ...string) error {
+				return func(_ context.Context, _, _, _ string, opts ...string) error {
+					capturedOpts = opts
+					return nil
+				}
+			}
+
+			req := &csi.NodePublishVolumeRequest{
+				VolumeId: "test-vol",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{
+							MountFlags: tt.userMountFlags,
+						},
+					},
+				},
+				TargetPath:    filepath.Join(t.TempDir(), "target"),
+				VolumeContext: tt.volumeContext,
+			}
+
+			err := publishVolume(context.Background(), req, "powerscale.test.local:/ifs/data/test-vol")
+			assert.NoError(t, err)
+
+			hasXprtsec := false
+			xprtsecCount := 0
+			for _, o := range capturedOpts {
+				if o == "xprtsec=mtls" {
+					hasXprtsec = true
+					xprtsecCount++
+				}
+			}
+
+			if tt.wantXprtsec {
+				assert.True(t, hasXprtsec, "expected xprtsec=mtls in mount options, got: %v", capturedOpts)
+			} else {
+				assert.False(t, hasXprtsec, "did not expect xprtsec=mtls in mount options, got: %v", capturedOpts)
+			}
+
+			// Never duplicate
+			assert.LessOrEqual(t, xprtsecCount, 1, "xprtsec=mtls must not be duplicated, count=%d opts=%v", xprtsecCount, capturedOpts)
 		})
 	}
 }

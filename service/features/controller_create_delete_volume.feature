@@ -1,3 +1,17 @@
+# Copyright © 2019-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 Feature: Isilon CSI interface
     As a consumer of the CSI interface
     I want to test service methods
@@ -34,7 +48,7 @@ Feature: Isilon CSI interface
      Examples:
      | induced                             | errormsg                                           |
      | "InstancesError"                    | "Error retrieving Volume"                          |
-     | "CreateQuotaError"                  | "error creating quota"                             |
+     | "CreateQuotaError"                  | "quota creation failed"                            |
      | "CreateExportError"                 | "EOF"                                              |
      | "GetExportInternalError"            | "EOF"                                              |
      | "none"                              | "none"                                             |
@@ -139,6 +153,47 @@ Feature: Isilon CSI interface
       | "Twelve_Hours"    |
       | "One_Day"         |
 
+@directoryBacked
+@v1.0.0
+    Scenario: Create directory-backed volume good scenario with quota enabled
+      Given a Isilon service
+      And I enable quota
+      And I induce error "ExportExists"
+      When I call CreateVolume with directory backed params "volume1" "/ifs/data/csi-isilon"
+      Then the error contains "none"
+
+    Scenario: Create directory-backed volume when shared export not found
+      Given a Isilon service
+      And I enable quota
+      When I call CreateVolume with directory backed params "volume1" "/ifs/data/csi-isilon"
+      Then the error contains "shared export not found"
+
+    Scenario: Create directory-backed volume with missing SharedExportPath parameter
+      Given a Isilon service
+      And I enable quota
+      When I call CreateVolume with directory backed params and missing SharedExportPath "volume1"
+      Then the error contains "SharedExportPath is required when DirectoryBacked is enabled"
+
+    Scenario Outline: Create directory-backed volume with induced errors
+      Given a Isilon service
+      And I enable quota
+      And I induce error "ExportExists"
+      And I induce error <induced>
+      When I call CreateVolume with directory backed params "volume1" "/ifs/data/csi-isilon"
+      Then the error contains <errormsg>
+
+      Examples:
+      | induced              | errormsg              |
+      | "CreateQuotaError"   | "quota creation failed" |
+      | "InstancesError"     | "Error retrieving Volume" |
+
+    Scenario: Create directory-backed volume when shared export lookup returns internal error
+      Given a Isilon service
+      And I enable quota
+      And I induce error "GetExportInternalError"
+      When I call CreateVolume with directory backed params "volume1" "/ifs/data/csi-isilon"
+      Then the error contains "failed to query shared export"
+
 @deleteVolume
 @v1.0.0
     Scenario: Delete volume good scenario with quota enabled
@@ -146,6 +201,23 @@ Feature: Isilon CSI interface
       And I enable quota
       When I call DeleteVolume "volume1=_=_=43=_=_=System"
       Then a valid DeleteVolumeResponse is returned
+
+@deleteVolumeDirBacked
+@v1.0.0
+    Scenario: Delete directory-backed volume good scenario with quota enabled
+      Given a Isilon service
+      And I enable quota
+      And I induce error "DirectoryBackedExportMode"
+      When I call DeleteVolume "volume1=_=_=557=_=_=System"
+      Then a valid DeleteVolumeResponse is returned
+
+    Scenario: Delete directory-backed volume with induced quota error
+      Given a Isilon service
+      And I enable quota
+      And I induce error "DirectoryBackedExportMode"
+      And I induce error "DeleteQuotaError"
+      When I call DeleteVolume "volume1=_=_=557=_=_=System"
+      Then the error contains "EOF"
 
     Scenario Outline: Delete volume with invalid volume id
       Given a Isilon service

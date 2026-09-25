@@ -14,11 +14,11 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: pvc-2
+  name: pvc-from-snap
   namespace: test
 spec:
   accessModes:
-    - ReadOnlyMany
+    - ReadWriteOnce
   volumeMode: Filesystem
   resources:
     requests:
@@ -26,5 +26,5 @@ spec:
   storageClassName: isilon
   dataSource:
     kind: VolumeSnapshot
-    name: snap-1
+    name: pvol0-snap1
     apiGroup: snapshot.storage.k8s.io

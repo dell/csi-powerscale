@@ -17,31 +17,18 @@ limitations under the License.
 package provider
 
 import (
-	"bytes"
 	"errors"
 	"testing"
 
-	csiutils "github.com/dell/csi-powerscale/v2/csi-utils"
-	"github.com/dell/gocsi"
-	"github.com/sirupsen/logrus"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/constants"
+	csiutils "github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/csi-utils"
+	"github.com/Ecosystems/container-storage-modules/src/gocsi"
 	"github.com/stretchr/testify/assert"
 )
 
-// Mocking utility functions
-var (
-	mockGetLogger = func() *logrus.Entry {
-		logger := logrus.New()
-		logger.SetLevel(logrus.DebugLevel)
-		var logBuffer bytes.Buffer
-		logger.SetOutput(&logBuffer)
-		return logrus.NewEntry(logger)
-	}
-	mockRemoveExistingCSISockFile = func() error {
-		return errors.New("failed to remove existing CSI sock file")
-	}
-)
-
 func TestNew(t *testing.T) {
+	t.Setenv(constants.EnvMetricsEnabled, "false")
+
 	// Inject the mock functions
 	newTest := New()
 
@@ -77,4 +64,15 @@ func TestNew(t *testing.T) {
 	assert.NotNil(t, plugin.BeforeServe)
 	assert.NotNil(t, plugin.RegisterAdditionalServers)
 	assert.Len(t, plugin.EnvVars, 2)
+}
+
+func TestNew_MetricsEnabled_WiresOperationInterceptor(t *testing.T) {
+	t.Setenv(constants.EnvMetricsEnabled, "true")
+
+	newTest := New()
+	plugin, ok := newTest.(*gocsi.StoragePlugin)
+	assert.True(t, ok, "newTest should be of type *gocsi.StoragePlugin")
+
+	assert.NotNil(t, plugin)
+	assert.Len(t, plugin.Interceptors, 3, "metrics-enabled provider must include operation interceptor")
 }

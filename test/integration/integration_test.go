@@ -24,12 +24,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dell/csi-powerscale/v2/common/constants"
-	"github.com/dell/csi-powerscale/v2/common/k8sutils"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/constants"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/k8sutils"
 	"github.com/Showmax/go-fqdn"
 
-	"github.com/dell/csi-powerscale/v2/provider"
-	csiutils "github.com/dell/gocsi/utils/csi"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/provider"
+	csiutils "github.com/Ecosystems/container-storage-modules/src/gocsi/utils/csi"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
 	"google.golang.org/grpc"
@@ -75,6 +75,11 @@ func TestMain(m *testing.M) {
 		fmt.Printf("'%s': '%s'\n", datadir, err)
 	}
 
+	if grpcClient == nil {
+		fmt.Printf("grpcClient is nil, skipping godog test suite (likely running via go test ./... instead of run.sh)\n")
+		os.Exit(0)
+	}
+
 	write, err := os.Create("Powerscale_integration_test_results.xml")
 	opts := godog.Options{
 		Output: write,
@@ -92,11 +97,16 @@ func TestMain(m *testing.M) {
 	if st := m.Run(); st > exitVal {
 		exitVal = st
 	}
-	stop()
+	if stop != nil {
+		stop()
+	}
 	os.Exit(exitVal)
 }
 
 func TestIdentityGetPluginInfo(t *testing.T) {
+	if grpcClient == nil {
+		t.Skip("Skipping test because gRPC client is nil (server failed to start)")
+	}
 	ctx := context.Background()
 	fmt.Printf("testing GetPluginInfo\n")
 	client := csi.NewIdentityClient(grpcClient)

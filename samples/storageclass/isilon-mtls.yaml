@@ -1,0 +1,138 @@
+# Copyright © 2020-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#      http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Sample StorageClass for PowerScale CSI Driver with NFS over mTLS (mutual TLS)
+# This configuration enables encrypted NFS transport with client certificate authentication
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: isilon-mtls
+provisioner: csi-isilon.dellemc.com
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+parameters:
+  # The name of the access zone a volume can be created in
+  # Optional: true
+  # Default value: default value specified in values.yaml
+  # Examples: System
+  AccessZone: System
+
+  # The base path for the volumes to be created on PowerScale cluster.
+  # Ensure that this path exists on PowerScale cluster.
+  # Allowed values: unix absolute path
+  # Optional: true
+  # Default value: value specified in values.yaml for isiPath
+  # Examples: /ifs/data/csi, /ifs/engineering
+  IsiPath: /ifs/data/csi
+
+  # AccessZone groupnet service IP. Update AzServiceIP if different than endpoint.
+  # Optional: true
+  # Default value: endpoint of the cluster ClusterName
+  # AzServiceIP : 192.168.2.1
+
+  # When a PVC is being created, this parameter determines, when a node mounts the PVC,
+  # whether to add the k8s node to the "Root clients" field or "Clients" field of the NFS export
+  # Allowed values:
+  #   "true": adds k8s node to the "Root clients" field of the NFS export
+  #   "false": adds k8s node to the "Clients" field of the NFS export
+  # Optional: true
+  # Default value: "false"
+  RootClientEnabled: "false"
+
+  # Name of PowerScale cluster, where pv will be provisioned.
+  # This name should match with name of one of the cluster configs in isilon-creds secret.
+  # If this parameter is not specified, then default cluster config in isilon-creds secret
+  # will be considered if available.
+  # Optional: true
+  # ClusterName: <cluster_name>
+
+  # ===== NFS over mTLS Configuration =====
+  # SmartConnectZoneFQDN: REQUIRED for mTLS - Specify the SmartConnect zone FQDN.
+  # Certificate validation requires an FQDN, not an IP address.
+  # This FQDN must match the Subject Alternative Name (SAN) in the PowerScale NFS TLS certificate.
+  # Allowed values: A valid FQDN
+  # Replace the placeholder below with your SmartConnect FQDN:
+  SmartConnectZoneFQDN: "<SMARTCONNECT_ZONE_FQDN>"
+
+  # NFSTransportSecurity: REQUIRED for mTLS - Specify the NFS transport security mode.
+  # Allowed values:
+  #   "mtls": NFS over mutual TLS (encryption + client certificate authentication) - RECOMMENDED
+  #   "tls": NFS over TLS (encryption only, server authentication)
+  #   "none": no transport security (default NFS behavior)
+  # Requirements for "mtls":
+  #   - PowerScale OneFS 9.16.0+ with NFS TLS configured (PAPI v27+)
+  #   - Linux kernel 6.7+ (or RHEL 9.8+ with backported kTLS)
+  #   - /sys/module/tls must exist on worker nodes
+  #   - tlshd daemon running on worker nodes with client certificates in /etc/tlshd.conf
+  #   - SmartConnectZoneFQDN must be set (IP addresses are rejected for mTLS)
+  # Driver capability detection checks only /sys/module/tls and the tlshd binary; verify the
+  # tlshd service and /etc/tlshd.conf independently.
+  NFSTransportSecurity: "mtls"
+
+  # NOTE: TLS handshake timeout cannot be configured via StorageClass parameters.
+  # To customize the timeout (default: 30 seconds), set the X_CSI_ISI_TLS_HANDSHAKE_TIMEOUT_SECONDS
+  # environment variable on the CSI driver controller and node pods.
+  # Example: X_CSI_ISI_TLS_HANDSHAKE_TIMEOUT_SECONDS: "60"
+
+  # ===== Optional Quota Parameters =====
+  # Parameter to set Advisory Limit to quota
+  # Optional: true
+  # Default Behaviour : Limit not set
+  # AdvisoryLimit: "50"
+
+  # Parameter to set soft limit to quota
+  # Optional: true
+  # Default Behaviour: Limit not set
+  # SoftLimit: "80"
+
+  # Parameter which must be mentioned along with Soft Limit
+  # Soft Limit can be exceeded until the grace period
+  # Optional: true
+  # Default Behaviour : Limit not set
+  # SoftGracePrd: "86400"
+
+  # The permissions for isi volume directory path
+  # This value overrides the isiVolumePathPermissions attribute of corresponding cluster config in secret, if present
+  # Allowed values: valid octal mode number
+  # Default value: "0777"
+  # Examples: "0777", "777", "0755"
+  # IsiVolumePathPermissions: "0777"
+
+  # Sets the filesystem type which will be used to format the new volume
+  # Optional: true
+  # Default value: None
+  # csi.storage.k8s.io/fstype: "nfs"
+
+# volumeBindingMode controls when volume binding and dynamic provisioning should occur.
+# Allowed values:
+#   Immediate: indicates that volume binding and dynamic provisioning occurs once the
+#   PersistentVolumeClaim is created
+#   WaitForFirstConsumer: will delay the binding and provisioning of a PersistentVolume
+#   until a Pod using the PersistentVolumeClaim is created
+# Default value: Immediate
+volumeBindingMode: Immediate
+
+# allowedTopologies helps scheduling pods on worker nodes which match all of below expressions.
+# If enableCustomTopology is set to true in helm values.yaml, then do not specify allowedTopologies
+# Change all instances of <ISILON_IP> to the IP of the PowerScale OneFS API server
+# allowedTopologies:
+#  - matchLabelExpressions:
+#      - key: csi-isilon.dellemc.com/<ISILON_IP>
+#        values:
+#          - csi-isilon.dellemc.com
+
+# specify additional mount options for when a Persistent Volume is being mounted on a node.
+# For mTLS, this sample supplies vers=4.1. The driver automatically injects xprtsec=mtls.
+mountOptions:
+  - "vers=4.1"

@@ -1,24 +1,22 @@
+// Copyright © 2019-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//      http://www.apache.org/licenses/LICENSE-2.0
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 package service
-
-/*
- Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
-
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
 
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -26,9 +24,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dell/csi-powerscale/v2/service/mock/k8s"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/service/mock/k8s"
+	csmlog "github.com/Ecosystems/container-storage-modules/src/csmlog"
 
-	isiapi "github.com/dell/gopowerscale/api"
+	isiapi "github.com/Ecosystems/container-storage-modules/src/gopowerscale/api"
 	"github.com/gorilla/mux"
 	"google.golang.org/grpc/codes"
 )
@@ -56,6 +55,7 @@ var (
 		CreateExportError             bool
 		GetExportInternalError        bool
 		GetExportByIDNotFoundError    bool
+		DirectoryBackedExportMode     bool
 		UnexportError                 bool
 		DeleteQuotaError              bool
 		QuotaNotFoundError            bool
@@ -112,6 +112,23 @@ var (
 		ModifyLastAttempt             bool
 		PodmonInvalidNodeIDError      bool
 		PodmonInvalidVolumeIDError    bool
+		CreateWritableSnapshotError   bool
+		SnapshotDependencyError       bool
+		WritableSnapshotExists        bool
+		NoReportsFound                bool
+		GetReportsByPolicyNameError   bool
+
+		// mTLS-related mock flags (ER-K8S-BR99506-001-powerscale-mtls-nfs-transport)
+		TLSCapabilityError          bool
+		TLSCapabilityNotSupported   bool
+		TLSCapabilitySupported      bool
+		NFSTLSSettingsError         bool
+		NFSTLSSettingsNotConfigured bool
+		NFSTLSSettingsConfigured    bool
+		ExportXprtsecError          bool
+		ExportXprtsecValue          string
+		ClusterNFSTLSSupported      bool
+		ClusterOneFSVersion         string
 	}
 )
 
@@ -127,11 +144,12 @@ var (
 func getHandler() http.Handler {
 	handler := http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			log.Infof("handler called: %s %s", r.Method, r.URL)
+			csmlog.Infof("handler called: %s %s", r.Method, r.URL)
 			if isilonRouter == nil {
 				getRouter().ServeHTTP(w, r)
 			}
-		})
+		},
+	)
 
 	debug = false
 
@@ -150,6 +168,7 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleCreateExport).Methods("POST")
 	// Do NOT change the sequence of the following four lines, the first three are subsets of the fourth
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetExportWithPathAndZone).Methods("GET").Queries("path", "/ifs/data/csi-isilon/volume1", "zone", "System")
+	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetSharedExportWithPathAndZone).Methods("GET").Queries("path", "/ifs/data/csi-isilon", "zone", "System")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetExportsWithLimit).Methods("GET").Queries("limit", "")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetExportsWithResume).Methods("GET").Queries("resume", "")
 	isilonRouter.HandleFunc("/platform/2/protocols/nfs/exports/", handleGetSnapshotExportWithPathAndZone).Methods("GET").Queries("path", "/ifs/.snapshot/existent_snapshot_name/data/yian/nfs_1", "zone", "System")
@@ -158,6 +177,8 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/platform/3/statistics/current", handleStatistics)
 	isilonRouter.HandleFunc("/platform/3/statistics/summary/client", handleIOInProgress).Methods("GET")
 	isilonRouter.HandleFunc("/platform/3/cluster/config/", handleGetClusterConfig)
+	// Handler for namespace ListVolumes API (used by gopowerscale.Client.ListVolumes)
+	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/", handleListFilesystems).Methods("GET")
 	// Do NOT change the sequence of the following lines, the first is the subset of the second,
 	// thus if the sequence is reversed, the query with "metadata" will be wrongly resolved.
 	isilonRouter.HandleFunc("/namespace/ifs/data/csi-isilon/{volume_id}", handleGetVolumeSize).Methods("GET").Queries("detail", "size", "max-depth", "-1")
@@ -213,6 +234,10 @@ func getRouter() http.Handler {
 	isilonRouter.HandleFunc("/namespace/ifs/.csi-k8s-12345678-tracking-dir", handleGetExistentVolumeFromSnapshot).Methods("GET")
 	isilonRouter.HandleFunc("/namespace/ifs/.csi-k8s-12345678-tracking-dir/snapVol3", handleGetExistentVolumeFromSnapshot).Methods("GET")
 	isilonRouter.HandleFunc("/platform/1/zones/System", handleGetZoneByName).Methods("GET")
+	// ER-K8S-BR20927-001-powerscale-writable-snapshots: Writable snapshot endpoints
+	isilonRouter.HandleFunc("/platform/14/snapshot/writable/", handleCreateWritableSnapshot).Methods("POST")
+	isilonRouter.HandleFunc("/platform/14/snapshot/writable/{path:.*}", handleGetWritableSnapshot).Methods("GET")
+	isilonRouter.HandleFunc("/platform/14/snapshot/writable/{path:.*}", handleDeleteWritableSnapshot).Methods("DELETE")
 	return isilonRouter
 }
 
@@ -266,6 +291,45 @@ func handleGetClusterConfig(w http.ResponseWriter, _ *http.Request) {
 	w.Write(readFromFile("mock/cluster/get_cluster_config.txt"))
 }
 
+// handleListFilesystems implements GET /namespace/ifs/data/csi-isilon/
+// This handler is used by gopowerscale.Client.ListVolumes via ContainerChildrenList.
+// It supports pagination with resume tokens and handles the invalid token error case.
+func handleListFilesystems(w http.ResponseWriter, r *http.Request) {
+	if testControllerHasNoConnection {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+
+	resume := r.URL.Query().Get("resume")
+	limit := r.URL.Query().Get("limit")
+
+	// Handle invalid resume token error case
+	if stepHandlersErrors.StartingTokenInvalidError && resume != "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write(readFromFile("mock/export/get_exports_with_invalid_resume.txt"))
+		return
+	}
+
+	// Success path - return valid ContainerChildList JSON
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	// If resume token is provided and valid (e.g., "1-1-MAAA1"), return second page (empty)
+	if resume == "1-1-MAAA1" {
+		w.Write(readFromFile("mock/namespace/list_filesystems_page2.txt"))
+		return
+	}
+
+	// If limit is specified, return response with resume token for pagination
+	if limit != "" && limit != "0" {
+		w.Write(readFromFile("mock/namespace/list_filesystems_with_resume.txt"))
+		return
+	}
+
+	// Default: return first page without resume token
+	w.Write(readFromFile("mock/namespace/list_filesystems.txt"))
+}
+
 // handleExportUpdate implements PUT /platform/2/protocols/nfs/exports
 func handleExportUpdate(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
@@ -312,6 +376,10 @@ func handleGetExportByID(w http.ResponseWriter, _ *http.Request) {
 	if stepHandlersErrors.GetExportByIDNotFoundError {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(readFromFile("mock/export/export_not_found_by_id.txt"))
+		return
+	}
+	if stepHandlersErrors.DirectoryBackedExportMode {
+		w.Write(readFromFile("mock/export/get_shared_export_557.txt"))
 		return
 	}
 	w.Write(readFromFile("mock/export/get_export_557.txt"))
@@ -539,6 +607,23 @@ func handleStatistics(w http.ResponseWriter, _ *http.Request) {
 	w.Write([]byte(str))
 }
 
+// handleGetSharedExportWithPathAndZone GET /platform/2/protocols/nfs/exports?path=/ifs/data/csi-isilon&zone=System
+func handleGetSharedExportWithPathAndZone(w http.ResponseWriter, _ *http.Request) {
+	if testControllerHasNoConnection {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+	if stepHandlersErrors.GetExportInternalError {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if stepHandlersErrors.ExportNotFoundError {
+		w.Write(readFromFile("mock/export/get_export_not_found.txt"))
+		return
+	}
+	w.Write(readFromFile("mock/export/get_export_557.txt"))
+}
+
 // handleGetExportWithPathAndZone GET /platform/2/protocols/nfs/exports?path=/ifs/data/csi-isilon/volume1&zone=System
 func handleGetExportWithPathAndZone(w http.ResponseWriter, _ *http.Request) {
 	if testControllerHasNoConnection {
@@ -639,6 +724,11 @@ func handleDeleteSnapshot(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	if stepHandlersErrors.SnapshotDependencyError == true {
+		w.WriteHeader(http.StatusConflict)
+		w.Write([]byte(`{"errors":[{"code":"AEC_CONFLICT","message":"Snapshot has dependent writable volumes"}]}`))
+		return
+	}
 	if strings.Contains(r.URL.String(), "/404") {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(readFromFile("mock/snapshot/get_non_existent_snapshot.txt"))
@@ -657,7 +747,7 @@ func writeError(w http.ResponseWriter, message string, httpStatus int, _ codes.C
 	encoder := json.NewEncoder(w)
 	err := encoder.Encode(resp)
 	if err != nil {
-		log.Infof("error encoding json: %s\n", err.Error())
+		csmlog.Infof("error encoding json: %s\n", err.Error())
 	}
 }
 
@@ -1076,6 +1166,16 @@ func handleGetReportsByPolicy(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
+	if stepHandlersErrors.GetReportsByPolicyNameError {
+		writeError(w, "", http.StatusInternalServerError, codes.Internal)
+		return
+	}
+
+	if stepHandlersErrors.NoReportsFound {
+		w.Write([]byte(`{"reports": [], "resume": null, "total": 0}`))
+		return
+	}
+
 	if stepHandlersErrors.QuotaScanError {
 		writeError(w, "", http.StatusInternalServerError, codes.Internal)
 		return
@@ -1159,31 +1259,89 @@ func MockK8sAPI() {
 	once.Do(func() {
 		fmt.Println("create mock server only once")
 		http.HandleFunc("/api/v1/nodes/", noderesponse)
-		time.Sleep(15)
 
 		// http://127.0.0.1:36443/array-status/cluster1
 		http.HandleFunc("/array-status/cluster1/", apiResponse)
+
+		// NOTE: This previously relied on `time.Sleep(15)` (15 *nanoseconds*,
+		// missing a unit multiplier - effectively a no-op) before launching
+		// http.ListenAndServe in a goroutine, with no further synchronization.
+		// That made the mock K8s API server startup racy: callers could issue
+		// requests to 127.0.0.1:36443 before the listener was bound, causing
+		// intermittent "connection refused" / "resource not found" failures
+		// in scenarios that call NodeGetInfo (discovered while validating
+		// ECS01G-1144; unrelated to that defect's fix itself). Binding the
+		// listener synchronously here (before this function returns) and only
+		// serving it in the background goroutine removes the race
+		// deterministically, without depending on sleep timing.
+		listener, err := net.Listen("tcp", ":36443") // #nosec G102
+		if err != nil {
+			fmt.Printf("mock k8s api: failed to bind listener: %v\n", err)
+			return
+		}
 		go func() {
 			fmt.Println("started mock server")
-			http.ListenAndServe(":36443", nil) // #nosec G114
+			http.Serve(listener, nil) // #nosec G114
 		}()
 	})
 	fmt.Println("mocking k8s api done")
 }
 
 func noderesponse(w http.ResponseWriter, req *http.Request) {
-	log.Infof("request in noderesponse -> %+v", req)
+	csmlog.Infof("request in noderesponse -> %+v", req)
 	param1 := req.URL.Query().Get("nodeId")
 	fakeNode := k8s.GetFakeNode()
 	fn, err := json.Marshal(fakeNode)
 	if err != nil {
 		fmt.Printf("Error fake node: %s", err)
 	}
-	log.Infof("wrote fn for %v", param1)
-	log.Infof("labels sent were %+v", fakeNode.GetLabels())
+	csmlog.Infof("wrote fn for %v", param1)
+	csmlog.Infof("labels sent were %+v", fakeNode.GetLabels())
 	w.Header().Add("Content-Type", "application/json")
 	w.Header().Add("Content-Type", "v=v1")
 	w.Write(fn)
+}
+
+// handleCreateWritableSnapshot implements POST /platform/14/snapshot/writable
+func handleCreateWritableSnapshot(w http.ResponseWriter, _ *http.Request) {
+	if testControllerHasNoConnection {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+	if stepHandlersErrors.CreateWritableSnapshotError {
+		writeError(w, "failed to create writable snapshot", http.StatusInternalServerError, codes.Internal)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	resp := `{"id":1001,"dst_path":"/ifs/data/csi/volume1","src_id":555,"src_path":"/ifs/data/csi","src_snap":"3754","created":1719000000,"state":"active","log_size":0,"phys_size":0}`
+	_, _ = w.Write([]byte(resp))
+}
+
+// handleGetWritableSnapshot implements GET /platform/14/snapshot/writable/{path}
+func handleGetWritableSnapshot(w http.ResponseWriter, _ *http.Request) {
+	if testControllerHasNoConnection {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+	if stepHandlersErrors.WritableSnapshotExists {
+		w.WriteHeader(http.StatusOK)
+		resp := `{"writable":[{"id":1001,"dst_path":"/ifs/data/csi/volume1","src_id":555,"src_path":"/ifs/data/csi","src_snap":"3754","created":1719000000,"state":"active","log_size":0,"phys_size":0}]}`
+		w.Write([]byte(resp))
+		return
+	}
+	// Default: writable snapshot not found
+	w.WriteHeader(http.StatusNotFound)
+	w.Write([]byte(`{"errors":[{"code":"AEC_NOT_FOUND","message":"Writable snapshot not found"}]}`))
+}
+
+// handleDeleteWritableSnapshot implements DELETE /platform/14/snapshot/writable/{path}
+func handleDeleteWritableSnapshot(w http.ResponseWriter, _ *http.Request) {
+	if testControllerHasNoConnection {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+	w.Write([]byte(""))
 }
 
 func apiResponse(w http.ResponseWriter, _ *http.Request) {

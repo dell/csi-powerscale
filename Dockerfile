@@ -13,7 +13,7 @@
 # some arguments that must be supplied
 ARG GOIMAGE
 ARG BASEIMAGE
-ARG VERSION="2.17.1"
+ARG VERSION="2.18.0"
 
 # Stage to build the driver
 FROM $GOIMAGE as builder
@@ -23,7 +23,7 @@ RUN mkdir -p /go/src
 COPY ./ /go/src/
 
 WORKDIR /go/src/
-RUN make build IMAGE_VERSION=$VERSION
+RUN make build-binary IMAGE_VERSION=$VERSION
 
 # Stage to build the driver image
 FROM $BASEIMAGE AS final
@@ -38,7 +38,7 @@ LABEL vendor="Dell Technologies" \
     name="csi-isilon" \
     summary="CSI Driver for Dell EMC PowerScale" \
     description="CSI Driver for provisioning persistent storage from Dell EMC PowerScale" \
-    release="1.17.1" \
+    release="1.18.0" \
     version=$VERSION \
     license="Apache-2.0"
 

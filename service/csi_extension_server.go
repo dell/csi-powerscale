@@ -20,13 +20,13 @@ import (
 	"context"
 	"fmt"
 
-	id "github.com/dell/csi-powerscale/v2/common/utils/identifiers"
-	podmon "github.com/dell/dell-csi-extensions/podmon"
+	id "github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/utils/identifiers"
+	csmlog "github.com/Ecosystems/container-storage-modules/src/csmlog"
+	podmon "github.com/Ecosystems/container-storage-modules/src/dell-csi-extensions/podmon"
 )
 
 func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmon.ValidateVolumeHostConnectivityRequest) (*podmon.ValidateVolumeHostConnectivityResponse, error) {
-	log := log.WithContext(ctx)
-	log.Infof("ValidateVolumeHostConnectivity called %+v", req)
+	csmlog.WithContext(ctx).Infof("ValidateVolumeHostConnectivity called %+v", req)
 	rep := &podmon.ValidateVolumeHostConnectivityResponse{
 		Messages: make([]string, 0),
 	}
@@ -66,13 +66,13 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 			// Get cluster config
 			isiConfig, err := s.getIsilonConfig(ctx, &systemID)
 			if err != nil {
-				log.Errorf("Failed to get Isilon config with error %v ", err.Error())
+				csmlog.WithContext(ctx).Errorf("Failed to get Isilon config with error %v ", err.Error())
 				return nil, err
 			}
 
 			// check if any IO is inProgress for the current systemID/array
 			clients, err := isiConfig.isiSvc.IsIOInProgress(ctx)
-			log.Debugf("fetched clients %+v", clients)
+			csmlog.WithContext(ctx).Debugf("fetched clients %+v", clients)
 			if clients != nil {
 				for _, c := range clients.ClientsList {
 					if c.Protocol == "nfs3" || c.Protocol == "nfs4" {
@@ -85,28 +85,27 @@ func (s *service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 			}
 		}
 	}
-	log.Infof("ValidateVolumeHostConnectivity reply %+v", rep)
+	csmlog.WithContext(ctx).Infof("ValidateVolumeHostConnectivity reply %+v", rep)
 	return rep, nil
 }
 
 func (s *service) getArrayIDsFromVolumes(ctx context.Context, systemIDs map[string]bool, requestVolumeIDs []string) bool {
-	log := log.WithContext(ctx)
 	var err error
 	var systemID string
 	var foundAtLeastOne bool
 	for _, volumeID := range requestVolumeIDs {
 		// Extract clusterName from the volume ID (if any volumes in the request)
 		if _, _, _, systemID, err = id.ParseNormalizedVolumeID(ctx, volumeID); err != nil {
-			log.Warnf("Error getting Cluster Name for %s - %s", volumeID, err.Error())
+			csmlog.WithContext(ctx).Warnf("Error getting Cluster Name for %s - %s", volumeID, err.Error())
 		}
 		if systemID != "" {
 			if _, exists := systemIDs[systemID]; !exists {
 				foundAtLeastOne = true
 				systemIDs[systemID] = true
-				log.Infof("Using systemID from %s, %s", volumeID, systemID)
+				csmlog.WithContext(ctx).Infof("Using systemID from %s, %s", volumeID, systemID)
 			}
 		} else {
-			log.Infof("Could not extract systemID from %s", volumeID)
+			csmlog.WithContext(ctx).Infof("Could not extract systemID from %s", volumeID)
 		}
 	}
 	return foundAtLeastOne
@@ -115,14 +114,13 @@ func (s *service) getArrayIDsFromVolumes(ctx context.Context, systemIDs map[stri
 // checkIfNodeIsConnected looks at the 'nodeId' to determine if there is connectivity to the 'arrayId' array.
 // The 'rep' object will be filled with the results of the check.
 func (s *service) checkIfNodeIsConnected(ctx context.Context, arrayID string, nodeID string, rep *podmon.ValidateVolumeHostConnectivityResponse) error {
-	log := log.WithContext(ctx)
-	log.Infof("Checking if array %s is connected to node %s", arrayID, nodeID)
+	csmlog.WithContext(ctx).Infof("Checking if array %s is connected to node %s", arrayID, nodeID)
 	var message string
 	rep.Connected = false
 
 	_, _, nodeIP, err := id.ParseNodeID(ctx, nodeID)
 	if err != nil {
-		log.Errorf("failed to parse node ID '%s'", nodeID)
+		csmlog.WithContext(ctx).Errorf("failed to parse node ID '%s'", nodeID)
 		return fmt.Errorf("failed to parse node ID")
 	}
 
@@ -131,9 +129,9 @@ func (s *service) checkIfNodeIsConnected(ctx context.Context, arrayID string, no
 	connected, err := s.queryArrayStatus(ctx, url)
 	if err != nil {
 		message = fmt.Sprintf("connectivity unknown for array %s to node %s due to %s", arrayID, nodeID, err)
-		log.Error(message)
+		csmlog.WithContext(ctx).Error(message)
 		rep.Messages = append(rep.Messages, message)
-		log.Error(err.Error())
+		csmlog.WithContext(ctx).Error(err.Error())
 	}
 
 	if connected {
@@ -142,7 +140,7 @@ func (s *service) checkIfNodeIsConnected(ctx context.Context, arrayID string, no
 	} else {
 		message = fmt.Sprintf("array %s is not connected to node %s", arrayID, nodeID)
 	}
-	log.Info(message)
+	csmlog.WithContext(ctx).Info(message)
 	rep.Messages = append(rep.Messages, message)
 	return nil
 }

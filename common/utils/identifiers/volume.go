@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
+Copyright (c) 2019-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,20 +21,21 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dell/csmlog"
+	"github.com/Ecosystems/container-storage-modules/src/csmlog"
 )
 
 // VolumeIDSeparator is the separator that separates volume name and export ID (two components that a normalized volume ID is comprised of)
 const VolumeIDSeparator = "=_=_="
 
+// ProvisioningModeDirectory is the provisioning mode token appended to directory-backed volume IDs
+const ProvisioningModeDirectory = "directory"
+
 // GetNormalizedVolumeID combines volume name (i.e. the directory name), export ID, access zone and clusterName to form the normalized volume ID
 // e.g. k8s-e89c9d089e + 19 + csi0zone + cluster1 => k8s-e89c9d089e=_=_=19=_=_=csi0zone=_=_=cluster1
 func GetNormalizedVolumeID(ctx context.Context, volName string, exportID int, accessZone, clusterName string) string {
-	log := csmlog.GetLogger().WithContext(ctx)
-
 	volID := fmt.Sprintf("%s%s%s%s%s%s%s", volName, VolumeIDSeparator, strconv.Itoa(exportID), VolumeIDSeparator, accessZone, VolumeIDSeparator, clusterName)
 
-	log.Debugf("combined volume name '%s' with export ID '%d', access zone '%s' and cluster name '%s' to form volume ID '%s'",
+	csmlog.WithContext(ctx).Debugf("combined volume name '%s' with export ID '%d', access zone '%s' and cluster name '%s' to form volume ID '%s'",
 		volName, exportID, accessZone, clusterName, volID)
 
 	return volID
@@ -44,7 +45,6 @@ func GetNormalizedVolumeID(ctx context.Context, volName string, exportID int, ac
 // e.g. k8s-e89c9d089e=_=_=19=_=_=csi0zone => k8s-e89c9d089e, 19, csi0zone, ""
 // e.g. k8s-e89c9d089e=_=_=19=_=_=csi0zone=_=_=cluster1 => k8s-e89c9d089e, 19, csi0zone, cluster1
 func ParseNormalizedVolumeID(ctx context.Context, volID string) (string, int, string, string, error) {
-	log := csmlog.GetLogger().WithContext(ctx)
 	tokens := strings.Split(volID, VolumeIDSeparator)
 	if len(tokens) < 3 {
 		return "", 0, "", "", fmt.Errorf("volume ID '%s' cannot be split into tokens", volID)
@@ -64,8 +64,38 @@ func ParseNormalizedVolumeID(ctx context.Context, volID string) (string, int, st
 		clusterName = tokens[3]
 	}
 
-	log.Debugf("volume ID '%s' parsed into volume name '%s', export ID '%d', access zone '%s' and cluster name '%s'",
+	csmlog.WithContext(ctx).Debugf("volume ID '%s' parsed into volume name '%s', export ID '%d', access zone '%s' and cluster name '%s'",
 		volID, volumeName, exportID, accessZone, clusterName)
 
 	return volumeName, exportID, accessZone, clusterName, nil
+}
+
+// GetDirectoryBackedVolumeID builds a volume ID with a 5th token indicating directory-backed provisioning mode
+// e.g. vol1 + 100 + System + cluster1 => vol1=_=_=100=_=_=System=_=_=cluster1=_=_=directory
+func GetDirectoryBackedVolumeID(ctx context.Context, volName string, exportID int, accessZone, clusterName string) string {
+	volID := fmt.Sprintf("%s%s%s%s%s%s%s%s%s", volName, VolumeIDSeparator, strconv.Itoa(exportID), VolumeIDSeparator, accessZone, VolumeIDSeparator, clusterName, VolumeIDSeparator, ProvisioningModeDirectory)
+
+	csmlog.WithContext(ctx).Debugf("built directory-backed volume ID '%s' from volume name '%s', export ID '%d', access zone '%s', cluster name '%s'",
+		volID, volName, exportID, accessZone, clusterName)
+
+	return volID
+}
+
+// ParseVolumeIDWithMode extends ParseNormalizedVolumeID by also returning the provisioning mode (5th token).
+// An empty provisioningMode means export-backed (the default).
+func ParseVolumeIDWithMode(ctx context.Context, volID string) (volName string, exportID int, accessZone, clusterName, provisioningMode string, err error) {
+	volName, exportID, accessZone, clusterName, err = ParseNormalizedVolumeID(ctx, volID)
+	if err != nil {
+		return
+	}
+
+	tokens := strings.Split(volID, VolumeIDSeparator)
+	if len(tokens) > 4 {
+		provisioningMode = tokens[4]
+	}
+
+	csmlog.WithContext(ctx).Debugf("volume ID '%s' parsed with provisioning mode '%s'",
+		volID, provisioningMode)
+
+	return
 }

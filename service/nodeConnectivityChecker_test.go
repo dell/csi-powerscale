@@ -1,18 +1,15 @@
-/*
-Copyright (c) 2025 Dell Inc, or its subsidiaries.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright © 2025-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//      http://www.apache.org/licenses/LICENSE-2.0
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 
 package service
 
@@ -28,9 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dell/csi-powerscale/v2/common/constants"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/constants"
 	"github.com/gorilla/mux"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -130,10 +126,6 @@ func (m *MockMarshal) MarshalSyncMapToJSON(_ *sync.Map) ([]byte, error) {
 }
 
 func TestConnectivityStatus_Success(t *testing.T) {
-	// Set up the test logger
-	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
-
 	// Initialize probeStatus
 	probeStatus = &sync.Map{}
 
@@ -167,10 +159,6 @@ func TestConnectivityStatus_Success(t *testing.T) {
 }
 
 func TestConnectivityStatus_ErrorDuringMarshal(t *testing.T) {
-	// Set up the test logger
-	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
-
 	// Initialize probeStatus
 	probeStatus = &sync.Map{}
 
@@ -296,4 +284,47 @@ func TestStartAPIService(_ *testing.T) {
 	mu.Lock()
 	s.startAPIService(ctx)
 	mu.Unlock()
+}
+
+// TestPodmonAuthMiddleware manipulates the package-level PodmonAPIToken; it must not run in parallel.
+func TestPodmonAuthMiddleware(t *testing.T) {
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	tests := []struct {
+		name       string
+		token      string
+		authHeader string
+		wantStatus int
+	}{
+		{"no token configured", "", "", http.StatusOK},
+		{"valid bearer token", "test-token", "Bearer test-token", http.StatusOK},
+		{"valid bearer token with extra whitespace", "test-token", "Bearer test-token   ", http.StatusOK},
+		{"valid lowercase bearer token (RFC 6750)", "test-token", "bearer test-token", http.StatusOK},
+		{"valid mixed case bearer token (RFC 6750)", "test-token", "BEARER test-token", http.StatusOK},
+		{"missing authorization header", "test-token", "", http.StatusUnauthorized},
+		{"invalid bearer token", "test-token", "Bearer wrong-token", http.StatusUnauthorized},
+		{"malformed authorization header", "test-token", "test-token", http.StatusUnauthorized},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			old := PodmonAPIToken
+			PodmonAPIToken = tt.token
+			defer func() { PodmonAPIToken = old }()
+
+			req := httptest.NewRequest(http.MethodGet, "/array-status", nil)
+			if tt.authHeader != "" {
+				req.Header.Set("Authorization", tt.authHeader)
+			}
+			rec := httptest.NewRecorder()
+
+			podmonAuthMiddleware(next).ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("got status %d, want %d", rec.Code, tt.wantStatus)
+			}
+		})
+	}
 }

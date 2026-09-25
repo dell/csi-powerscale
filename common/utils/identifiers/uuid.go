@@ -16,16 +16,15 @@ limitations under the License.
 package identifiers
 
 import (
-	csmlog "github.com/dell/csmlog"
+	csmlog "github.com/Ecosystems/container-storage-modules/src/csmlog"
 	"github.com/google/uuid"
 )
 
 // GetNewUUID generates a UUID
 func GetNewUUID() (string, error) {
-	log := csmlog.GetLogger()
 	id, err := uuid.NewUUID()
 	if err != nil {
-		log.Errorf("error generating UUID : '%s'", err)
+		csmlog.Errorf("error generating UUID : '%s'", err)
 		return "", err
 	}
 
