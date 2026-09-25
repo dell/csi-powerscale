@@ -23,8 +23,8 @@ import (
 	"strconv"
 	"strings"
 
-	csmlog "github.com/dell/csmlog"
-	isi "github.com/dell/gopowerscale"
+	csmlog "github.com/Ecosystems/container-storage-modules/src/csmlog"
+	isi "github.com/Ecosystems/container-storage-modules/src/gopowerscale"
 )
 
 // CSIQuotaIDPrefix is the CSI tag for quota id stored in the export's description field set by csi driver
@@ -35,7 +35,7 @@ var (
 	QuotaIDPattern = regexp.MustCompile(fmt.Sprintf("^%s(.*)", CSIQuotaIDPrefix))
 
 	// ExportConflictMessagePattern is the regex pattern that identifies the error message of export conflict
-	ExportConflictMessagePattern = regexp.MustCompile(fmt.Sprintf("^Export rules (\\d+) and (\\d+) conflict on '(.+)'$"))
+	ExportConflictMessagePattern = regexp.MustCompile("^Export rules (\\d+) and (\\d+) conflict on '(.+)'$")
 )
 
 // GetQuotaIDWithCSITag formats a given quota id with the CSI tag, e.g. AABpAQEAAAAAAAAAAAAAQA0AAAAAAAAA -> CSI_QUOTA_ID:AABpAQEAAAAAAAAAAAAAQA0AAAAAAAAA
@@ -49,25 +49,23 @@ func GetQuotaIDWithCSITag(quotaID string) string {
 
 // GetQuotaIDFromDescription extracts quota id from the description field of export
 func GetQuotaIDFromDescription(ctx context.Context, export isi.Export) (string, error) {
-	log := csmlog.GetLogger().WithContext(ctx)
-
-	log.Debugf("try to extract quota id from the description field of export (id:'%d', path: '%s', description : '%s')", export.ID, export.Paths, export.Description)
+	csmlog.WithContext(ctx).Debugf("try to extract quota id from the description field of export (id:'%d', path: '%s', description : '%s')", export.ID, export.Paths, export.Description)
 
 	if export.Description == "" {
-		log.Debugf("description field is empty, this could be normal, the backing directory might not have a quota set on it, return normally")
+		csmlog.WithContext(ctx).Debugf("description field is empty, this could be normal, the backing directory might not have a quota set on it, return normally")
 		return "", nil
 	}
 
 	matches := QuotaIDPattern.FindStringSubmatch(export.Description)
 
 	if len(matches) < 2 {
-		log.Debugf("description field does not match the expected CSI_QUOTA_ID:(.*) pattern, this could be normal, the backing directory might not have a quota set on it and the description is a user-set text irrelevant to the export id, return normally")
+		csmlog.WithContext(ctx).Debugf("description field does not match the expected CSI_QUOTA_ID:(.*) pattern, this could be normal, the backing directory might not have a quota set on it and the description is a user-set text irrelevant to the export id, return normally")
 		return "", nil
 	}
 
 	quotaID := matches[1]
 
-	log.Debugf("quotaID extracted : '%s'", quotaID)
+	csmlog.WithContext(ctx).Debugf("quotaID extracted : '%s'", quotaID)
 
 	return quotaID, nil
 }

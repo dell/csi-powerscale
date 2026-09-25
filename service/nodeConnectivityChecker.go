@@ -1,23 +1,21 @@
+// Copyright © 2022-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//      http://www.apache.org/licenses/LICENSE-2.0
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 package service
-
-/*
- Copyright (c) 2022-2025 Dell Inc, or its subsidiaries.
-
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -25,8 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dell/csi-powerscale/v2/common/constants"
-	fromctx "github.com/dell/csi-powerscale/v2/common/utils/fromcontext"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/constants"
+	fromctx "github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/utils/fromcontext"
+	csmlog "github.com/Ecosystems/container-storage-modules/src/csmlog"
 	"github.com/gorilla/mux"
 )
 
@@ -54,28 +53,56 @@ type ArrayConnectivityStatus struct {
 }
 
 func setAPIPort(ctx context.Context) {
-	log := log.WithContext(ctx)
 	port := fromctx.GetUint(ctx, constants.EnvPodmonAPIPORT)
 	if port == 0 {
 		// If the port number cannot be fetched, set it to default
 		apiPort = ":" + constants.DefaultPodmonAPIPortNumber
-		log.Debugf("set podmon API port to default %s", apiPort)
+		csmlog.WithContext(ctx).Debugf("set podmon API port to default %s", apiPort)
 		return
 	}
 	apiPort = fmt.Sprintf(":%d", port)
-	log.Debugf("set podmon API port to %s", apiPort)
+	csmlog.WithContext(ctx).Debugf("set podmon API port to %s", apiPort)
 }
 
 // reads the pollingFrequency from Env, sets default if not found
 func setPollingFrequency(ctx context.Context) int64 {
-	log := log.WithContext(ctx)
 	pollRate, err := fromctx.GetInt64(ctx, constants.EnvPodmonArrayConnectivityPollRate)
 	if err != nil || pollRate == 0 {
-		log.Debugf("use default pollingFrequency %d seconds, err %v", constants.DefaultPodmonPollRate, err)
+		csmlog.WithContext(ctx).Debugf("use default pollingFrequency %d seconds, err %v", constants.DefaultPodmonPollRate, err)
 		return constants.DefaultPodmonPollRate
 	}
-	log.Debugf("use pollingFrequency as %d seconds", pollRate)
+	csmlog.WithContext(ctx).Debugf("use pollingFrequency as %d seconds", pollRate)
 	return pollRate
+}
+
+// podmonAuthMiddleware returns a middleware that validates Bearer token authentication
+// for the podmon API endpoints. If the token is empty, authentication is skipped
+// for backward compatibility with deployments that have not yet configured a token.
+func podmonAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := PodmonAPIToken
+		if token == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "missing authorization header", http.StatusUnauthorized)
+			return
+		}
+		const bearerPrefix = "Bearer "
+		// RFC 6750: the "Bearer" scheme is case-insensitive
+		if !strings.HasPrefix(strings.ToLower(authHeader), strings.ToLower(bearerPrefix)) {
+			http.Error(w, "invalid authorization header format", http.StatusUnauthorized)
+			return
+		}
+		provided := strings.TrimSpace(authHeader[len(bearerPrefix):])
+		if subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
+			http.Error(w, "invalid token", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // MarshalSyncMapToJSON marshal the sync Map to Json
@@ -88,16 +115,15 @@ var MarshalSyncMapToJSON = func(m *sync.Map) ([]byte, error) {
 		}
 		return true
 	})
-	log.Debugf("map value is %+v", tmpMap)
+	csmlog.Debugf("map value is %+v", tmpMap)
 	return json.Marshal(tmpMap)
 }
 
 // startAPIService reads nodes to array status periodically
 func (s *service) startAPIService(ctx context.Context) {
-	log := log.WithContext(ctx)
 	isPodmonEnabled := fromctx.GetBoolean(ctx, constants.EnvPodmonEnabled)
 	if !isPodmonEnabled {
-		log.Info("podmon is not enabled")
+		csmlog.WithContext(ctx).Info("podmon is not enabled")
 		return
 	}
 	pollingFrequencyLock.Lock()
@@ -107,7 +133,7 @@ func (s *service) startAPIService(ctx context.Context) {
 
 	// start methods based on mode
 	if strings.EqualFold(s.mode, constants.ModeController) {
-		log.Info("controller mode, don't need to start apiRouter")
+		csmlog.WithContext(ctx).Info("controller mode, don't need to start apiRouter")
 		return
 	}
 	s.startNodeToArrayConnectivityCheck(ctx)
@@ -116,13 +142,14 @@ func (s *service) startAPIService(ctx context.Context) {
 
 // apiRouter serves http requests
 func (s *service) apiRouter(_ context.Context) {
-	log.Infof("starting http server on port %s", apiPort)
+	csmlog.Infof("starting http server on port %s", apiPort)
 	// create a new router
 	router := mux.NewRouter()
 	// route to connectivity status
 	router.HandleFunc(nodeStatus, nodeHealth).Methods("GET")
 	router.HandleFunc(arrayStatus, connectivityStatus).Methods("GET")
 	router.HandleFunc(arrayStatus+"/"+"{arrayId}", getArrayConnectivityStatus).Methods("GET")
+	router.Use(podmonAuthMiddleware)
 	// start http server to serve requests
 	server := &http.Server{
 		Addr:         apiPort,
@@ -132,14 +159,14 @@ func (s *service) apiRouter(_ context.Context) {
 	}
 	err := server.ListenAndServe()
 	if err != nil {
-		log.Errorf("unable to start http server to serve status requests due to %s", err)
+		csmlog.Errorf("unable to start http server to serve status requests due to %s", err)
 	}
 }
 
 // getArrayConnectivityStatus lists status of the requested array
 func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 	arrayID := mux.Vars(r)["arrayId"]
-	log.Infof("GetArrayConnectivityStatus called for array %s \n", arrayID)
+	csmlog.Infof("GetArrayConnectivityStatus called for array %s \n", arrayID)
 	status, found := probeStatus.Load(arrayID)
 	if !found {
 		// specify status code
@@ -153,17 +180,17 @@ func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 	// convert status struct to JSON
 	jsonResponse, err := json.Marshal(status)
 	if err != nil {
-		log.Errorf("error %s during marshaling to json", err)
+		csmlog.Errorf("error %s during marshaling to json", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Header().Set("Content-Type", "application/json")
 		return
 	}
-	log.Infof("sending response %+v for array %s \n", status, arrayID)
+	csmlog.Infof("sending response %+v for array %s \n", status, arrayID)
 	// update response
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(jsonResponse)
 	if err != nil {
-		log.Errorf("unable to write response %s", err)
+		csmlog.Errorf("unable to write response %s", err)
 	}
 }
 
@@ -176,45 +203,43 @@ func nodeHealth(w http.ResponseWriter, _ *http.Request) {
 
 // connectivityStatus Returns array connectivity status
 func connectivityStatus(w http.ResponseWriter, _ *http.Request) {
-	log.Infof("connectivityStatus called, urr status is %v \n", probeStatus)
+	csmlog.Infof("connectivityStatus called, urr status is %v \n", probeStatus)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
 	// convert struct to JSON
 	jsonResponse, err := MarshalSyncMapToJSON(probeStatus)
 	if err != nil {
-		log.Errorf("error %s during marshaling to json", err)
+		csmlog.Errorf("error %s during marshaling to json", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Header().Set("Content-Type", "application/json")
 		return
 	}
-	log.Info("sending connectivityStatus for all clusters ")
+	csmlog.Info("sending connectivityStatus for all clusters ")
 	_, err = w.Write(jsonResponse)
 	if err != nil {
-		log.Errorf("unable to write response %s", err)
+		csmlog.Errorf("unable to write response %s", err)
 	}
 }
 
 // startNodeToArrayConnectivityCheck starts connectivityTest as one goroutine for each cluster
 func (s *service) startNodeToArrayConnectivityCheck(ctx context.Context) {
-	log := log.WithContext(ctx)
-	log.Debug("startNodeToArrayConnectivityCheck called")
+	csmlog.WithContext(ctx).Debug("startNodeToArrayConnectivityCheck called")
 	probeStatus = new(sync.Map)
 	isilonClusters := s.getIsilonClusters()
 	for _, cluster := range isilonClusters {
 		// start one goroutine for each cluster, so each cluster's nodeProbe is run concurrently
 		go s.testConnectivityAndUpdateStatus(ctx, cluster, timeout)
 	}
-	log.Infof("startNodeToArrayConnectivityCheck is running probes at pollingFrequency %d ", pollingFrequencyInSeconds/2)
+	csmlog.WithContext(ctx).Infof("startNodeToArrayConnectivityCheck is running probes at pollingFrequency %d ", pollingFrequencyInSeconds/2)
 }
 
 // testConnectivityAndUpdateStatus runs probe to test connectivity from node to array
 // updates probeStatus map[array]ArrayConnectivityStatus
 func (s *service) testConnectivityAndUpdateStatus(ctx context.Context, cluster *IsilonClusterConfig, timeout time.Duration) {
-	log := log.WithContext(ctx)
 	defer func() {
 		if err := recover(); err != nil {
-			log.Errorf("panic occurred in testConnectivityAndUpdateStatus:%s for cluster %s", err, cluster)
+			csmlog.WithContext(ctx).Errorf("panic occurred in testConnectivityAndUpdateStatus:%s for cluster %s", err, cluster)
 		}
 		// if panic occurs restart
 		go s.testConnectivityAndUpdateStatus(ctx, cluster, timeout)
@@ -223,31 +248,31 @@ func (s *service) testConnectivityAndUpdateStatus(ctx context.Context, cluster *
 	for {
 		select {
 		case <-ctx.Done():
-			log.Infof("connectivity monitor for cluster %s canceled", cluster.ClusterName)
+			csmlog.WithContext(ctx).Infof("connectivity monitor for cluster %s canceled", cluster.ClusterName)
 			return
 		default:
 		}
 		// add timeout to context
 		timeOutCtx, cancel := context.WithTimeout(ctx, timeout)
-		log.Debugf("Running probe for cluster %s at time %v \n", cluster.ClusterName, time.Now())
+		csmlog.WithContext(ctx).Debugf("Running probe for cluster %s at time %v \n", cluster.ClusterName, time.Now())
 		if existingStatus, ok := probeStatus.Load(cluster.ClusterName); !ok {
-			log.Debugf("%s not in probeStatus ", cluster.ClusterName)
+			csmlog.WithContext(ctx).Debugf("%s not in probeStatus ", cluster.ClusterName)
 		} else {
 			if status, ok = existingStatus.(ArrayConnectivityStatus); !ok {
-				log.Errorf("failed to extract ArrayConnectivityStatus for cluster '%s'", cluster.ClusterName)
+				csmlog.WithContext(ctx).Errorf("failed to extract ArrayConnectivityStatus for cluster '%s'", cluster.ClusterName)
 			}
 		}
-		log.Debugf("cluster %s , status is %+v", cluster.ClusterName, status)
+		csmlog.WithContext(ctx).Debugf("cluster %s , status is %+v", cluster.ClusterName, status)
 		// run nodeProbe to test connectivity
 		err := s.nodeProbe(timeOutCtx, cluster)
 		if err == nil {
-			log.Debugf("Probe successful for %s", cluster.ClusterName)
+			csmlog.WithContext(ctx).Debugf("Probe successful for %s", cluster.ClusterName)
 			status.LastSuccess = time.Now().Unix()
 		} else {
-			log.Debugf("Probe failed for isilon cluster '%s' error:'%s'", cluster.ClusterName, err)
+			csmlog.WithContext(ctx).Debugf("Probe failed for isilon cluster '%s' error:'%s'", cluster.ClusterName, err)
 		}
 		status.LastAttempt = time.Now().Unix()
-		log.Debugf("cluster %s , storing status %+v", cluster.ClusterName, status)
+		csmlog.WithContext(ctx).Debugf("cluster %s , storing status %+v", cluster.ClusterName, status)
 		probeStatus.Store(cluster.ClusterName, status)
 		cancel()
 		// sleep for half the pollingFrequency and run check again

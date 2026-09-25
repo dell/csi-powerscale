@@ -1,27 +1,27 @@
 # CSI Driver for Dell EMC PowerScale
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/dell/csi-isilon?style=flat-square)](https://goreportcard.com/report/github.com/dell/csi-isilon)
-[![License](https://img.shields.io/github/license/dell/csi-isilon?style=flat-square&color=blue&label=License)](https://github.com/dell/csi-isilon/blob/main/LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/eos2git.cec.lab.emc.com/Ecosystems/container-storage-modules/src/csi-isilon?style=flat-square)](https://goreportcard.com/report/github.com/dell/csi-isilon)
+[![License](https://img.shields.io/github/license/dell/csi-isilon?style=flat-square&color=blue&label=License)](https://github.com/Ecosystems/container-storage-modules/src/csi-isilon/blob/main/LICENSE)
 [![Docker](https://img.shields.io/docker/pulls/dellemc/csi-isilon.svg?logo=docker&style=flat-square&label=Pulls)](https://hub.docker.com/r/dellemc/csi-isilon)
-[![Last Release](https://img.shields.io/github/v/release/dell/csi-isilon?label=Latest&style=flat-square&logo=go)](https://github.com/dell/csi-isilon/releases)
+[![Last Release](https://img.shields.io/github/v/release/dell/csi-isilon?label=Latest&style=flat-square&logo=go)](https://github.com/Ecosystems/container-storage-modules/src/csi-isilon/releases)
 
 **Repository for CSI Driver for Dell EMC PowerScale**
 
 ## Description
 
-CSI Driver for PowerScale is part of the [CSM (Container Storage Modules)](https://github.com/dell/csm) open-source suite of Kubernetes storage enablers for Dell Technology (Dell) products. CSI Driver for PowerScale is a Container Storage Interface (CSI) driver that provides support for provisioning persistent storage using Dell PowerScale storage array.
+CSI Driver for PowerScale is part of the [CSM (Container Storage Modules)](https://github.com/Ecosystems/container-storage-modules/src/csm) open-source suite of Kubernetes storage enablers for Dell Technology (Dell) products. CSI Driver for PowerScale is a Container Storage Interface (CSI) driver that provides support for provisioning persistent storage using Dell PowerScale storage array.
 
 This project may be compiled as a stand-alone binary using Golang that, when run, provides a valid CSI endpoint. It also can be used as a precompiled container image.
 
 ## Table of Contents
 
-* [Code of Conduct](https://github.com/dell/csm/blob/main/docs/CODE_OF_CONDUCT.md)
-* [Maintainer Guide](https://github.com/dell/csm/blob/main/docs/MAINTAINER_GUIDE.md)
-* [Committer Guide](https://github.com/dell/csm/blob/main/docs/COMMITTER_GUIDE.md)
-* [Contributing Guide](https://github.com/dell/csm/blob/main/docs/CONTRIBUTING.md)
-* [List of Adopters](https://github.com/dell/csm/blob/main/docs/ADOPTERS.md)
+* [Code of Conduct](https://github.com/Ecosystems/container-storage-modules/src/csm/blob/main/docs/CODE_OF_CONDUCT.md)
+* [Maintainer Guide](https://github.com/Ecosystems/container-storage-modules/src/csm/blob/main/docs/MAINTAINER_GUIDE.md)
+* [Committer Guide](https://github.com/Ecosystems/container-storage-modules/src/csm/blob/main/docs/COMMITTER_GUIDE.md)
+* [Contributing Guide](https://github.com/Ecosystems/container-storage-modules/src/csm/blob/main/docs/CONTRIBUTING.md)
+* [List of Adopters](https://github.com/Ecosystems/container-storage-modules/src/csm/blob/main/docs/ADOPTERS.md)
 * [Support](#support)
-* [Security](https://github.com/dell/csm/blob/main/docs/SECURITY.md)
+* [Security](https://github.com/Ecosystems/container-storage-modules/src/csm/blob/main/docs/SECURITY.md)
 * [Building](#building)
 * [Runtime Dependecies](#runtime-dependencies)
 * [Documentation](#documentation)
@@ -44,8 +44,7 @@ You can run an integration test on a Linux system by populating the env files at
 
 ## Runtime Dependencies
 
-Both the Controller and the Node portions of the driver can only be run on nodes which have network connectivity to a “`PowerScale Cluster`” (which is used by the driver).
+Both the Controller and the Node portions of the driver can only be run on nodes which have network connectivity to a "PowerScale Cluster" (which is used by the driver).
 
 ## Documentation
-
-For more detailed information on the driver, please refer to [Container Storage Modules documentation](https://dell.github.io/csm-docs/).
+For more detailed information on the driver, please refer to [Container Storage Modules documentation](https://www.dell.com/support/product-details/en-us/product/container-storage-modules/resources/manuals).

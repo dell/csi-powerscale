@@ -1,18 +1,15 @@
-/*
-Copyright (c) 2025 Dell Inc, or its subsidiaries.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright © 2019-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//      http://www.apache.org/licenses/LICENSE-2.0
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 
 package service
 
@@ -21,14 +18,18 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"testing"
 
-	isi "github.com/dell/gopowerscale"
-	"github.com/dell/gopowerscale/api"
-	apiv1 "github.com/dell/gopowerscale/api/v1"
-	apiv2 "github.com/dell/gopowerscale/api/v2"
-	apiv5 "github.com/dell/gopowerscale/api/v5"
-	isimocks "github.com/dell/gopowerscale/mocks"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/constants"
+	isi "github.com/Ecosystems/container-storage-modules/src/gopowerscale"
+	"github.com/Ecosystems/container-storage-modules/src/gopowerscale/api"
+	apiv1 "github.com/Ecosystems/container-storage-modules/src/gopowerscale/api/v1"
+	apiv14 "github.com/Ecosystems/container-storage-modules/src/gopowerscale/api/v14"
+	apiv17 "github.com/Ecosystems/container-storage-modules/src/gopowerscale/api/v17"
+	apiv2 "github.com/Ecosystems/container-storage-modules/src/gopowerscale/api/v2"
+	apiv5 "github.com/Ecosystems/container-storage-modules/src/gopowerscale/api/v5"
+	isimocks "github.com/Ecosystems/container-storage-modules/src/gopowerscale/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -253,6 +254,79 @@ func TestCreateVolumeWithMetaData(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreateWritableSnapshotLookupFailureReturnsError(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	ctx := context.Background()
+	mockClient.On("Post", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(6).(**apiv14.IsiWritableSnapshotResponse)
+		*resp = &apiv14.IsiWritableSnapshotResponse{
+			DstPath: "/ifs/data/dst",
+			State:   "available",
+		}
+	}).Once()
+	mockClient.On("Get", anyArgs...).Return(errors.New("lookup failed")).Once()
+
+	vol, err := svc.CreateWritableSnapshot(ctx, "/ifs/data", "/ifs/data/dst", "snap-123", "new-vol", "System")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "lookup failed")
+	assert.Nil(t, vol)
+}
+
+func TestGetLicenseByID(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("returns error from gopowerscale client", func(t *testing.T) {
+		mockClient := &isimocks.Client{}
+		mockClient.On("Get", mock.Anything, "platform/17/license/licenses", "SNAPSHOTIQ", mock.Anything, mock.Anything, mock.Anything).
+			Return(errors.New("mock error")).Once()
+
+		svc := &isiService{
+			endpoint: "http://localhost:8080",
+			client: &isi.Client{
+				API: mockClient,
+			},
+		}
+
+		license, err := svc.GetLicenseByID(ctx, "SNAPSHOTIQ")
+		assert.Error(t, err)
+		assert.Nil(t, license)
+		assert.Contains(t, err.Error(), "mock error")
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("returns license when lookup succeeds", func(t *testing.T) {
+		mockClient := &isimocks.Client{}
+		mockClient.On("Get", mock.Anything, "platform/17/license/licenses", "SNAPSHOTIQ", mock.Anything, mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) {
+				resp := args.Get(5).(*apiv17.LicensesResponse)
+				resp.Licenses = []apiv17.License{{ID: "SNAPSHOTIQ", Status: "Licensed"}}
+			}).
+			Return(nil).Once()
+
+		svc := &isiService{
+			endpoint: "http://localhost:8080",
+			client: &isi.Client{
+				API: mockClient,
+			},
+		}
+
+		license, err := svc.GetLicenseByID(ctx, "SNAPSHOTIQ")
+		assert.NoError(t, err)
+		if assert.NotNil(t, license) {
+			assert.Equal(t, "SNAPSHOTIQ", license.ID)
+			assert.Equal(t, "Licensed", license.Status)
+		}
+		mockClient.AssertExpectations(t)
+	})
 }
 
 func TestGetVolumeQuota(t *testing.T) {
@@ -584,6 +658,39 @@ func TestGetExportsWithParams(t *testing.T) {
 	}
 }
 
+func TestGetExportsWithResume(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("error case", func(t *testing.T) {
+		mockClient := &isimocks.Client{}
+		svc := &isiService{
+			endpoint: "http://localhost:8080",
+			client:   &isi.Client{API: mockClient},
+		}
+		mockClient.On("Get", anyArgs...).Return(errors.New("failed to get exports")).Once()
+		exports, resume, err := svc.GetExportsWithResume(ctx, "")
+		assert.Error(t, err)
+		assert.Nil(t, exports)
+		assert.Empty(t, resume)
+	})
+
+	t.Run("success case", func(t *testing.T) {
+		mockClient := &isimocks.Client{}
+		svc := &isiService{
+			endpoint: "http://localhost:8080",
+			client:   &isi.Client{API: mockClient},
+		}
+		mockClient.On("Get", anyArgs...).Run(func(args mock.Arguments) {
+			resp := args.Get(5).(*apiv2.Exports)
+			resp.Resume = "next-token"
+		}).Return(nil).Once()
+		exports, resume, err := svc.GetExportsWithResume(ctx, "")
+		assert.NoError(t, err)
+		assert.Equal(t, "next-token", resume)
+		assert.Nil(t, exports)
+	})
+}
+
 func TestGetVolumeSize(t *testing.T) {
 	mockClient := &isimocks.Client{}
 
@@ -684,35 +791,118 @@ func TestOtherClientsAlreadyAdded(t *testing.T) {
 		},
 	}
 
-	// Define the test cases
-	testCases := []struct {
-		name         string
-		exportID     int
-		accessZone   string
-		nodeID       string
-		expectedBool bool
-	}{
-		{
-			name:         "Export is nil",
-			exportID:     456,
-			accessZone:   "System",
-			nodeID:       "node2",
-			expectedBool: true,
-		},
-	}
+	ctx := context.Background()
 
-	// Run the test cases
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
-			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
-			result := svc.OtherClientsAlreadyAdded(ctx, tc.exportID, tc.accessZone, tc.nodeID)
+	t.Run("export not found returns true", func(t *testing.T) {
+		mockClient.On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+		result := svc.OtherClientsAlreadyAdded(ctx, 456, "System", "node2")
+		assert.True(t, result)
+	})
 
-			if result != tc.expectedBool {
-				t.Errorf("Expected '%v', but got '%v'", tc.expectedBool, result)
+	t.Run("invalid node ID returns true", func(t *testing.T) {
+		mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+			resp := args.Get(5).(*apiv2.ExportList)
+			clients := []string{"client1"}
+			roClients := []string{}
+			rwClients := []string{}
+			rootClients := []string{}
+			*resp = apiv2.ExportList{
+				&apiv2.Export{
+					ID:               1,
+					Clients:          &clients,
+					ReadOnlyClients:  &roClients,
+					ReadWriteClients: &rwClients,
+					RootClients:      &rootClients,
+				},
 			}
-		})
-	}
+		}).Once()
+		result := svc.OtherClientsAlreadyAdded(ctx, 1, "System", "")
+		assert.True(t, result)
+	})
+
+	t.Run("other clients exist returns true", func(t *testing.T) {
+		mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+			resp := args.Get(5).(*apiv2.ExportList)
+			clients := []string{"other-client", "another-client"}
+			roClients := []string{}
+			rwClients := []string{}
+			rootClients := []string{}
+			*resp = apiv2.ExportList{
+				&apiv2.Export{
+					ID:               1,
+					Clients:          &clients,
+					ReadOnlyClients:  &roClients,
+					ReadWriteClients: &rwClients,
+					RootClients:      &rootClients,
+				},
+			}
+		}).Once()
+		result := svc.OtherClientsAlreadyAdded(ctx, 1, "System", "node1=#=#=node1.example.com=#=#=10.0.0.1")
+		assert.True(t, result)
+	})
+
+	t.Run("only this node exists returns false", func(t *testing.T) {
+		mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+			resp := args.Get(5).(*apiv2.ExportList)
+			clients := []string{"node1"}
+			roClients := []string{}
+			rwClients := []string{}
+			rootClients := []string{}
+			*resp = apiv2.ExportList{
+				&apiv2.Export{
+					ID:               1,
+					Clients:          &clients,
+					ReadOnlyClients:  &roClients,
+					ReadWriteClients: &rwClients,
+					RootClients:      &rootClients,
+				},
+			}
+		}).Once()
+		result := svc.OtherClientsAlreadyAdded(ctx, 1, "System", "node1=#=#=node1.example.com=#=#=10.0.0.1")
+		assert.False(t, result)
+	})
+
+	t.Run("only localhost exists returns false", func(t *testing.T) {
+		mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+			resp := args.Get(5).(*apiv2.ExportList)
+			clients := []string{"localhost"}
+			roClients := []string{}
+			rwClients := []string{}
+			rootClients := []string{}
+			*resp = apiv2.ExportList{
+				&apiv2.Export{
+					ID:               1,
+					Clients:          &clients,
+					ReadOnlyClients:  &roClients,
+					ReadWriteClients: &rwClients,
+					RootClients:      &rootClients,
+				},
+			}
+		}).Once()
+		result := svc.OtherClientsAlreadyAdded(ctx, 1, "System", "node1=#=#=node1.example.com=#=#=10.0.0.1")
+		assert.False(t, result)
+	})
+
+	t.Run("node IP in client fields returns false", func(t *testing.T) {
+		mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+			resp := args.Get(5).(*apiv2.ExportList)
+			clients := []string{"10.0.0.1"}
+			roClients := []string{}
+			rwClients := []string{}
+			rootClients := []string{}
+			*resp = apiv2.ExportList{
+				&apiv2.Export{
+					ID:               1,
+					Clients:          &clients,
+					ReadOnlyClients:  &roClients,
+					ReadWriteClients: &rwClients,
+					RootClients:      &rootClients,
+				},
+			}
+		}).Once()
+		result := svc.OtherClientsAlreadyAdded(ctx, 1, "System", "node1=#=#=node1.example.com=#=#=10.0.0.1")
+		assert.False(t, result)
+	})
 }
 
 func TestAddExportClientNetworkIdentifierByIDWithZone(t *testing.T) {
@@ -734,30 +924,97 @@ func TestAddExportClientNetworkIdentifierByIDWithZone(t *testing.T) {
 		accessZone              string
 		nodeID                  string
 		ignoreUnresolvableHosts bool
+		addClientFunc           func(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error
 		expectedErr             error
 	}{
 		{
-			name:                    "error case",
+			name:                    "error case - invalid node ID",
 			clusterName:             "cluster2",
 			exportID:                456,
 			accessZone:              "System",
 			nodeID:                  "!@$%~^",
 			ignoreUnresolvableHosts: true,
-			expectedErr:             errors.New("node ID '!@$%~^' cannot match the expected '^(.+)=#=#=(.+)=#=#=(.+)$' pattern"),
+			addClientFunc: func(_ context.Context, _ int, _, _ string, _ bool) error {
+				return nil
+			},
+			expectedErr: errors.New("node ID '!@$%~^' cannot match the expected '^(.+)=#=#=(.+)=#=#=(.+)$' pattern"),
+		},
+		{
+			name:                    "success case with ignoreUnresolvableHosts",
+			clusterName:             "cluster1",
+			exportID:                123,
+			accessZone:              "System",
+			nodeID:                  "node1=#=#=node1.example.com=#=#=192.168.1.1",
+			ignoreUnresolvableHosts: true,
+			addClientFunc: func(_ context.Context, _ int, _, _ string, _ bool) error {
+				return nil
+			},
+			expectedErr: nil,
+		},
+		{
+			name:                    "error case with ignoreUnresolvableHosts - addClientFunc fails",
+			clusterName:             "cluster1",
+			exportID:                123,
+			accessZone:              "System",
+			nodeID:                  "node1=#=#=node1.example.com=#=#=192.168.1.1",
+			ignoreUnresolvableHosts: true,
+			addClientFunc: func(_ context.Context, _ int, _, _ string, _ bool) error {
+				return errors.New("add client failed")
+			},
+			expectedErr: errors.New("failed to add client '192.168.1.1' to the export id '123'"),
+		},
+		{
+			name:                    "success case without ignoreUnresolvableHosts - FQDN works",
+			clusterName:             "cluster1",
+			exportID:                123,
+			accessZone:              "System",
+			nodeID:                  "node1=#=#=node1.example.com=#=#=192.168.1.1",
+			ignoreUnresolvableHosts: false,
+			addClientFunc: func(_ context.Context, _ int, _, _ string, _ bool) error {
+				// First call with FQDN succeeds
+				return nil
+			},
+			expectedErr: nil,
+		},
+		{
+			name:                    "success case without ignoreUnresolvableHosts - FQDN fails, IP works",
+			clusterName:             "cluster1",
+			exportID:                124,
+			accessZone:              "System",
+			nodeID:                  "node2=#=#=node2.example.com=#=#=192.168.1.2",
+			ignoreUnresolvableHosts: false,
+			addClientFunc: func() func(ctx context.Context, exportID int, accessZone, clientIP string, ignoreUnresolvableHosts bool) error {
+				callCount := 0
+				return func(_ context.Context, _ int, _, _ string, _ bool) error {
+					callCount++
+					if callCount == 1 {
+						// First call with FQDN fails
+						return errors.New("FQDN resolution failed")
+					}
+					// Second call with IP succeeds
+					return nil
+				}
+			}(),
+			expectedErr: nil,
+		},
+		{
+			name:                    "error case without ignoreUnresolvableHosts - both FQDN and IP fail",
+			clusterName:             "cluster1",
+			exportID:                125,
+			accessZone:              "System",
+			nodeID:                  "node3=#=#=node3.example.com=#=#=192.168.1.3",
+			ignoreUnresolvableHosts: false,
+			addClientFunc: func(_ context.Context, _ int, _, _ string, _ bool) error {
+				return errors.New("add client failed")
+			},
+			expectedErr: errors.New("failed to add clients 'node3.example.com' or '192.168.1.3' to export id '125'"),
 		},
 	}
 
 	// Run the test cases
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("node ID '!@$%~^' cannot match the expected '^(.+)=#=#=(.+)=#=#=(.+)$' pattern")).Once()
-			err := svc.AddExportClientNetworkIdentifierByIDWithZone(context.Background(), tc.clusterName, tc.exportID, tc.accessZone, tc.nodeID, tc.ignoreUnresolvableHosts, func(_ context.Context, _ int, _, _ string, _ bool) error {
-				// Simulate the addClientFunc behavior
-				if tc.expectedErr != nil {
-					return tc.expectedErr
-				}
-				return nil
-			})
+			err := svc.AddExportClientNetworkIdentifierByIDWithZone(context.Background(), tc.clusterName, tc.exportID, tc.accessZone, tc.nodeID, tc.ignoreUnresolvableHosts, tc.addClientFunc)
 
 			if err != nil {
 				if tc.expectedErr == nil {
@@ -986,7 +1243,7 @@ func TestAddExportClientByIPWithZone(t *testing.T) {
 				},
 			}
 
-			err := svc.AddExportClientByIPWithZone(ctx, tc.clusterName, tc.exportID, tc.accessZone, tc.nodeID, tc.clientIPs, tc.addClientFunc)
+			err := svc.AddExportClientByIPWithZone(ctx, tc.clusterName, tc.exportID, tc.accessZone, tc.nodeID, tc.clientIPs, tc.addClientFunc, nil, constants.AllowedNetworksModeDefault)
 
 			if err != nil {
 				if tc.expectedErr == nil {
@@ -1001,6 +1258,79 @@ func TestAddExportClientByIPWithZone(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAddExportClientByIPWithZoneMultiMode(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Multi mode adds all IPs", func(t *testing.T) {
+		svc := &isiService{client: &isi.Client{API: &isimocks.Client{}}}
+		var addedIPs []string
+		addFunc := func(_ context.Context, _ int, _ string, ip string, _ bool) error {
+			addedIPs = append(addedIPs, ip)
+			return nil
+		}
+		err := svc.AddExportClientByIPWithZone(ctx, "cluster1", 1, "System", "node1",
+			[]string{"10.0.0.1", "10.0.0.2", "10.0.0.3"}, addFunc, nil, constants.AllowedNetworksModeMulti)
+		assert.NoError(t, err)
+		assert.Equal(t, 3, len(addedIPs))
+	})
+
+	t.Run("Multi mode partial failure succeeds", func(t *testing.T) {
+		svc := &isiService{client: &isi.Client{API: &isimocks.Client{}}}
+		callCount := 0
+		addFunc := func(_ context.Context, _ int, _ string, _ string, _ bool) error {
+			callCount++
+			if callCount == 2 {
+				return errors.New("transient error")
+			}
+			return nil
+		}
+		err := svc.AddExportClientByIPWithZone(ctx, "cluster1", 1, "System", "node1",
+			[]string{"10.0.0.1", "10.0.0.2", "10.0.0.3"}, addFunc, nil, constants.AllowedNetworksModeMulti)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Multi mode all fail returns error", func(t *testing.T) {
+		svc := &isiService{client: &isi.Client{API: &isimocks.Client{}}}
+		addFunc := func(_ context.Context, _ int, _ string, _ string, _ bool) error {
+			return errors.New("all fail")
+		}
+		err := svc.AddExportClientByIPWithZone(ctx, "cluster1", 1, "System", "node1",
+			[]string{"10.0.0.1", "10.0.0.2"}, addFunc, nil, constants.AllowedNetworksModeMulti)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to add any of clients")
+	})
+
+	t.Run("Multi mode batches all IPs with addClientsFunc", func(t *testing.T) {
+		svc := &isiService{client: &isi.Client{API: &isimocks.Client{}}}
+		var batchIPs []string
+		addClientsFunc := func(_ context.Context, _ int, _ string, clientIPs []string, _ bool) error {
+			batchIPs = append(batchIPs, clientIPs...)
+			return nil
+		}
+		addFunc := func(_ context.Context, _ int, _ string, _ string, _ bool) error {
+			t.Fatal("expected batch addClientsFunc, not per-IP addClientFunc")
+			return nil
+		}
+		err := svc.AddExportClientByIPWithZone(ctx, "cluster1", 1, "System", "node1",
+			[]string{"10.0.0.1", "10.0.0.2", "10.0.0.3"}, addFunc, addClientsFunc, constants.AllowedNetworksModeMulti)
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"}, batchIPs)
+	})
+
+	t.Run("Single mode stops at first success", func(t *testing.T) {
+		svc := &isiService{client: &isi.Client{API: &isimocks.Client{}}}
+		var addedIPs []string
+		addFunc := func(_ context.Context, _ int, _ string, ip string, _ bool) error {
+			addedIPs = append(addedIPs, ip)
+			return nil
+		}
+		err := svc.AddExportClientByIPWithZone(ctx, "cluster1", 1, "System", "node1",
+			[]string{"10.0.0.1", "10.0.0.2", "10.0.0.3"}, addFunc, nil, constants.AllowedNetworksModeDefault)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(addedIPs))
+	})
 }
 
 func TestRemoveExportClientByIDWithZone(t *testing.T) {
@@ -1233,35 +1563,98 @@ func TestIsHostAlreadyAdded(t *testing.T) {
 		},
 	}
 
-	// Define the test cases
-	testCases := []struct {
-		name         string
-		exportID     int
-		accessZone   string
-		nodeID       string
-		expectedBool bool
-	}{
-		{
-			name:         "Node ID is in client fields",
-			exportID:     789,
-			accessZone:   "System",
-			nodeID:       "node2",
-			expectedBool: true,
-		},
-	}
+	ctx := context.Background()
 
-	// Run the test cases
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
-			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
-			result := svc.IsHostAlreadyAdded(ctx, tc.exportID, tc.accessZone, tc.nodeID)
+	t.Run("export not found returns true", func(t *testing.T) {
+		mockClient.On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+		result := svc.IsHostAlreadyAdded(ctx, 789, "System", "node2")
+		assert.True(t, result)
+	})
 
-			if result != tc.expectedBool {
-				t.Errorf("Expected '%v', but got '%v'", tc.expectedBool, result)
+	t.Run("invalid node ID returns true", func(t *testing.T) {
+		mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+			resp := args.Get(5).(*apiv2.ExportList)
+			clients := []string{"client1"}
+			roClients := []string{}
+			rwClients := []string{}
+			rootClients := []string{}
+			*resp = apiv2.ExportList{
+				&apiv2.Export{
+					ID:               1,
+					Clients:          &clients,
+					ReadOnlyClients:  &roClients,
+					ReadWriteClients: &rwClients,
+					RootClients:      &rootClients,
+				},
 			}
-		})
-	}
+		}).Once()
+		// Invalid node ID format
+		result := svc.IsHostAlreadyAdded(ctx, 1, "System", "")
+		assert.True(t, result)
+	})
+
+	t.Run("node in client fields returns true", func(t *testing.T) {
+		mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+			resp := args.Get(5).(*apiv2.ExportList)
+			clients := []string{"node1"}
+			roClients := []string{}
+			rwClients := []string{}
+			rootClients := []string{}
+			*resp = apiv2.ExportList{
+				&apiv2.Export{
+					ID:               1,
+					Clients:          &clients,
+					ReadOnlyClients:  &roClients,
+					ReadWriteClients: &rwClients,
+					RootClients:      &rootClients,
+				},
+			}
+		}).Once()
+		result := svc.IsHostAlreadyAdded(ctx, 1, "System", "node1=#=#=node1.example.com=#=#=10.0.0.1")
+		assert.True(t, result)
+	})
+
+	t.Run("node not in client fields returns false", func(t *testing.T) {
+		mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+			resp := args.Get(5).(*apiv2.ExportList)
+			clients := []string{"other-node"}
+			roClients := []string{}
+			rwClients := []string{}
+			rootClients := []string{}
+			*resp = apiv2.ExportList{
+				&apiv2.Export{
+					ID:               1,
+					Clients:          &clients,
+					ReadOnlyClients:  &roClients,
+					ReadWriteClients: &rwClients,
+					RootClients:      &rootClients,
+				},
+			}
+		}).Once()
+		result := svc.IsHostAlreadyAdded(ctx, 1, "System", "node1=#=#=node1.example.com=#=#=10.0.0.1")
+		assert.False(t, result)
+	})
+
+	t.Run("node IP in client fields returns true", func(t *testing.T) {
+		mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+			resp := args.Get(5).(*apiv2.ExportList)
+			clients := []string{"10.0.0.1"}
+			roClients := []string{}
+			rwClients := []string{}
+			rootClients := []string{}
+			*resp = apiv2.ExportList{
+				&apiv2.Export{
+					ID:               1,
+					Clients:          &clients,
+					ReadOnlyClients:  &roClients,
+					ReadWriteClients: &rwClients,
+					RootClients:      &rootClients,
+				},
+			}
+		}).Once()
+		result := svc.IsHostAlreadyAdded(ctx, 1, "System", "node1=#=#=node1.example.com=#=#=10.0.0.1")
+		assert.True(t, result)
+	})
 }
 
 func TestGetExportsCountAttachedToNode(t *testing.T) {
@@ -1340,6 +1733,29 @@ func TestGetExportsCountAttachedToNode(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetExportsCountAttachedToNodeIPs(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Empty IPs returns zero", func(t *testing.T) {
+		svc := &isiService{
+			client: &isi.Client{API: &isimocks.Client{}},
+		}
+		count, err := svc.GetExportsCountAttachedToNodeIPs(ctx, []string{}, "System")
+		assert.NoError(t, err)
+		assert.Equal(t, int64(0), count)
+	})
+
+	t.Run("API error returns error", func(t *testing.T) {
+		mockAPI := &isimocks.Client{}
+		svc := &isiService{
+			client: &isi.Client{API: mockAPI},
+		}
+		mockAPI.On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+		_, err := svc.GetExportsCountAttachedToNodeIPs(ctx, []string{"10.0.0.1"}, "System")
+		assert.Error(t, err)
+	})
 }
 
 func TestGetExports(t *testing.T) {
@@ -1890,4 +2306,1054 @@ func TestGetVolumeWithIsiPath(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRemoveExportClientByIPsWithZone(t *testing.T) {
+	mockClient := &isimocks.Client{}
+
+	// Create a new instance of the isiService struct
+	svc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Define the test cases
+	testCases := []struct {
+		name                    string
+		exportID                int
+		accessZone              string
+		clientIPs               []string
+		ignoreUnresolvableHosts bool
+		setup                   func(mockClient *isimocks.Client)
+		expectedErr             error
+	}{
+		{
+			name:                    "success case",
+			exportID:                456,
+			accessZone:              "System",
+			clientIPs:               []string{"1.2.3.4", "5.6.7.8"},
+			ignoreUnresolvableHosts: true,
+			setup: func(mockClient *isimocks.Client) {
+				ex := &apiv2.Export{
+					ID:               456,
+					Paths:            &[]string{"/export1"},
+					Clients:          &[]string{"1.2.3.4", "5.6.7.8"},
+					RootClients:      &[]string{},
+					ReadOnlyClients:  &[]string{},
+					ReadWriteClients: &[]string{},
+				}
+				mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+					resp := args.Get(5).(*apiv2.ExportList)
+					*resp = apiv2.ExportList{ex}
+				}).Once()
+				mockClient.On("Put", anyArgs...).Return(nil).Once()
+			},
+			expectedErr: nil,
+		},
+		{
+			name:                    "404 error - export not found",
+			exportID:                456,
+			accessZone:              "System",
+			clientIPs:               []string{"1.2.3.4"},
+			ignoreUnresolvableHosts: true,
+			setup: func(mockClient *isimocks.Client) {
+				mockClient.On("Get", anyArgs...).Return(&api.JSONError{StatusCode: 404}).Once()
+			},
+			expectedErr: nil, // 404 is handled gracefully
+		},
+		{
+			name:                    "generic error",
+			exportID:                456,
+			accessZone:              "System",
+			clientIPs:               []string{"1.2.3.4"},
+			ignoreUnresolvableHosts: true,
+			setup: func(mockClient *isimocks.Client) {
+				mockClient.On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			},
+			expectedErr: errors.New("failed to remove clients from export '456' with access zone 'System' : 'mock error'"),
+		},
+	}
+
+	// Run the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.setup != nil {
+				tc.setup(mockClient)
+			}
+
+			ctx := context.Background()
+			err := svc.RemoveExportClientByIPsWithZone(ctx, tc.exportID, tc.accessZone, tc.clientIPs, tc.ignoreUnresolvableHosts)
+
+			if err != nil {
+				if tc.expectedErr == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.expectedErr, err)
+				}
+			} else {
+				if tc.expectedErr != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.expectedErr)
+				}
+			}
+		})
+	}
+}
+
+func TestAddExportClientsByIDWithZone(t *testing.T) {
+	mockClient := &isimocks.Client{}
+
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	testCases := []struct {
+		name                    string
+		exportID                int
+		accessZone              string
+		clientIPs               []string
+		ignoreUnresolvableHosts bool
+		expectedErr             error
+	}{
+		{
+			name:                    "error case",
+			exportID:                456,
+			accessZone:              "System",
+			clientIPs:               []string{"5.6.7.8"},
+			ignoreUnresolvableHosts: true,
+			expectedErr:             errors.New("failed to add clients to export id '456' with access zone 'System' : 'mock error'"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			err := svc.AddExportClientsByIDWithZone(ctx, tc.exportID, tc.accessZone, tc.clientIPs, tc.ignoreUnresolvableHosts)
+
+			if err != nil {
+				if tc.expectedErr == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.expectedErr, err)
+				}
+			} else {
+				if tc.expectedErr != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.expectedErr)
+				}
+			}
+		})
+	}
+}
+
+func TestAddExportRootClientsByIDWithZone(t *testing.T) {
+	mockClient := &isimocks.Client{}
+
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	testCases := []struct {
+		name                    string
+		exportID                int
+		accessZone              string
+		clientIPs               []string
+		ignoreUnresolvableHosts bool
+		expectedErr             error
+	}{
+		{
+			name:                    "error case",
+			exportID:                456,
+			accessZone:              "System",
+			clientIPs:               []string{"5.6.7.8"},
+			ignoreUnresolvableHosts: true,
+			expectedErr:             errors.New("failed to add clients to export id '456' with access zone 'System' : 'mock error'"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			err := svc.AddExportRootClientsByIDWithZone(ctx, tc.exportID, tc.accessZone, tc.clientIPs, tc.ignoreUnresolvableHosts)
+
+			if err != nil {
+				if tc.expectedErr == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.expectedErr, err)
+				}
+			} else {
+				if tc.expectedErr != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.expectedErr)
+				}
+			}
+		})
+	}
+}
+
+func TestAddExportReadOnlyClientsByIDWithZone(t *testing.T) {
+	mockClient := &isimocks.Client{}
+
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	testCases := []struct {
+		name                    string
+		exportID                int
+		accessZone              string
+		clientIPs               []string
+		ignoreUnresolvableHosts bool
+		expectedErr             error
+	}{
+		{
+			name:                    "error case",
+			exportID:                456,
+			accessZone:              "System",
+			clientIPs:               []string{"5.6.7.8"},
+			ignoreUnresolvableHosts: true,
+			expectedErr:             errors.New("failed to add read only clients to export id '456' with access zone 'System' : 'mock error'"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("mock error")).Once()
+			err := svc.AddExportReadOnlyClientsByIDWithZone(ctx, tc.exportID, tc.accessZone, tc.clientIPs, tc.ignoreUnresolvableHosts)
+
+			if err != nil {
+				if tc.expectedErr == nil {
+					t.Errorf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedErr.Error() {
+					t.Errorf("Expected error '%v', but got '%v'", tc.expectedErr, err)
+				}
+			} else {
+				if tc.expectedErr != nil {
+					t.Errorf("Expected error '%v', but got nil", tc.expectedErr)
+				}
+			}
+		})
+	}
+}
+
+func TestAddExportClientsByIDWithZoneSuccess(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(*apiv2.ExportList)
+		*resp = apiv2.ExportList{
+			&apiv2.Export{
+				ID:      456,
+				Zone:    "System",
+				Clients: &[]string{},
+			},
+		}
+	}).Once()
+	mockClient.On("Put", anyArgs...).Return(nil).Once()
+
+	ctx := context.Background()
+	err := svc.AddExportClientsByIDWithZone(ctx, 456, "System", []string{"5.6.7.8"}, false)
+	assert.NoError(t, err)
+}
+
+func TestAddExportRootClientsByIDWithZoneSuccess(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(*apiv2.ExportList)
+		*resp = apiv2.ExportList{
+			&apiv2.Export{
+				ID:          456,
+				Zone:        "System",
+				RootClients: &[]string{},
+			},
+		}
+	}).Once()
+	mockClient.On("Put", anyArgs...).Return(nil).Once()
+
+	ctx := context.Background()
+	err := svc.AddExportRootClientsByIDWithZone(ctx, 456, "System", []string{"5.6.7.8"}, false)
+	assert.NoError(t, err)
+}
+
+func TestAddExportReadOnlyClientsByIDWithZoneSuccess(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(*apiv2.ExportList)
+		*resp = apiv2.ExportList{
+			&apiv2.Export{
+				ID:              456,
+				Zone:            "System",
+				ReadOnlyClients: &[]string{},
+			},
+		}
+	}).Once()
+	mockClient.On("Put", anyArgs...).Return(nil).Once()
+
+	ctx := context.Background()
+	err := svc.AddExportReadOnlyClientsByIDWithZone(ctx, 456, "System", []string{"5.6.7.8"}, false)
+	assert.NoError(t, err)
+}
+
+func TestGetExportsWithLimit_Error(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+	mockClient.On("Get", anyArgs...).Return(errors.New("get exports failed")).Once()
+	ctx := context.Background()
+	exports, resume, err := svc.GetExportsWithLimit(ctx, "10")
+	assert.Error(t, err)
+	assert.Nil(t, exports)
+	assert.Empty(t, resume)
+}
+
+func TestGetExportsWithLimit_Success(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		endpoint: "http://localhost:8080",
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+	mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(*apiv2.Exports)
+		*resp = apiv2.Exports{
+			Exports: apiv2.ExportList{
+				&apiv2.Export{ID: 1, Paths: &[]string{"/ifs/data/vol1"}},
+				&apiv2.Export{ID: 2, Paths: &[]string{"/ifs/data/vol2"}},
+			},
+			Resume: "next-token",
+		}
+	}).Once()
+	ctx := context.Background()
+	exports, resume, err := svc.GetExportsWithLimit(ctx, "10")
+	assert.NoError(t, err)
+	assert.NotNil(t, exports)
+	assert.Len(t, exports, 2)
+	assert.Equal(t, "next-token", resume)
+}
+
+func TestGetFilesystemsWithLimit_InvalidLimit(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+	ctx := context.Background()
+	_, _, err := svc.GetFilesystemsWithLimit(ctx, "/ifs/data", "not-a-number")
+	assert.Error(t, err)
+}
+
+func TestGetFilesystemsWithLimit_ListError(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+	mockClient.On("Get", anyArgs...).Return(errors.New("list error")).Once()
+	ctx := context.Background()
+	_, _, err := svc.GetFilesystemsWithLimit(ctx, "/ifs/data", "10")
+	assert.Error(t, err)
+}
+
+func TestGetSubDirectoryCount_VolumeNotFound(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+	mockClient.On("Get", anyArgs...).Return(errors.New("not found")).Once()
+	ctx := context.Background()
+	_, err := svc.GetSubDirectoryCount(ctx, "/ifs/data", "nonexistent-vol")
+	assert.Error(t, err)
+}
+
+func TestGetSubDirectoryCount_Success(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+	ctx := context.Background()
+
+	// First call to check if volume exists
+	mockClient.On("Get", anyArgs...).Return(nil).Once()
+
+	// Second call to get volume details with nlink attribute
+	mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(**apiv1.GetIsiVolumeAttributesResp)
+		*resp = &apiv1.GetIsiVolumeAttributesResp{
+			AttributeMap: []struct {
+				Name  string      `json:"name"`
+				Value interface{} `json:"value"`
+			}{
+				{Name: "nlink", Value: float64(5)},
+			},
+		}
+	}).Once()
+
+	count, err := svc.GetSubDirectoryCount(ctx, "/ifs/data", "test-vol")
+	assert.NoError(t, err)
+	assert.Equal(t, int64(5), count)
+}
+
+func TestGetSubDirectoryCount_InvalidNlinkType(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+	ctx := context.Background()
+
+	// First call to check if volume exists
+	mockClient.On("Get", anyArgs...).Return(nil).Once()
+
+	// Second call to get volume details with invalid nlink attribute
+	mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(**apiv1.GetIsiVolumeAttributesResp)
+		*resp = &apiv1.GetIsiVolumeAttributesResp{
+			AttributeMap: []struct {
+				Name  string      `json:"name"`
+				Value interface{} `json:"value"`
+			}{
+				{Name: "nlink", Value: "invalid"},
+			},
+		}
+	}).Once()
+
+	_, err := svc.GetSubDirectoryCount(ctx, "/ifs/data", "test-vol")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to get total subdirectory count")
+}
+
+func TestGetSubDirectoryCount_NoNlinkAttribute(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+	ctx := context.Background()
+
+	// First call to check if volume exists
+	mockClient.On("Get", anyArgs...).Return(nil).Once()
+
+	// Second call to get volume details without nlink attribute
+	mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(**apiv1.GetIsiVolumeAttributesResp)
+		*resp = &apiv1.GetIsiVolumeAttributesResp{
+			AttributeMap: []struct {
+				Name  string      `json:"name"`
+				Value interface{} `json:"value"`
+			}{
+				{Name: "size", Value: float64(1000)},
+			},
+		}
+	}).Once()
+
+	count, err := svc.GetSubDirectoryCount(ctx, "/ifs/data", "test-vol")
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), count)
+}
+
+func TestGetSubDirectoryCount_GetVolumeError(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+	ctx := context.Background()
+
+	// First call to check if volume exists
+	mockClient.On("Get", anyArgs...).Return(nil).Once()
+
+	// Second call to get volume details returns error
+	mockClient.On("Get", anyArgs...).Return(errors.New("API error")).Once()
+
+	_, err := svc.GetSubDirectoryCount(ctx, "/ifs/data", "test-vol")
+	assert.Error(t, err)
+}
+
+func TestSetVolumeGroupOwnershipByPath(t *testing.T) {
+	tests := []struct {
+		name            string
+		isiPath         string
+		volName         string
+		gid             int
+		existingGID     string
+		putErr          error
+		expectErr       bool
+		expectChanged   bool
+		expectErrSubstr string
+	}{
+		{
+			name:          "success",
+			isiPath:       "/ifs/k8s/shared",
+			volName:       "csivol-abc123",
+			gid:           2000,
+			existingGID:   "",
+			putErr:        nil,
+			expectErr:     false,
+			expectChanged: true,
+		},
+		{
+			name:            "API error",
+			isiPath:         "/ifs/k8s/shared",
+			volName:         "csivol-abc123",
+			gid:             2000,
+			existingGID:     "",
+			putErr:          errors.New("mock PUT error"),
+			expectErr:       true,
+			expectErrSubstr: "failed to set group ownership",
+		},
+		{
+			name:          "group already matches",
+			isiPath:       "/ifs/k8s/shared",
+			volName:       "csivol-abc123",
+			gid:           2000,
+			existingGID:   "2000",
+			putErr:        nil,
+			expectErr:     false,
+			expectChanged: false,
+		},
+		{
+			name:            "fsGroup conflict",
+			isiPath:         "/ifs/k8s/shared",
+			volName:         "csivol-abc123",
+			gid:             2000,
+			existingGID:     "3000",
+			putErr:          nil,
+			expectErr:       true,
+			expectErrSubstr: "fsGroup conflict",
+		},
+		{
+			name:          "inherited root group allowed",
+			isiPath:       "/ifs/k8s/shared",
+			volName:       "csivol-abc123",
+			gid:           2000,
+			existingGID:   "0",
+			putErr:        nil,
+			expectErr:     false,
+			expectChanged: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockClient := &isimocks.Client{}
+			svc := &isiService{
+				client: &isi.Client{
+					API: mockClient,
+				},
+			}
+			isClone := false
+
+			// Mock GetVolumeACL via the underlying API.Get call
+			mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+				if len(tc.existingGID) > 0 {
+					resp := args.Get(5).(*apiv2.ACL)
+					*resp = apiv2.ACL{
+						Group: &apiv2.Persona{
+							ID: &apiv2.PersonaID{
+								ID:   tc.existingGID,
+								Type: apiv2.PersonaIDTypeGID,
+							},
+						},
+					}
+				}
+			}).Once()
+
+			// Mock Put for fresh volumes, API error cases, or inherited root group (0) being updated.
+			if len(tc.existingGID) == 0 || tc.existingGID == "0" && strconv.Itoa(tc.gid) != "0" {
+				mockClient.On("Put", anyArgs...).Return(tc.putErr).Once()
+			}
+
+			ctx := context.Background()
+			result, err := svc.SetVolumeGroupOwnershipByPath(ctx, tc.isiPath, tc.volName, tc.gid, isClone)
+			if tc.expectErr {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+				assert.Contains(t, err.Error(), tc.expectErrSubstr)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.Equal(t, tc.expectChanged, result.Changed)
+			}
+		})
+	}
+}
+
+func TestSetVolumeGroupOwnershipByPath_CloneOwnershipChange(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	// Mock Get to return existing GID 2000
+	mockClient.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(*apiv2.ACL)
+		*resp = apiv2.ACL{
+			Group: &apiv2.Persona{
+				ID: &apiv2.PersonaID{
+					ID:   "2000",
+					Type: apiv2.PersonaIDTypeGID,
+				},
+			},
+		}
+	}).Once()
+
+	// Mock Put for ownership update
+	mockClient.On("Put", anyArgs...).Return(nil).Once()
+
+	ctx := context.Background()
+	result, err := svc.SetVolumeGroupOwnershipByPath(ctx, "/ifs/k8s/shared", "csivol-clone123", 3000, true)
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.True(t, result.Changed, "Clone should allow ownership change from 2000 to 3000")
+	assert.Equal(t, "2000", result.ExistingGID)
+}
+
+func TestSetVolumeGroupOwnershipRecursive_InvalidPath(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	ctx := context.Background()
+	err := svc.SetVolumeGroupOwnershipRecursive(ctx, "invalid-path", "vol1", 1000, 8)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid volume path format")
+}
+
+func TestSetPathGroupOwnership_InvalidPath(t *testing.T) {
+	mockClient := &isimocks.Client{}
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	ctx := context.Background()
+	err := svc.setPathGroupOwnership(ctx, "invalid-path", 1000, false)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid path for group ownership update")
+}
+
+func TestSetPathGroupOwnership_APIError(t *testing.T) {
+	mockClient := &isimocks.Client{}
+
+	// Mock the API to return an error
+	mockClient.On("Put", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		&api.JSONError{StatusCode: 500},
+	)
+
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	ctx := context.Background()
+	err := svc.setPathGroupOwnership(ctx, "/ifs/data/vol1/file.txt", 1000, false)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to set group ownership")
+	mockClient.AssertExpectations(t)
+}
+
+func TestSetPathGroupOwnership_SuccessFile(t *testing.T) {
+	mockClient := &isimocks.Client{}
+
+	// Mock the API to succeed
+	mockClient.On("Put", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	ctx := context.Background()
+	err := svc.setPathGroupOwnership(ctx, "/ifs/data/vol1/file.txt", 1000, false)
+
+	assert.NoError(t, err)
+	mockClient.AssertExpectations(t)
+}
+
+func TestSetPathGroupOwnership_SuccessDirectory(t *testing.T) {
+	mockClient := &isimocks.Client{}
+
+	// Mock the API to succeed
+	mockClient.On("Put", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	ctx := context.Background()
+	err := svc.setPathGroupOwnership(ctx, "/ifs/data/vol1/subdir", 1000, true)
+
+	assert.NoError(t, err)
+	mockClient.AssertExpectations(t)
+}
+
+func TestSetVolumeGroupOwnershipRecursive_NoChildren(t *testing.T) {
+	mockClient := &isimocks.Client{}
+
+	// Mock the API to return empty children list
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(*resumeableContainerChildList)
+		*resp = resumeableContainerChildList{
+			Children: []*apiv2.ContainerChild{},
+			Resume:   "",
+		}
+	})
+
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	ctx := context.Background()
+	err := svc.SetVolumeGroupOwnershipRecursive(ctx, "/ifs/data", "vol1", 1000, 8)
+
+	assert.NoError(t, err)
+	mockClient.AssertExpectations(t)
+}
+
+func TestSetVolumeGroupOwnershipRecursive_GetChildrenError(t *testing.T) {
+	mockClient := &isimocks.Client{}
+
+	// Mock the API to return an error
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		&api.JSONError{StatusCode: 500},
+	)
+
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	ctx := context.Background()
+	err := svc.SetVolumeGroupOwnershipRecursive(ctx, "/ifs/data", "vol1", 1000, 8)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to query volume children for recursive ownership")
+	mockClient.AssertExpectations(t)
+}
+
+func TestSetVolumeGroupOwnershipRecursive_WithPagination(t *testing.T) {
+	mockClient := &isimocks.Client{}
+
+	path1 := "/ifs/data/vol1/file1.txt"
+	name1 := "file1.txt"
+	path2 := "/ifs/data/vol1/file2.txt"
+	name2 := "file2.txt"
+	path3 := "/ifs/data/vol1/file3.txt"
+	name3 := "file3.txt"
+	typeFile := "object"
+
+	callCount := 0
+	// Mock the API to return paginated results
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(*resumeableContainerChildList)
+		callCount++
+		if callCount == 1 {
+			// First page with resume token
+			*resp = resumeableContainerChildList{
+				Children: []*apiv2.ContainerChild{
+					{Path: &path1, Name: &name1, Type: &typeFile},
+					{Path: &path2, Name: &name2, Type: &typeFile},
+				},
+				Resume: "token123",
+			}
+		} else {
+			// Second page without resume token
+			*resp = resumeableContainerChildList{
+				Children: []*apiv2.ContainerChild{
+					{Path: &path3, Name: &name3, Type: &typeFile},
+				},
+				Resume: "",
+			}
+		}
+	})
+
+	// Mock the Put calls for setting ownership
+	mockClient.On("Put", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	ctx := context.Background()
+	err := svc.SetVolumeGroupOwnershipRecursive(ctx, "/ifs/data", "vol1", 1000, 8)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, callCount, "Should make 2 Get calls for pagination")
+	mockClient.AssertExpectations(t)
+}
+
+func TestSetVolumeGroupOwnershipRecursive_SetOwnershipError(t *testing.T) {
+	mockClient := &isimocks.Client{}
+
+	path1 := "/ifs/data/vol1/file1.txt"
+	name1 := "file1.txt"
+	typeFile := "object"
+
+	// Mock the API to return children
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(*resumeableContainerChildList)
+		*resp = resumeableContainerChildList{
+			Children: []*apiv2.ContainerChild{
+				{Path: &path1, Name: &name1, Type: &typeFile},
+			},
+			Resume: "",
+		}
+	})
+
+	// Mock the Put call to fail
+	mockClient.On("Put", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		&api.JSONError{StatusCode: 500},
+	)
+
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	ctx := context.Background()
+	err := svc.SetVolumeGroupOwnershipRecursive(ctx, "/ifs/data", "vol1", 1000, 8)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "recursive ownership failed")
+	mockClient.AssertExpectations(t)
+}
+
+func TestSetVolumeGroupOwnershipRecursive_Success(t *testing.T) {
+	mockClient := &isimocks.Client{}
+
+	path1 := "/ifs/data/vol1/file1.txt"
+	name1 := "file1.txt"
+	path2 := "/ifs/data/vol1/subdir"
+	name2 := "subdir"
+	typeFile := "object"
+	typeDir := "container"
+
+	// Mock the API to return children with Type field
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(*resumeableContainerChildList)
+		*resp = resumeableContainerChildList{
+			Children: []*apiv2.ContainerChild{
+				{Path: &path1, Name: &name1, Type: &typeFile},
+				{Path: &path2, Name: &name2, Type: &typeDir},
+			},
+			Resume: "",
+		}
+	})
+
+	// Mock the Put calls for setting ownership
+	mockClient.On("Put", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	ctx := context.Background()
+	err := svc.SetVolumeGroupOwnershipRecursive(ctx, "/ifs/data", "vol1", 1000, 8)
+
+	assert.NoError(t, err)
+	mockClient.AssertExpectations(t)
+}
+
+func TestSetVolumeGroupOwnershipRecursive_ChildrenWithNilFields(t *testing.T) {
+	mockClient := &isimocks.Client{}
+
+	path1 := "/ifs/data/vol1/file1.txt"
+	name1 := "file1.txt"
+	typeFile := "object"
+
+	// Mock the API to return children with some nil fields (should be skipped)
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(*resumeableContainerChildList)
+		*resp = resumeableContainerChildList{
+			Children: []*apiv2.ContainerChild{
+				{Path: &path1, Name: &name1, Type: &typeFile},
+				{Path: nil, Name: &name1}, // Should be skipped
+				{Path: &path1, Name: nil}, // Should be skipped
+				{Path: nil, Name: nil},    // Should be skipped
+			},
+			Resume: "",
+		}
+	})
+
+	// Mock the Put call (should only be called once for the valid child)
+	mockClient.On("Put", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+	svc := &isiService{
+		client: &isi.Client{
+			API: mockClient,
+		},
+	}
+
+	ctx := context.Background()
+	err := svc.SetVolumeGroupOwnershipRecursive(ctx, "/ifs/data", "vol1", 1000, 8)
+
+	assert.NoError(t, err)
+	mockClient.AssertExpectations(t)
+}
+
+func TestGetVolumeMetaData_InvalidPath_Dot(t *testing.T) {
+	ctx := context.Background()
+	svc := &isiService{}
+
+	_, err := svc.GetVolumeMetaData(ctx, ".")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid volume path")
+}
+
+func TestGetVolumeMetaData_InvalidPath_Root(t *testing.T) {
+	ctx := context.Background()
+	svc := &isiService{}
+
+	_, err := svc.GetVolumeMetaData(ctx, "/")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid volume path")
+}
+
+func TestGetSnapshotTrackingDirName(t *testing.T) {
+	svc := &isiService{}
+
+	result := svc.GetSnapshotTrackingDirName("test-snapshot")
+	assert.Equal(t, ".csi-test-snapshot-tracking-dir", result)
+}
+
+func TestGetVolumeMetaData_GetVolumeError(t *testing.T) {
+	ctx := context.Background()
+	mockClient := &isimocks.Client{}
+
+	svc := &isiService{
+		client: &isi.Client{API: mockClient},
+	}
+
+	// Mock GetVolumeWithIsiPath to return error
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(errors.New("volume not found"))
+
+	_, err := svc.GetVolumeMetaData(ctx, "/ifs/data/test-vol")
+	assert.Error(t, err)
+}
+
+func TestGetSnapshotSourceVolumeIsiPath(t *testing.T) {
+	ctx := context.Background()
+	mockClient := &isimocks.Client{}
+
+	svc := &isiService{
+		client: &isi.Client{API: mockClient},
+	}
+
+	t.Run("success", func(t *testing.T) {
+		mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Run(func(args mock.Arguments) {
+			resp := args.Get(5).(**apiv1.GetIsiSnapshotsResp)
+			*resp = &apiv1.GetIsiSnapshotsResp{
+				SnapshotList: []*apiv1.IsiSnapshot{
+					{
+						Path: "/ifs/data/volume1",
+					},
+				},
+			}
+		}).Once()
+
+		result, err := svc.GetSnapshotSourceVolumeIsiPath(ctx, "snap1")
+		assert.NoError(t, err)
+		assert.Equal(t, "/ifs/data", result)
+		mockClient.ExpectedCalls = nil
+	})
+
+	t.Run("get snapshot error", func(t *testing.T) {
+		mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(errors.New("snapshot not found"))
+
+		_, err := svc.GetSnapshotSourceVolumeIsiPath(ctx, "snap1")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get snapshot id")
+		mockClient.ExpectedCalls = nil
+	})
+}
+
+func TestDeleteWritableSnapshot(t *testing.T) {
+	ctx := context.Background()
+	mockClient := &isimocks.Client{}
+
+	svc := &isiService{
+		client: &isi.Client{API: mockClient},
+	}
+
+	t.Run("success", func(t *testing.T) {
+		mockClient.On("Delete", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Once()
+
+		err := svc.DeleteWritableSnapshot(ctx, "/ifs/data/writable-vol-1")
+		assert.NoError(t, err)
+		mockClient.ExpectedCalls = nil
+	})
+
+	t.Run("delete error", func(t *testing.T) {
+		mockClient.On("Delete", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(errors.New("delete failed")).Once()
+
+		err := svc.DeleteWritableSnapshot(ctx, "/ifs/data/writable-vol-1")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "delete failed")
+		mockClient.ExpectedCalls = nil
+	})
 }

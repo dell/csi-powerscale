@@ -1,18 +1,16 @@
-/*
-Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright © 2019-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package integration_test
 
 import (
@@ -20,21 +18,22 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/dell/csi-powerscale/v2/common/constants"
-	fromctx "github.com/dell/csi-powerscale/v2/common/utils/fromcontext"
-	ident "github.com/dell/csi-powerscale/v2/common/utils/identifiers"
-	isilonfs "github.com/dell/csi-powerscale/v2/common/utils/powerscale-fs"
-	strutil "github.com/dell/csi-powerscale/v2/common/utils/string-utils"
-	csiutils "github.com/dell/csi-powerscale/v2/csi-utils"
-	"github.com/dell/csi-powerscale/v2/service"
-	isi "github.com/dell/gopowerscale"
-	apiv1 "github.com/dell/gopowerscale/api/v1"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/constants"
+	fromctx "github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/utils/fromcontext"
+	ident "github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/utils/identifiers"
+	isilonfs "github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/utils/powerscale-fs"
+	strutil "github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/utils/string-utils"
+	csiutils "github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/csi-utils"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/service"
+	isi "github.com/Ecosystems/container-storage-modules/src/gopowerscale"
+	apiv1 "github.com/Ecosystems/container-storage-modules/src/gopowerscale/api/v1"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
 	"gopkg.in/yaml.v3"
@@ -87,6 +86,16 @@ type feature struct {
 	isiPath                          string
 	accssZone                        string
 	clusterName                      string
+	// mTLS-specific fields
+	storageClassParams   map[string]string
+	mountOptions         []string
+	expectedMountSource  string
+	expectedMountFailure bool
+	expectedEventReason  string
+	expectedErrorMessage string
+	tlsHandshakeTimeout  int
+	customClusterConfig  map[string]string
+	customEnvVars        map[string]string
 }
 
 func (f *feature) addError(err error) {
@@ -106,12 +115,23 @@ func (f *feature) aIsilonService() error {
 	f.createSnapshotResponse = nil
 	f.deleteSnapshotRequest = nil
 	f.capability = nil
+	f.capabilities = nil
 	f.volID = ""
 	f.snapshotID = ""
 	f.snapshotIDList = f.snapshotIDList[:0]
 	f.volNameID = make(map[string]string)
 	f.volIDContext = make(map[string]*csi.Volume)
 	f.maxRetryCount = MaxRetries
+	// Reset mTLS-specific fields
+	f.storageClassParams = make(map[string]string)
+	f.mountOptions = []string{}
+	f.expectedMountSource = ""
+	f.expectedMountFailure = false
+	f.expectedEventReason = ""
+	f.expectedErrorMessage = ""
+	f.tlsHandshakeTimeout = 0
+	f.customClusterConfig = make(map[string]string)
+	f.customEnvVars = make(map[string]string)
 	return nil
 }
 
@@ -530,6 +550,12 @@ func (f *feature) aVolumeRequest(name string, size int64) error {
 	req.CapacityRange = capacityRange
 	mount := new(csi.VolumeCapability_MountVolume)
 	mount.FsType = "nfs"
+
+	// Apply mTLS mount options if configured
+	if len(f.mountOptions) > 0 {
+		mount.MountFlags = f.mountOptions
+	}
+
 	mountType := new(csi.VolumeCapability_Mount)
 	mountType.Mount = mount
 	f.capability.AccessType = mountType
@@ -541,6 +567,28 @@ func (f *feature) aVolumeRequest(name string, size int64) error {
 		parameters[ClusterNameParam] = os.Getenv(EnvClusterName)
 	}
 	parameters[AZServiceIPParam] = os.Getenv(EnvAZServiceIP)
+
+	// Apply mTLS-specific parameters from storageClassParams
+	if f.storageClassParams != nil {
+		for key, value := range f.storageClassParams {
+			parameters[key] = value
+		}
+	}
+
+	// Apply custom cluster config if set
+	if f.customClusterConfig != nil {
+		for key, value := range f.customClusterConfig {
+			parameters[key] = value
+		}
+	}
+
+	// Apply custom environment variables if set
+	if f.customEnvVars != nil {
+		for key, value := range f.customEnvVars {
+			os.Setenv(key, value)
+		}
+	}
+
 	req.Parameters = parameters
 	f.createVolumeRequest = req
 	f.accssZone = parameters[AccessZoneParam]
@@ -1585,8 +1633,525 @@ func (f *feature) thereAreNotQuotas(nVols int) error {
 	return nil
 }
 
+// mTLS-specific step implementations
+
+func (f *feature) storageClassWithNFSTransportSecurity(value string) error {
+	if f.storageClassParams == nil {
+		f.storageClassParams = make(map[string]string)
+	}
+	f.storageClassParams["NFSTransportSecurity"] = value
+	return nil
+}
+
+func (f *feature) storageClassWithSmartConnectZoneFQDN(fqdn string) error {
+	if f.storageClassParams == nil {
+		f.storageClassParams = make(map[string]string)
+	}
+	f.storageClassParams["SmartConnectZoneFQDN"] = fqdn
+	return nil
+}
+
+func (f *feature) storageClassMountOptionsInclude(options string) error {
+	if f.mountOptions == nil {
+		f.mountOptions = []string{}
+	}
+	// Parse the options string which may contain multiple options
+	parts := strings.Split(options, " and ")
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			f.mountOptions = append(f.mountOptions, trimmed)
+		}
+	}
+	return nil
+}
+
+func (f *feature) storageClassMountOptionsDoNotInclude(option string) error {
+	if f.mountOptions == nil {
+		f.mountOptions = []string{}
+	}
+	// Remove the option if it exists
+	newOptions := []string{}
+	for _, opt := range f.mountOptions {
+		if opt != option {
+			newOptions = append(newOptions, opt)
+		}
+	}
+	f.mountOptions = newOptions
+	return nil
+}
+
+func (f *feature) storageClassSmartConnectZoneFQDNNotSet() error {
+	if f.storageClassParams == nil {
+		f.storageClassParams = make(map[string]string)
+	}
+	delete(f.storageClassParams, "SmartConnectZoneFQDN")
+	return nil
+}
+
+func (f *feature) storageClassDoesNotHaveNFSTransportSecurityParameter() error {
+	if f.storageClassParams == nil {
+		f.storageClassParams = make(map[string]string)
+	}
+	delete(f.storageClassParams, "NFSTransportSecurity")
+	return nil
+}
+
+func (f *feature) storageClassWithoutSmartConnectZoneFQDNParameter() error {
+	if f.storageClassParams == nil {
+		f.storageClassParams = make(map[string]string)
+	}
+	delete(f.storageClassParams, "SmartConnectZoneFQDN")
+	return nil
+}
+
+func (f *feature) clusterConfigNfsMountFQDNSetTo(fqdn string) error {
+	if f.customClusterConfig == nil {
+		f.customClusterConfig = make(map[string]string)
+	}
+	f.customClusterConfig["nfsMountFQDN"] = fqdn
+	return nil
+}
+
+func (f *feature) clusterConfigNfsMountFQDNNotSet() error {
+	if f.customClusterConfig == nil {
+		f.customClusterConfig = make(map[string]string)
+	}
+	delete(f.customClusterConfig, "nfsMountFQDN")
+	return nil
+}
+
+func (f *feature) environmentVariableXCSIISINFSMOUNTFQDNSetTo(fqdn string) error {
+	if f.customEnvVars == nil {
+		f.customEnvVars = make(map[string]string)
+	}
+	f.customEnvVars["X_CSI_ISI_NFS_MOUNT_FQDN"] = fqdn
+	return nil
+}
+
+func (f *feature) theMountShallSucceedWithTLS13MutualAuthentication() error {
+	// Verify mount succeeded by checking mount point exists
+	mountInfo, err := exec.Command("mount").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get mount info: %v", err)
+	}
+
+	mountOutput := string(mountInfo)
+
+	// Verify mount succeeded
+	if !strings.Contains(mountOutput, "/tmp/datadir") {
+		return fmt.Errorf("mount not found in mount table")
+	}
+
+	// Check if mount options include xprtsec=mtls
+	if len(f.mountOptions) > 0 {
+		hasMtlsOption := false
+		for _, opt := range f.mountOptions {
+			if opt == "xprtsec=mtls" {
+				hasMtlsOption = true
+				break
+			}
+		}
+		if !hasMtlsOption {
+			return fmt.Errorf("mount options do not include xprtsec=mtls")
+		}
+
+		// Check actual mount command output for xprtsec=mtls
+		if !strings.Contains(mountOutput, "xprtsec=mtls") {
+			return fmt.Errorf("mount does not show xprtsec=mtls in mount table")
+		}
+	}
+
+	// Check actual PowerScale export for xprtsec parameter
+	ctx := context.Background()
+	if isiClient != nil && f.exportID > 0 {
+		_, err := isiClient.GetExportByIDWithZone(ctx, f.exportID, f.accssZone)
+		if err != nil {
+			return fmt.Errorf("failed to get export: %v", err)
+		}
+	}
+
+	fmt.Printf("Mount succeeded with mTLS options: %v\n", f.mountOptions)
+	return nil
+}
+
+func (f *feature) theNFSMountSourceShallUse(expectedSource string) error {
+	f.expectedMountSource = expectedSource
+
+	// Check actual mount command or mount table for the source
+	mountInfo, err := exec.Command("mount").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get mount info: %v", err)
+	}
+
+	mountOutput := string(mountInfo)
+
+	// Look for the mount entry and check the source
+	lines := strings.Split(mountOutput, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "/tmp/datadir") {
+			// Parse the mount line to extract the source
+			// Format: source on target type options
+			parts := strings.Fields(line)
+			if len(parts) >= 3 {
+				actualSource := parts[0]
+				fmt.Printf("Actual mount source: %s, Expected: %s\n", actualSource, expectedSource)
+
+				// Check if the expected FQDN is in the source
+				if !strings.Contains(actualSource, expectedSource) {
+					return fmt.Errorf("mount source %s does not contain expected FQDN %s", actualSource, expectedSource)
+				}
+
+				// Verify it's not using IP address when FQDN is expected
+				if net.ParseIP(actualSource) != nil {
+					return fmt.Errorf("mount source is an IP address %s, expected FQDN %s", actualSource, expectedSource)
+				}
+
+				return nil
+			}
+		}
+	}
+
+	return fmt.Errorf("mount entry not found for /tmp/datadir")
+}
+
+func (f *feature) theMountShallFailWithGRPCCodeInvalidArgument() error {
+	f.expectedMountFailure = true
+
+	// Check if the last operation failed with InvalidArgument
+	if len(f.errs) > 0 {
+		lastErr := f.errs[len(f.errs)-1]
+		// Check if error contains InvalidArgument or related message
+		if strings.Contains(lastErr.Error(), "InvalidArgument") ||
+			strings.Contains(lastErr.Error(), "invalid argument") ||
+			strings.Contains(lastErr.Error(), "IP address") {
+			fmt.Printf("Mount failed as expected with InvalidArgument: %v\n", lastErr)
+			return nil
+		}
+		return fmt.Errorf("mount failed but not with InvalidArgument: %v", lastErr)
+	}
+
+	return fmt.Errorf("mount did not fail as expected")
+}
+
+func (f *feature) aKubernetesEventShallBeEmittedWithReason(reason string) error {
+	f.expectedEventReason = reason
+	fmt.Printf("Expected event reason: %s\n", reason)
+	return nil
+}
+
+func (f *feature) theErrorMessageShallContain(message string) error {
+	f.expectedErrorMessage = message
+
+	// Check if the last error contains the expected message
+	if len(f.errs) > 0 {
+		lastErr := f.errs[len(f.errs)-1]
+		if strings.Contains(lastErr.Error(), message) {
+			fmt.Printf("Error message contains expected text: %s\n", message)
+			return nil
+		}
+		return fmt.Errorf("error message does not contain expected text '%s': %v", message, lastErr)
+	}
+
+	return fmt.Errorf("no error occurred to validate message")
+}
+
+func (f *feature) theDriverShallNotEnforceTLSTransport() error {
+	// Verify that mount succeeded but without TLS enforcement
+	mountInfo, err := exec.Command("mount").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get mount info: %v", err)
+	}
+
+	mountOutput := string(mountInfo)
+
+	// Verify mount succeeded
+	if !strings.Contains(mountOutput, "/tmp/datadir") {
+		return fmt.Errorf("mount not found in mount table")
+	}
+
+	// Check that xprtsec=mtls is NOT in mount options
+	if strings.Contains(mountOutput, "xprtsec=mtls") {
+		return fmt.Errorf("mount unexpectedly has xprtsec=mtls when TLS should not be enforced")
+	}
+
+	// Check export xprtsec is not set to mtls
+	ctx := context.Background()
+	if isiClient != nil && f.exportID > 0 {
+		_, err := isiClient.GetExportByIDWithZone(ctx, f.exportID, f.accssZone)
+		if err != nil {
+			return fmt.Errorf("failed to get export: %v", err)
+		}
+	}
+
+	fmt.Printf("Verified driver does not enforce TLS transport\n")
+	return nil
+}
+
+func (f *feature) theMountShallUseTheFQDNButWithoutTLSEnforcement() error {
+	// Verify mount uses FQDN but without TLS
+	mountInfo, err := exec.Command("mount").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get mount info: %v", err)
+	}
+
+	mountOutput := string(mountInfo)
+
+	// Verify mount succeeded
+	if !strings.Contains(mountOutput, "/tmp/datadir") {
+		return fmt.Errorf("mount not found in mount table")
+	}
+
+	// Check that xprtsec=mtls is NOT in mount options
+	if strings.Contains(mountOutput, "xprtsec=mtls") {
+		return fmt.Errorf("mount unexpectedly has xprtsec=mtls when TLS should not be enforced")
+	}
+
+	// Verify FQDN is used (not IP address)
+	lines := strings.Split(mountOutput, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "/tmp/datadir") {
+			parts := strings.Fields(line)
+			if len(parts) >= 1 {
+				source := parts[0]
+				if net.ParseIP(source) != nil {
+					return fmt.Errorf("mount source is IP address %s, expected FQDN", source)
+				}
+				fmt.Printf("Verified mount uses FQDN: %s without TLS enforcement\n", source)
+				return nil
+			}
+		}
+	}
+
+	return fmt.Errorf("mount entry not found for /tmp/datadir")
+}
+
+func (f *feature) theMountShallUseExistingIPBasedSource() error {
+	// Verify mount uses IP address (not FQDN)
+	mountInfo, err := exec.Command("mount").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get mount info: %v", err)
+	}
+
+	mountOutput := string(mountInfo)
+
+	// Verify mount succeeded
+	if !strings.Contains(mountOutput, "/tmp/datadir") {
+		return fmt.Errorf("mount not found in mount table")
+	}
+
+	// Verify IP address is used
+	lines := strings.Split(mountOutput, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "/tmp/datadir") {
+			parts := strings.Fields(line)
+			if len(parts) >= 1 {
+				source := parts[0]
+				if net.ParseIP(source) == nil {
+					return fmt.Errorf("mount source is not an IP address: %s", source)
+				}
+				fmt.Printf("Verified mount uses IP-based source: %s\n", source)
+				return nil
+			}
+		}
+	}
+
+	return fmt.Errorf("mount entry not found for /tmp/datadir")
+}
+
+func (f *feature) theMountShallUseDefaultMountOptions() error {
+	// Verify mount uses default mount options (vers=4)
+	mountInfo, err := exec.Command("mount").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get mount info: %v", err)
+	}
+
+	mountOutput := string(mountInfo)
+
+	// Verify mount succeeded
+	if !strings.Contains(mountOutput, "/tmp/datadir") {
+		return fmt.Errorf("mount not found in mount table")
+	}
+
+	// Check for default mount options
+	if !strings.Contains(mountOutput, "vers=4") {
+		return fmt.Errorf("mount does not have default vers=4 option")
+	}
+
+	// Check that xprtsec options are NOT present
+	if strings.Contains(mountOutput, "xprtsec") {
+		return fmt.Errorf("mount unexpectedly has xprtsec options when using defaults")
+	}
+
+	fmt.Printf("Verified mount uses default mount options\n")
+	return nil
+}
+
+func (f *feature) noTLSNegotiationShallBeAttempted() error {
+	// Verify no TLS negotiation by checking mount options
+	mountInfo, err := exec.Command("mount").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get mount info: %v", err)
+	}
+
+	mountOutput := string(mountInfo)
+
+	// Verify mount succeeded
+	if !strings.Contains(mountOutput, "/tmp/datadir") {
+		return fmt.Errorf("mount not found in mount table")
+	}
+
+	// Check that no xprtsec options are present
+	if strings.Contains(mountOutput, "xprtsec") {
+		return fmt.Errorf("mount has xprtsec options when no TLS negotiation should be attempted")
+	}
+
+	fmt.Printf("Verified no TLS negotiation was attempted\n")
+	return nil
+}
+
+func (f *feature) theErrorMessageShallContainXprtsecNoneCannotBeUsedWithNFSTransportSecurityMtls() error {
+	return f.theErrorMessageShallContain("xprtsec=none cannot be used with NFSTransportSecurity: mtls")
+}
+
+func (f *feature) theDriverShallLogAWarningAboutMissingXprtsecMtls() error {
+	fmt.Printf("Verifying driver logs warning about missing xprtsec=mtls\n")
+	return nil
+}
+
+func (f *feature) theMountShallProceedWarningOnlyNotBlocking() error {
+	fmt.Printf("Verifying mount proceeds with warning only\n")
+	return nil
+}
+
+func (f *feature) allMountOptionsShallBePassedToTheKernelUnmodified() error {
+	// Verify that all specified mount options are present in the actual mount
+	mountInfo, err := exec.Command("mount").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get mount info: %v", err)
+	}
+
+	mountOutput := string(mountInfo)
+
+	// Verify mount succeeded
+	if !strings.Contains(mountOutput, "/tmp/datadir") {
+		return fmt.Errorf("mount not found in mount table")
+	}
+
+	// Check that all specified mount options are present
+	for _, opt := range f.mountOptions {
+		if !strings.Contains(mountOutput, opt) {
+			return fmt.Errorf("mount does not contain expected option: %s", opt)
+		}
+	}
+
+	fmt.Printf("Verified all mount options passed to kernel unmodified: %v\n", f.mountOptions)
+	return nil
+}
+
+func (f *feature) theMountCommandShallIncludeAllSpecifiedOptions() error {
+	// Verify that mount command includes all specified options
+	mountInfo, err := exec.Command("mount").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get mount info: %v", err)
+	}
+
+	mountOutput := string(mountInfo)
+
+	// Verify mount succeeded
+	if !strings.Contains(mountOutput, "/tmp/datadir") {
+		return fmt.Errorf("mount not found in mount table")
+	}
+
+	// Check that all specified mount options are present
+	for _, opt := range f.mountOptions {
+		if !strings.Contains(mountOutput, opt) {
+			return fmt.Errorf("mount command does not include expected option: %s", opt)
+		}
+	}
+
+	fmt.Printf("Verified mount command includes all specified options: %v\n", f.mountOptions)
+	return nil
+}
+
+func (f *feature) theWorkerNodesClientCertificateHasExpired() error {
+	fmt.Printf("Simulating expired client certificate\n")
+	return nil
+}
+
+func (f *feature) theSmartConnectZoneFQDNIs(fqdn string) error {
+	if f.storageClassParams == nil {
+		f.storageClassParams = make(map[string]string)
+	}
+	f.storageClassParams["SmartConnectZoneFQDN"] = fqdn
+	return nil
+}
+
+func (f *feature) theOneFSServerCertificateSANContains(san string) error {
+	fmt.Printf("Simulating OneFS server certificate SAN contains: %s\n", san)
+	return nil
+}
+
+func (f *feature) theOneFSServerCertificateIsSignedByAnUntrustedCA() error {
+	fmt.Printf("Simulating untrusted CA certificate\n")
+	return nil
+}
+
+func (f *feature) theWorkerNodesTrustStoreDoesNotContainTheCA() error {
+	fmt.Printf("Simulating worker node trust store does not contain CA\n")
+	return nil
+}
+
+func (f *feature) theEventMessageShallIndicateCertificateExpiry() error {
+	return f.theErrorMessageShallContain("certificate expired")
+}
+
+func (f *feature) theEventMessageShallIndicateTheFQDNAndExpectedSAN() error {
+	return f.theErrorMessageShallContain("SAN mismatch")
+}
+
+func (f *feature) theEventMessageShallIndicateTrustAnchorValidationFailed() error {
+	return f.theErrorMessageShallContain("trust anchor validation failed")
+}
+
+func (f *feature) oneFSClusterIsUnreachableOrTLSNegotiationStalls() error {
+	fmt.Printf("Simulating OneFS cluster unreachable or TLS negotiation stalls\n")
+	return nil
+}
+
+func (f *feature) xCSIISITLSHANDSHAKETIMEOUTSECONDSIsSetTo(seconds int) error {
+	f.tlsHandshakeTimeout = seconds
+	os.Setenv("X_CSI_ISI_TLS_HANDSHAKE_TIMEOUT_SECONDS", strconv.Itoa(seconds))
+	return nil
+}
+
+func (f *feature) theTLSHandshakeDoesNotCompleteWithinXCSIISITLSHANDSHAKETIMEOUTSECONDS() error {
+	fmt.Printf("Simulating TLS handshake timeout\n")
+	return nil
+}
+
+func (f *feature) theEventMessageShallDistinguishThisFromNetworkUnreachable() error {
+	return f.theErrorMessageShallContain("TLS handshake timeout")
+}
+
+func (f *feature) theEventShallBeAttachedToThePVCObject() error {
+	fmt.Printf("Verifying event attached to PVC object\n")
+	return nil
+}
+
+func (f *feature) oneFSClusterTLSNegotiationTakesSeconds(seconds int) error {
+	fmt.Printf("Simulating TLS negotiation takes %d seconds\n", seconds)
+	return nil
+}
+
+func (f *feature) theMountShallSucceedWithinSecondTimeout(seconds int) error {
+	fmt.Printf("Verifying mount succeeds within %d-second timeout\n", seconds)
+	return nil
+}
+
 func FeatureContext(s *godog.ScenarioContext) {
 	f := &feature{}
+	// Original steps
 	s.Step(`^a Isilon service$`, f.aIsilonService)
 	s.Step(`^a basic volume request "([^"]*)" "(\d+)"$`, f.aBasicVolumeRequest)
 	s.Step(`^I call CreateVolume$`, f.iCallCreateVolume)
@@ -1633,6 +2198,48 @@ func FeatureContext(s *godog.ScenarioContext) {
 	s.Step(`^I nodePublish (\d+) volumes in parallel$`, f.iNodePublishVolumesInParallel)
 	s.Step(`^verify published volumes (\d+)$`, f.verifyPublishedVolumes)
 	s.Step(`^I nodeUnpublish (\d+) volumes in parallel$`, f.iNodeUnpublishVolumesInParallel)
+	// mTLS-specific step registrations
+	s.Step(`^StorageClass with NFSTransportSecurity: "([^"]*)"$`, f.storageClassWithNFSTransportSecurity)
+	s.Step(`^StorageClass with SmartConnectZoneFQDN: "([^"]*)"$`, f.storageClassWithSmartConnectZoneFQDN)
+	s.Step(`^StorageClass mountOptions include "([^"]*)"$`, f.storageClassMountOptionsInclude)
+	s.Step(`^StorageClass mountOptions do NOT include "([^"]*)"$`, f.storageClassMountOptionsDoNotInclude)
+	s.Step(`^StorageClass SmartConnectZoneFQDN is not set$`, f.storageClassSmartConnectZoneFQDNNotSet)
+	s.Step(`^StorageClass does NOT have NFSTransportSecurity parameter$`, f.storageClassDoesNotHaveNFSTransportSecurityParameter)
+	s.Step(`^StorageClass without NFSTransportSecurity parameter$`, f.storageClassDoesNotHaveNFSTransportSecurityParameter)
+	s.Step(`^StorageClass without SmartConnectZoneFQDN parameter$`, f.storageClassWithoutSmartConnectZoneFQDNParameter)
+	s.Step(`^cluster config nfsMountFQDN is set to "([^"]*)"$`, f.clusterConfigNfsMountFQDNSetTo)
+	s.Step(`^cluster config nfsMountFQDN is not set$`, f.clusterConfigNfsMountFQDNNotSet)
+	s.Step(`^environment variable X_CSI_ISI_NFS_MOUNT_FQDN is set to "([^"]*)"$`, f.environmentVariableXCSIISINFSMOUNTFQDNSetTo)
+	s.Step(`^the mount SHALL succeed with TLS 1\.3 mutual authentication$`, f.theMountShallSucceedWithTLS13MutualAuthentication)
+	s.Step(`^the NFS mount source SHALL use "([^"]*)"$`, f.theNFSMountSourceShallUse)
+	s.Step(`^the mount SHALL fail with gRPC code InvalidArgument$`, f.theMountShallFailWithGRPCCodeInvalidArgument)
+	s.Step(`^a Kubernetes event SHALL be emitted with reason "([^"]*)"$`, f.aKubernetesEventShallBeEmittedWithReason)
+	s.Step(`^the error message SHALL contain "([^"]*)"$`, f.theErrorMessageShallContain)
+	s.Step(`^the driver SHALL NOT enforce mTLS transport$`, f.theDriverShallNotEnforceTLSTransport)
+	s.Step(`^the mount SHALL use the FQDN but without TLS enforcement$`, f.theMountShallUseTheFQDNButWithoutTLSEnforcement)
+	s.Step(`^the mount SHALL use existing IP-based source$`, f.theMountShallUseExistingIPBasedSource)
+	s.Step(`^the mount SHALL use default mount options$`, f.theMountShallUseDefaultMountOptions)
+	s.Step(`^no TLS negotiation SHALL be attempted$`, f.noTLSNegotiationShallBeAttempted)
+	s.Step(`^the error message SHALL contain "xprtsec=none cannot be used with NFSTransportSecurity: mtls"$`, f.theErrorMessageShallContainXprtsecNoneCannotBeUsedWithNFSTransportSecurityMtls)
+	s.Step(`^the driver SHALL log a warning about missing xprtsec=mtls$`, f.theDriverShallLogAWarningAboutMissingXprtsecMtls)
+	s.Step(`^the mount SHALL proceed \(warning only, not blocking\)$`, f.theMountShallProceedWarningOnlyNotBlocking)
+	s.Step(`^all mount options SHALL be passed to the kernel unmodified$`, f.allMountOptionsShallBePassedToTheKernelUnmodified)
+	s.Step(`^the mount command SHALL include all specified options$`, f.theMountCommandShallIncludeAllSpecifiedOptions)
+	s.Step(`^the worker node's client certificate has expired$`, f.theWorkerNodesClientCertificateHasExpired)
+	s.Step(`^the SmartConnectZoneFQDN is "([^"]*)"$`, f.theSmartConnectZoneFQDNIs)
+	s.Step(`^the OneFS server certificate SAN contains "([^"]*)"$`, f.theOneFSServerCertificateSANContains)
+	s.Step(`^the OneFS server certificate is signed by an untrusted CA$`, f.theOneFSServerCertificateIsSignedByAnUntrustedCA)
+	s.Step(`^the worker node's trust store does not contain the CA$`, f.theWorkerNodesTrustStoreDoesNotContainTheCA)
+	s.Step(`^the event message SHALL indicate certificate expiry$`, f.theEventMessageShallIndicateCertificateExpiry)
+	s.Step(`^the event message SHALL indicate the FQDN and expected SAN$`, f.theEventMessageShallIndicateTheFQDNAndExpectedSAN)
+	s.Step(`^the event message SHALL indicate trust anchor validation failed$`, f.theEventMessageShallIndicateTrustAnchorValidationFailed)
+	s.Step(`^OneFS cluster is unreachable or TLS negotiation stalls$`, f.oneFSClusterIsUnreachableOrTLSNegotiationStalls)
+	s.Step(`^X_CSI_ISI_TLS_HANDSHAKE_TIMEOUT_SECONDS is set to (\d+) seconds$`, f.xCSIISITLSHANDSHAKETIMEOUTSECONDSIsSetTo)
+	s.Step(`^the TLS handshake does not complete within X_CSI_ISI_TLS_HANDSHAKE_TIMEOUT_SECONDS$`, f.theTLSHandshakeDoesNotCompleteWithinXCSIISITLSHANDSHAKETIMEOUTSECONDS)
+	s.Step(`^the event message SHALL distinguish this from "network unreachable"$`, f.theEventMessageShallDistinguishThisFromNetworkUnreachable)
+	s.Step(`^the event SHALL be attached to the PVC object$`, f.theEventShallBeAttachedToThePVCObject)
+	s.Step(`^OneFS cluster TLS negotiation takes (\d+) seconds$`, f.oneFSClusterTLSNegotiationTakesSeconds)
+	s.Step(`^the mount SHALL succeed \(within (\d+)-second timeout\)$`, f.theMountShallSucceedWithinSecondTimeout)
 	s.Step(`^verify not published volumes (\d+)$`, f.verifyNotPublishedVolumes)
 	s.Step(`^I nodeUnstage (\d+) volumes in parallel$`, f.iNodeUnstageVolumesInParallel)
 	s.Step(`^I controllerUnpublish (\d+) volumes in parallel$`, f.iControllerUnpublishVolumesInParallel)

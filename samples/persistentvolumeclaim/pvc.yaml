@@ -1,4 +1,4 @@
-# Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2020-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,4 +26,6 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  # Use 'isilon' for standard NFS or 'isilon-mtls' for NFS over mutual TLS
+  # For mTLS, ensure the StorageClass has SmartConnectZoneFQDN and NFSTransportSecurity configured
   storageClassName: isilon

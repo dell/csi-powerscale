@@ -1,18 +1,15 @@
-/*
-Copyright (c) 2019-2026 Dell Inc, or its subsidiaries.
+// Copyright © 2019-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//      http://www.apache.org/licenses/LICENSE-2.0
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package service
 
 import (
@@ -21,8 +18,9 @@ import (
 
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
-	"github.com/dell/csi-powerscale/v2/common/constants"
-	csiext "github.com/dell/dell-csi-extensions/replication"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/constants"
+	csmlog "github.com/Ecosystems/container-storage-modules/src/csmlog"
+	csiext "github.com/Ecosystems/container-storage-modules/src/dell-csi-extensions/replication"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 )
 
@@ -79,14 +77,13 @@ func (s *service) Probe(
 	_ *csi.ProbeRequest) (
 	*csi.ProbeResponse, error,
 ) {
-	log := log.WithContext(ctx)
 	ready := new(wrapperspb.BoolValue)
 	ready.Value = true
 	rep := new(csi.ProbeResponse)
 	rep.Ready = ready
 
-	if noProbeOnStart {
-		log.Debugf("noProbeOnStart is set to true, skip probe")
+	if noProbeOnStart.Load() {
+		csmlog.WithContext(ctx).Debugf("noProbeOnStart is set to true, skip probe")
 		return rep, nil
 	}
 
@@ -94,7 +91,7 @@ func (s *service) Probe(
 		rep.Ready.Value = false
 		return rep, err
 	}
-	log.Debugf("Probe returning: %v", rep.Ready.GetValue())
+	csmlog.WithContext(ctx).Debugf("Probe returning: %v", rep.Ready.GetValue())
 	return rep, nil
 }
 

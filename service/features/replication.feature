@@ -173,6 +173,35 @@ Feature: Isilon CSI interface
       | "GetSpgErrors"                 | "error while getting link state"                  |
       | "GetSpgTPErrors"               | "error while getting link state"                  |
 
+  Scenario: Get storage protection group status with SyncIQ reports and metrics
+    Given a Isilon service
+    And I induce error "FailedStatus"
+    And I call GetStorageProtectionGroupStatusWithReports
+    Then a valid GetStorageProtectionGroupStatusResponse is returned
+    And the response contains valid lag seconds
+    And the response contains valid bandwidth bytes per second
+    And the response contains valid last sync timestamp
+
+  Scenario: Get storage protection group status with no SyncIQ reports
+    Given a Isilon service
+    And I induce error "FailedStatus"
+    And I induce error "NoReportsFound"
+    And I call GetStorageProtectionGroupStatus
+    Then a valid GetStorageProtectionGroupStatusResponse is returned
+    And the response contains zero lag seconds
+    And the response contains zero bandwidth bytes per second
+    And the response contains zero last sync timestamp
+
+  Scenario: Get storage protection group status with SyncIQ report API error
+    Given a Isilon service
+    And I induce error "FailedStatus"
+    And I induce error "GetReportsByPolicyNameError"
+    And I call GetStorageProtectionGroupStatus
+    Then a valid GetStorageProtectionGroupStatusResponse is returned
+    And the response contains zero lag seconds
+    And the response contains zero bandwidth bytes per second
+    And the response contains zero last sync timestamp
+
   Scenario Outline: Delete local volume with parameters
     Given a Isilon service
     When I call Probe

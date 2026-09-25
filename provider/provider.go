@@ -17,15 +17,16 @@ package provider
 */
 
 import (
-	csiutils "github.com/dell/csi-powerscale/v2/csi-utils"
-	"github.com/dell/csi-powerscale/v2/service"
-	"github.com/dell/csi-powerscale/v2/service/interceptor"
-	csmlog "github.com/dell/csmlog"
-	"github.com/dell/gocsi"
+	"os"
+
+	csiutils "github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/csi-utils"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/service"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/service/interceptor"
+	"github.com/Ecosystems/container-storage-modules/src/csmlog"
+	"github.com/Ecosystems/container-storage-modules/src/gocsi"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 )
-
-var log = csmlog.GetLogger()
 
 // New returns a new Storage Plug-in Provider.
 func New() gocsi.StoragePluginProvider {
@@ -35,7 +36,7 @@ func New() gocsi.StoragePluginProvider {
 	// For the time being, manually remove the sock files right at the beginning to
 	// avoid the "...address is in use..." error
 	if err := csiutils.RemoveExistingCSISockFile(); err != nil {
-		log.Error("failed to call utils.RemoveExistingCSISockFile")
+		csmlog.Error("failed to call utils.RemoveExistingCSISockFile")
 	}
 	// Get the MaxConcurrentStreams server option and configure it.
 	maxStreams := grpc.MaxConcurrentStreams(8)
@@ -46,6 +47,21 @@ func New() gocsi.StoragePluginProvider {
 	interList := []grpc.UnaryServerInterceptor{
 		interceptor.NewCustomSerialLock(),
 		interceptor.NewRewriteRequestIDInterceptor(),
+	}
+
+	// Wire the operation metrics interceptor when metrics are enabled.
+	// The cluster_name label uses X_CSI_CLUSTER_NAME env var (defaults to "default").
+	type metricsExposer interface {
+		MetricsRegistry() *prometheus.Registry
+	}
+	if me, ok := svc.(metricsExposer); ok {
+		if reg := me.MetricsRegistry(); reg != nil {
+			clusterName := os.Getenv("X_CSI_CLUSTER_NAME")
+			if clusterName == "" {
+				clusterName = "default"
+			}
+			interList = append(interList, service.NewOperationInterceptor(reg, clusterName))
+		}
 	}
 	return &gocsi.StoragePlugin{
 		Controller:                svc,

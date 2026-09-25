@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2025-2026 Dell Inc, or its subsidiaries.
+Copyright (c) 2025-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,12 +22,12 @@ import (
 	"flag"
 	"os"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
-	"github.com/dell/csi-powerscale/v2/common/constants"
-	"github.com/dell/gocsi"
-	"github.com/stretchr/testify/assert"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/constants"
+	"github.com/Ecosystems/container-storage-modules/src/gocsi"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,10 +46,6 @@ func (m *MockGocsi) Run(ctx context.Context, name, desc, usage string, sp gocsi.
 }
 
 var osExit = os.Exit
-
-func expectMockExit(int) {
-	osExit(0)
-}
 
 func mockExit(int) {
 	panic("os.Exit called")
@@ -232,10 +228,6 @@ func TestValidateArgs(_ *testing.T) {
 	w.Close()
 }
 
-func fakeCreateKubeClientSet(_ string) (kubernetes.Interface, error) {
-	return nil, errors.New("simulated error")
-}
-
 func TestCheckLeaderElectionError(_ *testing.T) {
 	// Mock the function to return an error
 	err := errors.New("mock error")
@@ -257,31 +249,61 @@ func TestCheckLeaderElectionError(_ *testing.T) {
 
 var exitCode int
 
-func exitFunc1(code int) {
-	// Mock exit function for testing
-	exitCode = code
-}
+func TestSignalHandlingWithoutLeaderElection(t *testing.T) {
+	// Save the original command-line arguments and restore them after the test
+	origArgs := os.Args
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	defer func() { os.Args = origArgs }()
 
-func Test_setEnvs(t *testing.T) {
-	tests := []struct {
-		name string
-		want map[string]string
-	}{
-		{
-			name: "execute setEnvs()",
-			want: map[string]string{
-				gocsi.EnvVarReqLogging: "true",
-				gocsi.EnvVarRepLogging: "true",
-			},
-		},
+	// Mock the gocsi.Run function to capture the context
+	var capturedCtx context.Context
+	var ctxMu sync.Mutex
+	mockRun := func(ctx context.Context, _, _, _ string, _ gocsi.StoragePluginProvider) {
+		ctxMu.Lock()
+		capturedCtx = ctx
+		ctxMu.Unlock()
+		// Block until context is cancelled
+		<-ctx.Done()
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			setEnvsFunc()
 
-			for envVar, expected := range tt.want {
-				assert.Equal(t, expected, os.Getenv(envVar))
-			}
-		})
+	// Set up command-line arguments
+	os.Args = []string{"cmd", "--leader-election=false", "--driver-config-params=config.yaml"}
+
+	// Run mainR in a goroutine
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		mainR(mockRun, mockCreateKubeClientSet, mockLeaderElection)
+	}()
+
+	// Wait a bit for mainR to start and capture the context
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify context was captured
+	ctxMu.Lock()
+	ctx := capturedCtx
+	ctxMu.Unlock()
+	require.NotNil(t, ctx, "Context should be captured by gocsi.Run")
+
+	// Send SIGTERM signal to trigger cancellation
+	p, err := os.FindProcess(os.Getpid())
+	require.NoError(t, err)
+	err = p.Signal(syscall.SIGTERM)
+	require.NoError(t, err)
+
+	// Wait for context to be cancelled
+	select {
+	case <-ctx.Done():
+		// Success - context was cancelled
+	case <-time.After(2 * time.Second):
+		t.Fatal("Context was not cancelled within timeout after receiving SIGTERM")
+	}
+
+	// Wait for mainR to complete
+	select {
+	case <-done:
+		// Success
+	case <-time.After(2 * time.Second):
+		t.Fatal("mainR did not complete within timeout")
 	}
 }

@@ -1,7 +1,7 @@
 package main
 
 /*
- Copyright (c) 2019-2026 Dell Inc, or its subsidiaries.
+ Copyright (c) 2019-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -22,15 +22,17 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
-	"github.com/dell/csi-powerscale/v2/common/constants"
-	"github.com/dell/csi-powerscale/v2/common/k8sutils"
-	"github.com/dell/csi-powerscale/v2/provider"
-	"github.com/dell/csi-powerscale/v2/service"
-	csmlog "github.com/dell/csmlog"
-	"github.com/dell/gocsi"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/constants"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/k8sutils"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/provider"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/service"
+	csmlog "github.com/Ecosystems/container-storage-modules/src/csmlog"
+	"github.com/Ecosystems/container-storage-modules/src/gocsi"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -38,25 +40,17 @@ var exitFunc = os.Exit
 
 var ManifestSemver string
 
-// sets environment variables
-func setEnvsFunc() {
-	// We always want to enable Request and Response logging(no reason for users to control this)
-	_ = os.Setenv(gocsi.EnvVarReqLogging, "true")
-	_ = os.Setenv(gocsi.EnvVarRepLogging, "true")
-}
-
 func validateArgs(driverConfigParamsfile *string) {
-	log := csmlog.GetLogger()
-	log.Info("Validating driver config params file argument")
+	csmlog.Info("Validating driver config params file argument")
 	if *driverConfigParamsfile == "" {
-		fmt.Fprintf(os.Stderr, "driver-config-params argument is mandatory")
+		csmlog.Error("driver-config-params argument is mandatory")
 		exitFunc(1)
 	}
 }
 
 func checkLeaderElectionError(err error) {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to initialize leader election: %v", err)
+		csmlog.Errorf("failed to initialize leader election: %v", err)
 		exitFunc(1)
 	}
 }
@@ -70,26 +64,30 @@ func main() {
 }
 
 func mainR(runFunc func(ctx context.Context, name, desc string, usage string, sp gocsi.StoragePluginProvider), createKubeClientSet func(kubeconfig string) (kubernetes.Interface, error), leaderElection func(clientset kubernetes.Interface, lockName, namespace string, renewDeadline, leaseDuration, retryPeriod time.Duration, run func(ctx context.Context))) {
-	log := csmlog.GetLogger()
+	csmlog.WithFields(csmlog.Fields{
+		csmlog.FieldComponent: "driver",
+		csmlog.FieldOperation: "startup",
+		"version":             ManifestSemver,
+		"driver_name":         constants.PluginName,
+	}).Info("initializing CSI PowerScale driver")
 
 	if ManifestSemver != "" {
 		service.ManifestSemver = ManifestSemver
 		service.Manifest["semver"] = ManifestSemver
 	}
 
-	setEnvsFunc()
 	enableLeaderElection := flag.Bool("leader-election", false, "Enables leader election.")
-	log.Info("Enabling leader election")
+	csmlog.Info("Enabling leader election")
 	leaderElectionNamespace := flag.String("leader-election-namespace", "", "The namespace where leader election lease will be created. Defaults to the pod namespace if not set.")
-	log.Info("leader-election-namespace = " + *leaderElectionNamespace)
+	csmlog.Info("leader-election-namespace = " + *leaderElectionNamespace)
 	leaderElectionLeaseDuration := flag.Duration("leader-election-lease-duration", 15*time.Second, "Duration, in seconds, that non-leader candidates will wait to force acquire leadership")
-	log.Info("leader-election-lease-duration = " + leaderElectionLeaseDuration.String())
+	csmlog.Info("leader-election-lease-duration = " + leaderElectionLeaseDuration.String())
 	leaderElectionRenewDeadline := flag.Duration("leader-election-renew-deadline", 10*time.Second, "Duration, in seconds, that the acting leader will retry refreshing leadership before giving up.")
-	log.Info("leader-election-renew-deadline = " + leaderElectionRenewDeadline.String())
+	csmlog.Info("leader-election-renew-deadline = " + leaderElectionRenewDeadline.String())
 	leaderElectionRetryPeriod := flag.Duration("leader-election-retry-period", 5*time.Second, "Duration, in seconds, the LeaderElector clients should wait between tries of actions")
-	log.Info("leader-election-retry-period = " + leaderElectionRetryPeriod.String())
+	csmlog.Info("leader-election-retry-period = " + leaderElectionRetryPeriod.String())
 	driverConfigParamsfile := flag.String("driver-config-params", "", "yaml file with driver config params")
-	log.Info("driver-config-params = " + *driverConfigParamsfile)
+	csmlog.Info("driver-config-params = " + *driverConfigParamsfile)
 	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	flag.Parse()
 
@@ -106,15 +104,32 @@ func mainR(runFunc func(ctx context.Context, name, desc string, usage string, sp
 	}
 
 	if *enableLeaderElection == false {
-		run(context.TODO())
+		// Create cancellable context for graceful shutdown
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Handle shutdown signals to allow graceful termination
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		go func() {
+			sig := <-sigChan
+			csmlog.WithFields(csmlog.Fields{
+				csmlog.FieldComponent: "driver",
+				csmlog.FieldOperation: "shutdown",
+				"signal":              sig.String(),
+			}).Info("Received shutdown signal, initiating graceful shutdown")
+			cancel()
+		}()
+
+		run(ctx)
 	} else {
 		driverName := strings.Replace(constants.PluginName, ".", "-", -1)
 		lockName := fmt.Sprintf("driver-%s", driverName)
 		k8sclientset, err := createKubeClientSet(*kubeconfig)
-		log.Info("Checking for leader election error")
+		csmlog.Info("Checking for leader election error")
 		checkLeaderElectionError(err)
 		// Attempt to become leader and start the driver
-		log.Info("Starting leader election")
+		csmlog.Info("Starting leader election")
 		leaderElection(k8sclientset, lockName, *leaderElectionNamespace,
 			*leaderElectionRenewDeadline, *leaderElectionLeaseDuration, *leaderElectionRetryPeriod, run)
 	}

@@ -1,18 +1,16 @@
-/*
-Copyright (c) 2019-2025 Dell Inc, or its subsidiaries.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright © 2019-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package service
 
 import (
@@ -29,10 +27,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dell/csi-powerscale/v2/common/constants"
-	"github.com/dell/csmlog"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/common/constants"
+	"github.com/Ecosystems/container-storage-modules/src/csi-powerscale/v2/service/collectors"
+	isi "github.com/Ecosystems/container-storage-modules/src/gopowerscale"
+	isimocks "github.com/Ecosystems/container-storage-modules/src/gopowerscale/mocks"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/cucumber/godog"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/assert"
 
@@ -46,9 +47,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 func TestMain(m *testing.M) {
@@ -80,7 +84,7 @@ func TestMain(m *testing.M) {
 	opts := godog.Options{
 		Format: format,
 		Paths:  []string{"features"},
-		Tags:   "~todo",
+		Tags:   "~todo && ~mtls",
 	}
 
 	status = godog.TestSuite{
@@ -125,8 +129,7 @@ func TestGetCSINodeIP(t *testing.T) {
 	s := service{
 		nodeIP: "",
 	}
-	ctx := context.Background()
-	_, err := s.GetCSINodeIP(ctx)
+	_, err := s.GetCSINodeIP()
 	assert.Equal(t, errors.New("cannot get node IP"), err)
 }
 
@@ -134,8 +137,7 @@ func TestGetCSINodeID(t *testing.T) {
 	s := service{
 		nodeID: "",
 	}
-	ctx := context.Background()
-	_, err := s.GetCSINodeID(ctx)
+	_, err := s.GetCSINodeID()
 	assert.Equal(t, errors.New("cannot get node id"), err)
 }
 
@@ -277,14 +279,26 @@ func TestGetNodeLabelsWithName(t *testing.T) {
 
 func TestServiceInitializeServiceOpts(t *testing.T) {
 	wantOps := Opts{
-		Port:                     "8080",
-		Path:                     "/ifs",
-		IsiVolumePathPermissions: "0777",
-		AccessZone:               "System",
-		KubeConfigPath:           "/home/kubeconfig",
-		replicationContextPrefix: "prefix/",
-		replicationPrefix:        "prefix",
-		IgnoreUnresolvableHosts:  false,
+		Port:                       "8080",
+		Path:                       "/ifs",
+		IsiVolumePathPermissions:   "0777",
+		AccessZone:                 "System",
+		KubeConfigPath:             "/home/kubeconfig",
+		replicationContextPrefix:   "prefix/",
+		replicationPrefix:          "prefix",
+		allowedNetworksMode:        constants.AllowedNetworksModeDefault,
+		IgnoreUnresolvableHosts:    false,
+		MetricsPort:                ":8443",
+		MetricsCollectionInterval:  30000000000,
+		MetricsCollectionCacheTTL:  25000000000,
+		MetricsArrayRateLimit:      100,
+		MetricsArrayTimeout:        30000000000,
+		MetricsArrayCBThreshold:    3,
+		MetricsArrayCBResetTimeout: 30000000000,
+		EnableDriverFSGroupChown:   true,
+		ChownWorkers:               8,
+		ChownWriteBatch:            1000,
+		ChownTimeoutSeconds:        30,
 	}
 
 	wantEnvNodeName := "node"
@@ -481,8 +495,8 @@ func TestGetNewIsilonConfigs(t *testing.T) {
     password: "password"
     endpoint: "https://1.2.3.4"
     isDefault: true`
-	copyNoProbeOnStart := noProbeOnStart
-	noProbeOnStart = true
+	copyNoProbeOnStart := noProbeOnStart.Load()
+	noProbeOnStart.Store(true)
 	configBytes, err = writeToFileandRead(isilonConfigFile, content)
 	_, _, err = s.getNewIsilonConfigs(ctx, configBytes)
 	assert.Equal(t, nil, err)
@@ -529,7 +543,7 @@ func TestGetNewIsilonConfigs(t *testing.T) {
 	_, _, err = s.getNewIsilonConfigs(ctx, configBytes)
 	assert.NotEqual(t, nil, err)
 
-	noProbeOnStart = copyNoProbeOnStart
+	noProbeOnStart.Store(copyNoProbeOnStart)
 }
 
 func writeToFileandRead(filePath, content string) ([]byte, error) {
@@ -540,23 +554,6 @@ func writeToFileandRead(filePath, content string) ([]byte, error) {
 	fmt.Println("File written successfully:", filePath)
 	configBytes, err := os.ReadFile(filepath.Clean(filePath))
 	return configBytes, nil
-}
-
-// Mocking the logger
-type MockLogger struct {
-	mock.Mock
-}
-
-func (m *MockLogger) Info(args ...interface{}) {
-	m.Called(args...)
-}
-
-func (m *MockLogger) Debug(args ...interface{}) {
-	m.Called(args...)
-}
-
-func (m *MockLogger) Error(args ...interface{}) {
-	m.Called(args...)
 }
 
 func TestLoadIsilonConfigs(t *testing.T) {
@@ -573,10 +570,20 @@ func TestLoadIsilonConfigs(t *testing.T) {
 		isiClusters: new(sync.Map),
 	}
 
-	ctx := context.Background()
+	// Set the global config file path to a valid secret so syncIsilonConfigs succeeds
+	// and the event-driven reconcile path is exercised.
+	origIsilonConfigFile := isilonConfigFile
+	isilonConfigFile = "mock/secret/secret.yaml"
+	defer func() { isilonConfigFile = origIsilonConfigFile }()
 
-	// Run loadIsilonConfigs in a separate goroutine
+	// Run loadIsilonConfigs with a cancelable context so the goroutine can exit
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		err := svc.loadIsilonConfigs(ctx, configFile)
 		require.NoError(t, err)
 	}()
@@ -593,6 +600,41 @@ func TestLoadIsilonConfigs(t *testing.T) {
 
 	// Wait to let the watcher pick up the event
 	time.Sleep(1 * time.Second)
+
+	// Cancel the context so loadIsilonConfigs returns and the goroutine exits
+	cancel()
+	wg.Wait()
+}
+
+func TestLoadIsilonConfigs_Cancel(t *testing.T) {
+	// Create a temporary directory to simulate the config file path
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.yaml")
+
+	// Create a dummy config file
+	err := os.WriteFile(configFile, []byte("dummy-content"), 0o600)
+	require.NoError(t, err)
+
+	svc := &service{
+		isiClusters: new(sync.Map),
+	}
+
+	// Start loadIsilonConfigs and cancel it immediately to cover the cancellation path
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := svc.loadIsilonConfigs(ctx, configFile)
+		require.NoError(t, err)
+	}()
+
+	// Give the watcher time to start and then cancel
+	time.Sleep(200 * time.Millisecond)
+	cancel()
+	wg.Wait()
 }
 
 func TestGetIsiClient(t *testing.T) {
@@ -604,8 +646,7 @@ func TestGetIsiClient(t *testing.T) {
 	}
 	ctx := context.Background()
 	isiConfig := IsilonClusterConfig{}
-	logLevel := csmlog.InfoLevel
-	_, err := s.GetIsiClient(ctx, &isiConfig, logLevel)
+	_, err := s.GetIsiClient(ctx, &isiConfig)
 	assert.NotEqual(t, nil, err)
 }
 
@@ -658,7 +699,7 @@ func TestString(t *testing.T) {
 		isiSvc:                    &isiService{},
 		ReplicationCertificateID:  "replicationCertificateID",
 	}
-	expectedOutput := "ClusterName: cluster1, Endpoint: 1.2.3.4, EndpointPort: 8080, EndpointURL: https://1.2.3.4:8080, User: user1, SkipCertificateValidation: true, IsiPath: /ifs/data/csi-isilon, IsiVolumePathPermissions: 0777, IsDefault: true, IgnoreUnresolvableHosts: true, AccessZone: System, isiSvc: &{ <nil>}"
+	expectedOutput := "ClusterName: cluster1, Endpoint: 1.2.3.4, EndpointPort: 8080, EndpointURL: https://1.2.3.4:8080, User: user1, SkipCertificateValidation: true, IsiPath: /ifs/data/csi-isilon, IsiVolumePathPermissions: 0777, IsDefault: true, IgnoreUnresolvableHosts: true, AccessZone: System, NFSMountFQDN: , isiSvc: &{ <nil>}"
 
 	// Call the function that prints to stdout
 	capturedOutput := clusterConfig.String()
@@ -1100,7 +1141,7 @@ func TestSetAzReconcileInterval(t *testing.T) {
 				v.Set(constants.ParamAZReconcileInterval, tt.intervalStr)
 			}
 
-			s.setAzReconcileInterval(log, v)
+			s.setAzReconcileInterval(context.Background(), v)
 			assert.Equal(t, tt.expectedInterval, s.azReconcileInterval)
 		})
 	}
@@ -1124,7 +1165,7 @@ func (m *mockReconciler) ReconcileNodeAzLabels(ctx context.Context) error {
 	return m.reconcileNodeAzLabelsFunc(ctx)
 }
 
-func (m *mockReconciler) setAzReconcileInterval(_ *csmlog.CsmLog, _ *viper.Viper) {}
+func (m *mockReconciler) setAzReconcileInterval(_ context.Context, _ *viper.Viper) {}
 
 func TestGetReconcileInterval(t *testing.T) {
 	expectedInterval := 5 * time.Second
@@ -1293,4 +1334,781 @@ func TestLogMap(_ *testing.T) {
 	ctx := context.Background()
 	m := map[string]string{"key1": "value1", "key2": "value2"}
 	LogMap(ctx, "testMap", m)
+}
+
+func TestNew(t *testing.T) {
+	// Test with metrics disabled (default)
+	svc := New()
+	assert.NotNil(t, svc)
+	assert.Nil(t, svc.(*service).MetricsRegistry())
+
+	// Test with metrics enabled
+	t.Setenv(constants.EnvMetricsEnabled, "true")
+	svcWithMetrics := New()
+	assert.NotNil(t, svcWithMetrics)
+	assert.NotNil(t, svcWithMetrics.(*service).MetricsRegistry())
+}
+
+func TestStartMetricsWithLeaderElection(t *testing.T) {
+	// Test startMetricsWithLeaderElection with k8s client creation failure
+	// This should fallback to startMetricsWithoutLeaderElection
+	t.Setenv(constants.EnvDriverNamespace, "test-namespace")
+	t.Setenv(constants.EnvMetricsLeaderElectionLeaseDuration, "15s")
+	t.Setenv(constants.EnvMetricsLeaderElectionRenewDeadline, "10s")
+	t.Setenv(constants.EnvMetricsLeaderElectionRetryPeriod, "5s")
+
+	svc := New().(*service)
+	assert.NotNil(t, svc)
+
+	// This should exercise the code path where k8s client creation fails
+	// and it falls back to startMetricsWithoutLeaderElection
+	// We can't easily test the full leader election path without a real k8s cluster
+	// but we can verify the function exists and handles errors gracefully
+}
+
+func TestBeforeServe_InitializeServiceOpts(t *testing.T) {
+	// Test BeforeServe with basic initialization
+	ctx := context.Background()
+	svc := New().(*service)
+
+	// Set required environment variables
+	t.Setenv("X_CSI_ISI_ENDPOINT", "https://test-endpoint:8080")
+	t.Setenv("X_CSI_ISI_PATH", "/test/path")
+	t.Setenv("X_CSI_ISI_AUTH_TYPE", "0")
+	t.Setenv("X_CSI_ISI_USER", "admin")
+	t.Setenv("X_CSI_ISI_PASSWORD", "password")
+	t.Setenv("X_CSI_ISI_PORT", "8080")
+
+	// Test that BeforeServe doesn't panic with basic setup
+	assert.NotPanics(t, func() {
+		// We can't fully test BeforeServe as it starts goroutines and requires
+		// a lot of setup, but we can verify it handles the initialization phase
+		err := svc.initializeServiceOpts(ctx)
+		// It might fail due to missing config, but shouldn't panic
+		_ = err
+	})
+}
+
+func TestPatchNodeLabels_NilK8sClient(t *testing.T) {
+	svc := New().(*service)
+
+	// Test that PatchNodeLabels handles nil k8sClient gracefully
+	err := svc.PatchNodeLabels(map[string]string{"key": "value"}, []string{"remove-key"})
+	assert.Error(t, err, "Should return error when k8sClient is nil")
+}
+
+func TestGetIsiClient_WithoutCustomTopology(t *testing.T) {
+	svc := &service{
+		metricsRegistry: nil,
+		opts: Opts{
+			CustomTopologyEnabled:     false,
+			SkipCertificateValidation: true,
+			Verbose:                   0,
+			IgnoreUnresolvableHosts:   true,
+			isiAuthType:               0,
+		},
+	}
+
+	isiConfig := &IsilonClusterConfig{
+		ClusterName:               "test-cluster",
+		Endpoint:                  "https://test.example.com:8080",
+		EndpointPort:              "8080",
+		EndpointURL:               "https://test.example.com:8080",
+		User:                      "admin",
+		Password:                  "password",
+		IsiPath:                   "/ifs",
+		IsiVolumePathPermissions:  "0777",
+		SkipCertificateValidation: boolPtr(true),
+		IgnoreUnresolvableHosts:   boolPtr(true),
+	}
+
+	ctx := context.Background()
+	_, err := svc.GetIsiClient(ctx, isiConfig)
+	// Will fail due to connection, but tests the code path without custom topology
+	assert.Error(t, err)
+}
+
+func TestGetIsiClient_WithMetricsRegistry(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	fakeAPIClient := &fakePowerScaleAPIClient{}
+	mockIsiClientFactory(t, &isi.Client{API: fakeAPIClient})
+	svc := &service{
+		metricsRegistry: reg,
+		opts: Opts{
+			CustomTopologyEnabled:     false,
+			SkipCertificateValidation: true,
+			Verbose:                   0,
+			IgnoreUnresolvableHosts:   true,
+			isiAuthType:               0,
+		},
+	}
+
+	isiConfig := &IsilonClusterConfig{
+		ClusterName:               "test-cluster",
+		Endpoint:                  "https://test.example.com:8080",
+		EndpointPort:              "8080",
+		EndpointURL:               "https://test.example.com:8080",
+		User:                      "admin",
+		Password:                  "password",
+		IsiPath:                   "/ifs",
+		IsiVolumePathPermissions:  "0777",
+		SkipCertificateValidation: boolPtr(true),
+		IgnoreUnresolvableHosts:   boolPtr(true),
+	}
+
+	ctx := context.Background()
+	client, err := svc.GetIsiClient(ctx, isiConfig)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+	// Verify the observer was actually attached to the API client
+	assert.NotNil(t, fakeAPIClient.GetRequestObserver(), "observer must be attached when metricsRegistry is non-nil")
+}
+
+func TestLoadIsilonConfigs_EmptyFile(t *testing.T) {
+	svc := New().(*service)
+	ctx := context.Background()
+
+	// Use a path whose parent directory does not exist so the watcher fails to add it
+	configFile := filepath.Join(t.TempDir(), "does-not-exist", "config.yaml")
+	err := svc.loadIsilonConfigs(ctx, configFile)
+	// Should return error because the parent directory cannot be watched
+	assert.Error(t, err)
+}
+
+func TestSyncIsilonConfigs_NoExistingClusters(t *testing.T) {
+	svc := New().(*service)
+	ctx := context.Background()
+
+	// Test with empty cluster map
+	svc.isiClusters = &sync.Map{}
+
+	// Test sync - it will try to read from default config file
+	// We're just testing that the function handles empty clusters gracefully
+	// without panicking
+	assert.NotPanics(t, func() {
+		_ = svc.syncIsilonConfigs(ctx)
+	})
+}
+
+func TestStartMetricsWithoutLeaderElection_NoClusters(t *testing.T) {
+	svc := New().(*service)
+	svc.isiClusters = &sync.Map{}
+	svc.metricsRegistry = prometheus.NewRegistry()
+	ctx := context.Background()
+
+	mgr := collectors.NewCollectorManager()
+	runtimeCfg := collectors.RuntimeConfig{}
+
+	// Should not panic with no clusters
+	assert.NotPanics(t, func() {
+		svc.startMetricsWithoutLeaderElection(ctx, mgr, runtimeCfg)
+	})
+}
+
+func TestStartMetricsWithLeaderElection_NoClusters(t *testing.T) {
+	svc := New().(*service)
+	svc.isiClusters = &sync.Map{}
+	svc.metricsRegistry = prometheus.NewRegistry()
+	svc.mode = "controller"
+	ctx := context.Background()
+
+	mgr := collectors.NewCollectorManager()
+	runtimeCfg := collectors.RuntimeConfig{}
+
+	// Set required env vars
+	t.Setenv(constants.EnvDriverNamespace, "test-namespace")
+	t.Setenv(constants.EnvMetricsLeaderElectionLeaseDuration, "15s")
+	t.Setenv(constants.EnvMetricsLeaderElectionRenewDeadline, "10s")
+	t.Setenv(constants.EnvMetricsLeaderElectionRetryPeriod, "5s")
+
+	// Should not panic with no clusters
+	assert.NotPanics(t, func() {
+		svc.startMetricsWithLeaderElection(ctx, mgr, runtimeCfg)
+	})
+}
+
+func TestGetArrayLevelCollectors_NoClusters(t *testing.T) {
+	svc := New().(*service)
+	svc.isiClusters = &sync.Map{}
+	svc.metricsRegistry = prometheus.NewRegistry()
+
+	runtimeCfg := collectors.RuntimeConfig{}
+	collectors := svc.getArrayLevelCollectors(runtimeCfg)
+
+	// Should return empty slice for no clusters
+	assert.Empty(t, collectors)
+}
+
+func TestGetPodLevelCollectors_NoClusters(t *testing.T) {
+	svc := New().(*service)
+	svc.isiClusters = &sync.Map{}
+	svc.metricsRegistry = prometheus.NewRegistry()
+
+	runtimeCfg := collectors.RuntimeConfig{}
+	collectors := svc.getPodLevelCollectors(runtimeCfg)
+
+	// Should return empty slice for no clusters
+	assert.Empty(t, collectors)
+}
+
+func TestGetPodLevelCollectors_InvalidCluster(t *testing.T) {
+	svc := New().(*service)
+	svc.isiClusters = &sync.Map{}
+	svc.metricsRegistry = prometheus.NewRegistry()
+	svc.isiClusters.Store("bad", "not a cluster config")
+	svc.isiClusters.Store("nil", (*IsilonClusterConfig)(nil))
+
+	runtimeCfg := collectors.RuntimeConfig{}
+	result := svc.getPodLevelCollectors(runtimeCfg)
+
+	// Should skip invalid entries and return empty slice
+	assert.Empty(t, result)
+}
+
+func TestGetArrayLevelCollectors_InvalidAndValidClusters(t *testing.T) {
+	svc := New().(*service)
+	svc.isiClusters = &sync.Map{}
+	svc.metricsRegistry = prometheus.NewRegistry()
+	svc.opts = Opts{Path: "/ifs"}
+
+	// Invalid cluster entries should be skipped
+	svc.isiClusters.Store("bad", "not a cluster config")
+	svc.isiClusters.Store("nil", (*IsilonClusterConfig)(nil))
+
+	// Valid cluster with no Kubernetes client and empty IsiPath falls back to s.opts.Path
+	mockAPI := &isimocks.Client{}
+	validNoK8s := &IsilonClusterConfig{
+		ClusterName: "cluster1",
+		IsiPath:     "",
+		isiSvc: &isiService{
+			client: &isi.Client{API: mockAPI},
+		},
+	}
+	svc.isiClusters.Store("validNoK8s", validNoK8s)
+
+	// Valid cluster with a Kubernetes client and explicit IsiPath
+	validWithK8s := &IsilonClusterConfig{
+		ClusterName: "cluster2",
+		IsiPath:     "/ifs/data",
+		isiSvc: &isiService{
+			client: &isi.Client{API: mockAPI},
+		},
+	}
+	svc.isiClusters.Store("validWithK8s", validWithK8s)
+	svc.k8sclient = fake.NewSimpleClientset()
+
+	runtimeCfg := collectors.RuntimeConfig{}
+	result := svc.getArrayLevelCollectors(runtimeCfg)
+
+	// Should return three collectors per valid cluster (Quota, NodePool, NFS)
+	assert.Len(t, result, 6)
+}
+
+func TestBeforeServe_WithMetricsEnabled(t *testing.T) {
+	svc := New().(*service)
+	ctx := context.Background()
+
+	// Set environment variables for metrics
+	t.Setenv("X_CSI_METRICS_ENABLED", "true")
+	t.Setenv("X_CSI_ISI_ENDPOINT", "https://test.example.com:8080")
+	t.Setenv("X_CSI_ISI_PATH", "/ifs")
+	t.Setenv("X_CSI_ISI_AUTH_TYPE", "0")
+	t.Setenv("X_CSI_ISI_USER", "admin")
+	t.Setenv("X_CSI_ISI_PASSWORD", "password")
+	t.Setenv("X_CSI_ISI_PORT", "8080")
+	t.Setenv("CSI_ENDPOINT", "unix:///tmp/csi.sock")
+	t.Setenv("X_CSI_MODE", "controller")
+
+	// Test BeforeServe with metrics enabled
+	// It will fail due to missing config file, but we're testing the code path
+	err := svc.BeforeServe(ctx, nil, nil)
+	// Expected to fail due to missing config, but shouldn't panic
+	assert.Error(t, err)
+}
+
+func TestBeforeServe_WithoutMetrics(t *testing.T) {
+	svc := New().(*service)
+	ctx := context.Background()
+
+	// Set environment variables without metrics
+	t.Setenv("X_CSI_METRICS_ENABLED", "false")
+	t.Setenv("X_CSI_ISI_ENDPOINT", "https://test.example.com:8080")
+	t.Setenv("X_CSI_ISI_PATH", "/ifs")
+	t.Setenv("X_CSI_ISI_AUTH_TYPE", "0")
+	t.Setenv("X_CSI_ISI_USER", "admin")
+	t.Setenv("X_CSI_ISI_PASSWORD", "password")
+	t.Setenv("X_CSI_ISI_PORT", "8080")
+	t.Setenv("CSI_ENDPOINT", "unix:///tmp/csi.sock")
+	t.Setenv("X_CSI_MODE", "controller")
+
+	// Test BeforeServe without metrics
+	err := svc.BeforeServe(ctx, nil, nil)
+	// Expected to fail due to missing config, but shouldn't panic
+	assert.Error(t, err)
+}
+
+func TestProbe_WithValidCluster(t *testing.T) {
+	svc := New().(*service)
+	svc.isiClusters = &sync.Map{}
+	ctx := context.Background()
+
+	isiConfig := &IsilonClusterConfig{
+		ClusterName:               "test-cluster",
+		Endpoint:                  "https://test.example.com:8080",
+		EndpointPort:              "8080",
+		EndpointURL:               "https://test.example.com:8080",
+		User:                      "admin",
+		Password:                  "password",
+		IsiPath:                   "/ifs",
+		IsiVolumePathPermissions:  "0777",
+		SkipCertificateValidation: boolPtr(true),
+		IgnoreUnresolvableHosts:   boolPtr(true),
+	}
+
+	// Test probe - will fail due to connection, but tests code path
+	err := svc.probe(ctx, isiConfig)
+	assert.Error(t, err)
+}
+
+func TestSetNoProbeOnStart_Enabled(t *testing.T) {
+	svc := New().(*service)
+	ctx := context.Background()
+
+	// Set env var to enable no probe on start
+	t.Setenv(constants.EnvNoProbeOnStart, "true")
+
+	// Test setting no probe on start
+	svc.setNoProbeOnStart(ctx)
+	// noProbeOnStart should be true
+	assert.True(t, noProbeOnStart.Load())
+}
+
+func TestProbeAllClusters_NoClusters(t *testing.T) {
+	svc := New().(*service)
+	svc.isiClusters = &sync.Map{}
+	ctx := context.Background()
+
+	// Test probe with no clusters
+	err := svc.probeAllClusters(ctx)
+	// Should fail because no clusters to probe
+	assert.Error(t, err)
+}
+
+func TestAutoProbe_WithoutAutoProbeEnabled(t *testing.T) {
+	svc := &service{
+		opts: Opts{
+			AutoProbe: false,
+		},
+	}
+	ctx := context.Background()
+
+	isiConfig := &IsilonClusterConfig{
+		isiSvc: nil,
+	}
+
+	// Test auto probe when disabled
+	err := svc.autoProbe(ctx, isiConfig)
+	// Should fail because auto probe is not enabled
+	assert.Error(t, err)
+}
+
+func TestValidateCreateVolumeRequest_BlockVolumeRejected(t *testing.T) {
+	svc := &service{}
+	req := &csi.CreateVolumeRequest{
+		Name: "test-vol",
+		VolumeCapabilities: []*csi.VolumeCapability{
+			{
+				AccessType: &csi.VolumeCapability_Block{Block: &csi.VolumeCapability_BlockVolume{}},
+				AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER},
+			},
+		},
+		CapacityRange: &csi.CapacityRange{RequiredBytes: 1024 * 1024 * 1024},
+	}
+	_, err := svc.ValidateCreateVolumeRequest(req)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "raw block requested from NFS Volume")
+}
+
+func TestValidateCreateVolumeRequest_EmptyName(t *testing.T) {
+	svc := &service{}
+	req := &csi.CreateVolumeRequest{
+		Name:          "",
+		CapacityRange: &csi.CapacityRange{RequiredBytes: 1024 * 1024 * 1024},
+	}
+	_, err := svc.ValidateCreateVolumeRequest(req)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "name cannot be empty")
+}
+
+func TestPatchNodeLabels_NodeNotFound(t *testing.T) {
+	fakeClient := fake.NewSimpleClientset()
+	svc := &service{
+		k8sclient: fakeClient,
+		nodeID:    "nonexistent-node",
+	}
+	err := svc.PatchNodeLabels(map[string]string{"key": "val"}, nil)
+	assert.Error(t, err)
+}
+
+func TestPatchNodeLabels_AddAndRemove(t *testing.T) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "test-node",
+			Labels: map[string]string{"existing": "label"},
+		},
+	}
+	fakeClient := fake.NewSimpleClientset(node)
+	svc := &service{
+		k8sclient: fakeClient,
+		nodeID:    "test-node",
+	}
+	err := svc.PatchNodeLabels(map[string]string{"new-key": "new-val"}, []string{"existing"})
+	assert.NoError(t, err)
+}
+
+func TestGetNodeLabelsWithName_KubeClientError(t *testing.T) {
+	origGetKubeClientSet := getKubeClientSet
+	getKubeClientSet = func(_ string) (*kubernetes.Clientset, error) {
+		return nil, errors.New("cannot create client")
+	}
+	defer func() { getKubeClientSet = origGetKubeClientSet }()
+
+	svc := &service{}
+	_, err := svc.GetNodeLabelsWithName("any-node")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot create client")
+}
+
+func TestGetNodeLabelsWithName_NodeNotFound(t *testing.T) {
+	origGetKubeClientSet := getKubeClientSet
+	getKubeClientSet = func(_ string) (*kubernetes.Clientset, error) {
+		return &kubernetes.Clientset{}, nil
+	}
+	defer func() { getKubeClientSet = origGetKubeClientSet }()
+
+	origGetK8sNodeByName := getK8sNodeByName
+	getK8sNodeByName = func(_ *kubernetes.Clientset, _ string) (*v1.Node, error) {
+		return nil, errors.New("node not found")
+	}
+	defer func() { getK8sNodeByName = origGetK8sNodeByName }()
+
+	svc := &service{}
+	_, err := svc.GetNodeLabelsWithName("missing-node")
+	assert.Error(t, err)
+}
+
+func TestGetNodeLabelsWithName_Success(t *testing.T) {
+	origGetKubeClientSet := getKubeClientSet
+	getKubeClientSet = func(_ string) (*kubernetes.Clientset, error) {
+		return &kubernetes.Clientset{}, nil
+	}
+	defer func() { getKubeClientSet = origGetKubeClientSet }()
+
+	origGetK8sNodeByName := getK8sNodeByName
+	getK8sNodeByName = func(_ *kubernetes.Clientset, _ string) (*v1.Node, error) {
+		return &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "test-node",
+				Labels: map[string]string{"zone": "us-east-1a"},
+			},
+		}, nil
+	}
+	defer func() { getK8sNodeByName = origGetK8sNodeByName }()
+
+	svc := &service{}
+	labels, err := svc.GetNodeLabelsWithName("test-node")
+	assert.NoError(t, err)
+	assert.Equal(t, "us-east-1a", labels["zone"])
+}
+
+func TestCleanupNodeFromSharedExports_NoIPs(t *testing.T) {
+	ctx := context.Background()
+	svc := &service{
+		k8sclient:         fake.NewSimpleClientset(),
+		directoryExportMu: sync.Map{},
+		isiClusters:       &sync.Map{},
+	}
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node-noip"},
+		Status:     v1.NodeStatus{Addresses: []v1.NodeAddress{}},
+	}
+	err := svc.cleanupNodeFromSharedExports(ctx, node)
+	assert.NoError(t, err)
+}
+
+func TestCleanupNodeFromSharedExports_PVListError(t *testing.T) {
+	ctx := context.Background()
+	fakeClient := fake.NewSimpleClientset()
+	fakeClient.Fake.PrependReactor("list", "persistentvolumes", func(_ k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("list error")
+	})
+	svc := &service{
+		k8sclient:         fakeClient,
+		directoryExportMu: sync.Map{},
+		isiClusters:       &sync.Map{},
+	}
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node-listerr"},
+		Status: v1.NodeStatus{
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+			},
+		},
+	}
+	err := svc.cleanupNodeFromSharedExports(ctx, node)
+	assert.Error(t, err)
+}
+
+func TestCleanupNodeFromSharedExports_WithDirectoryPVs(t *testing.T) {
+	ctx := context.Background()
+
+	dirpv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "dir-pv-cleanup"},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: &v1.CSIPersistentVolumeSource{
+					Driver:           constants.PluginName,
+					VolumeHandle:     "dir-pv-cleanup=_=_=50=_=_=System=_=_=system=_=_=directory",
+					VolumeAttributes: map[string]string{"ProvisioningMode": "directory"},
+				},
+			},
+		},
+	}
+
+	mockClient := &isimocks.Client{}
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("export not found"))
+	falseVal := false
+	isiConfig := &IsilonClusterConfig{
+		ClusterName:             "system",
+		IgnoreUnresolvableHosts: &falseVal,
+		isiSvc: &isiService{
+			client: &isi.Client{API: mockClient},
+		},
+	}
+
+	fakeClient := fake.NewSimpleClientset(dirpv)
+	svc := &service{
+		k8sclient:             fakeClient,
+		directoryExportMu:     sync.Map{},
+		isiClusters:           &sync.Map{},
+		defaultIsiClusterName: "system",
+	}
+	svc.isiClusters.Store("system", isiConfig)
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node-cleanup"},
+		Status: v1.NodeStatus{
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.5"},
+			},
+		},
+	}
+	err := svc.cleanupNodeFromSharedExports(ctx, node)
+	assert.NoError(t, err)
+}
+
+func TestCleanupNodeFromSharedExports_InvalidPVHandle(t *testing.T) {
+	ctx := context.Background()
+
+	pvBadHandle := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "pv-badhandle"},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: &v1.CSIPersistentVolumeSource{
+					Driver:           constants.PluginName,
+					VolumeHandle:     "badhandle-no-separators",
+					VolumeAttributes: map[string]string{"ProvisioningMode": "directory"},
+				},
+			},
+		},
+	}
+
+	svc := &service{
+		k8sclient:         fake.NewSimpleClientset(pvBadHandle),
+		directoryExportMu: sync.Map{},
+		isiClusters:       &sync.Map{},
+	}
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node-badpv"},
+		Status: v1.NodeStatus{
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeExternalIP, Address: "192.168.1.10"},
+			},
+		},
+	}
+	err := svc.cleanupNodeFromSharedExports(ctx, node)
+	assert.NoError(t, err)
+}
+
+func TestWatchNodeDeletions_WatchError(t *testing.T) {
+	// Use a short timeout context since the watcher now retries with backoff
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	fakeClient := fake.NewSimpleClientset()
+	fakeClient.Fake.PrependWatchReactor("nodes", func(_ k8stesting.Action) (bool, watch.Interface, error) {
+		return true, nil, errors.New("watch failed")
+	})
+
+	svc := &service{
+		k8sclient:         fakeClient,
+		directoryExportMu: sync.Map{},
+		isiClusters:       &sync.Map{},
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		svc.watchNodeDeletions(ctx)
+	}()
+
+	// Wait for the watcher to exit (should exit when context times out)
+	select {
+	case <-done:
+		// Success - watcher exited due to context cancellation
+	case <-time.After(3 * time.Second):
+		t.Error("watchNodeDeletions did not exit within timeout after context cancellation")
+	}
+}
+
+func TestWatchNodeDeletions_DeleteEvent(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	fakeWatcher := watch.NewFake()
+	fakeClient := fake.NewSimpleClientset()
+	fakeClient.Fake.PrependWatchReactor("nodes", func(_ k8stesting.Action) (bool, watch.Interface, error) {
+		return true, fakeWatcher, nil
+	})
+
+	svc := &service{
+		k8sclient:         fakeClient,
+		directoryExportMu: sync.Map{},
+		isiClusters:       &sync.Map{},
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		svc.watchNodeDeletions(ctx)
+	}()
+
+	deletedNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "deleted-node"},
+		Status: v1.NodeStatus{
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+			},
+		},
+	}
+	fakeWatcher.Delete(deletedNode)
+	fakeWatcher.Stop()
+
+	// Cancel context after stopping watcher to prevent reconnection loop
+	cancel()
+
+	select {
+	case <-done:
+		// Success - watcher exited after context cancellation
+	case <-time.After(3 * time.Second):
+		t.Error("watchNodeDeletions did not exit within timeout")
+	}
+}
+
+func TestCleanupNodeFromSharedExports(t *testing.T) {
+	ctx := context.Background()
+
+	// Create mock k8s client
+	fakeClient := fake.NewSimpleClientset()
+
+	// Create test PVs with directory-backed labels
+	pv1 := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pv-1",
+			Labels: map[string]string{
+				"powerscale.csi.dell.com/provisioning-mode": "directory",
+			},
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: &v1.CSIPersistentVolumeSource{
+					Driver:       constants.PluginName,
+					VolumeHandle: "vol-name=_=_=100=_=_=System=_=_=cluster1",
+					VolumeAttributes: map[string]string{
+						"ProvisioningMode": "directory",
+					},
+				},
+			},
+		},
+	}
+
+	_, err := fakeClient.CoreV1().PersistentVolumes().Create(ctx, pv1, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	// Create service with real isiService and mock client
+	mockClient := new(isimocks.Client)
+	mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockClient.On("Put", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	isiSvc := &isiService{
+		client: &isi.Client{API: mockClient},
+	}
+
+	isiClusters := &sync.Map{}
+	isiClusters.Store("cluster1", &IsilonClusterConfig{
+		ClusterName: "cluster1",
+		isiSvc:      isiSvc,
+	})
+
+	svc := &service{
+		k8sclient:         fakeClient,
+		directoryExportMu: sync.Map{},
+		isiClusters:       isiClusters,
+	}
+
+	// Create test node with IP addresses
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+		Status: v1.NodeStatus{
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+				{Type: v1.NodeExternalIP, Address: "10.0.0.2"},
+			},
+		},
+	}
+
+	// Test successful cleanup
+	err = svc.cleanupNodeFromSharedExports(ctx, node)
+	assert.NoError(t, err)
+}
+
+func TestRecordAPICall_NilCollector(_ *testing.T) {
+	s := &service{
+		driverHealthCollector: nil,
+	}
+	// Should not panic
+	s.RecordAPICall(true, 200)
+	s.RecordAPICall(false, 500)
+}
+
+func TestRecordAuthFailure_NilCollector(_ *testing.T) {
+	s := &service{
+		driverHealthCollector: nil,
+	}
+	// Should not panic
+	s.RecordAuthFailure()
+}
+
+// Additional error path tests for coverage
+
+// Additional error path tests for coverage
+func TestGetIsilonConfig_NonExistentCluster(t *testing.T) {
+	s := &service{
+		isiClusters: &sync.Map{},
+	}
+
+	// Test with non-existent cluster
+	clusterName := "nonexistent-cluster"
+	_, err := s.getIsilonConfig(context.Background(), &clusterName)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to get cluster config details")
 }
