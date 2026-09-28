@@ -46,7 +46,7 @@ run_command() {
   CMDOUT=$(eval "${@}" 2>&1)
   local rc=$?
 
-  if [ $rc -ne 0 ]; then
+  if [ "${rc}" -ne 0 ]; then
     echo
     echo "ERROR"
     echo "Received a non-zero return code ($rc) from the following comand:"
@@ -226,7 +226,7 @@ CREATE="false"
 PREPARE="false"
 REGISTRY=""
 DRIVER="csi-isilon"
-DEFAULT_VERSION="v2.17.1"
+DEFAULT_VERSION="v2.18.0"
 
 # some directories
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"

@@ -22,7 +22,6 @@ import (
 	"reflect"
 	"testing"
 
-	csmlog "github.com/dell/csmlog"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	isi "github.com/dell/gopowerscale"
 	v11 "github.com/dell/gopowerscale/api/v11"
@@ -217,7 +216,7 @@ func Test_failbackDiscardLocal(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			localIsiConfig, remoteIsiConfig := setUpSvcForFailbackDiscardLocal(tt.failStep)
 
-			err := failbackDiscardLocal(context.Background(), localIsiConfig, remoteIsiConfig, "vgstest-Five_Minutes", log.WithContext(context.Background()))
+			err := failbackDiscardLocal(context.Background(), localIsiConfig, remoteIsiConfig, "vgstest-Five_Minutes")
 			if tt.wantErr == "" {
 				assert.NoError(t, err)
 			} else {
@@ -242,16 +241,12 @@ func Test_synchronize(t *testing.T) {
 		IsiPath: "/ifs/data",
 		isiSvc:  svc,
 	}
-	remoteIsiConfig := &IsilonClusterConfig{
-		IsiPath: "/ifs/data",
-		isiSvc:  svc,
-	}
 
 	ppName := "vgstest-Five_Minutes"
 
 	// Negative case - when policy sync failed
 	svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("policy sync failed")).Run(nil).Times(1)
-	err := synchronize(context.Background(), localIsiConfig, remoteIsiConfig, ppName, log.WithContext(context.Background()))
+	err := synchronize(context.Background(), localIsiConfig, ppName)
 	assert.Error(t, err)
 
 	// Positive cases
@@ -307,7 +302,7 @@ func Test_synchronize(t *testing.T) {
 		}
 	}).Times(1)
 
-	err = synchronize(context.Background(), localIsiConfig, remoteIsiConfig, ppName, log.WithContext(context.Background()))
+	err = synchronize(context.Background(), localIsiConfig, ppName)
 	assert.NoError(t, err)
 }
 
@@ -326,16 +321,12 @@ func Test_suspend(t *testing.T) {
 		IsiPath: "/ifs/data",
 		isiSvc:  svc,
 	}
-	remoteIsiConfig := &IsilonClusterConfig{
-		IsiPath: "/ifs/data",
-		isiSvc:  svc,
-	}
 
 	ppName := "vgstest-Five_Minutes"
 
 	// Negative case - can't disable local policy
 	svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("can't disable local policy")).Run(nil).Times(1)
-	err := suspend(context.Background(), localIsiConfig, remoteIsiConfig, ppName, log.WithContext(context.Background()))
+	err := suspend(context.Background(), localIsiConfig, ppName)
 	assert.Error(t, err)
 
 	// Negative case - policy couldn't reach disabled condition
@@ -353,7 +344,7 @@ func Test_suspend(t *testing.T) {
 	}).Times(1)
 	svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(errors.New("policy couldn't reach disabled condition")).Run(nil).Times(1)
 
-	err = suspend(context.Background(), localIsiConfig, remoteIsiConfig, ppName, log.WithContext(context.Background()))
+	err = suspend(context.Background(), localIsiConfig, ppName)
 	assert.Error(t, err)
 
 	// Positive cases
@@ -370,7 +361,7 @@ func Test_suspend(t *testing.T) {
 		}
 	}).Times(2)
 
-	err = suspend(context.Background(), localIsiConfig, remoteIsiConfig, ppName, log.WithContext(context.Background()))
+	err = suspend(context.Background(), localIsiConfig, ppName)
 	assert.NoError(t, err)
 }
 
@@ -435,7 +426,7 @@ func Test_failbackDiscardRemote(t *testing.T) {
 		}
 	}).Times(2)
 
-	err := failbackDiscardRemote(context.Background(), localIsiConfig, remoteIsiConfig, "vgstest-Five_Minutes", log.WithContext(context.Background()))
+	err := failbackDiscardRemote(context.Background(), localIsiConfig, remoteIsiConfig, "vgstest-Five_Minutes")
 	assert.NoError(t, err)
 }
 
@@ -635,7 +626,6 @@ func Test_reprotect(t *testing.T) {
 		localIsiConfig  *IsilonClusterConfig
 		remoteIsiConfig *IsilonClusterConfig
 		vgName          string
-		log             *csmlog.CsmLog
 	}
 	tests := []struct {
 		name     string
@@ -656,7 +646,6 @@ func Test_reprotect(t *testing.T) {
 					isiSvc:  remoteSvc,
 				},
 				vgName: "csi-vg-test",
-				log:    log.WithContext(context.Background()),
 			},
 			setMocks: func() {
 				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
@@ -680,7 +669,6 @@ func Test_reprotect(t *testing.T) {
 					isiSvc:  remoteSvc,
 				},
 				vgName: "csi-vg-test",
-				log:    log.WithContext(context.Background()),
 			},
 			setMocks: func() {
 				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
@@ -713,7 +701,6 @@ func Test_reprotect(t *testing.T) {
 					isiSvc:  remoteSvc,
 				},
 				vgName: "csi-vg-test",
-				log:    log.WithContext(context.Background()),
 			},
 			setMocks: func() {
 				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
@@ -749,7 +736,6 @@ func Test_reprotect(t *testing.T) {
 					isiSvc:  remoteSvc,
 				},
 				vgName: "csi-vg-test",
-				log:    log.WithContext(context.Background()),
 			},
 			setMocks: func() {
 				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
@@ -801,7 +787,6 @@ func Test_reprotect(t *testing.T) {
 					isiSvc:  remoteSvc,
 				},
 				vgName: "csi-vg-test",
-				log:    log.WithContext(context.Background()),
 			},
 			setMocks: func() {
 				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
@@ -857,7 +842,6 @@ func Test_reprotect(t *testing.T) {
 					isiSvc:  remoteSvc,
 				},
 				vgName: "csi-vg-test",
-				log:    log.WithContext(context.Background()),
 			},
 			setMocks: func() {
 				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
@@ -917,7 +901,6 @@ func Test_reprotect(t *testing.T) {
 					isiSvc:  remoteSvc,
 				},
 				vgName: "csi-vg-test",
-				log:    log.WithContext(context.Background()),
 			},
 			setMocks: func() {
 				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
@@ -990,7 +973,6 @@ func Test_reprotect(t *testing.T) {
 					isiSvc:  remoteSvc,
 				},
 				vgName: "csi-vg-test",
-				log:    log.WithContext(context.Background()),
 			},
 			setMocks: func() {
 				// mocks function: localIsiConfig.isiSvc.client.GetTargetPolicyByName(ctx, ppName)
@@ -1055,7 +1037,7 @@ func Test_reprotect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setMocks()
 
-			if err := reprotect(tt.args.ctx, tt.args.localIsiConfig, tt.args.remoteIsiConfig, tt.args.vgName, tt.args.log); (err != nil) != tt.wantErr {
+			if err := reprotect(tt.args.ctx, tt.args.localIsiConfig, tt.args.remoteIsiConfig, tt.args.vgName); (err != nil) != tt.wantErr {
 				t.Errorf("reprotect() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

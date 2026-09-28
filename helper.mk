@@ -4,14 +4,15 @@
 # or its subsidiaries. Other trademarks may be trademarks of their respective 
 # owners.
 
+.PHONY: generate copy-csm-common vendor
+
 generate:
 	GOPRIVATE=github.com go generate
 	GOPRIVATE=github.com go run core/semver/semver.go -f mk > semver.mk
 
-download-csm-common:
-	git clone --depth 1 git@github.com:dell/csm.git temp-repo
-	cp temp-repo/config/csm-common.mk .
-	rm -rf temp-repo
+copy-csm-common:
+	cp ../csm/config/csm-common.mk .
 
 vendor:
+	rm -rf vendor
 	GOPRIVATE=github.com go mod vendor

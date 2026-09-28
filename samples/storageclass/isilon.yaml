@@ -1,4 +1,4 @@
-# Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2020-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -81,6 +81,37 @@ parameters:
   # Optional: true
   # ClusterName: <cluster_name>
 
+  # SmartConnectZoneFQDN: Specify the SmartConnect zone FQDN to use as the NFS mount target.
+  # This overrides the selected cluster's nfsMountFQDN and the global X_CSI_ISI_NFS_MOUNT_FQDN.
+  # Optional: true (mTLS requires an FQDN from one of these supported sources)
+  # Default value: None
+  # Example:
+  # SmartConnectZoneFQDN: "smartconnect.isilon.example.com"
+
+  # NFSTransportSecurity: Specify the NFS transport security mode for volumes.
+  # This setting is StorageClass-scoped and must be explicit; it is never inherited from the
+  # cluster Secret or environment.
+  # For plain "tls", also specify mountOptions with "xprtsec=tls"; plain TLS does not receive the
+  # mTLS-specific prerequisite validation, FQDN enforcement, timeout, event, or mount-option injection.
+  # Allowed values:
+  #   "none": no transport security (default NFS behavior)
+  #   "tls": NFS over TLS (encryption only, server authentication)
+  #   "mtls": NFS over mutual TLS (encryption + client certificate authentication)
+  # Optional: true
+  # Default value: None (no transport security)
+  # Requirements for "mtls":
+  #   - PowerScale OneFS 9.16.0+ with NFS TLS configured
+  #   - Linux kernel 6.7+ (or RHEL 9.8+ with backported kTLS)
+  #   - tlshd daemon running with client certificates in /etc/tlshd.conf
+  #   - SmartConnectZoneFQDN must be set (IP addresses are rejected for mTLS)
+  # Example:
+  # NFSTransportSecurity: "mtls"
+
+  # NOTE: TLS handshake timeout cannot be configured via StorageClass parameters.
+  # To customize the timeout (default: 30 seconds), set the X_CSI_ISI_TLS_HANDSHAKE_TIMEOUT_SECONDS
+  # environment variable on the CSI driver controller and node pods.
+  # Example: X_CSI_ISI_TLS_HANDSHAKE_TIMEOUT_SECONDS: "60"
+
   # Sets the filesystem type which will be used to format the new volume
   # Optional: true
   # Default value: None
@@ -96,6 +127,7 @@ parameters:
 volumeBindingMode: Immediate
 # allowedTopologies helps scheduling pods on worker nodes which match all of below expressions.
 # If enableCustomTopology is set to true in helm values.yaml, then do not specify allowedTopologies
+# TLS-capability topology is not part of the mTLS implementation.
 # Change all instances of <ISILON_IP> to the IP of the PowerScale OneFS API server
 # allowedTopologies:
 #  - matchLabelExpressions:

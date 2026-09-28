@@ -1,3 +1,17 @@
+# Copyright © 2019-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 Feature: Isilon CSI interface
     As a consumer of the CSI interface
     I want to test service methods
@@ -194,10 +208,29 @@ Feature: Isilon CSI interface
       Then a valid ControllerPublishVolumeResponse is returned
       Then a valid CreateVolumeResponse is returned
 
+    Scenario: ControllerPublishVolume directory-backed good scenario
+      Given a Isilon service
+      When I call Probe
+      And I call ControllerPublishVolume with directory backed name "volume2=_=_=557=_=_=System" and access type "multiple-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
+      Then a valid ControllerPublishVolumeResponse is returned
+
+    Scenario: ControllerPublishVolume directory-backed node already authorized scenario
+      Given a Isilon service
+      When I call Probe
+      And I induce error "GetExportByIDNotFoundError"
+      And I call ControllerPublishVolume with directory backed name "volume2=_=_=557=_=_=System" and access type "multiple-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
+      Then a valid ControllerPublishVolumeResponse is returned
+
     Scenario: ControllerUnpublishVolume good scenario
       Given a Isilon service
       When I call Probe
       And I call ControllerUnpublishVolume with name "volume2=_=_=43=_=_=System" and access type "single-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
+      Then a valid ControllerUnpublishVolumeResponse is returned
+
+    Scenario: ControllerUnpublishVolume directory-backed good scenario
+      Given a Isilon service
+      When I call Probe
+      And I call ControllerUnpublishVolume with directory backed name "volume2=_=_=557=_=_=System" and access type "single-writer" to "vpi7125=#=#=vpi7125.a.b.com=#=#=1.1.1.1"
       Then a valid ControllerUnpublishVolumeResponse is returned
 
     Scenario Outline: ControllerUnpublishVolume bad calls
@@ -211,7 +244,6 @@ Feature: Isilon CSI interface
       | ""                     | "ControllerUnpublishVolumeRequest.VolumeId is empty"    |
       | "volume2=_=_=43"       | "failed to parse volume ID"                             |
 
-    @todo
     Scenario Outline: Calls to ListVolumes
       Given a Isilon service
       When I call ListVolumes with max entries <entry> starting token <token>
@@ -362,15 +394,21 @@ Feature: Isilon CSI interface
 
     Scenario: Verify Invalid Custom Networks
       Given a Isilon service
-      When I call set allowed networks "1.2.3.4/33"
+      When I call set allowed networks "203.0.113.0/24"
       And I call NodeGetInfo with invalid networks
       Then the error contains "no valid IP address found matching against allowedNetworks"
 
     Scenario: Verify Multiple Custom Networks
       Given a Isilon service
-      When I call set allowed networks with multiple networks "1.2.3.4/33" "127.0.0.0/8"
+      When I call set allowed networks with multiple networks "203.0.113.0/24" "127.0.0.0/8"
       And I call NodeGetInfo
       Then a valid NodeGetInfoResponse is returned
+
+    Scenario: Verify Malformed CIDR In Custom Networks Is Filtered
+      Given a Isilon service
+      When I call set allowed networks "192.0.2.0/33"
+      And I call NodeGetInfo with invalid networks
+      Then the error contains "no valid networks in allowedNetworks"
 
     Scenario: ControllerGetVolume good scenario
       Given a Isilon service

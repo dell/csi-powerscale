@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright © 2019-2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2019-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,3 +40,7 @@ mv ./Powerscale_integration_test_results.xml Powerscale_integration_test_results
 echo "Custom Topology is enabled"
 runTest ./env_Custom_Topology_Enabled.sh ./features/integration.feature "v1.0"
 mv ./Powerscale_integration_test_results.xml Powerscale_integration_test_results_CustomTopology.xml
+
+echo "mTLS basic integration tests"
+runTest ./env_mtls.sh ./features/mtls_basic.feature "@mtls-basic"
+mv ./Powerscale_integration_test_results.xml Powerscale_integration_test_results_mTLS.xml
