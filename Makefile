@@ -41,6 +41,9 @@ format:
 build: generate vendor
 	CGO_ENABLED=0 GOOS=linux GO111MODULE=on go build -mod=vendor -ldflags $(LDFLAGS) -o csi-isilon
 
+build-binary:
+	CGO_ENABLED=0 GOOS=linux GO111MODULE=on go build -mod=vendor -ldflags $(LDFLAGS) -o csi-isilon
+
 # Windows or Linux; requires no hardware
 unit-test: go-code-tester
 	GITHUB_OUTPUT=/dev/null \

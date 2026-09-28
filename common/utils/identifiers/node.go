@@ -36,15 +36,13 @@ var NodeIDPattern = regexp.MustCompile(fmt.Sprintf("^(.+)%s(.+)%s(.+)$", NodeIDS
 
 // ParseNodeID parses NodeID to node name, node FQDN and IP address using pattern '^(.+)=#=#=(.+)=#=#=(.+)'
 func ParseNodeID(ctx context.Context, nodeID string) (string, string, string, error) {
-	log := csmlog.GetLogger().WithContext(ctx)
-
 	matches := NodeIDPattern.FindStringSubmatch(nodeID)
 
 	if len(matches) < 4 {
 		return "", "", "", fmt.Errorf("node ID '%s' cannot match the expected '^(.+)=#=#=(.+)=#=#=(.+)$' pattern", nodeID)
 	}
 
-	log.Debugf("Node ID '%s' parsed into node name '%s', node FQDN '%s' and IP address '%s'",
+	csmlog.WithContext(ctx).Debugf("Node ID '%s' parsed into node name '%s', node FQDN '%s' and IP address '%s'",
 		nodeID, matches[1], matches[2], matches[3])
 
 	return matches[1], matches[2], matches[3], nil

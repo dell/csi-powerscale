@@ -6,7 +6,7 @@ The `csi-offline-bundle.sh` script can be used to create a package for the offli
 
 This includes the following drivers:
 
-* [PowerFlex](https://github.com/dell/csi-vxflexos)
+* [PowerFlex](https://github.com/dell/csi-powerflex)
 * [PowerMax](https://github.com/dell/csi-powermax)
 * [PowerScale](https://github.com/dell/csi-powerscale)
 * [PowerStore](https://github.com/dell/csi-powerstore)
@@ -89,7 +89,7 @@ For example, here is the output of a request to build an offline bundle for the 
 * Pulling and saving container images
 
 ...
-   quay.io/dell/container-storage-modules/csi-isilon:v2.17.1
+   quay.io/dell/container-storage-modules/csi-isilon:v2.18.0
 ...
 
 *
@@ -169,19 +169,19 @@ Preparing a offline bundle for installation
 *
 * Loading docker images
 
-Loaded image: quay.io/dell/container-storage-modules/csi-isilon:v2.17.1
+Loaded image: quay.io/dell/container-storage-modules/csi-isilon:v2.18.0
 ...
 
 *
 * Tagging and pushing images
 
-   quay.io/dell/container-storage-modules/csi-isilon:v2.17.1 -> localregistry:5000/dell-csm-operator/csi-isilon:v2.17.1
+   quay.io/dell/container-storage-modules/csi-isilon:v2.18.0 -> localregistry:5000/dell-csm-operator/csi-isilon:v2.18.0
    ...
 
 *
 * Preparing files within /root/dell-csm-operator-bundle
 
-   changing: quay.io/dell/container-storage-modules/csi-isilon:v2.17.1 -> localregistry:5000/dell-csm-operator/csi-isilon:v2.17.1
+   changing: quay.io/dell/container-storage-modules/csi-isilon:v2.18.0 -> localregistry:5000/dell-csm-operator/csi-isilon:v2.18.0
    ...
 
 *

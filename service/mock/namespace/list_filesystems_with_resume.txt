@@ -1,0 +1,21 @@
+{
+  "children": [
+    {
+      "name": "volume1",
+      "container_path": "/ifs/data/csi-isilon",
+      "type": "container",
+      "owner": "root",
+      "group": "wheel",
+      "size": 4096
+    },
+    {
+      "name": "volume2",
+      "container_path": "/ifs/data/csi-isilon",
+      "type": "container",
+      "owner": "root",
+      "group": "wheel",
+      "size": 4096
+    }
+  ],
+  "resume": "1-1-MAAA1"
+}

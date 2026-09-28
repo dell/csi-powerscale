@@ -1,0 +1,12 @@
+apiVersion: storage.k8s.io/v1
+kind: VolumeAttributesClass
+metadata:
+  name: isilon-vac
+driverName: csi-isilon.dellemc.com
+parameters:
+  # AdvisoryLimit - Advisory limit to the quota in percentage
+  "AdvisoryLimit": "60"
+  # SoftLimit - Soft limit for the quota in percentage
+  "SoftLimit": "70"
+  # SoftGracePrd - Soft grace period in seconds (11520 = 3 hours)
+  "SoftGracePrd": "11520"
