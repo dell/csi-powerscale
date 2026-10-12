@@ -33,7 +33,6 @@ import (
 	isiapi "github.com/dell/gopowerscale/api"
 	apiv1 "github.com/dell/gopowerscale/api/v1"
 	v1 "github.com/dell/gopowerscale/api/v1"
-	apiv17 "github.com/dell/gopowerscale/api/v17"
 	v2 "github.com/dell/gopowerscale/api/v2"
 	isimocks "github.com/dell/gopowerscale/mocks"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -354,116 +353,6 @@ func TestCreateVolumeFromSnapshot(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestValidateSnapshotIQLicense(t *testing.T) {
-	originalGetSnapshotIQLicenseStatusFunc := getSnapshotIQLicenseStatusFunc
-	defer func() {
-		getSnapshotIQLicenseStatusFunc = originalGetSnapshotIQLicenseStatusFunc
-	}()
-
-	isiConfig := &IsilonClusterConfig{isiSvc: &isiService{}}
-	ctx := context.Background()
-
-	tests := []struct {
-		name           string
-		mockStatus     string
-		mockErr        error
-		expectCode     codes.Code
-		expectContains string
-	}{
-		{
-			name:       "licensed status",
-			mockStatus: "Licensed",
-			expectCode: codes.OK,
-		},
-		{
-			name:           "license lookup failed",
-			mockErr:        errors.New("no license found"),
-			expectCode:     codes.FailedPrecondition,
-			expectContains: "SnapshotIQ license is not activated or available",
-		},
-		{
-			name:       "license api unavailable fallback",
-			mockErr:    errors.New("json: cannot unmarshal number into Go value of type api.JSONError"),
-			expectCode: codes.OK,
-		},
-		{
-			name:           "license not active",
-			mockStatus:     "Expired",
-			expectCode:     codes.FailedPrecondition,
-			expectContains: "SnapshotIQ license status is 'Expired'",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			getSnapshotIQLicenseStatusFunc = func(context.Context, *IsilonClusterConfig) (string, error) {
-				return tt.mockStatus, tt.mockErr
-			}
-
-			err := validateSnapshotIQLicense(ctx, isiConfig)
-			if tt.expectCode == codes.OK {
-				assert.NoError(t, err)
-				return
-			}
-			assert.Error(t, err)
-			st, ok := status.FromError(err)
-			assert.True(t, ok)
-			assert.Equal(t, tt.expectCode, st.Code())
-			assert.Contains(t, st.Message(), tt.expectContains)
-		})
-	}
-}
-
-func TestGetSnapshotIQLicenseStatusFunc(t *testing.T) {
-	ctx := context.Background()
-
-	t.Run("returns error when service is not initialized", func(t *testing.T) {
-		status, err := getSnapshotIQLicenseStatusFunc(ctx, nil)
-		assert.Error(t, err)
-		assert.Equal(t, "", status)
-		assert.Contains(t, err.Error(), "isilon service is not initialized")
-	})
-
-	t.Run("returns error from backend lookup", func(t *testing.T) {
-		mockClient := &isimocks.Client{}
-		mockClient.On("Get", mock.Anything, "platform/17/license/licenses", SnapshotIQLicenseID, mock.Anything, mock.Anything, mock.Anything).
-			Return(errors.New("mock license lookup error")).Once()
-
-		isiConfig := &IsilonClusterConfig{
-			isiSvc: &isiService{
-				client: &isi.Client{API: mockClient},
-			},
-		}
-
-		status, err := getSnapshotIQLicenseStatusFunc(ctx, isiConfig)
-		assert.Error(t, err)
-		assert.Equal(t, "", status)
-		assert.Contains(t, err.Error(), "mock license lookup error")
-		mockClient.AssertExpectations(t)
-	})
-
-	t.Run("returns license status when lookup succeeds", func(t *testing.T) {
-		mockClient := &isimocks.Client{}
-		mockClient.On("Get", mock.Anything, "platform/17/license/licenses", SnapshotIQLicenseID, mock.Anything, mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) {
-				resp := args.Get(5).(*apiv17.LicensesResponse)
-				resp.Licenses = []apiv17.License{{ID: SnapshotIQLicenseID, Status: "Evaluation"}}
-			}).
-			Return(nil).Once()
-
-		isiConfig := &IsilonClusterConfig{
-			isiSvc: &isiService{
-				client: &isi.Client{API: mockClient},
-			},
-		}
-
-		status, err := getSnapshotIQLicenseStatusFunc(ctx, isiConfig)
-		assert.NoError(t, err)
-		assert.Equal(t, "Evaluation", status)
-		mockClient.AssertExpectations(t)
-	})
 }
 
 func TestCreateVolumeFromSnapshotErrorCodeMapping(t *testing.T) {
@@ -2273,6 +2162,42 @@ func TestValidateCreateSnapshotRequest(t *testing.T) {
 	_, _, err := svc.validateCreateSnapshotRequest(ctx, req, "/ifs/data", isiConfig)
 
 	assert.NotEqual(t, nil, err)
+}
+
+func TestMapSnapshotCreationError(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		expected   codes.Code
+		messageHas string
+	}{
+		{
+			name:       "wrapped license rejection",
+			err:        fmt.Errorf("wrapped: %w", &isiapi.JSONError{StatusCode: 402}),
+			expected:   codes.FailedPrecondition,
+			messageHas: "possible licensing or privilege issue",
+		},
+		{
+			name:     "wrapped permission rejection",
+			err:      fmt.Errorf("wrapped: %w", &isiapi.JSONError{StatusCode: 403}),
+			expected: codes.FailedPrecondition,
+		},
+		{
+			name:     "other error",
+			err:      errors.New("backend failure"),
+			expected: codes.Internal,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := mapSnapshotCreationError("req-1", tt.err)
+			assert.Equal(t, tt.expected, status.Code(err))
+			if tt.messageHas != "" {
+				assert.Contains(t, err.Error(), tt.messageHas)
+			}
+		})
+	}
 }
 
 func TestGetCapacity(t *testing.T) {

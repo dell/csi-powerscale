@@ -25,6 +25,13 @@ import (
 	"time"
 )
 
+func TestNewInitializesHTTPClient(t *testing.T) {
+	svc := New().(*service)
+	if svc.httpClient == nil {
+		t.Fatal("expected service to initialize a shared HTTP client")
+	}
+}
+
 func TestQueryArrayStatus_UnsupportedScheme(t *testing.T) {
 	s := &service{}
 	got, err := s.queryArrayStatus(context.Background(), "ftp://example.com/api")

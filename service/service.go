@@ -190,6 +190,7 @@ type service struct {
 	metricsCollectorManager     *collectors.CollectorManager
 	driverHealthCollector       *collectors.PSCDriverHealthCollector
 	accessControlCollector      *collectors.AccessControlCollector
+	httpClient                  *http.Client
 	directoryExportMu           sync.Map
 	eventRecorder               record.EventRecorder
 	eventBroadcaster            record.EventBroadcaster
@@ -232,7 +233,9 @@ func (s IsilonClusterConfig) String() string {
 
 // New returns a new Service.
 func New() Service {
-	svc := &service{}
+	svc := &service{
+		httpClient: &http.Client{},
+	}
 	if enabled, _ := strconv.ParseBool(os.Getenv(constants.EnvMetricsEnabled)); enabled {
 		svc.metricsRegistry = prometheus.NewRegistry()
 	}

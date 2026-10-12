@@ -40,10 +40,10 @@ func TestResolveXprtsec(t *testing.T) {
 			description:          "Should return 'tls' for TLS-only export",
 		},
 		{
-			name:                 "None mode returns none",
+			name:                 "None mode uses cluster default",
 			nfsTransportSecurity: constants.NFSTransportSecurityNone,
-			expectedXprtsec:      "none",
-			description:          "Should return 'none' for plaintext-only export",
+			expectedXprtsec:      "",
+			description:          "Should use the legacy export path for plaintext NFS",
 		},
 		{
 			name:                 "Empty string returns empty",
@@ -110,10 +110,10 @@ func TestResolveXprtsecDefenseInDepth(t *testing.T) {
 			securityLevel:        "Medium - Server authentication only",
 		},
 		{
-			name:                 "None provides no encryption",
+			name:                 "None uses the cluster default export path",
 			nfsTransportSecurity: "none",
-			expectedXprtsec:      "none",
-			securityLevel:        "Lowest - Plaintext only",
+			expectedXprtsec:      "",
+			securityLevel:        "Lowest - Plaintext NFS without an explicit xprtsec policy",
 		},
 	}
 

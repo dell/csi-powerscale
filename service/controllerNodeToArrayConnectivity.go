@@ -59,7 +59,10 @@ func (s *service) queryArrayStatus(ctx context.Context, url string) (bool, error
 	}
 	csmlog.WithContext(ctx).Debugf("Making %s url request %+v", url, req)
 
-	client := &http.Client{}
+	client := s.httpClient
+	if client == nil {
+		client = http.DefaultClient
+	}
 	// Validate URL scheme before making request to prevent SSRF
 	if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
 		return false, fmt.Errorf("unsupported URL scheme: %s", req.URL.Scheme)
