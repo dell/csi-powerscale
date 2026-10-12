@@ -58,3 +58,16 @@ func registerOrGetHistogramVec(reg prometheus.Registerer, collector *prometheus.
 	}
 	return collector
 }
+
+func registerOrGetNFSLatencyCollector(reg prometheus.Registerer, collector *nfsLatencyCollector) *nfsLatencyCollector {
+	if err := reg.Register(collector); err != nil {
+		var alreadyRegisteredErr prometheus.AlreadyRegisteredError
+		if errors.As(err, &alreadyRegisteredErr) {
+			if existing, ok := alreadyRegisteredErr.ExistingCollector.(*nfsLatencyCollector); ok {
+				return existing
+			}
+		}
+		panic(err)
+	}
+	return collector
+}

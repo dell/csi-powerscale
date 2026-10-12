@@ -199,3 +199,37 @@ func TestRegisterOrGet_MultipleRegistrations(t *testing.T) {
 	counter.WithLabelValues("test").Inc()
 	histogram.WithLabelValues("test").Observe(1.0)
 }
+
+// U-REG-NFS-LATENCY: registerOrGetNFSLatencyCollector registers a new collector
+func TestRegisterOrGetNFSLatencyCollector_NewRegistration(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	collector := newNFSLatencyCollector("test_nfs_latency", "Test NFS latency", []float64{0.1, 1}, []string{"label"})
+
+	result := registerOrGetNFSLatencyCollector(reg, collector)
+	assert.Same(t, collector, result)
+}
+
+// U-REG-NFS-LATENCY-DUP: registerOrGetNFSLatencyCollector returns the existing
+// collector on duplicate registration, so multiple clusters sharing one
+// registry feed the same underlying collector instance.
+func TestRegisterOrGetNFSLatencyCollector_DuplicateRegistration(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	collector1 := newNFSLatencyCollector("test_nfs_latency_dup", "Test NFS latency", []float64{0.1, 1}, []string{"label"})
+	result1 := registerOrGetNFSLatencyCollector(reg, collector1)
+	assert.Same(t, collector1, result1)
+
+	collector2 := newNFSLatencyCollector("test_nfs_latency_dup", "Test NFS latency", []float64{0.1, 1}, []string{"label"})
+	result2 := registerOrGetNFSLatencyCollector(reg, collector2)
+	assert.Same(t, result1, result2, "should return the already-registered collector")
+}
+
+// U-REG-NFS-LATENCY-PANIC: registerOrGetNFSLatencyCollector panics on a
+// non-AlreadyRegistered registration error.
+func TestRegisterOrGetNFSLatencyCollector_PanicOnOtherError(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	collector := newNFSLatencyCollector("", "invalid empty name", []float64{0.1, 1}, []string{"label"})
+
+	assert.Panics(t, func() {
+		registerOrGetNFSLatencyCollector(reg, collector)
+	})
+}

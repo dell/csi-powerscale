@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/dell/csi-powerscale/v2/common/constants"
@@ -28,7 +29,6 @@ import (
 	apiv14 "github.com/dell/gopowerscale/api/v14"
 	apiv17 "github.com/dell/gopowerscale/api/v17"
 	apiv2 "github.com/dell/gopowerscale/api/v2"
-	apiv5 "github.com/dell/gopowerscale/api/v5"
 	isimocks "github.com/dell/gopowerscale/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -446,17 +446,18 @@ func TestGetVolumeQuota(t *testing.T) {
 
 func TestCreateQuota(t *testing.T) {
 	testCases := []struct {
-		name            string
-		setup           func(svc *isiService)
-		isiPath         string
-		volName         string
-		softLimit       string
-		advisoryLimit   string
-		softGracePrd    string
-		sizeInBytes     int64
-		quotaEnabled    bool
-		expectedQuotaID string
-		expectedError   error
+		name                  string
+		setup                 func(svc *isiService)
+		isiPath               string
+		volName               string
+		softLimit             string
+		advisoryLimit         string
+		softGracePrd          string
+		sizeInBytes           int64
+		quotaEnabled          bool
+		expectedQuotaID       string
+		expectedError         error
+		expectedErrorContains string
 	}{
 		{
 			name: "quota not enabled skip creating quotas",
@@ -468,44 +469,35 @@ func TestCreateQuota(t *testing.T) {
 			quotaEnabled: false,
 		},
 		{
-			name: "invalid smart quota value skip create",
+			name: "license rejection returns quota error",
 			setup: func(svc *isiService) {
-				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
-					resp := args.Get(5).(*apiv5.QuotaLicense)
-					*resp = apiv5.QuotaLicense{
-						STATUS: "invalid",
-					}
-				}).Once()
+				svc.client.API.(*isimocks.Client).On("Post", anyArgs...).Return(&api.JSONError{StatusCode: 402})
 			},
-			sizeInBytes:  100,
-			quotaEnabled: true,
+			sizeInBytes:           100,
+			quotaEnabled:          true,
+			expectedErrorContains: "quota creation failed",
+		},
+		{
+			name: "tenant permission rejection returns quota error",
+			setup: func(svc *isiService) {
+				svc.client.API.(*isimocks.Client).On("Post", anyArgs...).Return(&api.JSONError{StatusCode: 403})
+			},
+			sizeInBytes:           100,
+			quotaEnabled:          true,
+			expectedErrorContains: "quota creation failed",
 		},
 		{
 			name: "failed to create quota",
 			setup: func(svc *isiService) {
-				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
-					resp := args.Get(5).(*apiv5.QuotaLicense)
-					*resp = apiv5.QuotaLicense{
-						STATUS: "Licensed",
-					}
-				}).Once()
-
 				svc.client.API.(*isimocks.Client).On("Post", anyArgs...).Return(errors.New("mock error"))
 			},
 			sizeInBytes:   100,
 			quotaEnabled:  true,
-			expectedError: errors.New("SmartQuotas is activated, but creating quota failed with error: 'mock error'"),
+			expectedError: errors.New("quota creation failed: 'mock error'"),
 		},
 		{
 			name: "invalid soft grace period use default",
 			setup: func(svc *isiService) {
-				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
-					resp := args.Get(5).(*apiv5.QuotaLicense)
-					*resp = apiv5.QuotaLicense{
-						STATUS: "Licensed",
-					}
-				}).Once()
-
 				svc.client.API.(*isimocks.Client).On("Post", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
 					resp := args.Get(6).(*apiv1.IsiQuota)
 					*resp = apiv1.IsiQuota{
@@ -525,7 +517,7 @@ func TestCreateQuota(t *testing.T) {
 		{
 			name: "invalid soft limit use default",
 			setup: func(svc *isiService) {
-				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Once()
+				svc.client.API.(*isimocks.Client).On("Post", anyArgs...).Return(nil).Once()
 			},
 			isiPath:       "/ifs/data/csi-isilon",
 			volName:       "volume3",
@@ -536,9 +528,9 @@ func TestCreateQuota(t *testing.T) {
 			quotaEnabled:  true,
 		},
 		{
-			name: "invalid advisory limit use default", // TODO need to validate
+			name: "invalid advisory limit use default",
 			setup: func(svc *isiService) {
-				svc.client.API.(*isimocks.Client).On("Get", anyArgs...).Return(nil).Once()
+				svc.client.API.(*isimocks.Client).On("Post", anyArgs...).Return(nil).Once()
 			},
 			isiPath:       "/ifs/data/csi-isilon",
 			volName:       "volume3",
@@ -586,10 +578,12 @@ func TestCreateQuota(t *testing.T) {
 
 			quotaID, err := svc.CreateQuota(ctx, tc.isiPath, tc.volName, tc.softLimit, tc.advisoryLimit, tc.softGracePrd, tc.sizeInBytes, tc.quotaEnabled)
 			if err != nil {
-				if tc.expectedError == nil {
-					t.Errorf("Unexpected error: %v", err)
-				} else if err.Error() != tc.expectedError.Error() {
+				if tc.expectedErrorContains != "" && !strings.Contains(err.Error(), tc.expectedErrorContains) {
+					t.Errorf("Expected error containing '%s', but got '%v'", tc.expectedErrorContains, err)
+				} else if tc.expectedError != nil && err.Error() != tc.expectedError.Error() {
 					t.Errorf("Expected error '%v', but got '%v'", tc.expectedError, err)
+				} else if tc.expectedError == nil && tc.expectedErrorContains == "" {
+					t.Errorf("Unexpected error: %v", err)
 				}
 			} else {
 				if tc.expectedError != nil {

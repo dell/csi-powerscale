@@ -47,8 +47,25 @@ func (a *NFSAdapter) SetRuntime(rt *MetricsRuntime) {
 	a.runtime = rt
 }
 
-// GetNFSStats fetches NFS basic stats and optime stats from OneFS using gopowerscale GetComplexStatistics
+// GetNFSStats fetches NFS basic stats and optime stats from OneFS using gopowerscale GetComplexStatistics.
+// When a MetricsRuntime is configured, the call is routed through it so the
+// request benefits from the same timeout, rate limiting, circuit breaking,
+// and stale-on-failure caching applied to the other PowerScale collectors.
 func (a *NFSAdapter) GetNFSStats(ctx context.Context) (*NFSBasicStats, error) {
+	if a.runtime == nil {
+		return a.fetchNFSStats(ctx)
+	}
+	v, err := a.runtime.Do(ctx, "nfs_stats", "nfs_stats", func(callCtx context.Context) (any, error) {
+		return a.fetchNFSStats(callCtx)
+	})
+	if err != nil {
+		return nil, err
+	}
+	result, _ := v.(*NFSBasicStats)
+	return result, nil
+}
+
+func (a *NFSAdapter) fetchNFSStats(ctx context.Context) (*NFSBasicStats, error) {
 	stats, err := a.client.GetComplexStatistics(ctx, []string{"node.nfs.basic_stats", "node.nfs.optime_stats"})
 	if err != nil {
 		csmlog.Errorf("GetNFSStats: failed to get NFS stats: %v", err)

@@ -17,6 +17,7 @@ package collectors
 import (
 	"context"
 	"fmt"
+	"math"
 
 	"github.com/dell/csm-metrics-common/pkg/naming"
 	"github.com/prometheus/client_golang/prometheus"
@@ -47,8 +48,8 @@ type NFSPerformanceCollector struct {
 	clusterName string
 	bytesRead   *prometheus.GaugeVec
 	bytesWrite  *prometheus.GaugeVec
-	latencyV3   *prometheus.HistogramVec
-	latencyV4   *prometheus.HistogramVec
+	latencyV3   *nfsLatencyCollector
+	latencyV4   *nfsLatencyCollector
 }
 
 // NewNFSPerformanceCollector creates a new NFSPerformanceCollector and registers its metrics
@@ -64,21 +65,33 @@ func NewNFSPerformanceCollector(client NFSStatsClient, reg prometheus.Registerer
 			Name: "dell_powerscale_nfs_write_throughput_bytes",
 			Help: "PowerScale cluster NFS write throughput in bytes per second.",
 		}, []string{naming.LabelClusterName})),
-		latencyV3: registerOrGetHistogramVec(reg, prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Name:    "dell_powerscale_nfs_v3_latency_seconds",
-			Help:    "PowerScale cluster NFSv3 operation latency distribution in seconds.",
-			Buckets: naming.HistogramBuckets,
-		}, []string{naming.LabelClusterName})),
-		latencyV4: registerOrGetHistogramVec(reg, prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Name:    "dell_powerscale_nfs_v4_latency_seconds",
-			Help:    "PowerScale cluster NFSv4 operation latency distribution in seconds.",
-			Buckets: naming.HistogramBuckets,
-		}, []string{naming.LabelClusterName})),
+		latencyV3: registerOrGetNFSLatencyCollector(reg, newNFSLatencyCollector(
+			"dell_powerscale_nfs_v3_latency_seconds",
+			"PowerScale cluster NFSv3 operation latency distribution in seconds.",
+			naming.HistogramBuckets,
+			[]string{naming.LabelClusterName},
+		)),
+		latencyV4: registerOrGetNFSLatencyCollector(reg, newNFSLatencyCollector(
+			"dell_powerscale_nfs_v4_latency_seconds",
+			"PowerScale cluster NFSv4 operation latency distribution in seconds.",
+			naming.HistogramBuckets,
+			[]string{naming.LabelClusterName},
+		)),
 	}
 	return c
 }
 
-// Collect fetches NFS performance statistics and updates the Prometheus gauges
+// Collect fetches NFS performance statistics and updates the Prometheus gauges.
+//
+// Latency buckets reported by OneFS (node.nfs.optime_stats) are converted
+// into a per-cluster histogram snapshot rather than replayed through
+// HistogramVec.Observe once per underlying operation count: replaying would
+// make collection cost proportional to the (potentially very large,
+// monotonically growing) OneFS operation counts, and would permanently
+// inflate the in-process histogram on every collection cycle since
+// Prometheus histograms never reset. buildLatencySnapshot keeps the cost of
+// this step at O(len(naming.HistogramBuckets)) regardless of how many NFS
+// operations OneFS has counted.
 func (c *NFSPerformanceCollector) Collect(ctx context.Context) error {
 	if c.client == nil {
 		return fmt.Errorf("NFSPerformanceCollector: client is nil")
@@ -94,52 +107,45 @@ func (c *NFSPerformanceCollector) Collect(ctx context.Context) error {
 		c.bytesWrite.WithLabelValues(c.clusterName).Set(stats.Basic.SvcCounters.BytesWritten)
 	}
 
-	// Process latency buckets if available
-	if stats != nil && len(stats.Optime.V3TimeBuckets) > 0 {
-		// Convert bucket counts to histogram observations
-		// The buckets are in microseconds, convert to seconds
-		bucketBounds := naming.HistogramBuckets
-		hasNonZero := false
-		for i, count := range stats.Optime.V3TimeBuckets {
-			if count > 0 && i < len(bucketBounds) {
-				hasNonZero = true
-				// Observe the bucket bound value for each count in the bucket
-				// Note: This is an approximation - we observe the bucket bound value
-				// since the actual latency values aren't provided in the API response
-				for j := 0; j < int(count); j++ {
-					c.latencyV3.WithLabelValues(c.clusterName).Observe(bucketBounds[i])
-				}
-			}
+	if stats != nil {
+		if len(stats.Optime.V3TimeBuckets) > 0 {
+			bucketCounts, sum := buildLatencySnapshot(stats.Optime.V3TimeBuckets, naming.HistogramBuckets)
+			c.latencyV3.set(c.clusterName, bucketCounts, sum)
 		}
-		// If all buckets are zero, observe a zero value to ensure metric appears in Prometheus
-		if !hasNonZero {
-			c.latencyV3.WithLabelValues(c.clusterName).Observe(0)
-		}
-	}
-
-	if stats != nil && len(stats.Optime.V4TimeBuckets) > 0 {
-		// Convert bucket counts to histogram observations
-		// The buckets are in microseconds, convert to seconds
-		bucketBounds := naming.HistogramBuckets
-		hasNonZero := false
-		for i, count := range stats.Optime.V4TimeBuckets {
-			if count > 0 && i < len(bucketBounds) {
-				hasNonZero = true
-				// Observe the bucket bound value for each count in the bucket
-				// Note: This is an approximation - we observe the bucket bound value
-				// since the actual latency values aren't provided in the API response
-				for j := 0; j < int(count); j++ {
-					c.latencyV4.WithLabelValues(c.clusterName).Observe(bucketBounds[i])
-				}
-			}
-		}
-		// If all buckets are zero, observe a zero value to ensure metric appears in Prometheus
-		if !hasNonZero {
-			c.latencyV4.WithLabelValues(c.clusterName).Observe(0)
+		if len(stats.Optime.V4TimeBuckets) > 0 {
+			bucketCounts, sum := buildLatencySnapshot(stats.Optime.V4TimeBuckets, naming.HistogramBuckets)
+			c.latencyV4.set(c.clusterName, bucketCounts, sum)
 		}
 	}
 
 	return nil
+}
+
+// buildLatencySnapshot converts the raw OneFS optime values into exclusive
+// counts aligned with the configured Prometheus bucket bounds and calculates
+// an approximate sum for prometheus.NewConstHistogram. Each input value is
+// treated as the count for the corresponding configured bucket and assigned
+// the bucket's upper bound as its representative latency.
+//
+// Values beyond the configured bucket bounds are ignored so the snapshot
+// remains compatible with the existing metric bucket layout. The resulting
+// exclusive counts are converted to cumulative counts by nfsLatencyCollector
+// when the metric is emitted.
+func buildLatencySnapshot(rawBuckets, bucketBounds []float64) ([]uint64, float64) {
+	bucketCounts := make([]uint64, len(bucketBounds))
+	var sum float64
+	for i, count := range rawBuckets {
+		if i >= len(bucketBounds) {
+			break
+		}
+		if count <= 0 || math.IsNaN(count) || math.IsInf(count, 0) {
+			continue
+		}
+		n := uint64(count)
+		bucketCounts[i] = n
+		sum += count * bucketBounds[i]
+	}
+	return bucketCounts, sum
 }
 
 // Name returns the collector name
@@ -150,6 +156,6 @@ func (c *NFSPerformanceCollector) Cleanup() {
 	labels := prometheus.Labels{naming.LabelClusterName: c.clusterName}
 	c.bytesRead.DeletePartialMatch(labels)
 	c.bytesWrite.DeletePartialMatch(labels)
-	c.latencyV3.DeletePartialMatch(labels)
-	c.latencyV4.DeletePartialMatch(labels)
+	c.latencyV3.delete(c.clusterName)
+	c.latencyV4.delete(c.clusterName)
 }

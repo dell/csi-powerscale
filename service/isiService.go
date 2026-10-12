@@ -670,26 +670,14 @@ func (svc *isiService) CreateQuota(ctx context.Context, path, volName, softLimit
 			softlimitInt, softGracePrdInt = 0, 0
 		}
 
-		isQuotaActivated, checkLicErr := svc.client.IsQuotaLicenseActivated(ctx)
-		if checkLicErr != nil {
-			csmlog.WithContext(ctx).Errorf("failed to check SmartQuotas license info: '%v'", checkLicErr)
-		}
-
-		if (!isQuotaActivated) && (checkLicErr == nil) {
-			csmlog.WithContext(ctx).Debugf("SmartQuotas is not activated, cannot add capacity limit '%d' bytes via quota, skip creating quota", sizeInBytes)
-			return "", nil
-		}
-
-		// create quota with container set to true
+		// Create quota with container set to true.
+		// Note: we intentionally skip the SmartQuotas license check (GET /platform/5/quota/license)
+		// because that endpoint requires admin privileges and is not accessible to tenant users.
+		// The actual quota request is still attempted after skipping the admin-only license check.
 		var quotaID string
 		var err error
 		if quotaID, err = svc.client.CreateQuotaWithPath(ctx, path, true, sizeInBytes, softlimitInt, advisoryLimitInt, softGracePrdInt); err != nil {
-			if isQuotaActivated && (checkLicErr == nil) {
-				return "", fmt.Errorf("SmartQuotas is activated, but creating quota failed with error: '%v'", err)
-			}
-
-			// if checkLicErr != nil, then it's uncertain whether creating quota failed because SmartQuotas license is not activated, or it failed with some other reason
-			return "", fmt.Errorf("creating quota failed with error, it might or might not be because SmartQuotas license has not been activated: '%v'", err)
+			return "", fmt.Errorf("quota creation failed: '%w'", err)
 		}
 
 		csmlog.WithContext(ctx).Infof("quota set to: %d on directory: '%s'", sizeInBytes, volName)

@@ -68,7 +68,6 @@ const (
 	AzNetwork                        = "AzNetwork"
 	RootClientEnabledParam           = "RootClientEnabled"
 	RootClientEnabledParamDefault    = "false"
-	SnapshotIQLicenseID              = "SNAPSHOTIQ"
 	DeleteSnapshotMarker             = "DELETE_SNAPSHOT"
 	IgnoreDotAndDotDotSubDirs        = 2
 	ClusterNameParam                 = "ClusterName"
@@ -1018,11 +1017,19 @@ func (s *service) CreateVolume(
 			} else {
 				rollbackPath = isiPath
 			}
+			var jsonErr *isiApi.JSONError
+			quotaLicenseError := errors.As(quotaErr, &jsonErr) && (jsonErr.StatusCode == http.StatusForbidden || jsonErr.StatusCode == http.StatusPaymentRequired)
 			if deleteErr := isiConfig.isiSvc.DeleteVolume(ctx, rollbackPath, volumeName); deleteErr != nil {
 				csmlog.WithContext(ctx).Errorf("rollback deletion of volume '%s' also failed: %v", req.GetName(), deleteErr)
+				if quotaLicenseError {
+					return nil, status.Errorf(codes.FailedPrecondition, "quota creation rejected by OneFS (possible licensing or privilege issue): %v; rollback deletion also failed: %v", quotaErr, deleteErr)
+				}
 				return nil, fmt.Errorf("quota creation failed after %d retries: %w, and rollback deletion also failed: %v", maxQuotaRetries, quotaErr, deleteErr)
 			}
 			csmlog.WithContext(ctx).Infof("successfully rolled back by deleting volume '%s'", req.GetName())
+			if quotaLicenseError {
+				return nil, status.Errorf(codes.FailedPrecondition, "quota creation rejected by OneFS (possible licensing or privilege issue): %v", quotaErr)
+			}
 			return nil, fmt.Errorf("quota creation failed after %d retries: %w, volume deleted successfully", maxQuotaRetries, quotaErr)
 		}
 	} else if !foundVol && !isROVolumeFromSnapshot && writableFromSnapshot {
@@ -1177,38 +1184,6 @@ var getSnapshotSizeFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.
 
 var copySnapshotFunc = func(isiConfig *IsilonClusterConfig) func(ctx context.Context, dstPath string, srcPath string, snapshotID int64, dstName string, accessZone string) (isi.Volume, error) {
 	return isiConfig.isiSvc.CopySnapshot
-}
-
-var getSnapshotIQLicenseStatusFunc = func(ctx context.Context, isiConfig *IsilonClusterConfig) (string, error) {
-	if isiConfig == nil || isiConfig.isiSvc == nil {
-		return "", fmt.Errorf("isilon service is not initialized")
-	}
-	license, err := isiConfig.isiSvc.GetLicenseByID(ctx, SnapshotIQLicenseID)
-	if err != nil {
-		return "", err
-	}
-	if license == nil {
-		return "", fmt.Errorf("no license found with ID %s", SnapshotIQLicenseID)
-	}
-	return license.Status, nil
-}
-
-func validateSnapshotIQLicense(ctx context.Context, isiConfig *IsilonClusterConfig) error {
-	licenseStatus, err := getSnapshotIQLicenseStatusFunc(ctx, isiConfig)
-	if err != nil {
-		// Some test mocks and older environments do not implement platform/17 license API.
-		// In those cases, keep existing behavior and let snapshot calls fail on the backend.
-		if strings.Contains(strings.ToLower(err.Error()), "cannot unmarshal number into go value of type api.jsonerror") {
-			csmlog.WithContext(ctx).Warnf("SnapshotIQ license pre-check skipped: %s", err.Error())
-			return nil
-		}
-		return status.Errorf(codes.FailedPrecondition, "SnapshotIQ license is not activated or available: %s", err.Error())
-	}
-	csmlog.WithContext(ctx).Infof("SnapshotIQ license found with status '%s'", licenseStatus)
-	if !strings.EqualFold(licenseStatus, "Licensed") && !strings.EqualFold(licenseStatus, "Evaluation") {
-		return status.Errorf(codes.FailedPrecondition, "SnapshotIQ license status is '%s'", licenseStatus)
-	}
-	return nil
 }
 
 func (s *service) createVolumeFromSnapshot(ctx context.Context, isiConfig *IsilonClusterConfig,
@@ -3484,6 +3459,14 @@ func (s *service) controllerProbe(ctx context.Context, clusterConfig *IsilonClus
 	return nil
 }
 
+func mapSnapshotCreationError(runID string, err error) error {
+	var jsonErr *isiApi.JSONError
+	if errors.As(err, &jsonErr) && (jsonErr.StatusCode == http.StatusForbidden || jsonErr.StatusCode == http.StatusPaymentRequired) {
+		return status.Errorf(codes.FailedPrecondition, " ReqID=%s snapshot creation rejected by OneFS (possible licensing or privilege issue): %s", runID, err.Error())
+	}
+	return status.Errorf(codes.Internal, " ReqID=%s %s", runID, err.Error())
+}
+
 // CreateSnapshot creates a snapshot.
 // If Parameters["VolumeIDList"] has a comma separated list of additional volumes, they will be
 // snapshotted in a consistency group with the primary volume in CreateSnapshotRequest.SourceVolumeId.
@@ -3589,11 +3572,11 @@ func (s *service) CreateSnapshot(
 				"incompatible with the specified source volume id '%s'", snapshotName, req.GetSourceVolumeId()))
 	}
 
-	// create new snapshot for source direcory
-	if err = validateSnapshotIQLicense(ctx, isiConfig); err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, " ReqID=%s %s", runID, err.Error())
-	}
 	// Construct the full volume path for snapshot creation
+	// Note: we intentionally skip the SnapshotIQ license check (GET /platform/17/license/licenses/SNAPSHOTIQ)
+	// because that endpoint requires admin privileges and is not accessible to tenant users.
+	// If SnapshotIQ is not licensed, OneFS will reject the snapshot creation request and we
+	// propagate that error to the caller.
 	// For directory-backed: isiPath is the shared export path, srcVolumeID is the directory name
 	// For export-backed: isiPath is the parent directory, srcVolumeID is the volume name
 	path := isilonfs.GetPathForVolume(isiPath, srcVolumeID)
@@ -3606,7 +3589,7 @@ func (s *service) CreateSnapshot(
 	}).Info("CreateSnapshot: creating snapshot at path")
 
 	if snapshotNew, err = isiConfig.isiSvc.CreateSnapshot(ctx, path, snapshotName); err != nil {
-		return nil, status.Errorf(codes.Internal, " ReqID=%s %s", runID, err.Error())
+		return nil, mapSnapshotCreationError(runID, err)
 	}
 	_, _ = isiConfig.isiSvc.GetSnapshot(ctx, snapshotName)
 

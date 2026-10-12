@@ -226,6 +226,33 @@ func TestSetPollingFrequency(t *testing.T) {
 	os.Unsetenv(constants.EnvPodmonArrayConnectivityPollRate)
 }
 
+func TestGetPollingFrequencyInSeconds(t *testing.T) {
+	pollingFrequencyLock.Lock()
+	previous := pollingFrequencyInSeconds
+	pollingFrequencyInSeconds = 10
+	pollingFrequencyLock.Unlock()
+	defer func() {
+		pollingFrequencyLock.Lock()
+		pollingFrequencyInSeconds = previous
+		pollingFrequencyLock.Unlock()
+	}()
+
+	assert.Equal(t, int64(10), getPollingFrequencyInSeconds())
+
+	done := make(chan struct{})
+	go func() {
+		pollingFrequencyLock.Lock()
+		pollingFrequencyLock.Unlock()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("polling frequency lock remained held")
+	}
+}
+
 func TestApiRouter(t *testing.T) {
 	// Start the service in a separate goroutine
 	s := &service{}

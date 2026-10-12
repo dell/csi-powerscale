@@ -40,6 +40,12 @@ var (
 	pollingFrequencyLock      sync.Mutex
 )
 
+func getPollingFrequencyInSeconds() int64 {
+	pollingFrequencyLock.Lock()
+	defer pollingFrequencyLock.Unlock()
+	return pollingFrequencyInSeconds
+}
+
 // port for API calls
 var apiPort string
 
@@ -231,7 +237,8 @@ func (s *service) startNodeToArrayConnectivityCheck(ctx context.Context) {
 		// start one goroutine for each cluster, so each cluster's nodeProbe is run concurrently
 		go s.testConnectivityAndUpdateStatus(ctx, cluster, timeout)
 	}
-	csmlog.WithContext(ctx).Infof("startNodeToArrayConnectivityCheck is running probes at pollingFrequency %d ", pollingFrequencyInSeconds/2)
+	pollingFrequency := getPollingFrequencyInSeconds()
+	csmlog.WithContext(ctx).Infof("startNodeToArrayConnectivityCheck is running probes at pollingFrequency %d ", pollingFrequency/2)
 }
 
 // testConnectivityAndUpdateStatus runs probe to test connectivity from node to array
@@ -276,8 +283,7 @@ func (s *service) testConnectivityAndUpdateStatus(ctx context.Context, cluster *
 		probeStatus.Store(cluster.ClusterName, status)
 		cancel()
 		// sleep for half the pollingFrequency and run check again
-		pollingFrequencyLock.Lock()
-		time.Sleep(time.Second * time.Duration(pollingFrequencyInSeconds/2))
-		pollingFrequencyLock.Unlock()
+		pollingFrequency := getPollingFrequencyInSeconds()
+		time.Sleep(time.Second * time.Duration(pollingFrequency/2))
 	}
 }

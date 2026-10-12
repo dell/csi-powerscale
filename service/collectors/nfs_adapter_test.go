@@ -17,12 +17,14 @@ package collectors
 import (
 	"context"
 	"testing"
+	"time"
 
 	isi "github.com/dell/gopowerscale"
 	apiv3 "github.com/dell/gopowerscale/api/v3"
 	isimocks "github.com/dell/gopowerscale/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func newNFSAdapterWithMock(mockAPI *isimocks.Client) *NFSAdapter {
@@ -623,4 +625,110 @@ func TestNFSAdapter_GetNFSStats_PartialValidData(t *testing.T) {
 	assert.Empty(t, stats.Optime.V3TimeBuckets)
 	assert.Empty(t, stats.Optime.V4TimeBuckets)
 	mockAPI.AssertExpectations(t)
+}
+
+// U-NFS-ADAPTER-RUNTIME-ROUTES-CALL: GetNFSStats routes through MetricsRuntime.Do
+// when a runtime is configured, so NFS stats collection benefits from the
+// same rate limiting, timeout, circuit breaking, and stale-on-failure
+// caching as the other PowerScale metrics adapters.
+func TestNFSAdapter_GetNFSStats_RoutesThroughRuntime(t *testing.T) {
+	mockAPI := &isimocks.Client{}
+	adapter := newNFSAdapterWithMock(mockAPI)
+	rt := NewMetricsRuntime("cluster1", RuntimeConfig{
+		Timeout: time.Second, CacheTTL: time.Minute,
+		RateLimit: 100, CBThreshold: 10, CBResetTimeout: time.Minute,
+	})
+	adapter.SetRuntime(rt)
+
+	mockAPI.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(**apiv3.IsiComplexStatsResp)
+		*resp = &apiv3.IsiComplexStatsResp{
+			StatsList: []*apiv3.IsiComplexStats{
+				{
+					Key: "node.nfs.basic_stats",
+					Value: map[string]interface{}{
+						"basic": map[string]interface{}{
+							"svc_counters": map[string]interface{}{
+								"bytes_read":    float64(42),
+								"bytes_written": float64(84),
+							},
+						},
+					},
+				},
+			},
+		}
+	}).Once()
+
+	stats, err := adapter.GetNFSStats(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, stats)
+	assert.Equal(t, float64(42), stats.Basic.SvcCounters.BytesRead)
+	mockAPI.AssertNumberOfCalls(t, "Get", 1)
+}
+
+// U-NFS-ADAPTER-RUNTIME-STALE-FALLBACK: when the underlying OneFS call fails
+// after a prior success, GetNFSStats must serve the last-known-good result
+// from the runtime's cache (stale-on-failure) instead of propagating the
+// error, proving the NFS adapter is actually wired into MetricsRuntime.Do
+// rather than calling the PowerScale client directly.
+func TestNFSAdapter_GetNFSStats_StaleFallbackOnFailureAfterSuccess(t *testing.T) {
+	mockAPI := &isimocks.Client{}
+	adapter := newNFSAdapterWithMock(mockAPI)
+	var staleSeen bool
+	rt := NewMetricsRuntime("cluster1", RuntimeConfig{
+		Timeout: time.Second, CacheTTL: time.Minute,
+		RateLimit: 100, CBThreshold: 10, CBResetTimeout: time.Minute,
+		StaleReporter: func(_ string, stale bool) { staleSeen = stale },
+	})
+	adapter.SetRuntime(rt)
+
+	mockAPI.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(**apiv3.IsiComplexStatsResp)
+		*resp = &apiv3.IsiComplexStatsResp{
+			StatsList: []*apiv3.IsiComplexStats{
+				{
+					Key: "node.nfs.basic_stats",
+					Value: map[string]interface{}{
+						"basic": map[string]interface{}{
+							"svc_counters": map[string]interface{}{
+								"bytes_read":    float64(42),
+								"bytes_written": float64(84),
+							},
+						},
+					},
+				},
+			},
+		}
+	}).Once()
+
+	stats, err := adapter.GetNFSStats(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, stats)
+
+	// Second call fails against the PowerScale API.
+	mockAPI.On("Get", anyArgs...).Return(assert.AnError).Once()
+
+	stats2, err := adapter.GetNFSStats(context.Background())
+	require.NoError(t, err, "a prior successful result must be served as stale rather than erroring")
+	require.NotNil(t, stats2)
+	assert.Equal(t, float64(42), stats2.Basic.SvcCounters.BytesRead)
+	assert.True(t, staleSeen)
+	mockAPI.AssertNumberOfCalls(t, "Get", 2)
+}
+
+// U-NFS-ADAPTER-RUNTIME-NIL-FALLBACK: GetNFSStats calls the API directly when no runtime is set
+func TestNFSAdapter_GetNFSStats_NoRuntimeFallback(t *testing.T) {
+	mockAPI := &isimocks.Client{}
+	adapter := newNFSAdapterWithMock(mockAPI)
+	assert.Nil(t, adapter.runtime)
+
+	mockAPI.On("Get", anyArgs...).Return(nil).Run(func(args mock.Arguments) {
+		resp := args.Get(5).(**apiv3.IsiComplexStatsResp)
+		*resp = &apiv3.IsiComplexStatsResp{StatsList: []*apiv3.IsiComplexStats{}}
+	}).Once()
+
+	stats, err := adapter.GetNFSStats(context.Background())
+	require.NoError(t, err)
+	assert.Nil(t, stats)
+	mockAPI.AssertNumberOfCalls(t, "Get", 1)
 }

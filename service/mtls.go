@@ -248,7 +248,7 @@ type MTLSLogFields struct {
 // Mapping:
 //   - "mtls" → "mtls" (mTLS-only export)
 //   - "tls" → "tls" (TLS-only export, no plaintext, no mTLS)
-//   - "none" → "none" (Plaintext-only export)
+//   - "none" → "" (Plaintext NFS via the legacy export path; use cluster default)
 //   - "" (empty) → "" (Use cluster default, usually "none:tls:mtls")
 //
 // This function enables defense-in-depth security by enforcing transport security
@@ -260,7 +260,7 @@ func ResolveXprtsec(nfsTransportSecurity string) string {
 	case constants.NFSTransportSecurityTLS:
 		return "tls" // TLS-only export (no plaintext, no mTLS)
 	case constants.NFSTransportSecurityNone:
-		return "none" // Plaintext-only export
+		return "" // Plaintext NFS uses the legacy export path and cluster default
 	default:
 		return "" // Use cluster default (usually "none:tls:mtls")
 	}

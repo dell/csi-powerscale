@@ -21,6 +21,7 @@ package interceptor
 import (
 	"context"
 	"fmt"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -71,13 +72,13 @@ func TestGetLockWithName(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Get lock with name present", func(t *testing.T) {
-		lockProvider := &lockProvider{
-			volNameLocks: map[string]gosync.TryLocker{
-				"name": &gosync.TryMutex{},
+		lp := &lockProvider{
+			volNameLocks: map[string]*refCountedLock{
+				"name": {TryLocker: &gosync.TryMutex{}, refCount: 1},
 			},
 		}
 
-		lock, err := lockProvider.GetLockWithName(ctx, "name")
+		lock, err := lp.GetLockWithName(ctx, "name")
 		if err != nil {
 			t.Errorf("Expected nil error, got %v", err)
 		}
@@ -88,11 +89,11 @@ func TestGetLockWithName(t *testing.T) {
 	})
 
 	t.Run("Get lock with name not present", func(t *testing.T) {
-		lockProvider := &lockProvider{
-			volNameLocks: map[string]gosync.TryLocker{},
+		lp := &lockProvider{
+			volNameLocks: map[string]*refCountedLock{},
 		}
 
-		lock, err := lockProvider.GetLockWithName(ctx, "name")
+		lock, err := lp.GetLockWithName(ctx, "name")
 		if err != nil {
 			t.Errorf("Expected nil error, got %v", err)
 		}
@@ -100,6 +101,69 @@ func TestGetLockWithName(t *testing.T) {
 		if lock == nil {
 			t.Error("Expected non-nil lock, got nil")
 		}
+	})
+}
+
+func TestLockProviderCleanup(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Lock evicted after Close for ID", func(t *testing.T) {
+		lp := &lockProvider{
+			volIDLocks:   map[string]*refCountedLock{},
+			volNameLocks: map[string]*refCountedLock{},
+		}
+
+		lock, err := lp.GetLockWithID(ctx, "vol-1")
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(lp.volIDLocks))
+
+		lock.(io.Closer).Close()
+		assert.Equal(t, 0, len(lp.volIDLocks))
+	})
+
+	t.Run("Lock evicted after Close for Name", func(t *testing.T) {
+		lp := &lockProvider{
+			volIDLocks:   map[string]*refCountedLock{},
+			volNameLocks: map[string]*refCountedLock{},
+		}
+
+		lock, err := lp.GetLockWithName(ctx, "vol-name")
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(lp.volNameLocks))
+
+		lock.(io.Closer).Close()
+		assert.Equal(t, 0, len(lp.volNameLocks))
+	})
+
+	t.Run("Lock retained while concurrent references exist", func(t *testing.T) {
+		lp := &lockProvider{
+			volIDLocks:   map[string]*refCountedLock{},
+			volNameLocks: map[string]*refCountedLock{},
+		}
+
+		lock1, _ := lp.GetLockWithID(ctx, "vol-1")
+		lock2, _ := lp.GetLockWithID(ctx, "vol-1")
+		assert.Equal(t, 1, len(lp.volIDLocks))
+		assert.Equal(t, 2, lp.volIDLocks["vol-1"].refCount)
+
+		lock1.(io.Closer).Close()
+		assert.Equal(t, 1, len(lp.volIDLocks), "entry should still exist with one reference")
+
+		lock2.(io.Closer).Close()
+		assert.Equal(t, 0, len(lp.volIDLocks), "entry should be evicted")
+	})
+
+	t.Run("Close is idempotent", func(t *testing.T) {
+		lp := &lockProvider{
+			volIDLocks:   map[string]*refCountedLock{},
+			volNameLocks: map[string]*refCountedLock{},
+		}
+
+		lock, _ := lp.GetLockWithID(ctx, "vol-1")
+		closer := lock.(io.Closer)
+		closer.Close()
+		closer.Close() // should not panic or double-decrement
+		assert.Equal(t, 0, len(lp.volIDLocks))
 	})
 }
 
@@ -225,8 +289,8 @@ func TestCreateMetadataRetrieverClient(t *testing.T) {
 	csictx.Setenv(ctx, "CSI_RETRIEVER_ENDPOINT", "localhost:8080")
 
 	locker := &lockProvider{
-		volIDLocks:   map[string]gosync.TryLocker{},
-		volNameLocks: map[string]gosync.TryLocker{},
+		volIDLocks:   map[string]*refCountedLock{},
+		volNameLocks: map[string]*refCountedLock{},
 	}
 
 	i := &interceptor{opts{locker: locker, timeout: 0}}
@@ -239,8 +303,8 @@ func TestCreateMetadataRetrieverClient(t *testing.T) {
 func TestCreateVolume(t *testing.T) {
 	// Create a new lockProvider instance
 	lockProvider := &lockProvider{
-		volIDLocks:   make(map[string]gosync.TryLocker),
-		volNameLocks: make(map[string]gosync.TryLocker),
+		volIDLocks:   make(map[string]*refCountedLock),
+		volNameLocks: make(map[string]*refCountedLock),
 	}
 
 	// Create a new interceptor instance
